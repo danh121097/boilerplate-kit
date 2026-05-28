@@ -1,0 +1,73 @@
+{
+  "name": "create-prism-app",
+  "version": "0.0.0",
+  "description": "Scaffold an opinionated frontend starter (Vue, Nuxt, React, Next.js, or TanStack Start) in seconds.",
+  "type": "module",
+  "license": "MIT",
+  "author": "danh121097@gmail.com",
+  "homepage": "https://github.com/danh121097/boilerplate-kit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/danh121097/boilerplate-kit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/danh121097/boilerplate-kit/issues"
+  },
+  "keywords": [
+    "cli",
+    "scaffold",
+    "boilerplate",
+    "starter",
+    "vue",
+    "nuxt",
+    "react",
+    "next",
+    "tanstack",
+    "vite",
+    "tailwind"
+  ],
+  "bin": {
+    "create-prism-app": "./dist/cli.mjs"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@11.1.3",
+  "scripts": {
+    "dev": "tsup --watch",
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "pnpm build"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.4.0",
+    "citty": "^0.2.2",
+    "giget": "^3.2.0",
+    "nypm": "^0.6.6",
+    "picocolors": "^1.1.1",
+    "validate-npm-package-name": "^8.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.9.1",
+    "@types/validate-npm-package-name": "^4.0.2",
+    "eslint": "^10.4.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.8.3",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.4",
+    "vitest": "^4.1.7"
+  }
+}
