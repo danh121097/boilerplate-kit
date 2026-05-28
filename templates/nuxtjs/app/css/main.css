@@ -1,0 +1,14 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+@theme {
+  --color-brand-50: oklch(0.97 0.02 250);
+  --color-brand-500: oklch(0.66 0.18 250);
+  --color-brand-700: oklch(0.5 0.18 250);
+}
+
+html,
+body,
+#__nuxt {
+  min-height: 100vh;
+}

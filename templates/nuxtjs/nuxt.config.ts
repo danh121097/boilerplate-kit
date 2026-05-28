@@ -10,7 +10,7 @@ export default defineNuxtConfig({
     "@vueuse/nuxt",
   ],
 
-  css: ["~/assets/css/main.css", "~/assets/css/main.scss"],
+  css: ["~/css/main.css", "~/css/main.scss"],
 
   // Auto-register only ~/components/ui as global. Other components stay explicit imports.
   components: [{ path: "~/components/ui", global: true, pathPrefix: false }],

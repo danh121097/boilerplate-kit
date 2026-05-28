@@ -49,7 +49,7 @@ templates/nuxtjs/
 ├── pnpm-workspace.yaml             # strictDepBuilds:false, minimumReleaseAge:0
 ├── app/
 │   ├── app.vue                     # <UApp><NuxtLayout><NuxtPage /></NuxtLayout></UApp>
-│   ├── assets/css/
+│   ├── css/
 │   │   ├── main.css                # @import "tailwindcss"; @import "@nuxt/ui"; @theme tokens
 │   │   └── main.scss               # SCSS extras (safe-area, mixins)
 │   ├── components/
