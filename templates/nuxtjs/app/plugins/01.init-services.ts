@@ -1,4 +1,4 @@
-import { Api, ApiInterceptors } from "~/services/core";
+import { Api, ApiInterceptors } from "@/services/core";
 
 /**
  * Bootstrap the shared `Api` client before any page-level data fetches run.

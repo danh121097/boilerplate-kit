@@ -1,4 +1,4 @@
-import { useStorageKeys } from "~/enums/storage-keys";
+import { useStorageKeys } from "@/enums/storage-keys";
 
 /**
  * Browser localStorage token registry. All reads/writes are SSR-guarded —

@@ -13,7 +13,7 @@ Opinionated Nuxt 4 starter mirroring the production patterns from the sibling Vu
 | Server state | TanStack Vue Query + `defineQuery` / `defineMutation` helpers |
 | HTTP | Axios + class-based `Api` + interceptors (optional HMAC signing) |
 | Forms | vee-validate + zod via `@vee-validate/zod` |
-| i18n | `@nuxtjs/i18n` (en + ja JSON locales bundled, lazy-loaded) |
+| i18n | `@nuxtjs/i18n` (en + ja TS locales, lazy-loaded; vue-i18n message types augmented) |
 | Icons | lucide-vue-next |
 | Dates | dayjs |
 | Lint / format | `@nuxt/eslint` (flat config, TS via jiti) + Prettier (TS) |
@@ -79,8 +79,8 @@ templates/nuxtjs/
 
 ## Key conventions (mirror the Vue template)
 
-- **Pinia stores stay explicit.** `import { useCounterStore } from "~/stores/counter"`. `pinia.storesDirs: []` in `nuxt.config.ts` disables auto-import.
-- **UI auto-registration scoped to `~/components/ui` only.** Other components stay explicit imports. See `components: [{ path: "~/components/ui", global: true }]`.
+- **Pinia stores stay explicit.** `import { useCounterStore } from "@/stores/counter"`. `pinia.storesDirs: []` in `nuxt.config.ts` disables auto-import.
+- **UI auto-registration scoped to `@/components/ui` only.** Other components stay explicit imports. See `components: [{ path: "@/components/ui", global: true }]`.
 - **Composable filenames in camelCase** (`useFoo.ts`) — exception to project-wide kebab-case.
 - **Every SFC: named `interface Props` / `interface Emits` extracted above macros.** Never inline.
 - **`<script setup>` strict section order:** imports → types → defineProps/Emits → composables → const → destructuring → let → ref → computed → functions → lifecycle.
@@ -114,7 +114,7 @@ export const useUsersListQuery = defineQuery<User[]>({
 
 ## i18n
 
-`@nuxtjs/i18n` 10.x with `strategy: "no_prefix"` (no URL prefix). Bundled locales in `i18n/locales/{en,ja}.json` are lazy-loaded. Toggle via the layout's locale button — persists via cookie.
+`@nuxtjs/i18n` 10.x with `strategy: "no_prefix"` (no URL prefix). Bundled locales in `i18n/locales/{en,ja}.ts` are lazy-loaded. `types/i18n.d.ts` augments `vue-i18n`'s `DefineLocaleMessage` so `t("nav.home")` autocompletes and typos fail at compile time. Toggle via the layout's locale button — persists via cookie.
 
 ## Forms
 
@@ -122,7 +122,7 @@ vee-validate + zod via `@vee-validate/zod`. See `app/pages/form.vue` for the can
 
 ## UI components
 
-Auto-registered globally via Nuxt's `components: [{ path: "~/components/ui", global: true }]`:
+Auto-registered globally via Nuxt's `components: [{ path: "@/components/ui", global: true }]`:
 
 | Component | Notes |
 |---|---|

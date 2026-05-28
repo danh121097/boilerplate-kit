@@ -1,4 +1,4 @@
-import { defineQuery, Model } from "~/services/core";
+import { defineQuery, Model } from "@/services/core";
 import type { UpdateUserPayload, User } from "./types/user";
 
 /** Domain model for the /users endpoint — initialized via initServices(). */

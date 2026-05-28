@@ -10,10 +10,10 @@ export default defineNuxtConfig({
     "@vueuse/nuxt",
   ],
 
-  css: ["~/css/main.css", "~/css/main.scss"],
+  css: ["@/css/main.css", "@/css/main.scss"],
 
-  // Auto-register only ~/components/ui as global. Other components stay explicit imports.
-  components: [{ path: "~/components/ui", global: true, pathPrefix: false }],
+  // Auto-register only @/components/ui as global. Other components stay explicit imports.
+  components: [{ path: "@/components/ui", global: true, pathPrefix: false }],
 
   // @pinia/nuxt: keep stores EXPLICIT — never auto-import.
   // Empty storesDirs disables the auto-import scanner per project convention.

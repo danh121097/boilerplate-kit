@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useCounterStore } from "~/stores/counter";
+import { useCounterStore } from "@/stores/counter";
 
 const { t } = useI18n();
 const counter = useCounterStore();

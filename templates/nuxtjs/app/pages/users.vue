@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useUsersListQuery } from "~/services/users";
+import { useUsersListQuery } from "@/services/users";
 
 const { t } = useI18n();
 const { data, isLoading, error } = useUsersListQuery();
