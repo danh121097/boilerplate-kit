@@ -144,7 +144,7 @@ onMounted(async () => {
             $slots.prepend ? 'pl-16 pr-4' : 'px-4',
             label && isFloating ? 'pt-4 pb-1' : '',
             center && 'text-center',
-            error && '!text-destructive',
+            error && 'text-destructive!',
             inputClass,
           )
         "
