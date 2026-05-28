@@ -1,0 +1,16 @@
+.nuxt
+.output
+.data
+node_modules
+dist
+.vite/
+*.local
+.DS_Store
+
+# env files
+.env
+.env.*
+!.env.example
+
+# logs
+*.log

@@ -1,0 +1,48 @@
+{
+  "name": "nuxtjs-starter",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "preview": "nuxt preview",
+    "generate": "nuxt generate",
+    "postinstall": "nuxt prepare",
+    "typecheck": "nuxt typecheck",
+    "lint": "eslint .",
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "@nuxt/ui": "^4.8.0",
+    "@nuxtjs/i18n": "^10.4.0",
+    "@pinia/nuxt": "^0.11.3",
+    "@tanstack/vue-query": "^5.100.14",
+    "@vee-validate/zod": "^4.15.1",
+    "@vueuse/nuxt": "^14.3.0",
+    "axios": "^1.16.1",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "crypto-js": "^4.2.0",
+    "dayjs": "^1.11.21",
+    "lucide-vue-next": "^1.0.0",
+    "nuxt": "^4.4.6",
+    "pinia": "^3.0.4",
+    "tailwind-merge": "^3.6.0",
+    "vee-validate": "^4.15.1",
+    "vue": "^3.5.34",
+    "vue-router": "^5.0.7",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@nuxt/eslint": "^1.15.2",
+    "@types/crypto-js": "^4.2.2",
+    "@types/node": "^25.9.1",
+    "eslint": "^10.4.0",
+    "eslint-config-prettier": "^10.1.8",
+    "jiti": "^2.7.0",
+    "prettier": "^3.8.3",
+    "sass-embedded": "^1.100.0",
+    "typescript": "^6.0.3"
+  }
+}
