@@ -18,7 +18,7 @@ const { data, isLoading, error } = useUsersListQuery();
           <span class="font-medium">{{ user.name }}</span>
           <span class="ml-2 text-sm text-(--ui-text-muted)">{{ user.email }}</span>
         </div>
-        <Badge variant="secondary">#{{ user.id }}</Badge>
+        <UiBadge variant="secondary">#{{ user.id }}</UiBadge>
       </li>
     </ul>
   </section>

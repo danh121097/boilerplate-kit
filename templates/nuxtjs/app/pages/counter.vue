@@ -12,9 +12,9 @@ const counter = useCounterStore();
       {{ t("counter.count") }}: <span class="font-mono">{{ counter.count }}</span>
     </p>
     <div class="flex gap-2">
-      <Button variant="secondary" size="sm" @click="counter.decrement">−</Button>
-      <Button variant="secondary" size="sm" @click="counter.increment">+</Button>
-      <Button variant="danger" size="sm" @click="counter.reset">Reset</Button>
+      <UiButton variant="secondary" size="sm" @click="counter.decrement">−</UiButton>
+      <UiButton variant="secondary" size="sm" @click="counter.increment">+</UiButton>
+      <UiButton variant="danger" size="sm" @click="counter.reset">Reset</UiButton>
     </div>
   </section>
 </template>

@@ -12,8 +12,10 @@ export default defineNuxtConfig({
 
   css: ["@/css/main.css", "@/css/main.scss"],
 
-  // Auto-register only @/components/ui as global. Other components stay explicit imports.
-  components: [{ path: "@/components/ui", global: true, pathPrefix: false }],
+  // Nuxt auto-imports every `app/components/**` file with a path-derived prefix —
+  // `app/components/ui/Button.vue` becomes `<UiButton>`, etc. No explicit
+  // `components:` config needed. Nuxt UI's stock components keep the `<U*>` prefix
+  // (`<UButton>`); ours pick up the `<Ui*>` prefix from the `ui/` folder name.
 
   // @pinia/nuxt: keep stores EXPLICIT — never auto-import.
   // Empty storesDirs disables the auto-import scanner per project convention.

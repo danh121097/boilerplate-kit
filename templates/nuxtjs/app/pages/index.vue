@@ -20,7 +20,7 @@ const { t } = useI18n();
       <template #footer>
         <div class="flex gap-2">
           <UButton color="primary">Nuxt UI Button</UButton>
-          <Button variant="secondary">Project Button</Button>
+          <UiButton variant="secondary">Project Button</UiButton>
         </div>
       </template>
     </UCard>

@@ -28,23 +28,23 @@ const onSubmit = handleSubmit(() => {
   <section>
     <h1 class="mb-4 text-3xl font-bold">{{ t("form.title") }}</h1>
 
-    <Card class="max-w-md">
+    <UiCard class="max-w-md">
       <form class="space-y-4" @submit="onSubmit">
-        <VeeInput
+        <UiVeeInput
           name="email"
           type="email"
           :label="t('form.email')"
           placeholder="you@example.com"
           clearable
         />
-        <VeeInput name="password" type="password" :label="t('form.password')" />
+        <UiVeeInput name="password" type="password" :label="t('form.password')" />
 
-        <Button type="submit" :disabled="!meta.valid" block>
+        <UiButton type="submit" :disabled="!meta.valid" block>
           {{ t("form.submit") }}
-        </Button>
+        </UiButton>
 
-        <Badge v-if="success" variant="success">{{ t("form.success") }}</Badge>
+        <UiBadge v-if="success" variant="success">{{ t("form.success") }}</UiBadge>
       </form>
-    </Card>
+    </UiCard>
   </section>
 </template>

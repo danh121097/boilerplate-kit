@@ -80,7 +80,7 @@ templates/nuxtjs/
 ## Key conventions (mirror the Vue template)
 
 - **Pinia stores stay explicit.** `import { useCounterStore } from "@/stores/counter"`. `pinia.storesDirs: []` in `nuxt.config.ts` disables auto-import.
-- **UI auto-registration scoped to `@/components/ui` only.** Other components stay explicit imports. See `components: [{ path: "@/components/ui", global: true }]`.
+- **UI components live under `@/components/ui/` and auto-import with the `<Ui*>` prefix** (Nuxt's default path-derived naming): `<UiButton>`, `<UiCard>`, `<UiInput>`, `<UiVeeInput>`, `<UiBadge>`. Nuxt UI's stock components keep their `<U*>` prefix (`<UButton>`), so the two namespaces don't collide. No explicit `components:` config needed — Nuxt's default scan handles it.
 - **Composable filenames in camelCase** (`useFoo.ts`) — exception to project-wide kebab-case.
 - **Every SFC: named `interface Props` / `interface Emits` extracted above macros.** Never inline.
 - **`<script setup>` strict section order:** imports → types → defineProps/Emits → composables → const → destructuring → let → ref → computed → functions → lifecycle.
@@ -122,17 +122,17 @@ vee-validate + zod via `@vee-validate/zod`. See `app/pages/form.vue` for the can
 
 ## UI components
 
-Auto-registered globally via Nuxt's `components: [{ path: "@/components/ui", global: true }]`:
+Auto-registered globally via Nuxt's default `components/` scan + path-derived prefix:
 
-| Component | Notes |
-|---|---|
-| `<Button>` | variant × shape × size, loading spinner, ripple, block, `unstyled` escape hatch |
-| `<Input>` | floating label, type-aware (password/email/number/tel/search), mask helper, slots |
-| `<VeeInput>` | wraps `<Input>` via `useField`; pass `name="..."` |
-| `<Card>` | rounded container |
-| `<Badge>` | CVA variant pill |
+| Component | Source file | Notes |
+|---|---|---|
+| `<UiButton>` | `components/ui/Button.vue` | variant × shape × size, loading spinner, ripple, block, `unstyled` escape hatch |
+| `<UiInput>` | `components/ui/Input.vue` | floating label, type-aware (password/email/number/tel/search), mask helper, slots |
+| `<UiVeeInput>` | `components/ui/VeeInput.vue` | wraps `<UiInput>` via `useField`; pass `name="..."` |
+| `<UiCard>` | `components/ui/Card.vue` | rounded container |
+| `<UiBadge>` | `components/ui/Badge.vue` | CVA variant pill |
 
-Nuxt UI components keep the `<U*>` prefix (`<UButton>`, `<UCard>`, ...). They live alongside the project UI components — pick whichever fits the use case.
+Nuxt UI's stock components keep their `<U*>` prefix (`<UButton>`, `<UCard>`, ...). The two namespaces (`<U*>` for Nuxt UI, `<Ui*>` for ours) co-exist without collision.
 
 ## Routes
 
