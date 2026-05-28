@@ -26,8 +26,8 @@ export default defineNuxtConfig({
     strategy: "no_prefix",
     lazy: true,
     locales: [
-      { code: "en", file: "en.json" },
-      { code: "ja", file: "ja.json" },
+      { code: "en", file: "en.ts" },
+      { code: "ja", file: "ja.ts" },
     ],
   },
 
