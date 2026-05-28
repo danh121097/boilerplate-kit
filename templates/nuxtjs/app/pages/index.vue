@@ -12,15 +12,17 @@ const { t } = useI18n();
         <p class="font-semibold">Nuxt UI 4 + Tailwind v4</p>
       </template>
       <p class="text-sm text-(--ui-text-muted)">
-        Nuxt UI components ship globally with the <code>U</code> prefix
-        (<code>&lt;UButton&gt;</code>, <code>&lt;UCard&gt;</code>, ...). Project
-        components in <code>app/components/ui/</code> auto-register without a prefix
-        (<code>&lt;Button&gt;</code>, <code>&lt;Card&gt;</code>, ...).
+        Project UI components live in <code>app/components/ui/</code> and
+        auto-register globally with the <code>Ui</code> prefix —
+        <code>&lt;UiButton&gt;</code>, <code>&lt;UiCard&gt;</code>, etc. Nuxt UI
+        ships alongside under the <code>U</code> prefix (<code>&lt;UButton&gt;</code>)
+        if you want to opt in for individual primitives.
       </p>
       <template #footer>
         <div class="flex gap-2">
-          <UButton color="primary">Nuxt UI Button</UButton>
-          <UiButton variant="secondary">Project Button</UiButton>
+          <UiButton variant="primary">Primary</UiButton>
+          <UiButton variant="secondary">Secondary</UiButton>
+          <UiButton variant="outline">Outline</UiButton>
         </div>
       </template>
     </UCard>
