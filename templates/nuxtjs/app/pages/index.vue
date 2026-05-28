@@ -12,11 +12,12 @@ const { t } = useI18n();
         <p class="font-semibold">Nuxt UI 4 + Tailwind v4</p>
       </template>
       <p class="text-sm text-(--ui-text-muted)">
-        Project UI components live in <code>app/components/ui/</code> and
-        auto-register globally with the <code>Ui</code> prefix —
-        <code>&lt;UiButton&gt;</code>, <code>&lt;UiCard&gt;</code>, etc. Nuxt UI
-        ships alongside under the <code>U</code> prefix (<code>&lt;UButton&gt;</code>)
-        if you want to opt in for individual primitives.
+        Project ships custom <code>&lt;UiButton&gt;</code>,
+        <code>&lt;UiInput&gt;</code>, <code>&lt;UiVeeInput&gt;</code> in
+        <code>app/components/ui/</code> — the bits that benefit from a tailored
+        design surface. For the rest (Card, Badge, Modal, Toast, …) use Nuxt UI
+        stock under the <code>U</code> prefix (<code>&lt;UCard&gt;</code>,
+        <code>&lt;UBadge&gt;</code>, …) to avoid reinventing them.
       </p>
       <template #footer>
         <div class="flex gap-2">

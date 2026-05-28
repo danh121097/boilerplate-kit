@@ -28,7 +28,7 @@ const onSubmit = handleSubmit(() => {
   <section>
     <h1 class="mb-4 text-3xl font-bold">{{ t("form.title") }}</h1>
 
-    <UiCard class="max-w-md">
+    <UCard class="max-w-md">
       <form class="space-y-4" @submit="onSubmit">
         <UiVeeInput
           name="email"
@@ -43,8 +43,10 @@ const onSubmit = handleSubmit(() => {
           {{ t("form.submit") }}
         </UiButton>
 
-        <UiBadge v-if="success" variant="success">{{ t("form.success") }}</UiBadge>
+        <UBadge v-if="success" color="success" variant="subtle">
+          {{ t("form.success") }}
+        </UBadge>
       </form>
-    </UiCard>
+    </UCard>
   </section>
 </template>

@@ -122,17 +122,16 @@ vee-validate + zod via `@vee-validate/zod`. See `app/pages/form.vue` for the can
 
 ## UI components
 
-Auto-registered globally via Nuxt's default `components/` scan + path-derived prefix:
+Project ships only the components that **benefit from custom behaviour** (variants, ripple, masking, form integration). Everything else comes from Nuxt UI directly — no reinvention.
 
-| Component | Source file | Notes |
+| Component | Source | Notes |
 |---|---|---|
 | `<UiButton>` | `components/ui/Button.vue` | variant × shape × size, loading spinner, ripple, block, `unstyled` escape hatch |
 | `<UiInput>` | `components/ui/Input.vue` | floating label, type-aware (password/email/number/tel/search), mask helper, slots |
 | `<UiVeeInput>` | `components/ui/VeeInput.vue` | wraps `<UiInput>` via `useField`; pass `name="..."` |
-| `<UiCard>` | `components/ui/Card.vue` | rounded container |
-| `<UiBadge>` | `components/ui/Badge.vue` | CVA variant pill |
+| `<UCard>`, `<UBadge>`, `<UModal>`, `<UToast>`, … | Nuxt UI stock | Use these directly — no project wrapper |
 
-Nuxt UI's stock components keep their `<U*>` prefix (`<UButton>`, `<UCard>`, ...). The two namespaces (`<U*>` for Nuxt UI, `<Ui*>` for ours) co-exist without collision.
+Two namespaces co-exist: `<Ui*>` (ours) and `<U*>` (Nuxt UI). Auto-registered via Nuxt's default `components/` scan + path-derived prefix.
 
 ## Routes
 
