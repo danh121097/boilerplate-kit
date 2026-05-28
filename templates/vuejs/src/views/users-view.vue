@@ -1,0 +1,25 @@
+<script setup lang="ts">
+import { useUsersListQuery } from "@/services/users";
+
+const { t } = useI18n();
+const { data, isLoading, error } = useUsersListQuery();
+</script>
+
+<template>
+  <section>
+    <h1 class="mb-4 text-3xl font-bold">{{ t("users.title") }}</h1>
+    <p v-if="isLoading" class="text-gray-500">{{ t("users.loading") }}</p>
+    <p v-else-if="error" class="text-red-600">
+      {{ t("users.error", { message: error.error_message || error.message }) }}
+    </p>
+    <ul v-else class="divide-y">
+      <li v-for="user in data" :key="user.id" class="flex items-center justify-between py-2">
+        <div>
+          <span class="font-medium">{{ user.name }}</span>
+          <span class="ml-2 text-sm text-gray-500">{{ user.email }}</span>
+        </div>
+        <Badge variant="secondary">#{{ user.id }}</Badge>
+      </li>
+    </ul>
+  </section>
+</template>
