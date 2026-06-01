@@ -1,8 +1,7 @@
 <script setup lang="ts">
 const { t, locale, setLocale } = useI18n();
 
-const locales = ["en", "ja"] as const;
-type Locale = (typeof locales)[number];
+type Locale = "en" | "ja";
 
 function toggleLocale() {
   const next: Locale = locale.value === "en" ? "ja" : "en";
@@ -11,18 +10,18 @@ function toggleLocale() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-(--ui-bg) text-(--ui-text)">
-    <header class="border-b border-(--ui-border) bg-(--ui-bg-elevated)">
+  <div class="min-h-screen bg-background text-foreground">
+    <header class="border-b border-border bg-background">
       <nav class="mx-auto flex max-w-3xl items-center gap-6 px-6 py-3 text-sm">
-        <NuxtLink to="/" class="font-semibold hover:text-(--ui-primary)">
+        <NuxtLink to="/" class="font-semibold hover:text-primary">
           {{ t("nav.home") }}
         </NuxtLink>
-        <NuxtLink to="/counter" class="hover:text-(--ui-primary)">{{ t("nav.counter") }}</NuxtLink>
-        <NuxtLink to="/users" class="hover:text-(--ui-primary)">{{ t("nav.users") }}</NuxtLink>
-        <NuxtLink to="/form" class="hover:text-(--ui-primary)">{{ t("nav.form") }}</NuxtLink>
-        <UButton size="xs" variant="outline" class="ml-auto" @click="toggleLocale">
+        <NuxtLink to="/counter" class="hover:text-primary">{{ t("nav.counter") }}</NuxtLink>
+        <NuxtLink to="/users" class="hover:text-primary">{{ t("nav.users") }}</NuxtLink>
+        <NuxtLink to="/form" class="hover:text-primary">{{ t("nav.form") }}</NuxtLink>
+        <UiButton size="sm" variant="outline" class="ml-auto" @click="toggleLocale">
           {{ locale.toUpperCase() }}
-        </UButton>
+        </UiButton>
       </nav>
     </header>
     <main class="mx-auto max-w-3xl px-6 py-8">

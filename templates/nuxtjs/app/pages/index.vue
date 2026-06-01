@@ -1,31 +1,59 @@
 <script setup lang="ts">
+import {
+  DialogRoot,
+  DialogTrigger,
+  DialogPortal,
+  DialogOverlay,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+  DialogClose,
+} from "reka-ui";
+
 const { t } = useI18n();
+const open = ref(false);
 </script>
 
 <template>
-  <section class="space-y-4">
-    <h1 class="text-3xl font-bold">{{ t("home.welcome") }} 👋</h1>
-    <p class="text-(--ui-text-muted)">{{ t("home.description") }}</p>
+  <section>
+    <h1 class="mb-3 text-3xl font-bold">{{ t("home.welcome") }} 👋</h1>
+    <p class="mb-6 text-muted-foreground">{{ t("home.description") }}</p>
 
-    <UCard>
-      <template #header>
-        <p class="font-semibold">Nuxt UI 4 + Tailwind v4</p>
-      </template>
-      <p class="text-sm text-(--ui-text-muted)">
-        Project ships custom <code>&lt;UiButton&gt;</code>,
-        <code>&lt;UiInput&gt;</code>, <code>&lt;UiVeeInput&gt;</code> in
-        <code>app/components/ui/</code> — the bits that benefit from a tailored
-        design surface. For the rest (Card, Badge, Modal, Toast, …) use Nuxt UI
-        stock under the <code>U</code> prefix (<code>&lt;UCard&gt;</code>,
-        <code>&lt;UBadge&gt;</code>, …) to avoid reinventing them.
-      </p>
-      <template #footer>
-        <div class="flex gap-2">
+    <DialogRoot v-model:open="open">
+      <DialogTrigger as-child>
+        <UiButton>{{ t("home.open_dialog") }}</UiButton>
+      </DialogTrigger>
+      <DialogPortal>
+        <DialogOverlay class="fixed inset-0 bg-black/40" />
+        <DialogContent
+          class="fixed left-1/2 top-1/2 w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-lg bg-background p-6 shadow-xl"
+        >
+          <DialogTitle class="text-lg font-semibold">Hello from Reka UI</DialogTitle>
+          <DialogDescription class="mt-1 text-sm text-muted-foreground">
+            Headless components — bring your own styles.
+          </DialogDescription>
+          <DialogClose as-child>
+            <UiButton variant="secondary" size="sm" class="mt-4">Close</UiButton>
+          </DialogClose>
+        </DialogContent>
+      </DialogPortal>
+    </DialogRoot>
+
+    <div class="mt-8 grid gap-3">
+      <UiCard>
+        <p class="font-semibold">Project components</p>
+        <p class="mt-1 text-sm text-muted-foreground">
+          <code>&lt;UiButton&gt;</code>, <code>&lt;UiCard&gt;</code>,
+          <code>&lt;UiInput&gt;</code>, <code>&lt;UiVeeInput&gt;</code>,
+          <code>&lt;UiBadge&gt;</code> live in <code>app/components/ui/</code>
+          and auto-register globally via Nuxt's path-derived prefix.
+        </p>
+        <div class="mt-4 flex gap-2">
           <UiButton variant="primary">Primary</UiButton>
           <UiButton variant="secondary">Secondary</UiButton>
           <UiButton variant="outline">Outline</UiButton>
         </div>
-      </template>
-    </UCard>
+      </UiCard>
+    </div>
   </section>
 </template>

@@ -7,8 +7,9 @@ Opinionated Nuxt 4 starter mirroring the production patterns from the sibling Vu
 | Concern | Choice |
 |---|---|
 | Framework | Nuxt 4 (Nitro server + Vue 3 + `<script setup>` + TypeScript) |
-| UI | Nuxt UI 4 (`<U*>` prefix; Tailwind v4 bundled) |
-| Project UI components | `app/components/ui/` (Button, Card, Input, VeeInput, Badge) — globally auto-registered, no prefix |
+| UI primitives | Reka UI (headless, project drives styling) |
+| Project UI components | `app/components/ui/` (Button, Card, Input, VeeInput, Badge) with cva variants + shadcn-vue HSL tokens — auto-registered as `<Ui*>` |
+| Styling | Tailwind v4 (`@tailwindcss/vite` plugin) + `tailwindcss-animate` |
 | Client state | Pinia (explicit imports — auto-import disabled) |
 | Server state | TanStack Vue Query + `defineQuery` / `defineMutation` helpers |
 | HTTP | Axios + class-based `Api` + interceptors (optional HMAC signing) |
@@ -42,15 +43,14 @@ pnpm dev
 ```
 templates/nuxtjs/
 ├── nuxt.config.ts                  # modules, components scope, pinia override, i18n, runtimeConfig
-├── app.config.ts                   # Nuxt UI theme tokens
 ├── tsconfig.json                   # extends ./.nuxt/tsconfig.json
 ├── eslint.config.ts                # uses @nuxt/eslint (TS via jiti)
 ├── prettier.config.ts
 ├── pnpm-workspace.yaml             # strictDepBuilds:false, minimumReleaseAge:0
 ├── app/
-│   ├── app.vue                     # <UApp><NuxtLayout><NuxtPage /></NuxtLayout></UApp>
+│   ├── app.vue                     # <NuxtLayout><NuxtPage /></NuxtLayout>
 │   ├── css/
-│   │   ├── main.css                # @import "tailwindcss"; @import "@nuxt/ui"; @theme tokens
+│   │   ├── main.css                # @import "tailwindcss"; @theme HSL tokens + @utility helpers
 │   │   └── main.scss               # SCSS extras (safe-area, mixins)
 │   ├── components/
 │   │   └── ui/                     # auto-registered globally (Button, Card, Input, VeeInput, Badge)
@@ -58,7 +58,7 @@ templates/nuxtjs/
 │   ├── enums/                      # STORAGE_KEYS (runtimeConfig-prefixed)
 │   ├── layouts/default.vue         # nav + locale toggle
 │   ├── pages/
-│   │   ├── index.vue               # Nuxt UI landing
+│   │   ├── index.vue               # Reka UI Dialog showcase + project component grid
 │   │   ├── counter.vue             # Pinia (explicit import)
 │   │   ├── users.vue               # TanStack Query demo
 │   │   └── form.vue                # vee-validate + zod + VeeInput
@@ -80,7 +80,7 @@ templates/nuxtjs/
 ## Key conventions (mirror the Vue template)
 
 - **Pinia stores stay explicit.** `import { useCounterStore } from "@/stores/counter"`. `pinia.storesDirs: []` in `nuxt.config.ts` disables auto-import.
-- **UI components live under `@/components/ui/` and auto-import with the `<Ui*>` prefix** (Nuxt's default path-derived naming): `<UiButton>`, `<UiCard>`, `<UiInput>`, `<UiVeeInput>`, `<UiBadge>`. Nuxt UI's stock components keep their `<U*>` prefix (`<UButton>`), so the two namespaces don't collide. No explicit `components:` config needed — Nuxt's default scan handles it.
+- **UI components live under `@/components/ui/` and auto-import with the `<Ui*>` prefix** (Nuxt's default path-derived naming): `<UiButton>`, `<UiCard>`, `<UiInput>`, `<UiVeeInput>`, `<UiBadge>`. No explicit `components:` config needed — Nuxt's default scan handles it. Headless primitives come from Reka UI (imported directly).
 - **Composable filenames in camelCase** (`useFoo.ts`) — exception to project-wide kebab-case.
 - **Every SFC: named `interface Props` / `interface Emits` extracted above macros.** Never inline.
 - **`<script setup>` strict section order:** imports → types → defineProps/Emits → composables → const → destructuring → let → ref → computed → functions → lifecycle.
@@ -122,20 +122,21 @@ vee-validate + zod via `@vee-validate/zod`. See `app/pages/form.vue` for the can
 
 ## UI components
 
-Project ships only the components that **benefit from custom behaviour** (variants, ripple, masking, form integration). Everything else comes from Nuxt UI directly — no reinvention.
+Project owns the entire UI surface — Reka UI provides headless primitives (Dialog, Popover, Combobox, …) and the project layers styled wrappers on top.
 
 | Component | Source | Notes |
 |---|---|---|
 | `<UiButton>` | `components/ui/Button.vue` | variant × shape × size, loading spinner, ripple, block, `unstyled` escape hatch |
 | `<UiInput>` | `components/ui/Input.vue` | floating label, type-aware (password/email/number/tel/search), mask helper, slots |
 | `<UiVeeInput>` | `components/ui/VeeInput.vue` | wraps `<UiInput>` via `useField`; pass `name="..."` |
-| `<UCard>`, `<UBadge>`, `<UModal>`, `<UToast>`, … | Nuxt UI stock | Use these directly — no project wrapper |
+| `<UiCard>` | `components/ui/Card.vue` | rounded container with shadow |
+| `<UiBadge>` | `components/ui/Badge.vue` | CVA variant pill |
 
-Two namespaces co-exist: `<Ui*>` (ours) and `<U*>` (Nuxt UI). Auto-registered via Nuxt's default `components/` scan + path-derived prefix.
+For complex interactive primitives (dialog, popover, dropdown, accordion, combobox, …) import directly from `reka-ui` — see `pages/index.vue` for a `DialogRoot` showcase.
 
 ## Routes
 
-- `/` — Nuxt UI showcase (`<UButton>` + `<UCard>`) alongside project `<Button>`
+- `/` — Reka UI dialog showcase + project `<UiButton>` variants in a `<UiCard>` grid
 - `/counter` — Pinia store demo (`useCounterStore` explicit import)
 - `/users` — TanStack Query demo via `usersService.list()` → axios
 - `/form` — vee-validate + zod with `<VeeInput>` + `<Button>` + `<Card>` + `<Badge>`

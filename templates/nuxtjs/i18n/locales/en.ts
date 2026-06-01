@@ -2,7 +2,8 @@ export default {
   nav: { home: "Home", counter: "Counter", users: "Users", form: "Form" },
   home: {
     welcome: "Welcome",
-    description: "Nuxt 4 + Nuxt UI + Pinia + TanStack Vue Query + Tailwind v4 + i18n.",
+    description: "Nuxt 4 + Reka UI + Pinia + TanStack Vue Query + Tailwind v4 + i18n.",
+    open_dialog: "Open a Reka UI dialog",
   },
   counter: { title: "Pinia counter", count: "Count" },
   users: { title: "TanStack Query users", loading: "Loading…", error: "Error: {message}" },
