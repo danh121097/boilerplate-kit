@@ -10,18 +10,21 @@ function toggleLocale() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-background text-foreground">
-    <header class="border-b border-border bg-background">
+  <div class="min-h-screen bg-gray-50 text-gray-900">
+    <header class="border-b bg-white">
       <nav class="mx-auto flex max-w-3xl items-center gap-6 px-6 py-3 text-sm">
-        <NuxtLink to="/" class="font-semibold hover:text-primary">
+        <NuxtLink to="/" class="font-semibold hover:text-indigo-600">
           {{ t("nav.home") }}
         </NuxtLink>
-        <NuxtLink to="/counter" class="hover:text-primary">{{ t("nav.counter") }}</NuxtLink>
-        <NuxtLink to="/users" class="hover:text-primary">{{ t("nav.users") }}</NuxtLink>
-        <NuxtLink to="/form" class="hover:text-primary">{{ t("nav.form") }}</NuxtLink>
-        <UiButton size="sm" variant="outline" class="ml-auto" @click="toggleLocale">
+        <NuxtLink to="/counter" class="hover:text-indigo-600">{{ t("nav.counter") }}</NuxtLink>
+        <NuxtLink to="/users" class="hover:text-indigo-600">{{ t("nav.users") }}</NuxtLink>
+        <NuxtLink to="/form" class="hover:text-indigo-600">{{ t("nav.form") }}</NuxtLink>
+        <button
+          class="ml-auto rounded-md border px-2 py-0.5 text-xs hover:bg-gray-100"
+          @click="toggleLocale"
+        >
           {{ locale.toUpperCase() }}
-        </UiButton>
+        </button>
       </nav>
     </header>
     <main class="mx-auto max-w-3xl px-6 py-8">

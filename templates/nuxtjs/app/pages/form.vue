@@ -12,6 +12,8 @@ const schema = toTypedSchema(
   }),
 );
 
+// Start fields as empty strings so zod's "expected string" check passes — users see
+// the format/length validation messages instead of the generic type error.
 const { handleSubmit, meta } = useForm({
   validationSchema: schema,
   initialValues: { email: "", password: "" },
@@ -37,9 +39,10 @@ const onSubmit = handleSubmit(() => {
           placeholder="you@example.com"
           clearable
         />
+
         <UiVeeInput name="password" type="password" :label="t('form.password')" />
 
-        <UiButton type="submit" :disabled="!meta.valid" block>
+        <UiButton type="submit" block>
           {{ t("form.submit") }}
         </UiButton>
 
