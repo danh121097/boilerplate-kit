@@ -19,7 +19,7 @@ const showError = computed(() => hasValidationError.value || props.error);
 
 <template>
   <div class="vee-input-wrapper" v-bind="$attrs">
-    <Input
+    <UiInput
       v-model="value"
       :label="label"
       :type="type"
@@ -42,6 +42,6 @@ const showError = computed(() => hasValidationError.value || props.error);
       <template v-if="$slots.append" #append>
         <slot name="append" />
       </template>
-    </Input>
+    </UiInput>
   </div>
 </template>
