@@ -21,9 +21,19 @@ const LOCAL_COPY_EXCLUDE = new Set([
   "node_modules",
   "dist",
   ".vite",
+  // Nuxt
+  ".nuxt",
+  ".output",
+  ".data",
+  // Lockfiles — user gets a fresh one from their chosen PM after scaffold.
   "pnpm-lock.yaml",
+  "package-lock.json",
+  "yarn.lock",
+  "bun.lockb",
+  // Auto-generated typings (unplugin-* / Nuxt)
   "auto-imports.d.ts",
   "components.d.ts",
+  ".eslintrc-auto-import.json",
 ]);
 
 /**
