@@ -4,6 +4,9 @@ export default defineNuxtConfig({
   compatibilityDate: "2026-05-21",
   devtools: { enabled: true },
 
+  // Default dev port — sidesteps the crowded port 3000 (Express/Bun/Next default).
+  devServer: { port: 4321 },
+
   modules: ["@nuxt/eslint", "@pinia/nuxt", "@nuxtjs/i18n", "@vueuse/nuxt"],
 
   css: ["@/css/main.css", "@/css/main.scss"],
