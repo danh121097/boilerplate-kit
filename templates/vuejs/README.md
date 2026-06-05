@@ -4,24 +4,24 @@ Opinionated Vue 3 starter built with Vite. Production-grade structure mirroring 
 
 ## Stack
 
-| Concern | Choice |
-|---|---|
-| Framework | Vue 3 + `<script setup>` + TypeScript |
-| Bundler | Vite (Rolldown) |
-| Routing | Vue Router |
-| Client state | Pinia |
-| Server state | TanStack Vue Query + `defineQuery`/`defineMutation` helpers |
-| HTTP | Axios + class-based `Api` + interceptors (optional HMAC signing) |
-| UI primitives | Reka UI (headless) |
+| Concern       | Choice                                                                       |
+| ------------- | ---------------------------------------------------------------------------- |
+| Framework     | Vue 3 + `<script setup>` + TypeScript                                        |
+| Bundler       | Vite (Rolldown)                                                              |
+| Routing       | Vue Router                                                                   |
+| Client state  | Pinia                                                                        |
+| Server state  | TanStack Vue Query + `defineQuery`/`defineMutation` helpers                  |
+| HTTP          | Axios + class-based `Api` + interceptors (optional HMAC signing)             |
+| UI primitives | Reka UI (headless)                                                           |
 | UI components | Pre-built `Button`, `Card`, `Input`, `Badge` with `class-variance-authority` |
-| Styles | Tailwind v4 + SCSS (`@tailwindcss/vite`, `sass-embedded`) |
-| Composables | `@vueuse/core` |
-| Forms | vee-validate + zod via `@vee-validate/zod` |
-| i18n | vue-i18n (en + ja locales bundled) |
-| Icons | lucide-vue-next |
-| Dates | dayjs |
-| Auto-imports | `unplugin-auto-import` + `unplugin-vue-components` |
-| Lint / format | ESLint flat config (TS) + Prettier (TS) |
+| Styles        | Tailwind v4 + SCSS (`@tailwindcss/vite`, `sass-embedded`)                    |
+| Composables   | `@vueuse/core`                                                               |
+| Forms         | vee-validate + zod via `@vee-validate/zod`                                   |
+| i18n          | vue-i18n (en + ja locales bundled)                                           |
+| Icons         | lucide-vue-next                                                              |
+| Dates         | dayjs                                                                        |
+| Auto-imports  | `unplugin-auto-import` + `unplugin-vue-components`                           |
+| Lint / format | ESLint flat config (TS) + Prettier (TS)                                      |
 
 ## Setup
 
@@ -95,7 +95,9 @@ export class UsersModel extends Model {
   static {
     Model.setup.call(this, { path: "/users", service: "MAIN" });
   }
-  static list() { return this.api.get<User[]>(); }
+  static list() {
+    return this.api.get<User[]>();
+  }
 }
 export const useUsersListQuery = defineQuery<User[]>({
   key: "users.list",
@@ -105,7 +107,7 @@ export const useUsersListQuery = defineQuery<User[]>({
 
 ## i18n
 
-Locale stored in `localStorage.language`, initialised from `VITE_LANGUAGE_CODE`. Switch via `setLocale("vi")` (see `App.vue` nav button). Bundled locales: `en`, `vi`.
+Locale stored in `localStorage.language`, initialize from `VITE_LANGUAGE_CODE`. Switch via `setLocale("vi")` (see `App.vue` nav button). Bundled locales: `en`, `vi`.
 
 ## Forms
 
@@ -115,13 +117,13 @@ Locale stored in `localStorage.language`, initialised from `VITE_LANGUAGE_CODE`.
 
 Pre-built and auto-registered globally via `unplugin-vue-components` — drop into any template without import:
 
-| Component | Notes |
-|---|---|
-| `Button` | variants × shapes × sizes, loading spinner, ripple effect, `unstyled` escape hatch |
-| `Input` | floating label, type-aware (`text`, `password`, `email`, `number`, `tel`, `search`, `url`), password toggle, search icon, clear button, mask helper, error message, `prepend`/`append` slots |
-| `VeeInput` | thin wrapper over `Input` that auto-wires `useField` from vee-validate — pass `name="..."` and the schema does the rest |
-| `Card` | rounded container with shadow |
-| `Badge` | status pill with CVA variants |
+| Component  | Notes                                                                                                                                                                                        |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Button`   | variants × shapes × sizes, loading spinner, ripple effect, `unstyled` escape hatch                                                                                                           |
+| `Input`    | floating label, type-aware (`text`, `password`, `email`, `number`, `tel`, `search`, `url`), password toggle, search icon, clear button, mask helper, error message, `prepend`/`append` slots |
+| `VeeInput` | thin wrapper over `Input` that auto-wires `useField` from vee-validate — pass `name="..."` and the schema does the rest                                                                      |
+| `Card`     | rounded container with shadow                                                                                                                                                                |
+| `Badge`    | status pill with CVA variants                                                                                                                                                                |
 
 Want more? Run `npx shadcn-vue@latest add <component>` — `components.json` is pre-configured.
 

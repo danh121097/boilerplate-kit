@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { setLocale } from "@/plugins/i18n";
 
-// `useI18n` is auto-imported (vue-i18n preset in unplugin-auto-import).
 const { t, locale } = useI18n();
 
 function toggleLocale() {

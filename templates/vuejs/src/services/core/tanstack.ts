@@ -6,7 +6,7 @@ import type {
   UseQueryOptions,
   UseQueryReturnType,
 } from "@tanstack/vue-query";
-import { computed, toValue, type MaybeRefOrGetter, type Ref } from "vue";
+import type { MaybeRefOrGetter, Ref } from "vue";
 import type { ApiResponseError } from "./types";
 
 type QueryDefinitionKey<TParams> = readonly [string] | readonly [string, TParams];

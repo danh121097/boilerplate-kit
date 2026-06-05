@@ -3,3 +3,6 @@
 # - minimumReleaseAge: 0 — install latest versions even when freshly published.
 strictDepBuilds: false
 minimumReleaseAge: 0
+allowBuilds:
+  '@parcel/watcher': set this to true or false
+  vue-demi: set this to true or false

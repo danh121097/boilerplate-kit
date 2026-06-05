@@ -37,9 +37,11 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      apiBaseUrl: "https://jsonplaceholder.typicode.com",
-      appName: "PRISM_APP",
+      apiBaseUrl: "",
+      appEndpoint: "",
+      appName: "",
       languageCode: "en",
+      hmacSecret: "",
     },
   },
 
