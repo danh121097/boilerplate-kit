@@ -62,7 +62,7 @@ describe("errorHandler", () => {
     config.isDevelopment = false;
     const res = createMockRes();
     const err = new AppError({
-      message: "prod error",
+      message: "prod error!",
       statusCode: 400,
       errorType: "VALIDATION_ERROR",
     });

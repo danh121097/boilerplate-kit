@@ -102,7 +102,7 @@ export function useSocketIO() {
   };
 }
 
-/** Get the live socket from the store, lazy-initing one if none exists yet. */
+/** Get the live socket from the store, lazy-init one if none exists yet. */
 export function useIo() {
   const storeSocketIO = useSocketIOStore();
   const { ioStore } = storeToRefs(storeSocketIO);
