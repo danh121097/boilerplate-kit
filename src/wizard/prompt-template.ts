@@ -8,7 +8,7 @@ const LABELS: Record<Template, string> = {
   reactjs: "ReactJS · TanStack Router · shadcn/ui · Tailwind",
   nextjs: "NextJS · App Router · shadcn/ui · Tailwind",
   "tanstack-start": "TanStack Start · shadcn/ui · Tailwind",
-  express: "Express · Mongoose · Socket.io · JWT/HMAC · Redis",
+  express: "Express · Mongoose · Socket.io · JWT · Redis",
 };
 
 export async function promptTemplate(): Promise<Template> {

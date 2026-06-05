@@ -7,7 +7,7 @@ Scaffold an opinionated starter in seconds. One CLI, six curated stacks:
 - **React 19** + Vite + TanStack Router + Zustand + shadcn/ui + Tailwind v4
 - **Next.js 16** (App Router) + TanStack Query + Zustand + shadcn/ui + Tailwind v4
 - **TanStack Start** + TanStack Query + Zustand + shadcn/ui + Tailwind v4
-- **Express 5** (backend) + TypeScript + Mongoose + Socket.io + Redis + JWT/HMAC auth
+- **Express 5** (backend) + TypeScript + Mongoose + Socket.io + Redis + JWT auth
 
 > Status: alpha — phase 01 scaffolding only. CLI surface, template fetch, and the six starters land in subsequent phases.
 
