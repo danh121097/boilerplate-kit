@@ -1,0 +1,13 @@
+{
+  // Run ESLint auto-fix (incl. perfectionist import sorting) on every save.
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  // Flat config (eslint.config.ts) + lint these languages so .vue files
+  // surface ESLint warnings/errors inline.
+  "eslint.useFlatConfig": true,
+  "eslint.validate": ["javascript", "typescript", "vue"],
+  // Prettier handles formatting; ESLint handles lint + import order.
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true
+}

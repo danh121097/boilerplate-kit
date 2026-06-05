@@ -92,6 +92,11 @@ ck.md
 .vscode/
 .github/
 
+# ...except the VSCode settings that ship with each starter template
+# (ESLint auto-fix-on-save + recommended extensions).
+!templates/*/.vscode/
+!templates/*/.vscode/**
+
 # Local-only state inside tracked claude source
 claude/agent-memory/
 claude/hooks/.logs/
