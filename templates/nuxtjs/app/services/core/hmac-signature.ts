@@ -6,10 +6,10 @@ import HmacSHA256 from "crypto-js/hmac-sha256";
 /**
  * HMAC signature generator for API request authentication.
  *
- * Active only when `runtimeConfig.hmacSecret` is set (private, server-only). For
- * truly secure HMAC the signing belongs in a Nitro server route — keeping it
- * here on the client is documentation-only and will return `null` unless the
- * secret is exposed (which you almost certainly should NOT do).
+ * Active only when `runtimeConfig.public.hmacSecret` is set. Note the secret is
+ * client-readable (public), mirroring the Vue template's behavior. For a
+ * stronger guarantee, move signing into a Nitro server route and keep the secret
+ * private (`runtimeConfig.hmacSecret`) so it never reaches the browser.
  */
 export class HMACSignatureGenerator {
   private static normalizeUrl(url: string): string {
@@ -21,17 +21,16 @@ export class HMACSignatureGenerator {
   }
 
   static generateSignature(config: InternalAxiosRequestConfig): HMACSignatureData | null {
-    // Read secret lazily — `useRuntimeConfig` must be called inside a request scope.
-    // Both keys are typed as `unknown` here so we don't depend on the runtimeConfig
-    // schema declared in nuxt.config.ts. Cast on read.
+    // Read config lazily — `useRuntimeConfig` must be called inside a request scope.
+    // Keys live under `public` (client-readable) and are typed as `unknown` here so
+    // we don't depend on the runtimeConfig schema declared in nuxt.config.ts.
     let secret = "";
     let xVersion = "1.0.0";
     try {
       const cfg = useRuntimeConfig() as unknown as {
-        hmacSecret?: string;
-        public?: { buildVersion?: string };
+        public?: { hmacSecret?: string; buildVersion?: string };
       };
-      secret = cfg.hmacSecret ?? "";
+      secret = cfg.public?.hmacSecret ?? "";
       xVersion = cfg.public?.buildVersion ?? "1.0.0";
     } catch {
       return null;

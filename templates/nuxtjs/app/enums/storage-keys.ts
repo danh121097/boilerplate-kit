@@ -11,7 +11,6 @@
 function buildKeys(prefix: string) {
   return {
     AUTH_TOKEN: `${prefix}_AUTH_TOKEN`,
-    AUX_TOKEN: `${prefix}_AUX_TOKEN`,
     LANGUAGE: `${prefix}_LANGUAGE`,
     THEME: `${prefix}_THEME`,
   } as const;
@@ -22,10 +21,15 @@ export type StorageKey = StorageKeyMap[keyof StorageKeyMap];
 
 let cached: StorageKeyMap | null = null;
 
-/** Get the prefix-resolved STORAGE_KEYS map. Safe to call on server or client. */
-export function useStorageKeys(): StorageKeyMap {
-  if (cached) return cached;
-  const prefix = useRuntimeConfig().public.appName || "PRISM_APP";
-  cached = buildKeys(prefix);
-  return cached;
+/**
+ * Resolve a single prefixed storage key by name, e.g. `useStorageKeys("AUTH_TOKEN")`.
+ * The `name` param autocompletes to the keys declared in `buildKeys`. Safe to
+ * call on server or client (the prefix map is resolved lazily and cached).
+ */
+export function useStorageKeys(name: keyof StorageKeyMap): string {
+  if (!cached) {
+    const prefix = useRuntimeConfig().public.appName || "PRISM_APP";
+    cached = buildKeys(prefix);
+  }
+  return cached[name];
 }

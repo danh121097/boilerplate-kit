@@ -5,33 +5,52 @@ import { useStorageKeys } from "@/enums/storage-keys";
  * during server rendering they no-op (`getAuthToken` returns `null`,
  * mutations are silently skipped).
  *
+ * Per-service design: each API service maps to its own storage slot via a lazy
+ * resolver (the slot name depends on the runtime app prefix, only knowable
+ * inside a Nuxt request scope). Most apps only need the default MAIN context.
+ * To talk to a second authenticated backend (admin panel, partner API, ...),
+ * register its slot once at startup alongside its base URL:
+ *
+ *   Api.setBaseURL(adminURL, "ADMIN");
+ *   registerServiceToken("ADMIN", () => `${useRuntimeConfig().public.appName}_ADMIN_TOKEN`);
+ *
  * Apps with stricter auth needs should swap this for `useCookie()` (Nuxt
  * native, server + client safe, HttpOnly capable).
  */
+
+type TokenKeyResolver = () => string;
+
+const serviceTokenKeys = new Map<string, TokenKeyResolver>([
+  ["MAIN", () => useStorageKeys("AUTH_TOKEN")],
+]);
+
+/** Register (or override) the storage slot a service keeps its token in. */
+export function registerServiceToken(service: string, resolver: TokenKeyResolver): void {
+  serviceTokenKeys.set(service, resolver);
+}
+
+/** Resolve a service to its storage slot, falling back to the MAIN slot. */
+function resolveTokenKey(service: string): string {
+  const resolver = serviceTokenKeys.get(service) ?? (() => useStorageKeys("AUTH_TOKEN"));
+  return resolver();
+}
 
 function isClient(): boolean {
   return typeof window !== "undefined" && typeof localStorage !== "undefined";
 }
 
+export function getAuthToken(service: string = "MAIN"): string | null {
+  if (!isClient()) return null;
+  return localStorage.getItem(resolveTokenKey(service));
+}
+
+export function persistAuthToken(token: string, service: string = "MAIN"): void {
+  if (!isClient()) return;
+  localStorage.setItem(resolveTokenKey(service), token);
+}
+
+/** Clear every registered service's token (e.g. on logout / 401). */
 export function clearAuthTokens(): void {
   if (!isClient()) return;
-  const keys = useStorageKeys();
-  [keys.AUTH_TOKEN, keys.AUX_TOKEN].forEach((k) => localStorage.removeItem(k));
-}
-
-export function persistAuthToken(token: string, key?: string): void {
-  if (!isClient()) return;
-  const keys = useStorageKeys();
-  localStorage.setItem(key ?? keys.AUTH_TOKEN, token);
-}
-
-export function getAuthToken(key?: string): string | null {
-  if (!isClient()) return null;
-  const keys = useStorageKeys();
-  return localStorage.getItem(key ?? keys.AUTH_TOKEN);
-}
-
-export function tokenKeys() {
-  const keys = useStorageKeys();
-  return { MAIN: keys.AUTH_TOKEN, AUX: keys.AUX_TOKEN } as const;
+  serviceTokenKeys.forEach((resolver) => localStorage.removeItem(resolver()));
 }

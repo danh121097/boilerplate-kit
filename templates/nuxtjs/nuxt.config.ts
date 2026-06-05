@@ -42,6 +42,7 @@ export default defineNuxtConfig({
       appName: "",
       languageCode: "en",
       hmacSecret: "",
+      buildVersion: "1.0.0",
     },
   },
 
