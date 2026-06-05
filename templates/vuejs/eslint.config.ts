@@ -52,11 +52,8 @@ export default [
     rules: {
       "perfectionist/sort-imports": sortImportsByKind,
       "vue/multi-word-component-names": "off",
-      // UI components intentionally render trusted HTML (e.g. validation messages).
       "vue/no-v-html": "off",
-      // Let Prettier own HTML tag formatting (self-closing on void elements).
       "vue/html-self-closing": "off",
-      // Optional props default to `undefined` implicitly — no explicit default needed.
       "vue/require-default-prop": "off",
     },
   },
