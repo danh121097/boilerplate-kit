@@ -8,7 +8,7 @@ export const TEMPLATES = [
 ] as const;
 export type Template = (typeof TEMPLATES)[number];
 
-export const PACKAGE_MANAGERS = ["npm", "yarn", "pnpm", "bun"] as const;
+export const PACKAGE_MANAGERS = ["pnpm", "bun", "yarn", "npm"] as const;
 export type PackageManager = (typeof PACKAGE_MANAGERS)[number];
 
 export const DEFAULT_REF = "latest";
