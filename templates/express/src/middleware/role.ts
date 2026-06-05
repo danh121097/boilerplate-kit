@@ -1,6 +1,6 @@
-import { NextFunction, Request, Response } from "express";
-import { ROLES, Role } from "@/types/auth";
 import { AppError } from "@/types";
+import { ROLES, Role } from "@/types/auth";
+import { NextFunction, Request, Response } from "express";
 
 /**
  * Role hierarchy (higher number = more authority): super_admin > admin > user.

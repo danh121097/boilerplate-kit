@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
 import { notFoundHandler } from "@/middleware/not-found-handler";
+import { describe, it, expect, vi } from "vitest";
 
 describe("notFoundHandler", () => {
   it("returns 404 JSON", () => {

@@ -1,6 +1,6 @@
-import { text, isCancel } from "@clack/prompts";
 import { UserAbortError } from "../errors.js";
 import { validateProjectName } from "../validators/validate-project-name.js";
+import { text, isCancel } from "@clack/prompts";
 
 export async function promptProjectName(defaultValue = "my-app"): Promise<string> {
   const result = await text({

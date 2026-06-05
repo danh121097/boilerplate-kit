@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
 import { AppError } from '@/types';
+import { describe, it, expect } from 'vitest';
 
 describe('AppError', () => {
   it('sets message, statusCode, errorType', () => {

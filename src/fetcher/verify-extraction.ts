@@ -1,6 +1,6 @@
+import { ScaffoldError } from "../errors.js";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { ScaffoldError } from "../errors.js";
 
 export function verifyExtraction(dir: string): void {
   if (!existsSync(dir)) {

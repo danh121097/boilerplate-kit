@@ -1,7 +1,7 @@
-import type { AxiosError, AxiosInstance, AxiosResponse } from "axios";
-import type { ApiResponseError, ApiService, HttpInterceptorSetup } from "./types";
 import { clearAuthTokens } from "./auth-token-storage";
 import { HeadersUtils } from "./headers-utils";
+import type { ApiResponseError, ApiService, HttpInterceptorSetup } from "./types";
+import type { AxiosError, AxiosInstance, AxiosResponse } from "axios";
 
 interface ResponseInterceptorOpts {
   clearUnauthorizedAuth: () => void;

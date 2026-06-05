@@ -1,5 +1,3 @@
-import { defineCommand } from "citty";
-import pkg from "../package.json" with { type: "json" };
 import { resolveOptions } from "./options-resolver.js";
 import { runScaffold } from "./runtime/run-scaffold.js";
 import {
@@ -9,6 +7,8 @@ import {
   type PackageManager,
   type Template,
 } from "./types.js";
+import { defineCommand } from "citty";
+import pkg from "../package.json" with { type: "json" };
 
 export const main = defineCommand({
   meta: {

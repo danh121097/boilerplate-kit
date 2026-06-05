@@ -1,7 +1,7 @@
+import { signHmac, signSocketHmac } from '../helpers/hmac-sign';
+import { socketHmac } from '@/socket/hmac-middleware';
 import { describe, expect, it, vi } from 'vitest';
 import type { Socket } from 'socket.io';
-import { socketHmac } from '@/socket/hmac-middleware';
-import { signHmac, signSocketHmac } from '../helpers/hmac-sign';
 
 /**
  * Handshake HMAC gate: accept a correctly-signed { sig, ctime } in the auth

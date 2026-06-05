@@ -1,11 +1,11 @@
-import { downloadTemplate } from "giget";
-import { cp, mkdir, realpath } from "node:fs/promises";
-import { existsSync } from "node:fs";
-import { dirname, isAbsolute, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { ScaffoldError, TemplateFetchError } from "../errors.js";
 import { getSource } from "./template-registry.js";
 import { validateRef } from "./validate-ref.js";
+import { downloadTemplate } from "giget";
+import { existsSync } from "node:fs";
+import { cp, mkdir, realpath } from "node:fs/promises";
+import { dirname, isAbsolute, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Template } from "../types.js";
 
 export interface DownloadOpts {

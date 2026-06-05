@@ -1,5 +1,5 @@
-import type { ApiService, ServiceConfig } from "./types";
 import { Api } from "./api";
+import type { ApiService, ServiceConfig } from "./types";
 
 /**
  * Base class for service models — subclass and call `Model.setup(config)` to wire

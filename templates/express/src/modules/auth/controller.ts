@@ -1,6 +1,6 @@
+import { clearTokenCookies, setTokenCookies } from "@/utils/cookie";
 import { Request, Response } from "express";
 import * as AuthService from "./service";
-import { clearTokenCookies, setTokenCookies } from "@/utils/cookie";
 
 /** POST /api/auth/register */
 export async function register(req: Request, res: Response): Promise<void> {

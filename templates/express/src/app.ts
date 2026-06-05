@@ -1,15 +1,15 @@
-import compression from "compression";
-import cookieParser from "cookie-parser";
-import cors from "cors";
-import express, { type Express } from "express";
-import helmet from "helmet";
-import morgan from "morgan";
 import { config } from "./config/environment";
 import { errorHandler } from "./middleware/error-handler";
 import { verifyHmacRequest } from "./middleware/hmac";
 import { notFoundHandler } from "./middleware/not-found-handler";
 import { globalRateLimiter } from "./middleware/rate-limit";
+import express, { type Express } from "express";
 import routes from "./routes";
+import compression from "compression";
+import cookieParser from "cookie-parser";
+import cors from "cors";
+import helmet from "helmet";
+import morgan from "morgan";
 
 const app: Express = express();
 

@@ -1,6 +1,6 @@
-import { select, isCancel } from "@clack/prompts";
 import { UserAbortError } from "../errors.js";
 import { TEMPLATES, type Template } from "../types.js";
+import { select, isCancel } from "@clack/prompts";
 
 const LABELS: Record<Template, string> = {
   vuejs: "VueJS · Pinia · Reka UI · Tailwind",

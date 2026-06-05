@@ -1,6 +1,6 @@
-import dotenv from "dotenv";
-import { EnvironmentConfig } from "@/types";
 import { loadRsaKeyPair } from "./keys";
+import { EnvironmentConfig } from "@/types";
+import dotenv from "dotenv";
 
 dotenv.config();
 

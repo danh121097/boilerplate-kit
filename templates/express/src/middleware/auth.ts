@@ -1,8 +1,8 @@
-import { NextFunction, Request, Response } from "express";
 import { AppError } from "@/types";
 import { JwtPayload } from "@/types/auth";
 import { verifyAccessToken } from "@/utils/jwt";
 import { getUserRevokedAt } from "@/utils/token-revocation";
+import { NextFunction, Request, Response } from "express";
 
 /** Extend Express Request to include authenticated user */
 declare global {

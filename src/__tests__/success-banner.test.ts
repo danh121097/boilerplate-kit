@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import { formatSuccessLines } from "../postprocess/success-banner.js";
+import { describe, expect, it } from "vitest";
 import type { PackageManager, ResolvedOptions } from "../types.js";
 
 // eslint-disable-next-line no-control-regex

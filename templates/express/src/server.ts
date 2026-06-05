@@ -1,7 +1,7 @@
-import { createServer } from 'http';
 import { connectDatabase } from './config/database';
 import { config } from './config/environment';
 import { connectRedis } from './config/redis';
+import { createServer } from 'http';
 
 /** Bootstrap server: connect DB and Redis, attach Socket.IO, then listen */
 const startServer = async (): Promise<void> => {

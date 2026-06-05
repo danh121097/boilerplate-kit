@@ -1,7 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
-import { errorHandler } from "@/middleware/error-handler";
 import { config } from "@/config/environment";
+import { errorHandler } from "@/middleware/error-handler";
 import { AppError } from "@/types";
+import { describe, it, expect, vi } from "vitest";
 
 // Stack-trace inclusion is driven by config.isDevelopment (computed once at load),
 // so tests toggle the config value rather than mutating process.env at runtime.

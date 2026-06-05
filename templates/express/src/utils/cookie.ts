@@ -1,5 +1,5 @@
-import { CookieOptions, Response } from 'express';
 import { config } from '@/config/environment';
+import { CookieOptions, Response } from 'express';
 
 /** Shared cookie options for secure HTTP-only cookies */
 const baseCookieOptions: CookieOptions = {

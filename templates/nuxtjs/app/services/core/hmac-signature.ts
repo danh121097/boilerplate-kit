@@ -1,5 +1,5 @@
-import type { InternalAxiosRequestConfig } from "axios";
 import type { HMACSignatureData } from "./types";
+import type { InternalAxiosRequestConfig } from "axios";
 import Base64 from "crypto-js/enc-base64";
 import HmacSHA256 from "crypto-js/hmac-sha256";
 

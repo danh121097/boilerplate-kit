@@ -1,5 +1,3 @@
-import { spinner } from "@clack/prompts";
-import pc from "picocolors";
 import { downloadCleanTemplate } from "../fetcher/download-template.js";
 import { verifyExtraction } from "../fetcher/verify-extraction.js";
 import { runGitInit } from "../postprocess/git-init.js";
@@ -7,7 +5,9 @@ import { runInstall } from "../postprocess/install-dependencies.js";
 import { rewritePackageJson } from "../postprocess/rewrite-package-json.js";
 import { printSuccessBanner } from "../postprocess/success-banner.js";
 import { upgradeDependencies } from "../postprocess/upgrade-dependencies.js";
+import { spinner } from "@clack/prompts";
 import type { ResolvedOptions } from "../types.js";
+import pc from "picocolors";
 
 export async function runScaffold(opts: ResolvedOptions): Promise<void> {
   const fetchSpin = spinner();

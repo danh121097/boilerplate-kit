@@ -1,6 +1,6 @@
+import { ValidationError } from "../errors.js";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { resolve } from "node:path";
-import { ValidationError } from "../errors.js";
 
 export interface TargetDir {
   absolutePath: string;

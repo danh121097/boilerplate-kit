@@ -1,15 +1,5 @@
-import { intro } from "@clack/prompts";
-import pc from "picocolors";
-import { isInteractive } from "./runtime/tty.js";
 import { ValidationError } from "./errors.js";
-import { validateProjectName } from "./validators/validate-project-name.js";
-import { assertTargetDirOk, inspectTargetDir } from "./validators/validate-target-dir.js";
-import { promptProjectName } from "./wizard/prompt-project-name.js";
-import { promptTemplate } from "./wizard/prompt-template.js";
-import { promptPackageManager } from "./wizard/prompt-package-manager.js";
-import { promptGit } from "./wizard/prompt-git.js";
-import { promptInstall } from "./wizard/prompt-install.js";
-import { promptLatest } from "./wizard/prompt-latest.js";
+import { isInteractive } from "./runtime/tty.js";
 import {
   DEFAULT_REF,
   PACKAGE_MANAGERS,
@@ -19,6 +9,16 @@ import {
   type ResolvedOptions,
   type Template,
 } from "./types.js";
+import { validateProjectName } from "./validators/validate-project-name.js";
+import { assertTargetDirOk, inspectTargetDir } from "./validators/validate-target-dir.js";
+import { promptGit } from "./wizard/prompt-git.js";
+import { promptInstall } from "./wizard/prompt-install.js";
+import { promptLatest } from "./wizard/prompt-latest.js";
+import { promptPackageManager } from "./wizard/prompt-package-manager.js";
+import { promptProjectName } from "./wizard/prompt-project-name.js";
+import { promptTemplate } from "./wizard/prompt-template.js";
+import { intro } from "@clack/prompts";
+import pc from "picocolors";
 
 function failMissingFlag(flag: string): never {
   throw new ValidationError(`Missing required option in non-interactive mode: --${flag}`);

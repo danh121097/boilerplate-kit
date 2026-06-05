@@ -1,13 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { ValidationError } from "../errors.js";
 import {
   assertTargetDirOk,
   inspectTargetDir,
   type TargetDir,
 } from "../validators/validate-target-dir.js";
-import { ValidationError } from "../errors.js";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 describe("inspectTargetDir", () => {
   let cwd: string;

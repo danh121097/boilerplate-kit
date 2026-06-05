@@ -1,7 +1,7 @@
-import { describe, it, expect, vi } from 'vitest';
 import { authenticate } from '@/middleware/auth';
-import { signAccessToken } from '@/utils/jwt';
 import { AppError } from '@/types';
+import { signAccessToken } from '@/utils/jwt';
+import { describe, it, expect, vi } from 'vitest';
 
 describe('authenticate middleware', () => {
   const mockRes = {} as any;

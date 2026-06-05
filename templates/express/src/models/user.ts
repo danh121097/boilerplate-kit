@@ -1,6 +1,6 @@
-import bcrypt from 'bcrypt';
-import { Schema, model } from 'mongoose';
 import { ROLES, UserDocument } from '@/types/auth';
+import { Schema, model } from 'mongoose';
+import bcrypt from 'bcrypt';
 
 const userSchema = new Schema<UserDocument>(
   {

@@ -1,11 +1,11 @@
-import { createServer, type Server as HttpServer } from 'http';
-import type { AddressInfo } from 'net';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
+import { signSocketHmac } from '../helpers/hmac-sign';
 import { closeSocket, initSocket } from '@/socket';
 import { SOCKET_EVENT } from '@/socket/events';
 import { signAccessToken } from '@/utils/jwt';
-import { signSocketHmac } from '../helpers/hmac-sign';
+import { createServer, type Server as HttpServer } from 'http';
+import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { AddressInfo } from 'net';
 
 /**
  * End-to-end: a real client connects through the JWT handshake, joins its user

@@ -1,9 +1,9 @@
+import { registerGroup } from '@/utils/route-registrar';
 import { Router } from 'express';
+import type { RouteGroup } from '@/types/routing';
+import healthGroup from './health-check';
 import authGroup from '@/modules/auth/routes';
 import userGroup from '@/modules/user/routes';
-import healthGroup from './health-check';
-import { registerGroup } from '@/utils/route-registrar';
-import type { RouteGroup } from '@/types/routing';
 
 // Order preserved (health → auth → user) to keep route precedence identical.
 // Exported so tooling (e.g. Postman collection generator) reuses the exact same

@@ -1,9 +1,9 @@
+import { loadRsaKeyPair } from '@/config/keys';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { loadRsaKeyPair } from '@/config/keys';
 
 /** Write a fresh RSA keypair to a temp dir, return the two file paths */
 function writeTempKeyPair(): { privPath: string; pubPath: string } {

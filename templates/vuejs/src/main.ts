@@ -1,7 +1,7 @@
-import { createApp } from "vue";
-import App from "./App.vue";
 import { registerPlugins } from "@/plugins";
 import { initServices } from "@/services";
+import { createApp } from "vue";
+import App from "./App.vue";
 import "@/scss/tailwind.css";
 import "@/scss/main.scss";
 

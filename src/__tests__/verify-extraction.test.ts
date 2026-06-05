@@ -1,9 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { ScaffoldError } from "../errors.js";
+import { verifyExtraction } from "../fetcher/verify-extraction.js";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { verifyExtraction } from "../fetcher/verify-extraction.js";
-import { ScaffoldError } from "../errors.js";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 describe("verifyExtraction", () => {
   let dir: string;

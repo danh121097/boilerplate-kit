@@ -1,6 +1,3 @@
-import crypto from 'crypto';
-import jwt from 'jsonwebtoken';
-import { describe, it, expect } from 'vitest';
 import { config } from '@/config/environment';
 import {
   signAccessToken,
@@ -9,6 +6,9 @@ import {
   verifyRefreshToken,
   hashToken,
 } from '@/utils/jwt';
+import { describe, it, expect } from 'vitest';
+import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 
 describe('JWT Utils', () => {
   const payload = { userId: '123', email: 'a@b.com', role: 'user' as const };

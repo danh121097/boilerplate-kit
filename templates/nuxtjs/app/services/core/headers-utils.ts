@@ -1,7 +1,7 @@
 import { getAuthToken } from "./auth-token-storage";
 import { HMACSignatureGenerator } from "./hmac-signature";
-import type { AxiosRequestHeaders, InternalAxiosRequestConfig } from "axios";
 import type { ApiService } from "./types";
+import type { AxiosRequestHeaders, InternalAxiosRequestConfig } from "axios";
 
 export class HeadersUtils {
   /** Attach HMAC signature headers if a secret is configured. */

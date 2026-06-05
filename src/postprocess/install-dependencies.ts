@@ -1,6 +1,6 @@
 import { installDependencies } from "nypm";
-import pc from "picocolors";
 import type { PackageManager } from "../types.js";
+import pc from "picocolors";
 
 export async function runInstall(cwd: string, packageManager: PackageManager): Promise<void> {
   try {

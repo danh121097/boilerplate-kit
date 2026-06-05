@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
-import request from 'supertest';
-import app from '@/app';
 import { signHmac } from '../helpers/hmac-sign';
+import { describe, it, expect } from 'vitest';
+import app from '@/app';
+import request from 'supertest';
 
 describe('Auth Routes', () => {
   const user = {

@@ -1,5 +1,5 @@
-import { createI18n } from "vue-i18n";
 import { STORAGE_KEYS } from "@/enums";
+import { createI18n } from "vue-i18n";
 import type { App } from "vue";
 import en from "@/i18n/locales/en";
 import ja from "@/i18n/locales/ja";

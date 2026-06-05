@@ -1,7 +1,7 @@
-import { Request, Response } from 'express';
-import mongoose from 'mongoose';
 import { getRedis } from '@/config/redis';
+import { Request, Response } from 'express';
 import type { RouteGroup } from '@/types/routing';
+import mongoose from 'mongoose';
 
 /** Report Redis liveness: 'disabled' when off, else 'up'/'down' by PING. */
 async function getRedisStatus(): Promise<string> {

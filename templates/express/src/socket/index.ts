@@ -1,12 +1,12 @@
-import type { Server as HttpServer } from 'http';
-import { createAdapter } from '@socket.io/redis-adapter';
-import type { Redis } from 'ioredis';
-import { Server, type Socket } from 'socket.io';
-import { config } from '@/config/environment';
-import { getRedis } from '@/config/redis';
 import { socketAuth } from './auth-middleware';
 import { SOCKET_EVENT } from './events';
 import { socketHmac } from './hmac-middleware';
+import { config } from '@/config/environment';
+import { getRedis } from '@/config/redis';
+import { createAdapter } from '@socket.io/redis-adapter';
+import { Server, type Socket } from 'socket.io';
+import type { Server as HttpServer } from 'http';
+import type { Redis } from 'ioredis';
 
 /**
  * Socket.IO server attached to the HTTP server. Optional like the rest of the

@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import { DEFAULT_REF, TEMPLATES, getSource } from "../fetcher/template-registry.js";
+import { describe, expect, it } from "vitest";
 
 describe("template-registry", () => {
   it("default ref is 'latest'", () => {

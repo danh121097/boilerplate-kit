@@ -1,7 +1,7 @@
-import mongoose from 'mongoose';
-import { closeSocket } from '@/socket';
 import { config } from './environment';
 import { disconnectRedis } from './redis';
+import { closeSocket } from '@/socket';
+import mongoose from 'mongoose';
 
 /** Connect to MongoDB with event logging and graceful shutdown */
 export async function connectDatabase(): Promise<void> {

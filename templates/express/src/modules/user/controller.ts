@@ -1,6 +1,6 @@
-import { Request, Response } from 'express';
 import { User } from '@/models/user';
 import { AppError } from '@/types';
+import { Request, Response } from 'express';
 
 /** List all users (admin only) */
 export async function listUsers(_req: Request, res: Response): Promise<void> {

@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { validatePasswordStrength } from '@/utils/password';
 import { AppError } from '@/types';
+import { validatePasswordStrength } from '@/utils/password';
+import { describe, it, expect } from 'vitest';
 
 describe('validatePasswordStrength', () => {
   it('accepts valid password', () => {

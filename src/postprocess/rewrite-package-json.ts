@@ -1,6 +1,6 @@
+import { ScaffoldError } from "../errors.js";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { ScaffoldError } from "../errors.js";
 
 export async function rewritePackageJson(targetDir: string, name: string): Promise<void> {
   const pkgPath = join(targetDir, "package.json");

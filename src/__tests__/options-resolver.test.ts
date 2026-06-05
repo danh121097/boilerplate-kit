@@ -1,12 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../runtime/tty.js", () => ({ isInteractive: () => false }));
 
-import { resolveOptions } from "../options-resolver.js";
 import { ValidationError } from "../errors.js";
+import { resolveOptions } from "../options-resolver.js";
 import { DEFAULT_REF, type Template } from "../types.js";
 
 describe("resolveOptions (non-interactive)", () => {

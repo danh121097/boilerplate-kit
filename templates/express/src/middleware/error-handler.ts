@@ -1,6 +1,6 @@
-import { NextFunction, Request, Response } from "express";
 import { config } from "@/config/environment";
 import { AppError } from "@/types";
+import { NextFunction, Request, Response } from "express";
 
 /** Global error handling middleware — must be registered last */
 export function errorHandler(

@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
 import { authorize } from '@/middleware/role';
 import { AppError } from '@/types';
+import { describe, it, expect, vi } from 'vitest';
 
 describe('authorize middleware', () => {
   const mockRes = {} as any;

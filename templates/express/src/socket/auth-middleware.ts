@@ -1,8 +1,8 @@
-import type { Socket } from 'socket.io';
+import { SOCKET_UNAUTHORIZED } from './events';
 import { JwtPayload } from '@/types/auth';
 import { verifyAccessToken } from '@/utils/jwt';
 import { getUserRevokedAt } from '@/utils/token-revocation';
-import { SOCKET_UNAUTHORIZED } from './events';
+import type { Socket } from 'socket.io';
 
 /** Read a single cookie value from a raw Cookie header. */
 function readCookie(

@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
 import { validateProjectName } from "../validators/validate-project-name.js";
+import { describe, it, expect } from "vitest";
 
 describe("validateProjectName", () => {
   it("accepts a valid lowercase slug", () => {

@@ -1,6 +1,6 @@
-import { NextFunction, Request, Response } from 'express';
 import { AppError } from '@/types';
 import { verifyHmac } from '@/utils/hmac';
+import { NextFunction, Request, Response } from 'express';
 
 /**
  * Verify the HMAC signature on the `sig` + `ctime` headers. The signed string is

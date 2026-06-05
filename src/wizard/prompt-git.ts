@@ -1,5 +1,5 @@
-import { confirm, isCancel } from "@clack/prompts";
 import { UserAbortError } from "../errors.js";
+import { confirm, isCancel } from "@clack/prompts";
 
 export async function promptGit(initial = true): Promise<boolean> {
   const result = await confirm({

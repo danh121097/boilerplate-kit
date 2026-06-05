@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { computeSignature, verifyHmac } from '@/utils/hmac';
+import { describe, expect, it } from 'vitest';
 
 /**
  * Core HMAC verify: Base64 signature, timestamp freshness, constant-time compare.

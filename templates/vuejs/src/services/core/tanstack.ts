@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
+import type { ApiResponseError } from "./types";
 import type {
   MutationOptions,
   UseMutationOptions,
@@ -7,7 +8,6 @@ import type {
   UseQueryReturnType,
 } from "@tanstack/vue-query";
 import type { MaybeRefOrGetter, Ref } from "vue";
-import type { ApiResponseError } from "./types";
 
 type QueryDefinitionKey<TParams> = readonly [string] | readonly [string, TParams];
 type UnwrapMaybeRef<T> = T extends Ref<infer V> ? V : T;

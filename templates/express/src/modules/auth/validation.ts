@@ -1,6 +1,6 @@
+import { AppError } from '@/types';
 import { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
-import { AppError } from '@/types';
 
 /** Generic Zod validation middleware factory */
 export function validate(schema: z.ZodSchema) {

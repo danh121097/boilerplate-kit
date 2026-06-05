@@ -1,5 +1,5 @@
-import { Schema, model } from 'mongoose';
 import { RefreshTokenDocument } from '@/types/auth';
+import { Schema, model } from 'mongoose';
 
 const refreshTokenSchema = new Schema<RefreshTokenDocument>(
   {

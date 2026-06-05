@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { RefreshToken } from '@/models/refresh-token';
+import { User } from '@/models/user';
 import {
   register,
   login,
@@ -6,10 +7,9 @@ import {
   logout,
   getMe,
 } from '@/modules/auth/service';
-import { User } from '@/models/user';
-import { RefreshToken } from '@/models/refresh-token';
-import { hashToken } from '@/utils/jwt';
 import { AppError } from '@/types';
+import { hashToken } from '@/utils/jwt';
+import { describe, it, expect } from 'vitest';
 
 describe('AuthService', () => {
   const validUser = {

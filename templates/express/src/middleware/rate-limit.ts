@@ -1,7 +1,7 @@
-import rateLimit, { type RateLimitRequestHandler, type Store } from "express-rate-limit";
-import { RedisStore } from "rate-limit-redis";
 import { config } from "@/config/environment";
 import { getRedis } from "@/config/redis";
+import rateLimit, { type RateLimitRequestHandler, type Store } from "express-rate-limit";
+import { RedisStore } from "rate-limit-redis";
 
 const isTest = config.isTest;
 

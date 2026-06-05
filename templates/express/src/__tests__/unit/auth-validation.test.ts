@@ -1,10 +1,10 @@
-import { describe, it, expect, vi } from 'vitest';
 import {
   registerSchema,
   loginSchema,
   validate,
 } from '@/modules/auth/validation';
 import { AppError } from '@/types';
+import { describe, it, expect, vi } from 'vitest';
 
 describe('Zod Schemas', () => {
   it('registerSchema accepts valid input', () => {

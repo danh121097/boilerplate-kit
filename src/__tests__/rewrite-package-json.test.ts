@@ -1,9 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { ScaffoldError } from "../errors.js";
+import { rewritePackageJson } from "../postprocess/rewrite-package-json.js";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { rewritePackageJson } from "../postprocess/rewrite-package-json.js";
-import { ScaffoldError } from "../errors.js";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 describe("rewritePackageJson", () => {
   let dir: string;

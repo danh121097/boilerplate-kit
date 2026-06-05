@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { validateRef } from "../fetcher/validate-ref.js";
 import { ValidationError } from "../errors.js";
+import { validateRef } from "../fetcher/validate-ref.js";
+import { describe, expect, it } from "vitest";
 
 describe("validateRef", () => {
   it("accepts common branch names", () => {

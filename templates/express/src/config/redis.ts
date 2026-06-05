@@ -1,5 +1,5 @@
-import Redis from "ioredis";
 import { config } from "./environment";
+import Redis from "ioredis";
 
 /**
  * Single shared Redis client for the whole app (rate-limit, cache, token

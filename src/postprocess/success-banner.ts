@@ -1,6 +1,6 @@
-import pc from "picocolors";
 import { relative } from "node:path";
 import type { PackageManager, ResolvedOptions } from "../types.js";
+import pc from "picocolors";
 
 const DEV_CMD: Record<PackageManager, string> = {
   npm: "npm run dev",

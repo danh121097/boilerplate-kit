@@ -1,6 +1,6 @@
+import { useStorageKeys } from "@/enums/storage-keys";
 import { Api, ApiInterceptors } from "@/services/core";
 import { registerServiceToken } from "@/services/core/auth-token-storage";
-import { useStorageKeys } from "@/enums/storage-keys";
 
 /**
  * Bootstrap the shared `Api` client before any page-level data fetches run.
