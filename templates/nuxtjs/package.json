@@ -10,6 +10,8 @@
     "generate": "nuxt generate",
     "postinstall": "nuxt prepare",
     "typecheck": "nuxt typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
@@ -48,6 +50,7 @@
     "jiti": "^2.7.0",
     "prettier": "^3.8.3",
     "sass-embedded": "^1.100.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8"
   }
 }
