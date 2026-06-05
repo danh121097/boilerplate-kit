@@ -1,5 +1,6 @@
 {
   "name": "nuxtjs-starter",
+  "description": "Nuxt 4 + TypeScript SSR starter — Pinia, TanStack Query, Reka UI, Tailwind v4, JWT Auth",
   "version": "0.0.0",
   "private": true,
   "type": "module",

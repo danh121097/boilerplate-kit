@@ -1,5 +1,6 @@
 {
   "name": "vuejs-starter",
+  "description": "Vue 3 + TypeScript SPA starter — Vite, Pinia, TanStack Query, Reka UI, Tailwind v4, JWT Auth",
   "version": "0.0.0",
   "private": true,
   "type": "module",

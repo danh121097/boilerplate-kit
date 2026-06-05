@@ -31,7 +31,7 @@ COPY --from=builder /usr/src/app/dist ./dist
 #     -v $(pwd)/src/keys:/usr/src/app/keys:ro \
 #     -e JWT_PRIVATE_KEY_PATH=/usr/src/app/keys/rsa.private \
 #     -e JWT_PUBLIC_KEY_PATH=/usr/src/app/keys/rsa.public \
-#     -p 3000:3000 node-ts-boilerplate
+#     -p 3000:3000 express-starter
 # (production env refuses to start without real key files — by design.)
 
 EXPOSE 3000

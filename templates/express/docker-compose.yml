@@ -1,7 +1,7 @@
 # Local dev dependencies (MongoDB + Redis) for the boilerplate.
 # The app itself still runs on the host (`npm run dev`); only the datastores live
 # in containers. Ports are mapped to localhost so the default .env works as-is:
-#   MONGODB_URI=mongodb://localhost:27017/node-ts-boilerplate
+#   MONGODB_URI=mongodb://localhost:27017/express-starter
 #   REDIS_URL=redis://localhost:6379
 #
 # Usage:

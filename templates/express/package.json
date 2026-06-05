@@ -1,7 +1,7 @@
 {
-  "name": "node-ts-boilerplate",
+  "name": "express-starter",
   "version": "1.0.0",
-  "description": "Node.js tutorial with TypeScript, Express, and MongoDB",
+  "description": "Express + TypeScript backend starter — JWT, HMAC, MongoDB, Redis, Socket.IO",
   "main": "dist/server.js",
   "scripts": {
     "predev": "[ -f src/keys/rsa.private ] || sh src/keys/setup.sh",
