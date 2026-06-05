@@ -3,6 +3,7 @@ import Base64 from "crypto-js/enc-base64";
 import HmacSHA256 from "crypto-js/hmac-sha256";
 import { getAuthToken } from "@/services/core/auth-token-storage";
 import { useSocketIOStore } from "@/stores/socket-io";
+import { SOCKET_EVENT, SOCKET_UNAUTHORIZED_MESSAGE } from "@/enums";
 
 /**
  * Initialize a socket.io connection scoped to the current component tree.
@@ -77,21 +78,21 @@ export function useSocketIO() {
 
   const handleAuthenticated = () => storeSocketIO.setSocketIO({ authenticated: true, socket });
   const handleConnectError = useThrottleFn((e: Error) => {
-    if (e.message === "Unauthorized!") storeSocketIO.setSocketIO({ authenticated: false });
+    if (e.message === SOCKET_UNAUTHORIZED_MESSAGE) storeSocketIO.setSocketIO({ authenticated: false });
     reConnect();
   }, 1000);
   const handleUnauthorized = () => destroySocket();
 
-  socket.on("authenticated", handleAuthenticated);
-  socket.on("connect_error", handleConnectError);
-  socket.on("unauthorized", handleUnauthorized);
+  socket.on(SOCKET_EVENT.AUTHENTICATED, handleAuthenticated);
+  socket.on(SOCKET_EVENT.CONNECT_ERROR, handleConnectError);
+  socket.on(SOCKET_EVENT.UNAUTHORIZED, handleUnauthorized);
 
   onMounted(connectSocket);
 
   onScopeDispose(() => {
-    socket.off("authenticated", handleAuthenticated);
-    socket.off("connect_error", handleConnectError);
-    socket.off("unauthorized", handleUnauthorized);
+    socket.off(SOCKET_EVENT.AUTHENTICATED, handleAuthenticated);
+    socket.off(SOCKET_EVENT.CONNECT_ERROR, handleConnectError);
+    socket.off(SOCKET_EVENT.UNAUTHORIZED, handleUnauthorized);
     destroySocket();
   });
 
