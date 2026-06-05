@@ -78,7 +78,8 @@ export function useSocketIO() {
 
   const handleAuthenticated = () => storeSocketIO.setSocketIO({ authenticated: true, socket });
   const handleConnectError = useThrottleFn((e: Error) => {
-    if (e.message === SOCKET_UNAUTHORIZED_MESSAGE) storeSocketIO.setSocketIO({ authenticated: false });
+    if (e.message === SOCKET_UNAUTHORIZED_MESSAGE)
+      storeSocketIO.setSocketIO({ authenticated: false });
     reConnect();
   }, 1000);
   const handleUnauthorized = () => destroySocket();
@@ -104,7 +105,7 @@ export function useSocketIO() {
   };
 }
 
-/** Get the live socket from the store, lazy-initing one if none exists yet. */
+/** Get the live socket from the store, lazy initializing one if none exists yet. */
 export function useIo() {
   const storeSocketIO = useSocketIOStore();
   const { ioStore } = storeToRefs(storeSocketIO);
