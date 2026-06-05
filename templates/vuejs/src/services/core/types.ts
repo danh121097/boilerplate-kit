@@ -1,7 +1,13 @@
 import type { QueryKey, UseQueryOptions } from "@tanstack/vue-query";
 import type { AxiosInstance, AxiosRequestConfig } from "axios";
 
-export type ApiService = "MAIN" | "AUX";
+/**
+ * Logical name of a backend an Api instance talks to. "MAIN" is the default and
+ * the only service most apps need. The `(string & {})` arm keeps "MAIN"
+ * autocompleting while letting apps register extra services freely (see
+ * `Api.setBaseURL` + `registerServiceToken`).
+ */
+export type ApiService = "MAIN" | (string & {});
 
 declare module "axios" {
   interface InternalAxiosRequestConfig {

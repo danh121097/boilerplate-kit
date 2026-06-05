@@ -6,12 +6,6 @@ import type {
   ServiceConfig,
 } from "./types";
 
-let inFlightRequestCount = 0;
-export const getApiInFlightRequestCount = (): number => inFlightRequestCount;
-
-const trackStart = () => (inFlightRequestCount += 1);
-const trackEnd = () => (inFlightRequestCount = Math.max(0, inFlightRequestCount - 1));
-
 /**
  * Shared HTTP API client with multi-service support and injectable interceptors.
  * Register interceptors via Api.registerInterceptors() before any API calls.
@@ -71,15 +65,10 @@ export class Api {
       ? { ...rest, headers: { ...rest.headers, ...customHeaders } }
       : rest;
 
-    trackStart();
-    try {
-      if (method === "get" || method === "delete") {
-        return await this.http[method]<T>(url, finalConfig);
-      }
-      return await this.http[method]<T>(url, data, finalConfig);
-    } finally {
-      trackEnd();
+    if (method === "get" || method === "delete") {
+      return await this.http[method]<T>(url, finalConfig);
     }
+    return await this.http[method]<T>(url, data, finalConfig);
   }
 
   getServiceType(): ApiService {

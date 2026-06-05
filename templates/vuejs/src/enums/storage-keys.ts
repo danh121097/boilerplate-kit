@@ -6,7 +6,6 @@ const APP_PREFIX = import.meta.env.VITE_APP_NAME || "PRISM_APP";
  */
 export const STORAGE_KEYS = {
   AUTH_TOKEN: `${APP_PREFIX}_AUTH_TOKEN`,
-  AUX_TOKEN: `${APP_PREFIX}_AUX_TOKEN`,
   LANGUAGE: `${APP_PREFIX}_LANGUAGE`,
   THEME: `${APP_PREFIX}_THEME`,
 } as const;

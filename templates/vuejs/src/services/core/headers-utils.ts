@@ -1,6 +1,6 @@
 import type { AxiosRequestHeaders, InternalAxiosRequestConfig } from "axios";
 import type { ApiService } from "./types";
-import { TOKEN_KEYS, getAuthToken } from "./auth-token-storage";
+import { getAuthToken } from "./auth-token-storage";
 import { HMACSignatureGenerator } from "./hmac-signature";
 
 export class HeadersUtils {
@@ -17,8 +17,7 @@ export class HeadersUtils {
     config: InternalAxiosRequestConfig,
     service: ApiService,
   ): void {
-    const key = service === "MAIN" ? TOKEN_KEYS.MAIN : TOKEN_KEYS.AUX;
-    const token = getAuthToken(key);
+    const token = getAuthToken(service);
     if (token) config.headers.authorization = `Bearer ${token}`;
   }
 }
