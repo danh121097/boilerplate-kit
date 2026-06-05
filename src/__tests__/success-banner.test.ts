@@ -16,6 +16,7 @@ function base(overrides: Partial<ResolvedOptions> = {}): ResolvedOptions {
     force: false,
     ref: "latest",
     latest: false,
+    harness: false,
     targetDir: `${process.cwd()}/demo`,
     ...overrides,
   };

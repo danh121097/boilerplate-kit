@@ -42,6 +42,7 @@ describe("resolveOptions (non-interactive)", () => {
     expect(opts.ref).toBe("main");
     expect(opts.force).toBe(false);
     expect(opts.latest).toBe(false);
+    expect(opts.harness).toBe(false);
     expect(opts.targetDir).toBe(join(tmpRoot, "my-app"));
   });
 
@@ -53,6 +54,13 @@ describe("resolveOptions (non-interactive)", () => {
       latest: true,
     });
     expect(opts.latest).toBe(true);
+  });
+
+  it("defaults harness to false and propagates --harness", async () => {
+    const off = await resolveOptions({ name: "h0", template: "vuejs", pm: "pnpm" });
+    expect(off.harness).toBe(false);
+    const on = await resolveOptions({ name: "h1", template: "vuejs", pm: "pnpm", harness: true });
+    expect(on.harness).toBe(true);
   });
 
   it("defaults ref to 'latest' when omitted", async () => {

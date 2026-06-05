@@ -23,6 +23,8 @@ export interface PartialOptions {
   ref?: string;
   /** Run `npx npm-check-updates -u` before install so every dep resolves to its absolute latest. */
   latest?: boolean;
+  /** Install the optional repository-harness durable CLI into the scaffold (downloads a per-OS binary). */
+  harness?: boolean;
 }
 
 export interface ResolvedOptions {
@@ -34,5 +36,6 @@ export interface ResolvedOptions {
   force: boolean;
   ref: string;
   latest: boolean;
+  harness: boolean;
   targetDir: string;
 }

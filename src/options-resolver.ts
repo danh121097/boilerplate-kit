@@ -12,6 +12,7 @@ import {
 import { validateProjectName } from "./validators/validate-project-name.js";
 import { assertTargetDirOk, inspectTargetDir } from "./validators/validate-target-dir.js";
 import { promptGit } from "./wizard/prompt-git.js";
+import { promptHarness } from "./wizard/prompt-harness.js";
 import { promptInstall } from "./wizard/prompt-install.js";
 import { promptLatest } from "./wizard/prompt-latest.js";
 import { promptPackageManager } from "./wizard/prompt-package-manager.js";
@@ -91,6 +92,11 @@ export async function resolveOptions(partial: PartialOptions): Promise<ResolvedO
     latest = false;
   }
 
+  // Optional durable-layer harness CLI. Default off — it downloads a per-OS
+  // binary; the doc layer already ships with every template.
+  const harness =
+    partial.harness !== undefined ? partial.harness : interactive ? await promptHarness() : false;
+
   const target = inspectTargetDir(name);
   assertTargetDirOk(target, partial.force ?? false);
 
@@ -104,6 +110,7 @@ export async function resolveOptions(partial: PartialOptions): Promise<ResolvedO
     force: partial.force ?? false,
     ref: ref && ref.length > 0 ? ref : DEFAULT_REF,
     latest,
+    harness,
     targetDir: target.absolutePath,
   };
 }

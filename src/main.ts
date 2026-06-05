@@ -55,6 +55,11 @@ export const main = defineCommand({
       description:
         "Upgrade every dependency to its absolute latest before install (runs npm-check-updates)",
     },
+    harness: {
+      type: "boolean",
+      description:
+        "Install the optional repository-harness durable CLI after scaffold (downloads a per-OS binary)",
+    },
   },
   async run({ args }) {
     const resolved = await resolveOptions({
@@ -66,6 +71,7 @@ export const main = defineCommand({
       force: args.force as boolean | undefined,
       ref: args.ref as string | undefined,
       latest: args.latest as boolean | undefined,
+      harness: args.harness as boolean | undefined,
     });
     await runScaffold(resolved);
   },
