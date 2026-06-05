@@ -49,7 +49,13 @@ export function persistAuthToken(token: string, service: string = "MAIN"): void 
   localStorage.setItem(resolveTokenKey(service), token);
 }
 
-/** Clear every registered service's token (e.g. on logout / 401). */
+/** Clear a single service's token (e.g. when only that service's refresh fails). */
+export function clearAuthToken(service: string = "MAIN"): void {
+  if (!isClient()) return;
+  localStorage.removeItem(resolveTokenKey(service));
+}
+
+/** Clear every registered service's token (e.g. on logout). */
 export function clearAuthTokens(): void {
   if (!isClient()) return;
   serviceTokenKeys.forEach((resolver) => localStorage.removeItem(resolver()));

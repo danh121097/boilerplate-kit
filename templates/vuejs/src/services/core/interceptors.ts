@@ -1,16 +1,100 @@
-import { clearAuthTokens } from "./auth-token-storage";
+import { createTokenRefresher } from "./auth-refresh-client";
+import { clearAuthToken, getAuthToken } from "./auth-token-storage";
 import { HeadersUtils } from "./headers-utils";
-import type { ApiResponseError, ApiService, HttpInterceptorSetup } from "./types";
-import type { AxiosError, AxiosInstance, AxiosResponse } from "axios";
+import { RefreshTokenManager } from "./refresh-token-manager";
+import type {
+  ApiResponseError,
+  ApiService,
+  HttpInterceptorSetup,
+  RefreshOptions,
+  ServiceRefreshConfig,
+} from "./types";
+import type { AxiosError, AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from "axios";
+
+const REFRESH_DEFAULTS: Omit<RefreshOptions, "service"> = {
+  endpoint: "/auth/refresh",
+  reloadOnFailure: true,
+};
+
+/** Reload the current page — guarded so it no-ops during SSR. */
+function reloadPage(): void {
+  if (typeof window !== "undefined") window.location.reload();
+}
+
+/** Refresh runtime for one service: its single-flight manager + resolved options. */
+interface RefreshContext {
+  manager: RefreshTokenManager;
+  options: RefreshOptions;
+}
+
+/** Marker fields the interceptor inspects to recognize and route an envelope. */
+interface EnvelopeBody {
+  status?: string;
+  success?: boolean;
+  error_code?: number;
+}
+
+/**
+ * Treat a body as an API envelope only when it carries a recognized marker —
+ * `status` of "success"/"error", or a boolean `success`. This avoids
+ * misclassifying domain payloads that merely happen to have a `status` field
+ * (e.g. `{ id, status: "done" }`), which would otherwise be rejected as errors.
+ */
+function isEnvelope(body: unknown): boolean {
+  if (!body || typeof body !== "object") return false;
+  const b = body as EnvelopeBody;
+  return b.status === "success" || b.status === "error" || typeof b.success === "boolean";
+}
+
+/**
+ * A 401 is eligible for an automatic refresh only when the request has not
+ * already been replayed, it is not the refresh call itself, and we hold an access
+ * token for that service (so anonymous traffic never triggers a refresh storm).
+ */
+function canAttemptRefresh(config: InternalAxiosRequestConfig, options: RefreshOptions): boolean {
+  if (config._retry) return false;
+  if ((config.url ?? "").includes(options.endpoint)) return false;
+  return Boolean(getAuthToken(options.service));
+}
 
 interface ResponseInterceptorOpts {
-  clearUnauthorizedAuth: () => void;
-  reloadOnUnauthorized: boolean;
   strictBlobError: boolean;
+  instance: AxiosInstance;
+  resolveRefresh: (service: ApiService) => RefreshContext | null;
 }
 
 function createResponseInterceptor(opts: ResponseInterceptorOpts) {
-  const { clearUnauthorizedAuth, reloadOnUnauthorized, strictBlobError } = opts;
+  const { strictBlobError, instance, resolveRefresh } = opts;
+
+  const serviceOf = (config?: InternalAxiosRequestConfig): ApiService =>
+    (config?.serviceType ?? "MAIN") as ApiService;
+
+  /** Replay the original request after refreshing the right service; null when
+   * not eligible (no refresh for this service, anonymous, already retried, ...).
+   * The returned promise carries the replay's own outcome — a later non-auth
+   * failure (e.g. 500) propagates as-is and must NOT clear the refreshed token. */
+  const refreshAndRetry = (
+    config: InternalAxiosRequestConfig | undefined,
+  ): Promise<AxiosResponse> | null => {
+    if (!config) return null;
+    const ctx = resolveRefresh(serviceOf(config));
+    if (!ctx || !canAttemptRefresh(config, ctx.options)) return null;
+    config._retry = true;
+    return ctx.manager.getFreshToken().then((token) => {
+      config.headers.authorization = `Bearer ${token}`;
+      return instance(config);
+    });
+  };
+
+  /** Cleanup when a 401 cannot be recovered by a refresh: drop only that
+   * service's token, and reload only when the service has no refresh configured
+   * (nothing can recover it). A refresh-capable service handles its own reload
+   * on actual refresh failure via the manager. */
+  const handleUnauthorized = (config?: InternalAxiosRequestConfig) => {
+    const service = serviceOf(config);
+    clearAuthToken(service);
+    if (!resolveRefresh(service)) reloadPage();
+  };
 
   const onSuccess = (response: AxiosResponse) => {
     if (response.data instanceof Blob) {
@@ -24,12 +108,15 @@ function createResponseInterceptor(opts: ResponseInterceptorOpts) {
         message: response.statusText || "blob_error",
       });
     }
-    // If the API returns an envelope, unwrap; otherwise pass through.
-    if (response.data && typeof response.data === "object" && "status" in response.data) {
-      if (response.data.status === "success") return response.data;
-      if (response.data.error_code === 401) {
-        clearUnauthorizedAuth();
-        if (reloadOnUnauthorized) window.location.reload();
+    // Unwrap a recognized envelope; otherwise pass the raw response through.
+    // Accepts either convention: { status: "success"|"error", ... } or { success, ... }.
+    if (isEnvelope(response.data)) {
+      const body = response.data as EnvelopeBody;
+      if (body.status === "success" || body.success === true) return response.data;
+      if (body.error_code === 401) {
+        const retry = refreshAndRetry(response.config);
+        if (retry) return retry;
+        handleUnauthorized(response.config);
       }
       return Promise.reject<ApiResponseError>(response.data as ApiResponseError);
     }
@@ -37,14 +124,18 @@ function createResponseInterceptor(opts: ResponseInterceptorOpts) {
   };
 
   const onError = (error: AxiosError<ApiResponseError>) => {
-    const errorData = error.response?.data ?? { message: error.message };
     if (error.response?.status === 401) {
-      clearUnauthorizedAuth();
-      if (reloadOnUnauthorized) window.location.reload();
+      // Eligible → refresh + replay; let the replay's own outcome propagate so a
+      // transient post-refresh failure does not wrongly clear the new token.
+      const retry = refreshAndRetry(error.config);
+      if (retry) return retry;
+      // Not eligible (anonymous / already retried / no refresh) → genuine logout.
+      handleUnauthorized(error.config);
     }
     if (error.code === "ERR_NETWORK" || error.code === "ERR_BLOCKED_BY_CLIENT") {
       console.error("Network error. Please check your internet connection.");
     }
+    const errorData = error.response?.data ?? { message: error.message };
     return Promise.reject<ApiResponseError>(errorData as ApiResponseError);
   };
 
@@ -52,6 +143,38 @@ function createResponseInterceptor(opts: ResponseInterceptorOpts) {
 }
 
 export class ApiInterceptors implements HttpInterceptorSetup {
+  private readonly configs = new Map<ApiService, RefreshOptions>();
+  private readonly contexts = new Map<ApiService, RefreshContext>();
+
+  /**
+   * @param refreshByService Map of service name → refresh config. A service is
+   * auto-refreshed iff it appears here; omit a service to opt out.
+   */
+  constructor(refreshByService: Record<string, ServiceRefreshConfig> = {}) {
+    for (const [service, opts] of Object.entries(refreshByService)) {
+      this.configs.set(service, { ...REFRESH_DEFAULTS, ...opts, service });
+    }
+  }
+
+  /** Lazily build (and cache) the single-flight manager for one service. */
+  private getRefreshContext(service: ApiService): RefreshContext | null {
+    const options = this.configs.get(service);
+    if (!options) return null;
+    let ctx = this.contexts.get(service);
+    if (!ctx) {
+      const manager = new RefreshTokenManager({
+        service,
+        refresh: createTokenRefresher(options.endpoint, service),
+        onRefreshFailed: () => {
+          if (options.reloadOnFailure) reloadPage();
+        },
+      });
+      ctx = { manager, options };
+      this.contexts.set(service, ctx);
+    }
+    return ctx;
+  }
+
   setupRequestInterceptor(instance: AxiosInstance, service: ApiService): void {
     instance.interceptors.request.use(
       (config) => {
@@ -67,9 +190,9 @@ export class ApiInterceptors implements HttpInterceptorSetup {
   setupResponseInterceptor(instance: AxiosInstance): void {
     instance.interceptors.response.use(
       ...createResponseInterceptor({
-        clearUnauthorizedAuth: clearAuthTokens,
-        reloadOnUnauthorized: true,
         strictBlobError: true,
+        instance,
+        resolveRefresh: (service) => this.getRefreshContext(service),
       }),
     );
   }

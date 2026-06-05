@@ -1,10 +1,5 @@
 import axios, { type AxiosInstance } from "axios";
-import type {
-  ApiRequestConfig,
-  ApiService,
-  HttpInterceptorSetup,
-  ServiceConfig,
-} from "./types";
+import type { ApiRequestConfig, ApiService, HttpInterceptorSetup, ServiceConfig } from "./types";
 
 /**
  * Shared HTTP API client with multi-service support and injectable interceptors.
@@ -36,7 +31,7 @@ export class Api {
     this.service = config.service ?? "MAIN";
     this.http = axios.create({
       headers: { "Content-Type": "application/json", Accept: "*/*" },
-      withCredentials: false,
+      withCredentials: true,
       timeout: 30_000,
     });
 

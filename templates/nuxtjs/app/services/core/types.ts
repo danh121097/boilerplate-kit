@@ -12,8 +12,32 @@ export type ApiService = "MAIN" | (string & {});
 declare module "axios" {
   interface InternalAxiosRequestConfig {
     serviceType?: ApiService;
+    /** Set once a request has already been replayed after a token refresh, so a
+     * second 401 cannot trigger an endless refresh/retry loop. */
+    _retry?: boolean;
   }
 }
+
+/**
+ * Resolved refresh config for one service. The refresh token itself lives in an
+ * httpOnly cookie owned by the backend — only the short-lived access token is
+ * managed client-side.
+ */
+export interface RefreshOptions {
+  /** Refresh endpoint, relative to the owning service's baseURL. */
+  endpoint: string;
+  /** Which backend owns the refresh cookie. */
+  service: ApiService;
+  /** Reload the page when a refresh ultimately fails (session truly expired). */
+  reloadOnFailure: boolean;
+}
+
+/**
+ * Per-service refresh config as supplied at registration. Presence (a service
+ * appearing in the registration map) is what enables refresh for that service;
+ * `service` is implied by the map key, so it is omitted here.
+ */
+export type ServiceRefreshConfig = Partial<Omit<RefreshOptions, "service">>;
 
 export interface ApiResponse<T = unknown> {
   status: string;
