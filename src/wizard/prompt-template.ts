@@ -4,7 +4,7 @@ import { TEMPLATES, type Template } from "../types.js";
 
 const LABELS: Record<Template, string> = {
   vuejs: "VueJS · Pinia · Reka UI · Tailwind",
-  nuxtjs: "NuxtJS · Pinia · Nuxt UI · Tailwind",
+  nuxtjs: "NuxtJS · Pinia · Reka UI · Tailwind",
   reactjs: "ReactJS · TanStack Router · shadcn/ui · Tailwind",
   nextjs: "NextJS · App Router · shadcn/ui · Tailwind",
   "tanstack-start": "TanStack Start · shadcn/ui · Tailwind",

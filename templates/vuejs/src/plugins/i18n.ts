@@ -1,8 +1,8 @@
-import type { App } from "vue";
 import { createI18n } from "vue-i18n";
+import { STORAGE_KEYS } from "@/enums";
+import type { App } from "vue";
 import en from "@/i18n/locales/en";
 import ja from "@/i18n/locales/ja";
-import { STORAGE_KEYS } from "@/enums";
 
 function getLanguage(): string {
   return localStorage.getItem(STORAGE_KEYS.LANGUAGE) || import.meta.env.VITE_LANGUAGE_CODE || "en";
