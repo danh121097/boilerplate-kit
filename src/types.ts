@@ -1,4 +1,11 @@
-export const TEMPLATES = ["vuejs", "nuxtjs", "reactjs", "nextjs", "tanstack-start"] as const;
+export const TEMPLATES = [
+  "vuejs",
+  "nuxtjs",
+  "reactjs",
+  "nextjs",
+  "tanstack-start",
+  "express",
+] as const;
 export type Template = (typeof TEMPLATES)[number];
 
 export const PACKAGE_MANAGERS = ["npm", "yarn", "pnpm", "bun"] as const;

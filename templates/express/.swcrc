@@ -1,0 +1,21 @@
+{
+  "$schema": "https://swc.rs/schema.json",
+  "jsc": {
+    "parser": {
+      "syntax": "typescript",
+      "tsx": false,
+      "dynamicImport": true
+    },
+    "target": "es2022",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+    "keepClassNames": true,
+    "loose": false
+  },
+  "module": {
+    "type": "commonjs"
+  },
+  "exclude": [".*\\.test\\.ts$", "__tests__"]
+}

@@ -1,0 +1,51 @@
+# Local dev dependencies (MongoDB + Redis) for the boilerplate.
+# The app itself still runs on the host (`npm run dev`); only the datastores live
+# in containers. Ports are mapped to localhost so the default .env works as-is:
+#   MONGODB_URI=mongodb://localhost:27017/node-ts-boilerplate
+#   REDIS_URL=redis://localhost:6379
+#
+# Usage:
+#   docker compose up -d        # start in background
+#   docker compose ps           # see status / health
+#   docker compose logs -f redis
+#   docker compose down         # stop (keeps data volumes)
+#   docker compose down -v      # stop AND wipe data
+#
+# NOTE: stop any native instance first to free the ports, e.g.:
+#   brew services stop redis
+#   brew services stop mongodb-community
+
+services:
+  mongo:
+    image: mongo:latest
+    container_name: ntb-mongo
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', "db.runCommand({ ping: 1 }).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:latest
+    container_name: ntb-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    # Persist data to disk so cache/rate-limit/revocation survive restarts.
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  mongo-data:
+  redis-data:

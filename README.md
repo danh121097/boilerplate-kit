@@ -1,14 +1,15 @@
 # create-prism-app
 
-Scaffold an opinionated frontend starter in seconds. One CLI, five curated stacks:
+Scaffold an opinionated starter in seconds. One CLI, six curated stacks:
 
 - **Vue 3** + Vite + Vue Router + Pinia + Reka UI + TanStack Query + Tailwind v4
 - **Nuxt 4** + Pinia + TanStack Query + Nuxt UI + Tailwind
 - **React 19** + Vite + TanStack Router + Zustand + shadcn/ui + Tailwind v4
 - **Next.js 16** (App Router) + TanStack Query + Zustand + shadcn/ui + Tailwind v4
 - **TanStack Start** + TanStack Query + Zustand + shadcn/ui + Tailwind v4
+- **Express 5** (backend) + TypeScript + Mongoose + Socket.io + Redis + JWT/HMAC auth
 
-> Status: alpha — phase 01 scaffolding only. CLI surface, template fetch, and the five starters land in subsequent phases.
+> Status: alpha — phase 01 scaffolding only. CLI surface, template fetch, and the six starters land in subsequent phases.
 
 ## Usage (once published)
 

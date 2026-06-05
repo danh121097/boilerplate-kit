@@ -8,9 +8,7 @@ describe("template-registry", () => {
 
   it("renders the expected giget spec for every template at the default ref", () => {
     for (const t of TEMPLATES) {
-      expect(getSource(t)).toBe(
-        `github:danh121097/boilerplate-kit/templates/${t}#latest`,
-      );
+      expect(getSource(t)).toBe(`github:danh121097/boilerplate-kit/templates/${t}#latest`);
     }
   });
 
@@ -27,7 +25,14 @@ describe("template-registry", () => {
     );
   });
 
-  it("exports exactly the 5 known templates", () => {
-    expect([...TEMPLATES]).toEqual(["vuejs", "nuxtjs", "reactjs", "nextjs", "tanstack-start"]);
+  it("exports exactly the 6 known templates", () => {
+    expect([...TEMPLATES]).toEqual([
+      "vuejs",
+      "nuxtjs",
+      "reactjs",
+      "nextjs",
+      "tanstack-start",
+      "express",
+    ]);
   });
 });

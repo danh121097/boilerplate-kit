@@ -25,11 +25,14 @@ const LOCAL_COPY_EXCLUDE = new Set([
   ".nuxt",
   ".output",
   ".data",
-  // Lockfiles — user gets a fresh one from their chosen PM after scaffold.
+  // Lock files — user gets a fresh one from their chosen PM after scaffold.
   "pnpm-lock.yaml",
   "package-lock.json",
   "yarn.lock",
   "bun.lockb",
+  "bun.lock",
+  // Never copy a contributor's local env into a scaffold (.env.example still ships).
+  ".env",
   // Auto-generated typings (unplugin-* / Nuxt)
   "auto-imports.d.ts",
   "components.d.ts",
