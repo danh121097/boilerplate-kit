@@ -6,9 +6,13 @@ import type en from "../i18n/locales/en";
  *
  * Add new locales by keeping their key shape identical to `en.ts`.
  */
+// An interface's `extends` clause needs a named type, not a `typeof` query —
+// so alias the locale's inferred shape first.
+type LocaleMessageSchema = typeof en;
+
 declare module "vue-i18n" {
   // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-  export interface DefineLocaleMessage extends typeof en {}
+  export interface DefineLocaleMessage extends LocaleMessageSchema {}
 }
 
 export {};

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useForm } from "vee-validate";
 import { toTypedSchema } from "@vee-validate/zod";
+import { useForm } from "vee-validate";
 import { z } from "zod";
 
 const { t } = useI18n();
@@ -14,7 +14,7 @@ const schema = toTypedSchema(
 
 // Start fields as empty strings so zod's "expected string" check passes — users see
 // the format/length validation messages instead of the generic type error.
-const { handleSubmit, meta } = useForm({
+const { handleSubmit } = useForm({
   validationSchema: schema,
   initialValues: { email: "", password: "" },
 });

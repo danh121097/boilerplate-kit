@@ -11,8 +11,7 @@ interface Props extends BaseInputProps {
 
 interface Emits {
   (e: "update:modelValue", value: string | number): void;
-  (e: "focus", event: FocusEvent): void;
-  (e: "blur", event: FocusEvent): void;
+  (e: "focus" | "blur", event: FocusEvent): void;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -148,10 +147,10 @@ onMounted(async () => {
             inputClass,
           )
         "
+        v-bind="$attrs"
         @input="handleInput"
         @focus="handleFocus"
         @blur="handleBlur"
-        v-bind="$attrs"
       />
 
       <button
@@ -194,7 +193,7 @@ onMounted(async () => {
       </div>
     </div>
 
-    <p v-if="error && errorMessage" class="mt-1 text-xs text-destructive" v-html="errorMessage"></p>
+    <p v-if="error && errorMessage" class="mt-1 text-xs text-destructive" v-html="errorMessage" />
   </div>
 </template>
 

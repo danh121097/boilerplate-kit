@@ -148,10 +148,10 @@ onMounted(async () => {
             inputClass,
           )
         "
+        v-bind="$attrs"
         @input="handleInput"
         @focus="handleFocus"
         @blur="handleBlur"
-        v-bind="$attrs"
       />
 
       <button
