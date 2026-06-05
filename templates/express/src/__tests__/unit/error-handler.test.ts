@@ -77,6 +77,6 @@ describe("errorHandler", () => {
     const err = { statusCode: 500 } as any;
     errorHandler(err, mockReq, res, mockNext);
     const jsonArg = res.json.mock.calls[0][0];
-    expect(jsonArg.message).toBe("Internal Server Error");
+    expect(jsonArg.message).toBe("Internal Server Error!");
   });
 });

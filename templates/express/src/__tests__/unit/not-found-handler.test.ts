@@ -12,7 +12,11 @@ describe("notFoundHandler", () => {
     expect(res.status).toHaveBeenCalledWith(404);
     expect(res.json).toHaveBeenCalledWith({
       success: false,
+      status: "error",
+      errorType: "NOT_FOUND",
       message: "Resource not found!",
+      error_code: 404,
+      error_message: "Resource not found!",
     });
   });
 });

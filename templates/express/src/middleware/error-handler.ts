@@ -12,10 +12,17 @@ export function errorHandler(
   const statusCode = err.statusCode || 500;
   console.error(`[Error] ${statusCode}: ${err.message}`);
 
+  const message = err.message || "Internal Server Error!";
+  const errorType = err.errorType || "INTERNAL_ERROR";
+
   res.status(statusCode).json({
     success: false,
-    errorType: err.errorType || "INTERNAL_ERROR",
-    message: err.message || "Internal Server Error!",
+    status: "error",
+    errorType,
+    message,
+    // Mirror message/code under the field names the client error type expects.
+    error_code: statusCode,
+    error_message: message,
     ...(config.isDevelopment && { stack: err.stack }),
   });
 }
