@@ -1,0 +1,14 @@
+# Dependencies & build output
+node_modules
+dist
+coverage
+
+# Lockfiles
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+bun.lock
+bun.lockb
+
+# TanStack Router generated (excluded from linter/formatter per its own header)
+src/routeTree.gen.ts

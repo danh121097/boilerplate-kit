@@ -1,0 +1,28 @@
+node_modules
+dist
+.output
+.nitro
+.vite/
+# routeTree.gen.ts is committed as a cold-typecheck stub.
+# The TanStack Start Vite plugin regenerates it from src/routes/ on every
+# dev/build run. Edit the stub only when adding/removing routes without running
+# the dev server first; the real generated file will overwrite it on next build.
+*.local
+.DS_Store
+
+# Lockfiles — the template ships PM-agnostic; commit yours after scaffolding.
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+bun.lockb
+
+# env files
+.env
+.env.*
+!.env.example
+
+# repository-harness durable layer (optional, never committed)
+harness.db
+harness.db-*
+scripts/bin/harness-cli
+scripts/bin/harness-cli.exe

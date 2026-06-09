@@ -1,0 +1,33 @@
+# Next.js
+.next/
+out/
+
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Build outputs
+dist/
+
+# Harness runtime (SQLite + compiled CLI — never commit)
+harness.db
+scripts/bin/harness-cli
+scripts/bin/harness-cli-*
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
