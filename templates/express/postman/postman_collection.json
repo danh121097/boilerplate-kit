@@ -1,0 +1,301 @@
+{
+  "info": {
+    "name": "app API",
+    "description": "Auto-generated from the declarative route definitions in `src/`.\n\n## Conventions\n- **Base path:** every endpoint is mounted under the `apiPrefix` variable.\n- **HMAC signing (required):** the collection-level pre-request script sets\n  `ctime` and `sig` on every request using the `hmacSecret` variable.\n  Signed string: `[METHOD, CONTENT_TYPE, ctime, PATH, ''].join('\\n')`\n  (HMAC-SHA256, Base64). PATH excludes the `apiPrefix` and query string.\n  Requests older than 5 minutes are rejected.\n- **Auth:** register/login/refresh set httpOnly `accessToken`/`refreshToken`\n  cookies; Postman replays them automatically. Bearer header also accepted.\n\n## Setup\n1. Select the generated environment (top-right) — `baseUrl` is preset.\n2. Set its `hmacSecret` value to match `HMAC_SECRET` in the server `.env`.\n3. Run **Auth > Login** once, then protected routes work via the cookie jar.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "apiPrefix",
+      "value": "/api/v1",
+      "type": "string"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-sign every request with HMAC-SHA256 (Base64) to satisfy the server.",
+          "// String to sign mirrors the client: [METHOD, CONTENT_TYPE, ctime, PATH, ''].join('\\n')",
+          "// PATH excludes the API prefix and query string (server signs req.url pathname).",
+          "const ctime = Date.now().toString();",
+          "const method = pm.request.method.toUpperCase();",
+          "",
+          "let contentType = '';",
+          "const body = pm.request.body;",
+          "if (body && body.mode === 'raw' && body.raw && body.raw.toString().trim() !== '') {",
+          "  contentType = 'application/json';",
+          "  pm.request.headers.upsert({ key: 'Content-Type', value: 'application/json' });",
+          "}",
+          "",
+          "// Resolve :path variables to their real values — a literal \":id\" would never match.",
+          "const url = pm.request.url;",
+          "const segments = (url.path || []).map(function (seg) {",
+          "  if (seg && seg.charAt(0) === ':') {",
+          "    const pv = url.variables && url.variables.get && url.variables.get(seg.slice(1));",
+          "    const val = pv && (pv.value != null ? pv.value : pv);",
+          "    if (val != null && String(val) !== '') return String(val);",
+          "  }",
+          "  return seg;",
+          "});",
+          "let path = pm.variables.replaceIn('/' + segments.join('/'));",
+          "",
+          "// Strip the API prefix so the signed path matches the server (req.url is",
+          "// already prefix-stripped by the app.use(apiPrefix, ...) mount). Query string",
+          "// is intentionally NOT signed.",
+          "const apiPrefix = pm.collectionVariables.get('apiPrefix') || pm.environment.get('apiPrefix') || '';",
+          "if (apiPrefix && path.indexOf(apiPrefix) === 0) {",
+          "  path = path.slice(apiPrefix.length) || '/';",
+          "}",
+          "",
+          "const secret = pm.collectionVariables.get('hmacSecret') || pm.environment.get('hmacSecret') || '';",
+          "if (!secret) {",
+          "  console.warn('hmacSecret variable is empty — requests will fail HMAC verification.');",
+          "}",
+          "",
+          "const stringToSign = [method, contentType, ctime, path, ''].join('\\n');",
+          "const signature = CryptoJS.HmacSHA256(stringToSign, secret).toString(CryptoJS.enc.Base64);",
+          "",
+          "pm.request.headers.upsert({ key: 'ctime', value: ctime });",
+          "pm.request.headers.upsert({ key: 'sig', value: signature });"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "try {",
+          "  const json = pm.response.json();",
+          "  const tokens = json && json.data && json.data.tokens;",
+          "  if (tokens) {",
+          "    const target = pm.environment.name ? pm.environment : pm.collectionVariables;",
+          "    if (tokens.accessToken) target.set('accessToken', tokens.accessToken);",
+          "    if (tokens.refreshToken) target.set('refreshToken', tokens.refreshToken);",
+          "    console.log('[postman] saved tokens to ' + (pm.environment.name || 'collection'));",
+          "  }",
+          "} catch (e) {",
+          "  // Non-JSON or no tokens — nothing to capture.",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "health"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"harrynguyen@admin.com\",\n  \"password\": \"Admin@123\",\n  \"name\": \"Harry Nguyen\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"harrynguyen@admin.com\",\n  \"password\": \"Admin@123\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "refresh"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "List",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

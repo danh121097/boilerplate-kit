@@ -1,8 +1,8 @@
-import type { RequestHandler } from 'express';
-import type { ZodType } from 'zod';
+import type { RequestHandler } from "express";
+import type { ZodType } from "zod";
 
 /** HTTP verbs supported by the declarative route config */
-export type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
+export type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
 
 /** A single route declared as data instead of an imperative call */
 export interface RouteConfig {
@@ -11,13 +11,13 @@ export interface RouteConfig {
   path: string;
   /** Middleware chain run before the handler; defaults to none */
   middleware?: RequestHandler[];
-  handler: RequestHandler;
   /**
    * Optional Zod schema describing the request body. Not used at runtime — the
    * `validate()` middleware still enforces it — but lets tooling (e.g. the
    * Postman collection generator) derive a body example straight from the route.
    */
   bodySchema?: ZodType;
+  handler: RequestHandler;
 }
 
 /** A set of routes sharing a common path prefix (e.g. '/auth') */

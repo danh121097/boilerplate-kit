@@ -1,10 +1,18 @@
-import { clearAuthTokens, defineMutation, defineQuery, Model, persistAuthToken } from "@/services/core";
+import {
+  clearAuthTokens,
+  defineMutation,
+  defineQuery,
+  Model,
+  persistAccessToken,
+  persistRefreshToken,
+} from "@/services/core";
 import type { AuthResult, AuthUser, LoginPayload, RegisterPayload } from "./types/auth";
 
 /**
- * Auth service for the MAIN backend. Access tokens are persisted for the Bearer
- * header; the refresh token is set/cleared by the server as an httpOnly cookie
- * (the client always sends cookies — see `withCredentials` in the Api client).
+ * Auth service for the MAIN backend. Both tokens are persisted in localStorage:
+ * the access token feeds the Bearer header; the refresh token is replayed in the
+ * refresh request body. `logout` clears both. (The backend may also set an
+ * httpOnly refresh cookie — harmless and still honored via `withCredentials`.)
  *
  * The response interceptor already unwraps the backend envelope, so a method
  * typed `post<T>` resolves to the payload `T` via a single `.data` — pass the
@@ -38,9 +46,10 @@ export class AuthModel extends Model {
     return res.data.user;
   }
 
-  /** Persist the access token so the request interceptor can attach it. */
+  /** Persist both tokens: access for the Bearer header, refresh for the refresh call. */
   private static storeSession(result: AuthResult): AuthResult {
-    persistAuthToken(result.tokens.accessToken, this.service);
+    persistAccessToken(result.tokens.accessToken, this.service);
+    if (result.tokens.refreshToken) persistRefreshToken(result.tokens.refreshToken, this.service);
     return result;
   }
 }

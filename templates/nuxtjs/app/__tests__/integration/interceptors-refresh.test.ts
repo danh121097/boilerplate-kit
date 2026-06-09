@@ -2,7 +2,7 @@ import { installLocalStorage } from "../helpers/fake-storage";
 import { bearerOf, httpError, makeClient, ok } from "../helpers/http-mocks";
 import { useStorageKeys } from "@/enums/storage-keys";
 import { Api } from "@/services/core";
-import { getAuthToken } from "@/services/core/auth-token-storage";
+import { getAccessToken, getRefreshToken } from "@/services/core/auth-token-storage";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import axios from "axios";
 
@@ -13,12 +13,12 @@ import axios from "axios";
  */
 
 let tokenKey = "";
-const NEW_TOKEN = { data: { success: true, data: { tokens: { accessToken: "NEW" } } } } as never;
+const NEW_TOKEN = { data: { success: true, data: { tokens: { accessToken: "NEW", refreshToken: "NEW_R" } } } } as never;
 
 describe("interceptors — token refresh", () => {
   beforeEach(() => {
     installLocalStorage();
-    tokenKey = useStorageKeys("AUTH_TOKEN");
+    tokenKey = useStorageKeys("ACCESS_TOKEN");
     Api.setBaseURL("http://api.test", "MAIN");
   });
 
@@ -41,7 +41,8 @@ describe("interceptors — token refresh", () => {
 
     expect((result as unknown as { data: string[] }).data).toEqual(["item"]);
     expect(post).toHaveBeenCalledTimes(1);
-    expect(getAuthToken("MAIN")).toBe("NEW");
+    expect(getAccessToken("MAIN")).toBe("NEW");
+    expect(getRefreshToken("MAIN")).toBe("NEW_R");
     expect(calls).toBe(2);
   });
 
@@ -70,7 +71,7 @@ describe("interceptors — token refresh", () => {
     );
 
     await expect(client.get("/users")).rejects.toMatchObject({ message: "boom" });
-    expect(getAuthToken("MAIN")).toBe("NEW");
+    expect(getAccessToken("MAIN")).toBe("NEW");
   });
 
   it("gives up after one retry (no infinite loop) and clears the token", async () => {
@@ -85,7 +86,7 @@ describe("interceptors — token refresh", () => {
 
     await expect(client.get("/users")).rejects.toBeTruthy();
     expect(calls).toBe(2);
-    expect(getAuthToken("MAIN")).toBeNull();
+    expect(getAccessToken("MAIN")).toBeNull();
   });
 
   it("does not attempt refresh for anonymous traffic (no token)", async () => {

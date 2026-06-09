@@ -1,5 +1,5 @@
 import { installLocalStorage } from "../helpers/fake-storage";
-import { persistAuthToken } from "@/services/core/auth-token-storage";
+import { persistAccessToken } from "@/services/core/auth-token-storage";
 import { HeadersUtils } from "@/services/core/headers-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { InternalAxiosRequestConfig } from "axios";
@@ -29,7 +29,7 @@ describe("headers-utils", () => {
   });
 
   it("addAuthorizationHeader attaches a Bearer token when one is stored", () => {
-    persistAuthToken("abc", "MAIN");
+    persistAccessToken("abc", "MAIN");
     const config = configWith();
     HeadersUtils.addAuthorizationHeader(config, "MAIN");
     expect(config.headers.authorization).toBe("Bearer abc");

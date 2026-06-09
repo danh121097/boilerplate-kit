@@ -1,4 +1,4 @@
-import { clearAuthToken, persistAuthToken } from "./auth-token-storage";
+import { clearServiceTokens, persistAccessToken } from "./auth-token-storage";
 import type { ApiService } from "./types";
 
 /** Performs the network refresh and resolves to a new access token. */
@@ -36,11 +36,11 @@ export class RefreshTokenManager {
 
     this.inFlight = this.refresh()
       .then((token) => {
-        persistAuthToken(token, this.service);
+        persistAccessToken(token, this.service);
         return token;
       })
       .catch((error) => {
-        clearAuthToken(this.service);
+        clearServiceTokens(this.service);
         this.onRefreshFailed();
         throw error;
       })

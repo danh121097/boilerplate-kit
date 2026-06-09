@@ -1,0 +1,16 @@
+# Dependencies & build output
+node_modules
+dist
+coverage
+
+# Lockfiles
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+bun.lock
+bun.lockb
+
+# Nuxt generated
+.nuxt
+.output
+.data

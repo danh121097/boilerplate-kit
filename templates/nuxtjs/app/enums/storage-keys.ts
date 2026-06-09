@@ -10,7 +10,8 @@
  */
 function buildKeys(prefix: string) {
   return {
-    AUTH_TOKEN: `${prefix}_AUTH_TOKEN`,
+    ACCESS_TOKEN: `${prefix}_ACCESS_TOKEN`,
+    REFRESH_TOKEN: `${prefix}_REFRESH_TOKEN`,
     LANGUAGE: `${prefix}_LANGUAGE`,
     THEME: `${prefix}_THEME`,
   } as const;
@@ -22,7 +23,7 @@ export type StorageKey = StorageKeyMap[keyof StorageKeyMap];
 let cached: StorageKeyMap | null = null;
 
 /**
- * Resolve a single prefixed storage key by name, e.g. `useStorageKeys("AUTH_TOKEN")`.
+ * Resolve a single prefixed storage key by name, e.g. `useStorageKeys("ACCESS_TOKEN")`.
  * The `name` param autocompletes to the keys declared in `buildKeys`. Safe to
  * call on server or client (the prefix map is resolved lazily and cached).
  */

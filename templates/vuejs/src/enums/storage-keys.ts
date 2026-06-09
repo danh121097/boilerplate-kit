@@ -5,7 +5,8 @@ const APP_PREFIX = import.meta.env.VITE_APP_NAME || "PRISM_APP";
  * rename ripples cleanly and stale keys are easy to spot.
  */
 export const STORAGE_KEYS = {
-  AUTH_TOKEN: `${APP_PREFIX}_AUTH_TOKEN`,
+  ACCESS_TOKEN: `${APP_PREFIX}_ACCESS_TOKEN`,
+  REFRESH_TOKEN: `${APP_PREFIX}_REFRESH_TOKEN`,
   LANGUAGE: `${APP_PREFIX}_LANGUAGE`,
   THEME: `${APP_PREFIX}_THEME`,
 } as const;

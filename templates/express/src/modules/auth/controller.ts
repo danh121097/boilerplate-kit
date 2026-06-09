@@ -30,13 +30,14 @@ export async function login(req: Request, res: Response): Promise<void> {
   });
 }
 
-/** POST /api/auth/refresh */
+/** POST /api/auth/refresh — accepts the refresh token from the request body
+ * (clients that store it in localStorage) or the httpOnly cookie. */
 export async function refresh(req: Request, res: Response): Promise<void> {
-  const refreshToken = req.cookies.refreshToken;
+  const refreshToken = req.body?.refreshToken || req.cookies?.refreshToken;
   if (!refreshToken) {
     res.status(401).json({
       success: false,
-      message: "Refresh token not found in cookies!",
+      message: "Refresh token not found in request body or cookies!",
     });
     return;
   }

@@ -1,4 +1,5 @@
 import { Api } from "./api";
+import { getRefreshToken, persistRefreshToken } from "./auth-token-storage";
 import { HMACSignatureGenerator } from "./hmac-signature";
 import type { ApiService } from "./types";
 import type { InternalAxiosRequestConfig } from "axios";
@@ -10,17 +11,19 @@ import axios from "axios";
  * Kept on a bare axios instance — NOT the app client — so a 401 returned by the
  * refresh request itself can never recurse back into the refresh interceptor.
  *
- * The refresh token lives in an httpOnly cookie the browser sets on login; it is
- * never readable from JS. `withCredentials` lets the browser attach that cookie,
- * the backend rotates the pair, and the new access token comes back in the body
- * for us to persist as the Bearer token.
+ * The refresh token is read from localStorage and sent in the request body. The
+ * backend rotates the pair and returns the new access (+ refresh) tokens; the new
+ * refresh token is persisted here and the access token is handed to the caller.
+ * (`withCredentials` is kept so a backend that prefers an httpOnly refresh cookie
+ * still works without code changes.)
  */
 
-/** Tolerates the common envelope shapes a backend may wrap the new token in. */
+/** Tolerates the common envelope shapes a backend may wrap the new tokens in. */
 interface RefreshResponseBody {
-  data?: { tokens?: { accessToken?: string }; accessToken?: string };
-  tokens?: { accessToken?: string };
+  data?: { tokens?: { accessToken?: string; refreshToken?: string }; accessToken?: string; refreshToken?: string };
+  tokens?: { accessToken?: string; refreshToken?: string };
   accessToken?: string;
+  refreshToken?: string;
 }
 
 function extractAccessToken(body: RefreshResponseBody): string {
@@ -33,9 +36,19 @@ function extractAccessToken(body: RefreshResponseBody): string {
   return token;
 }
 
+function extractRefreshToken(body: RefreshResponseBody): string | undefined {
+  return (
+    body.data?.tokens?.refreshToken ??
+    body.data?.refreshToken ??
+    body.tokens?.refreshToken ??
+    body.refreshToken
+  );
+}
+
 /**
  * Build a refresher bound to a service + endpoint. Returns a thunk the
- * single-flight manager calls; it yields the freshly minted access token.
+ * single-flight manager calls; it yields the freshly minted access token and
+ * persists the rotated refresh token as a side effect.
  */
 export function createTokenRefresher(endpoint: string, service: ApiService) {
   return async (): Promise<string> => {
@@ -54,13 +67,14 @@ export function createTokenRefresher(endpoint: string, service: ApiService) {
     } as unknown as InternalAxiosRequestConfig);
     if (signature) Object.assign(headers, signature);
 
-    // Send an empty object (not null) so axios keeps the Content-Type header we
-    // signed; the refresh token travels in the cookie, the body is unused.
     const { data } = await axios.post<RefreshResponseBody>(
       `${Api.getBaseURL(service)}${endpoint}`,
-      {},
+      { refreshToken: getRefreshToken(service) ?? undefined },
       { withCredentials: true, headers },
     );
+
+    const rotated = extractRefreshToken(data);
+    if (rotated) persistRefreshToken(rotated, service);
     return extractAccessToken(data);
   };
 }

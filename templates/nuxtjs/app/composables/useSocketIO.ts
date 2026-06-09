@@ -1,5 +1,5 @@
 import { SOCKET_EVENT, SOCKET_UNAUTHORIZED_MESSAGE } from "@/enums";
-import { getAuthToken } from "@/services/core/auth-token-storage";
+import { getAccessToken } from "@/services/core/auth-token-storage";
 import { useSocketIOStore } from "@/stores/socket-io";
 import { io, type Socket } from "socket.io-client";
 import Base64 from "crypto-js/enc-base64";
@@ -14,7 +14,7 @@ import HmacSHA256 from "crypto-js/hmac-sha256";
  * - `onMounted(connectSocket)` fires only on the client, so no WebSocket handshake
  *   happens during Nitro SSR rendering.
  *
- * Auth payload: `{ token: 'Bearer <localStorage.AUTH_TOKEN>', role: 'user', sig, ctime }`.
+ * Auth payload: `{ token: 'Bearer <localStorage access_token>', role: 'user', sig, ctime }`.
  *
  * SECURITY: signing in the browser requires exposing the secret via a PUBLIC
  * runtime config (`public.hmacSecret`). For production prefer signing in a Nitro
@@ -42,7 +42,7 @@ export function useSocketIO() {
   }
 
   function buildAuth() {
-    return { token: `Bearer ${getAuthToken() ?? ""}`, role: "user", ...signHeader() };
+    return { token: `Bearer ${getAccessToken() ?? ""}`, role: "user", ...signHeader() };
   }
 
   const socket = io(URL, {

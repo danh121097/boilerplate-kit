@@ -1,7 +1,7 @@
 import { useStorageKeys } from "@/enums/storage-keys";
 import { Api, ApiInterceptors } from "@/services/core";
 import { registerServiceToken } from "@/services/core/auth-token-storage";
-import type { ServiceRefreshConfig } from "@/services/core";
+import type { ServiceRefreshConfig, ServiceTokenKeys } from "@/services/core";
 
 /**
  * Bootstrap the shared `Api` client before any page-level data fetches run.
@@ -18,13 +18,16 @@ export default defineNuxtPlugin(() => {
   const services: Array<{
     name: string;
     baseURL: string;
-    tokenKey: () => string;
+    tokenKeys: ServiceTokenKeys;
     refresh?: ServiceRefreshConfig;
   }> = [
     {
       name: "MAIN",
       baseURL: pub.apiBaseUrl || "https://jsonplaceholder.typicode.com",
-      tokenKey: () => useStorageKeys("AUTH_TOKEN"),
+      tokenKeys: {
+        access: () => useStorageKeys("ACCESS_TOKEN"),
+        refresh: () => useStorageKeys("REFRESH_TOKEN"),
+      },
       refresh: { endpoint: "/auth/refresh" },
     },
   ];
@@ -34,12 +37,12 @@ export default defineNuxtPlugin(() => {
   for (const svc of services) {
     if (!svc.baseURL) continue;
     Api.setBaseURL(svc.baseURL, svc.name);
-    registerServiceToken(svc.name, svc.tokenKey);
+    registerServiceToken(svc.name, svc.tokenKeys);
     if (svc.refresh) refreshByService[svc.name] = svc.refresh;
   }
 
   // On a 401 the interceptor calls the failing service's own refresh endpoint
-  // (refresh token rides along in its httpOnly cookie), stores the new access
-  // token, and replays the request. Each service refreshes independently.
+  // (sending the stored refresh token in the body), stores the new access +
+  // refresh tokens, and replays the request. Each service refreshes independently.
   Api.registerInterceptors(new ApiInterceptors(refreshByService));
 });

@@ -1,6 +1,6 @@
 import { installLocalStorage } from "../helpers/fake-storage";
 import { AuthModel } from "@/services/auth";
-import { getAuthToken, persistAuthToken } from "@/services/core/auth-token-storage";
+import { getAccessToken, getRefreshToken, persistAccessToken } from "@/services/core/auth-token-storage";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -21,32 +21,44 @@ describe("AuthModel", () => {
     vi.unstubAllGlobals();
   });
 
-  it("login persists the access token and returns the result", async () => {
+  it("login persists both access and refresh tokens and returns the result", async () => {
     vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true, data: RESULT } as never);
     const res = await AuthModel.login({ email: "a@b.com", password: "x" });
     expect(res).toEqual(RESULT);
-    expect(getAuthToken("MAIN")).toBe("AT");
+    expect(getAccessToken("MAIN")).toBe("AT");
+    expect(getRefreshToken("MAIN")).toBe("RT");
   });
 
-  it("register persists the access token and returns the result", async () => {
+  it("register persists both access and refresh tokens and returns the result", async () => {
     vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true, data: RESULT } as never);
     const res = await AuthModel.register({ email: "a@b.com", password: "x", name: "A" });
     expect(res.user._id).toBe("u1");
-    expect(getAuthToken("MAIN")).toBe("AT");
+    expect(getAccessToken("MAIN")).toBe("AT");
+    expect(getRefreshToken("MAIN")).toBe("RT");
   });
 
-  it("logout clears the stored token", async () => {
-    persistAuthToken("AT", "MAIN");
+  it("login skips persisting refresh token when absent from response", async () => {
+    const resultNoRefresh = { user: RESULT.user, tokens: { accessToken: "AT" } };
+    vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true, data: resultNoRefresh } as never);
+    await AuthModel.login({ email: "a@b.com", password: "x" });
+    expect(getAccessToken("MAIN")).toBe("AT");
+    expect(getRefreshToken("MAIN")).toBeNull(); // not set
+  });
+
+  it("logout clears both stored tokens", async () => {
+    persistAccessToken("AT", "MAIN");
     vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
     await AuthModel.logout();
-    expect(getAuthToken("MAIN")).toBeNull();
+    expect(getAccessToken("MAIN")).toBeNull();
+    expect(getRefreshToken("MAIN")).toBeNull();
   });
 
-  it("logout still clears the token even if the request fails", async () => {
-    persistAuthToken("AT", "MAIN");
+  it("logout still clears both tokens even if the request fails", async () => {
+    persistAccessToken("AT", "MAIN");
     vi.spyOn(AuthModel.api, "post").mockRejectedValue(new Error("network"));
     await expect(AuthModel.logout()).rejects.toThrow("network");
-    expect(getAuthToken("MAIN")).toBeNull();
+    expect(getAccessToken("MAIN")).toBeNull();
+    expect(getRefreshToken("MAIN")).toBeNull();
   });
 
   it("getMe returns the unwrapped user", async () => {

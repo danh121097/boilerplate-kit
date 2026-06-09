@@ -1,5 +1,5 @@
 import { SOCKET_EVENT, SOCKET_UNAUTHORIZED_MESSAGE } from "@/enums";
-import { getAuthToken } from "@/services/core/auth-token-storage";
+import { getAccessToken } from "@/services/core/auth-token-storage";
 import { useSocketIOStore } from "@/stores/socket-io";
 import { io, type Socket } from "socket.io-client";
 import Base64 from "crypto-js/enc-base64";
@@ -26,7 +26,7 @@ function signHeader(): { sig: string; ctime: number } | Record<string, never> {
 /**
  * Initialize a socket.io connection scoped to the current component tree.
  *
- * Auth payload defaults to `{ token: 'Bearer <localStorage.AUTH_TOKEN>', role: 'user' }`.
+ * Auth payload defaults to `{ token: 'Bearer <localStorage access_token>', role: 'user' }`.
  * Extend with HMAC signing or extra claims by spreading additional fields in
  * the `auth` object below — see `@/services/core/hmac-signature` for a ready-to-go
  * signer.
@@ -39,7 +39,7 @@ export function useSocketIO() {
   const URL = import.meta.env.VITE_APP_ENDPOINT || "";
 
   function buildAuth() {
-    return { token: `Bearer ${getAuthToken() ?? ""}`, role: "user", ...signHeader() };
+    return { token: `Bearer ${getAccessToken() ?? ""}`, role: "user", ...signHeader() };
   }
 
   const socket = io(URL, {

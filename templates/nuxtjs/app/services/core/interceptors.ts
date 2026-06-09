@@ -1,5 +1,5 @@
 import { createTokenRefresher } from "./auth-refresh-client";
-import { clearAuthToken, getAuthToken } from "./auth-token-storage";
+import { clearServiceTokens, getAccessToken } from "./auth-token-storage";
 import { HeadersUtils } from "./headers-utils";
 import { RefreshTokenManager } from "./refresh-token-manager";
 import type {
@@ -54,7 +54,7 @@ function isEnvelope(body: unknown): boolean {
 function canAttemptRefresh(config: InternalAxiosRequestConfig, options: RefreshOptions): boolean {
   if (config._retry) return false;
   if ((config.url ?? "").includes(options.endpoint)) return false;
-  return Boolean(getAuthToken(options.service));
+  return Boolean(getAccessToken(options.service));
 }
 
 interface ResponseInterceptorOpts {
@@ -92,7 +92,7 @@ function createResponseInterceptor(opts: ResponseInterceptorOpts) {
    * on actual refresh failure via the manager. */
   const handleUnauthorized = (config?: InternalAxiosRequestConfig) => {
     const service = serviceOf(config);
-    clearAuthToken(service);
+    clearServiceTokens(service);
     if (!resolveRefresh(service)) reloadPage();
   };
 

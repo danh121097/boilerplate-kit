@@ -1,5 +1,5 @@
 import { installLocalStorage } from "../helpers/fake-storage";
-import { getAuthToken, persistAuthToken } from "@/services/core/auth-token-storage";
+import { getAccessToken, persistAccessToken } from "@/services/core/auth-token-storage";
 import { RefreshTokenManager } from "@/services/core/refresh-token-manager";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -9,7 +9,7 @@ describe("RefreshTokenManager", () => {
   beforeEach(() => installLocalStorage());
   afterEach(() => vi.unstubAllGlobals());
 
-  it("dedupes concurrent calls into a single refresh and persists the token", async () => {
+  it("dedupes concurrent calls into a single refresh and persists the access token", async () => {
     let runs = 0;
     const mgr = new RefreshTokenManager({
       service: "MAIN",
@@ -25,7 +25,7 @@ describe("RefreshTokenManager", () => {
 
     expect(runs).toBe(1); // single-flight
     expect([a, b, c]).toEqual(["T1", "T1", "T1"]);
-    expect(getAuthToken("MAIN")).toBe("T1"); // persisted
+    expect(getAccessToken("MAIN")).toBe("T1"); // persisted
   });
 
   it("refreshes again after the in-flight one settles", async () => {
@@ -41,8 +41,8 @@ describe("RefreshTokenManager", () => {
     expect(runs).toBe(2);
   });
 
-  it("clears the service token and fires onRefreshFailed when refresh rejects", async () => {
-    persistAuthToken("OLD", "MAIN");
+  it("clears both service tokens and fires onRefreshFailed when refresh rejects", async () => {
+    persistAccessToken("OLD", "MAIN");
     const onRefreshFailed = vi.fn();
     const mgr = new RefreshTokenManager({
       service: "MAIN",
@@ -54,6 +54,6 @@ describe("RefreshTokenManager", () => {
 
     await expect(mgr.getFreshToken()).rejects.toThrow("refresh failed");
     expect(onRefreshFailed).toHaveBeenCalledTimes(1);
-    expect(getAuthToken("MAIN")).toBeNull(); // cleared
+    expect(getAccessToken("MAIN")).toBeNull(); // cleared
   });
 });

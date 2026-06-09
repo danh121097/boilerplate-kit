@@ -1,4 +1,4 @@
-import { getAuthToken } from "./auth-token-storage";
+import { getAccessToken } from "./auth-token-storage";
 import { HMACSignatureGenerator } from "./hmac-signature";
 import type { ApiService } from "./types";
 import type { AxiosRequestHeaders, InternalAxiosRequestConfig } from "axios";
@@ -14,7 +14,7 @@ export class HeadersUtils {
 
   /** Attach Bearer token from the matching storage slot for the service. */
   static addAuthorizationHeader(config: InternalAxiosRequestConfig, service: ApiService): void {
-    const token = getAuthToken(service);
+    const token = getAccessToken(service);
     if (token) config.headers.authorization = `Bearer ${token}`;
   }
 }
