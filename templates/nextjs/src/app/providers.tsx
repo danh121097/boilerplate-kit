@@ -23,9 +23,6 @@ function makeQueryClient() {
         retry: false,
         refetchOnWindowFocus: true,
         placeholderData: keepPreviousData,
-        // Avoid hydration mismatch: stale time 0 ensures server-prefetched
-        // data is always considered fresh on the client after hydration.
-        staleTime: 0,
       },
     },
   });

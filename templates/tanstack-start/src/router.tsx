@@ -1,7 +1,7 @@
 import { routeTree } from "./routeTree.gen";
 import { initI18n } from "@/i18n/i18n";
 import { initServices } from "@/services";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { keepPreviousData, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
 import { I18nextProvider } from "react-i18next";
 
@@ -34,7 +34,13 @@ export function getRouter() {
   // Fresh QueryClient per call; on the browser Start caches the router so this
   // runs once; on the server it runs once per request.
   const client = new QueryClient({
-    defaultOptions: { queries: { retry: false, refetchOnWindowFocus: true } },
+    defaultOptions: {
+      queries: {
+        retry: false,
+        refetchOnWindowFocus: true,
+        placeholderData: keepPreviousData,
+      },
+    },
   });
 
   // SSR-safe i18n: getSavedLanguage reads localStorage only when window is defined.
