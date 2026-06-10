@@ -79,7 +79,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     const isUnstyled = variant === "unstyled";
 
     const shapeClass =
-      shape === "circle" ? "rounded-full" : shape === "square" ? "rounded-md aspect-square px-0" : "rounded-md";
+      shape === "circle"
+        ? "rounded-full"
+        : shape === "square"
+          ? "rounded-md aspect-square px-0"
+          : "rounded-md";
 
     const classes = isUnstyled
       ? className

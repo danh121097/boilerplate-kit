@@ -47,7 +47,10 @@ describe("Api", () => {
     });
 
     it("merges customHeaders into the request", async () => {
-      await new Api({ path: "/items" }).post({ customHeaders: { "X-Trace": "42" }, adapter: capture });
+      await new Api({ path: "/items" }).post({
+        customHeaders: { "X-Trace": "42" },
+        adapter: capture,
+      });
       expect(String(captured?.headers["X-Trace"])).toBe("42");
     });
 

@@ -6,17 +6,19 @@ import i18next from "i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
 
 /**
- * SSR-safe language read: localStorage is browser-only; on the server fall back
- * to the VITE_LANGUAGE_CODE env var or "en". This is called at module init in
- * client.tsx — on the server the i18n instance is initialized in ssr.tsx without
- * localStorage access.
+ * SSR-safe language read: localStorage is browser-only; on the server fall back to
+ * VITE_LANGUAGE_CODE or "en". Because the server can't see the saved language, the
+ * `<html lang>` it renders may differ from the client — `__root.tsx` marks that
+ * element `suppressHydrationWarning` so the divergence isn't flagged as a mismatch.
  */
 function getSavedLanguage(): string {
   try {
     if (typeof window === "undefined") {
       return import.meta.env.VITE_LANGUAGE_CODE || "en";
     }
-    return localStorage.getItem(STORAGE_KEYS.LANGUAGE) || import.meta.env.VITE_LANGUAGE_CODE || "en";
+    return (
+      localStorage.getItem(STORAGE_KEYS.LANGUAGE) || import.meta.env.VITE_LANGUAGE_CODE || "en"
+    );
   } catch {
     return import.meta.env.VITE_LANGUAGE_CODE || "en";
   }
@@ -30,7 +32,7 @@ export function initI18n(): typeof i18next {
     lng: getSavedLanguage(),
     fallbackLng: "en",
     interpolation: { escapeValue: false },
-    detection: { order: [] }, // we handle detection ourselves via STORAGE_KEYS
+    detection: { order: [], lookupLocalStorage: STORAGE_KEYS.LANGUAGE },
   });
   return i18next;
 }

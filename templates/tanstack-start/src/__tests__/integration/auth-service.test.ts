@@ -18,14 +18,18 @@ describe("AuthModel", () => {
   afterEach(() => vi.restoreAllMocks());
 
   it("login posts to /auth/login and returns the result", async () => {
-    const post = vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true, data: RESULT } as never);
+    const post = vi
+      .spyOn(AuthModel.api, "post")
+      .mockResolvedValue({ success: true, data: RESULT } as never);
     const res = await AuthModel.login({ email: "a@b.com", password: "x" });
     expect(res).toEqual(RESULT);
     expect(post).toHaveBeenCalledWith(expect.objectContaining({ url: "/auth/login" }));
   });
 
   it("register posts to /auth/register and returns the result", async () => {
-    const post = vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true, data: RESULT } as never);
+    const post = vi
+      .spyOn(AuthModel.api, "post")
+      .mockResolvedValue({ success: true, data: RESULT } as never);
     const res = await AuthModel.register({ email: "a@b.com", password: "x", name: "A" });
     expect(res.user._id).toBe("u1");
     expect(post).toHaveBeenCalledWith(expect.objectContaining({ url: "/auth/register" }));
@@ -38,7 +42,10 @@ describe("AuthModel", () => {
   });
 
   it("getMe returns the unwrapped user", async () => {
-    vi.spyOn(AuthModel.api, "get").mockResolvedValue({ success: true, data: { user: RESULT.user } } as never);
+    vi.spyOn(AuthModel.api, "get").mockResolvedValue({
+      success: true,
+      data: { user: RESULT.user },
+    } as never);
     const user = await AuthModel.getMe();
     expect(user).toEqual(RESULT.user);
   });

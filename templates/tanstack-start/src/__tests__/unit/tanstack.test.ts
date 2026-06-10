@@ -31,7 +31,10 @@ describe("defineQuery", () => {
 });
 
 describe("defineMutation", () => {
-  const useUpdate = defineMutation<string, number>({ key: "users.update", mutator: async () => "ok" });
+  const useUpdate = defineMutation<string, number>({
+    key: "users.update",
+    mutator: async () => "ok",
+  });
 
   it("exposes the key", () => {
     expect(useUpdate.key).toBe("users.update");

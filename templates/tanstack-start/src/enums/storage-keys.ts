@@ -9,8 +9,6 @@ const APP_PREFIX = import.meta.env.VITE_APP_NAME || "PRISM_APP";
  * localStorage.getItem/setItem calls must be guarded by typeof window checks.
  */
 export const STORAGE_KEYS = {
-  // Auth tokens are NOT stored here — they live in httpOnly cookies set by the
-  // backend (cookie-based auth). Only non-sensitive UI prefs are persisted.
   LANGUAGE: `${APP_PREFIX}_LANGUAGE`,
   THEME: `${APP_PREFIX}_THEME`,
 } as const;

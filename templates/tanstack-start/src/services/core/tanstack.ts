@@ -1,10 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiResponseError } from "./types";
-import type {
-  MutationOptions,
-  UseMutationOptions,
-  UseQueryOptions,
-} from "@tanstack/react-query";
+import type { MutationOptions, UseMutationOptions, UseQueryOptions } from "@tanstack/react-query";
 
 type QueryDefinitionKey<TParams> = readonly [string] | readonly [string, TParams];
 
@@ -29,9 +25,9 @@ export interface QueryOptionsObject<TData, TParams = void> {
 }
 
 export interface QueryDefinition<TData, TParams = void> {
-  (config?: UseQueryConfig<TData, TParams>): ReturnType<
-    typeof useQuery<TData, ApiResponseError, TData, QueryDefinitionKey<TParams>>
-  >;
+  (
+    config?: UseQueryConfig<TData, TParams>,
+  ): ReturnType<typeof useQuery<TData, ApiResponseError, TData, QueryDefinitionKey<TParams>>>;
   key: string;
   queryKey: (params?: TParams) => QueryDefinitionKey<TParams>;
   /** Same key + fetcher as the hook, as a plain object — lets a route loader
@@ -79,9 +75,9 @@ interface DefineMutationConfig<TData, TVars, TCtx = unknown> {
 }
 
 export interface MutationDefinition<TData, TVars, TCtx = unknown> {
-  (overrides?: MutationDefOpts<TData, TVars, TCtx>): ReturnType<
-    typeof useMutation<TData, ApiResponseError, TVars, TCtx>
-  >;
+  (
+    overrides?: MutationDefOpts<TData, TVars, TCtx>,
+  ): ReturnType<typeof useMutation<TData, ApiResponseError, TVars, TCtx>>;
   key: string;
 }
 

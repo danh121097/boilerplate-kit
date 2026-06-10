@@ -1,21 +1,14 @@
+import { authContract } from "./auth/contract";
 import { Api, ApiInterceptors } from "./core";
 import type { ServiceRefreshConfig } from "./core";
 
 /**
- * Declare every backend the app talks to in one place. Each entry wires a
- * service's base URL and (optionally) its automatic token-refresh endpoint.
+ * Declare every backend the app talks to in one place (base URL + optional
+ * auto-refresh endpoint). Cookie-based auth → no localStorage token slots. Call
+ * on the CLIENT only; server functions forward the request cookie directly.
  *
- * Auth is cookie-based: the backend sets httpOnly access + refresh token cookies,
- * so there are no localStorage token slots to register — the browser attaches the
- * cookie automatically (the axios client uses `withCredentials`).
- *
- * TanStack Start is SSR-first: this function must only be called on the CLIENT.
- * Server functions that need to call the API forward the request's cookie header
- * directly (see `src/server/`); they do not rely on this client-side registry.
- *
- * Add a backend = add a row + its `VITE_*_API_URL` in `.env` (the URL must include
- * the API prefix, e.g. `http://localhost:3000/api/v1`). Rows with an empty baseURL
- * are skipped. Give a row a `refresh` to enable per-service auto-refresh.
+ * Add a backend = a row + its `VITE_*_API_URL` in `.env` (URL includes the API
+ * prefix, e.g. `http://localhost:3000/api/v1`); empty-baseURL rows are skipped.
  */
 interface ServiceDefinition {
   name: string;
@@ -26,8 +19,13 @@ interface ServiceDefinition {
 const SERVICES: ServiceDefinition[] = [
   {
     name: "MAIN",
-    baseURL: import.meta.env.VITE_API_BASE_URL ?? "https://jsonplaceholder.typicode.com",
-    refresh: { endpoint: "/auth/refresh" },
+    baseURL: import.meta.env.VITE_API_BASE_URL,
+    // reloadOnFailure: true — most endpoints need auth, so a failed refresh means
+    // the session is truly dead → reload to a clean (logged-out) state. Safe here:
+    // client axios calls are gated behind auth and the session bootstrap runs via
+    // server functions (not this interceptor). If you add a PUBLIC client call that
+    // fires for anonymous users, gate it or it will 401→refresh→reload loop.
+    refresh: { endpoint: authContract.paths.refresh, reloadOnFailure: true },
   },
 ];
 

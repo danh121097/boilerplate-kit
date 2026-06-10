@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as UsersRouteImport } from './routes/users'
 import { Route as FormRouteImport } from './routes/form'
 import { Route as CounterRouteImport } from './routes/counter'
+import { Route as AuthDemoRouteImport } from './routes/auth-demo'
 import { Route as IndexRouteImport } from './routes/index'
 
 const UsersRoute = UsersRouteImport.update({
@@ -29,6 +30,11 @@ const CounterRoute = CounterRouteImport.update({
   path: '/counter',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthDemoRoute = AuthDemoRouteImport.update({
+  id: '/auth-demo',
+  path: '/auth-demo',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -37,12 +43,14 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth-demo': typeof AuthDemoRoute
   '/counter': typeof CounterRoute
   '/form': typeof FormRoute
   '/users': typeof UsersRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth-demo': typeof AuthDemoRoute
   '/counter': typeof CounterRoute
   '/form': typeof FormRoute
   '/users': typeof UsersRoute
@@ -50,20 +58,22 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/auth-demo': typeof AuthDemoRoute
   '/counter': typeof CounterRoute
   '/form': typeof FormRoute
   '/users': typeof UsersRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/counter' | '/form' | '/users'
+  fullPaths: '/' | '/auth-demo' | '/counter' | '/form' | '/users'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/counter' | '/form' | '/users'
-  id: '__root__' | '/' | '/counter' | '/form' | '/users'
+  to: '/' | '/auth-demo' | '/counter' | '/form' | '/users'
+  id: '__root__' | '/' | '/auth-demo' | '/counter' | '/form' | '/users'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthDemoRoute: typeof AuthDemoRoute
   CounterRoute: typeof CounterRoute
   FormRoute: typeof FormRoute
   UsersRoute: typeof UsersRoute
@@ -92,6 +102,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CounterRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth-demo': {
+      id: '/auth-demo'
+      path: '/auth-demo'
+      fullPath: '/auth-demo'
+      preLoaderRoute: typeof AuthDemoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -104,6 +121,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthDemoRoute: AuthDemoRoute,
   CounterRoute: CounterRoute,
   FormRoute: FormRoute,
   UsersRoute: UsersRoute,

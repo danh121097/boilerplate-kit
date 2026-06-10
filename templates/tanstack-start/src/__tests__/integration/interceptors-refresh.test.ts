@@ -44,7 +44,9 @@ describe("interceptors — cookie-based token refresh", () => {
   it("single-flights concurrent 401s into ONE refresh", async () => {
     const post = vi
       .spyOn(axios, "post")
-      .mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve({ data: {} }), 10)) as never);
+      .mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve({ data: {} }), 10)) as never,
+      );
 
     const client = makeClient(async (config) =>
       retried(config) ? ok(config, { success: true, data: 1 }) : httpError(config),

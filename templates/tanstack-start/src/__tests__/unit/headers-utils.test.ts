@@ -19,6 +19,7 @@ describe("HeadersUtils.setAuthHeaders", () => {
   afterEach(() => vi.unstubAllEnvs());
 
   it("returns the headers unchanged when no HMAC secret is configured", () => {
+    vi.stubEnv("VITE_HMAC_SECRET", ""); // env-independent: explicit empty secret
     const config = makeConfig();
     const headers = HeadersUtils.setAuthHeaders(config);
     expect(headers).toBe(config.headers);

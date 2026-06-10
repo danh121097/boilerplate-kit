@@ -33,17 +33,11 @@ function buildAuth() {
 }
 
 /**
- * React hook that manages a Socket.IO connection for the current component.
- *
- * Mirrors `useSocketIO` from the vuejs template, adapted for React + Zustand:
- * - Connects on mount via `useEffect` (client-only — effect never runs on server).
- * - Disconnects on unmount or when the component calling this hook is destroyed.
- * - Auth payload: `{ token: 'Bearer <access_token>', role: 'user' }` + optional HMAC sig.
- * - Re-connection is throttled: a new socket is not created if one already exists in the store.
- *
- * SSR safety: the entire body is inside a `typeof window !== "undefined"` guard
- * in `useEffect` (effects run client-only), and the dynamic `import('socket.io-client')`
- * ensures the browser bundle for socket.io-client is never evaluated during SSR render.
+ * Manages a Socket.IO connection for the calling component — connects on mount,
+ * disconnects on unmount, and reuses an existing store socket instead of stacking
+ * connections. Cookie-based auth: the httpOnly access cookie rides the WS upgrade
+ * (`withCredentials`); the handshake carries only role + optional HMAC sig.
+ * SSR-safe: the effect runs client-only and socket.io-client is lazy-imported.
  */
 export function useSocketIO() {
   const { socket, authenticated, setSocketIO } = useSocketIOStore();

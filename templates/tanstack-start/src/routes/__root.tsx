@@ -47,11 +47,14 @@ function RootLayout() {
   }
 
   return (
-    <html lang={i18n.language}>
+    // suppressHydrationWarning: `lang` is decided client-side from localStorage
+    // (the server can't know it without a cookie), and browser extensions mutate
+    // <html>/<body> attributes before React hydrates — neither is a real mismatch.
+    <html lang={i18n.language} suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
-      <body className="min-h-screen bg-gray-50 text-gray-900">
+      <body className="min-h-screen bg-gray-50 text-gray-900" suppressHydrationWarning>
         <header className="border-b bg-white">
           <nav className="mx-auto flex max-w-3xl items-center gap-6 px-6 py-3 text-sm">
             <Link to="/" className="font-semibold hover:text-indigo-600 [&.active]:text-indigo-600">
@@ -65,6 +68,9 @@ function RootLayout() {
             </Link>
             <Link to="/form" className="hover:text-indigo-600 [&.active]:text-indigo-600">
               {t("nav.form")}
+            </Link>
+            <Link to="/auth-demo" className="hover:text-indigo-600 [&.active]:text-indigo-600">
+              {t("nav.authDemo")}
             </Link>
             <button
               className="ml-auto rounded-md border px-2 py-0.5 text-xs hover:bg-gray-100"

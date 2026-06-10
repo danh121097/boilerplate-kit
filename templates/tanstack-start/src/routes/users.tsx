@@ -7,22 +7,10 @@ import { useTranslation } from "react-i18next";
 import type { User } from "@/services/users/types/user";
 
 /**
- * Users route — SSR-first via a server function.
- *
- * `useUsersList` is one `defineQuery` definition backed by `getUsersServerFn`
- * (runs on the server — no client-only axios layer needed). The route loader
- * prefetches it via `useUsersList.queryOptions()` and the component reads it via
- * the `useUsersList()` hook: one key + one fetcher shared by both, so the
- * prefetched cache shape and the rendered shape can never disagree.
- *
- * The router's QueryClient is dehydrated on the server and hydrated on the client
- * (setupRouterSsrQueryIntegration in router.tsx), so the loader's prefetched cache
- * survives the SSR boundary: the hook reads it on the client too, without a second
- * fetch on hydration.
- *
- * The axios service layer's client-side list query lives under a distinct key
- * (`useUsersListQuery`, key "users.list.client") so a server-fn query and an
- * auth-aware client query never collide on one key.
+ * Users route — SSR-first. One `defineQuery` backed by `getUsersServerFn` (server
+ * only): the loader prefetches it and the component reads the same key/fetcher, so
+ * the SSR-hydrated cache renders on the client with no refetch. Distinct key from
+ * the axios client list (`useUsersListQuery`, "users.list.client").
  */
 const useUsersList = defineQuery<User[]>({
   key: queryKeys.users.list,
@@ -53,12 +41,12 @@ function UsersPage() {
       {!isLoading && !error && (
         <ul className="divide-y">
           {users.map((user) => (
-            <li key={user.id} className="flex items-center justify-between py-2">
+            <li key={user._id} className="flex items-center justify-between py-2">
               <div>
                 <span className="font-medium">{user.name}</span>
                 <span className="ml-2 text-sm text-gray-500">{user.email}</span>
               </div>
-              <Badge variant="secondary">#{user.id}</Badge>
+              <Badge variant="secondary">#{user._id}</Badge>
             </li>
           ))}
         </ul>

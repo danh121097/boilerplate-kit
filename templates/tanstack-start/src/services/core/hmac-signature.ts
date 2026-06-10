@@ -3,28 +3,18 @@ import type { InternalAxiosRequestConfig } from "axios";
 import Base64 from "crypto-js/enc-base64";
 import HmacSHA256 from "crypto-js/hmac-sha256";
 
-/** Inputs for a request signature. `path` must be the request path WITHOUT the
- * API prefix and WITHOUT the query string — exactly what the backend signs
- * (Express strips the `apiPrefix` mount and the query before verifying). */
 export interface SignRequestInput {
   method: string;
   path: string;
   contentType?: string;
-  /** Injectable timestamp — defaults to now; pass a fixed value for parity tests. */
   ctime?: number;
 }
 
 /**
- * HMAC signature generator for API request authentication.
- * Computes a signature header set; only active when VITE_HMAC_SECRET is set.
- *
- * TanStack Start uses Vite, so env vars are read via `import.meta.env.VITE_*`
- * identical to the SPA reactjs template. The secret is client-readable (soft
- * layer) — it matches the backend's HMAC_SECRET for request integrity.
- *
- * `signRequest` is the pure core, reused by both the axios interceptor (client)
- * and server functions (SSR), so a forwarded SSR fetch carries the same headers
- * the backend requires of every request.
+ * HMAC request signer — active only when `VITE_HMAC_SECRET` is set. The secret is
+ * client-readable (a soft integrity layer matching the backend's HMAC_SECRET).
+ * `signRequest` is the pure core, reused by the axios interceptor and SSR server
+ * functions so a forwarded SSR fetch carries the same headers the backend requires.
  */
 export class HMACSignatureGenerator {
   private static normalizeUrl(url: string): string {
@@ -58,12 +48,23 @@ export class HMACSignatureGenerator {
   }
 
   /** Adapter for the axios interceptor — signs `config.url` (already the path
-   * after baseURL, i.e. without the API prefix). */
+   * after baseURL, i.e. without the API prefix).
+   *
+   * The signed content-type MUST equal what the request actually sends, because
+   * the backend signs the `Content-Type` header it receives. axios omits
+   * Content-Type on body less requests (GET, or POST/DELETE with no data), so we
+   * sign "" for those and "application/json" only when a body is present. A
+   * request that pins its own content-type (e.g. multipart form-data) keeps it. */
   static generateSignature(config: InternalAxiosRequestConfig): HMACSignatureData | null {
+    const pinned = config.headers?.["Content-Type"] as string | undefined;
+    const isMultipart = typeof pinned === "string" && pinned.startsWith("multipart");
+    const hasBody = config.data !== undefined && config.data !== null;
+    const contentType = isMultipart ? pinned : hasBody ? "application/json" : "";
+
     return this.signRequest({
       method: config.method || "",
       path: config.url || "",
-      contentType: (config.headers?.["Content-Type"] as string) || "application/json",
+      contentType,
     });
   }
 }

@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/services/auth/session";
 import { useCounterStore } from "@/stores/counter";
 import { createFileRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -10,6 +11,8 @@ export const Route = createFileRoute("/counter")({
 function CounterPage() {
   const { t } = useTranslation();
   const { count, increment, decrement, reset } = useCounterStore();
+  const { user, isAuthenticated, isLoading } = useAuth();
+  console.log("User:", user, "Is Authenticated:", isAuthenticated, "Is Loading:", isLoading);
 
   return (
     <section>
