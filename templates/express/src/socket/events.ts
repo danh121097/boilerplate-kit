@@ -5,12 +5,11 @@
  */
 export const SOCKET_EVENT = {
   /** Server → client, emitted once the handshake auth succeeds. */
-  AUTHENTICATED: 'authenticated',
-  /** Server → client, a user-targeted notification (see emitToUser). */
-  NOTIFICATION: 'notification'
+  AUTHENTICATED: "authenticated",
+  PING: "ping",
 } as const;
 
 /** Error message sent to the client when a handshake is rejected. */
-export const SOCKET_UNAUTHORIZED = 'Unauthorized!';
+export const SOCKET_UNAUTHORIZED = "Unauthorized!";
 
 export type SocketEvent = (typeof SOCKET_EVENT)[keyof typeof SOCKET_EVENT];
