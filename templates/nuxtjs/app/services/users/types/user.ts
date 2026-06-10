@@ -1,7 +1,7 @@
 /** Domain types for the Users service. */
 
 export interface User {
-  id: number;
+  _id: number;
   name: string;
   email: string;
 }
