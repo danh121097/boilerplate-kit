@@ -29,7 +29,7 @@ const corsOrigins: string[] = isProduction
   ? [
       "https://app.example.com", // ← replace with your production frontend origin(s)
     ]
-  : ["http://localhost:5173", "http://localhost:5174"];
+  : ["http://localhost:5173", "http://localhost:9000"];
 
 /** Validated environment configuration */
 export const config: EnvironmentConfig = {
