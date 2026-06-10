@@ -1,5 +1,5 @@
-import { Router } from 'express';
-import type { RouteGroup } from '@/types/routing';
+import { Router } from "express";
+import type { RouteGroup } from "@/types/routing";
 
 /**
  * Build an Express Router from a declarative RouteGroup.

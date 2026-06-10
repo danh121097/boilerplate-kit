@@ -1,6 +1,7 @@
 import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 import perfectionist from "eslint-plugin-perfectionist";
+import eslintConfigPrettier from "eslint-config-prettier";
 
 // Order imports by syntax kind, not by source path:
 //   1. named value imports   -> import { X } from "x"
@@ -48,4 +49,6 @@ export default tseslint.config(
   {
     ignores: ["dist/", "node_modules/"],
   },
+  // Must be last: turns off ESLint rules that conflict with Prettier formatting.
+  eslintConfigPrettier,
 );

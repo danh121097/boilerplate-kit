@@ -1,53 +1,50 @@
-import { authorize } from '@/middleware/role';
-import { AppError } from '@/types';
-import { describe, it, expect, vi } from 'vitest';
+import { authorize } from "@/middleware/role";
+import { AppError } from "@/types";
+import { describe, it, expect, vi } from "vitest";
 
-describe('authorize middleware', () => {
+describe("authorize middleware", () => {
   const mockRes = {} as any;
 
-  it('calls next when role matches', () => {
+  it("calls next when role matches", () => {
     const mockNext = vi.fn();
     const req = {
-      user: { userId: '1', email: 'a@b.com', role: 'admin' },
+      user: { userId: "1", email: "a@b.com", role: "admin" },
     } as any;
-    authorize('admin')(req, mockRes, mockNext);
+    authorize("admin")(req, mockRes, mockNext);
     expect(mockNext).toHaveBeenCalled();
   });
 
-  it('throws 403 when role does not match', () => {
+  it("throws 403 when role does not match", () => {
     const mockNext = vi.fn();
     const req = {
-      user: { userId: '1', email: 'a@b.com', role: 'user' },
+      user: { userId: "1", email: "a@b.com", role: "user" },
     } as any;
-    expect(() => authorize('admin')(req, mockRes, mockNext)).toThrow(AppError);
+    expect(() => authorize("admin")(req, mockRes, mockNext)).toThrow(AppError);
   });
 
-  it('throws 401 when no user on req', () => {
+  it("throws 401 when no user on req", () => {
     const mockNext = vi.fn();
     const req = {} as any;
-    expect(() => authorize('admin')(req, mockRes, mockNext)).toThrow(AppError);
+    expect(() => authorize("admin")(req, mockRes, mockNext)).toThrow(AppError);
   });
 
   // Hierarchy: super_admin > admin > user. authorize(X) allows X and anything higher.
-  const reqWith = (role: string) =>
-    ({ user: { userId: '1', email: 'a@b.com', role } }) as any;
+  const reqWith = (role: string) => ({ user: { userId: "1", email: "a@b.com", role } }) as any;
 
-  it('higher role passes a lower requirement (super_admin on admin route)', () => {
+  it("higher role passes a lower requirement (super_admin on admin route)", () => {
     const mockNext = vi.fn();
-    authorize('admin')(reqWith('super_admin'), mockRes, mockNext);
+    authorize("admin")(reqWith("super_admin"), mockRes, mockNext);
     expect(mockNext).toHaveBeenCalled();
   });
 
-  it('admin passes a user-level requirement', () => {
+  it("admin passes a user-level requirement", () => {
     const mockNext = vi.fn();
-    authorize('user')(reqWith('admin'), mockRes, mockNext);
+    authorize("user")(reqWith("admin"), mockRes, mockNext);
     expect(mockNext).toHaveBeenCalled();
   });
 
-  it('lower role is rejected on a higher requirement (admin on super_admin route)', () => {
+  it("lower role is rejected on a higher requirement (admin on super_admin route)", () => {
     const mockNext = vi.fn();
-    expect(() => authorize('super_admin')(reqWith('admin'), mockRes, mockNext)).toThrow(
-      AppError
-    );
+    expect(() => authorize("super_admin")(reqWith("admin"), mockRes, mockNext)).toThrow(AppError);
   });
 });

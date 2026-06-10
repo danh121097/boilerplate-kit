@@ -1,10 +1,10 @@
-import { Document, Types } from 'mongoose';
+import { Document, Types } from "mongoose";
 
 /** Single source of truth for user roles — used by the User model enum and the Role type */
 export const ROLES = {
-  USER: 'user',
-  ADMIN: 'admin',
-  SUPER_ADMIN: 'super_admin'
+  USER: "user",
+  ADMIN: "admin",
+  SUPER_ADMIN: "super_admin",
 } as const;
 
 /** User role — derived from ROLES values */

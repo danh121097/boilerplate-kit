@@ -1,22 +1,19 @@
-import { RefreshTokenDocument } from '@/types/auth';
-import { Schema, model } from 'mongoose';
+import { RefreshTokenDocument } from "@/types/auth";
+import { Schema, model } from "mongoose";
 
 const refreshTokenSchema = new Schema<RefreshTokenDocument>(
   {
     token: { type: String, required: true, index: true },
     userId: {
       type: Schema.Types.ObjectId,
-      ref: 'User',
+      ref: "User",
       required: true,
-      index: true
+      index: true,
     },
     expiresAt: { type: Date, required: true, index: { expires: 0 } },
-    isRevoked: { type: Boolean, default: false }
+    isRevoked: { type: Boolean, default: false },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-export const RefreshToken = model<RefreshTokenDocument>(
-  'RefreshToken',
-  refreshTokenSchema
-);
+export const RefreshToken = model<RefreshTokenDocument>("RefreshToken", refreshTokenSchema);

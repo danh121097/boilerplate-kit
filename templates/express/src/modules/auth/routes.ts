@@ -1,54 +1,47 @@
-import {
-  loginSchema,
-  registerSchema,
-  validate
-} from './validation';
-import { authenticate } from '@/middleware/auth';
-import {
-  authRateLimiter,
-  loginRateLimiter
-} from '@/middleware/rate-limit';
-import type { RouteGroup } from '@/types/routing';
-import * as AuthController from './controller';
+import { loginSchema, registerSchema, validate } from "./validation";
+import { authenticate } from "@/middleware/auth";
+import { authRateLimiter, loginRateLimiter } from "@/middleware/rate-limit";
+import type { RouteGroup } from "@/types/routing";
+import * as AuthController from "./controller";
 
 const authGroup: RouteGroup = {
-  prefix: '/auth',
+  prefix: "/auth",
   routes: [
     {
-      method: 'post',
-      path: '/register',
+      method: "post",
+      path: "/register",
       bodySchema: registerSchema,
       middleware: [authRateLimiter, validate(registerSchema)],
-      handler: AuthController.register
+      handler: AuthController.register,
     },
     {
-      method: 'post',
-      path: '/login',
+      method: "post",
+      path: "/login",
       bodySchema: loginSchema,
       middleware: [loginRateLimiter, validate(loginSchema)],
-      handler: AuthController.login
+      handler: AuthController.login,
     },
     // Refresh token is read from httpOnly cookie — no body validation needed
     {
-      method: 'post',
-      path: '/refresh',
+      method: "post",
+      path: "/refresh",
       middleware: [authRateLimiter],
-      handler: AuthController.refresh
+      handler: AuthController.refresh,
     },
     // Refresh token is read from httpOnly cookie — no body validation needed
     {
-      method: 'post',
-      path: '/logout',
+      method: "post",
+      path: "/logout",
       middleware: [authRateLimiter],
-      handler: AuthController.logout
+      handler: AuthController.logout,
     },
     {
-      method: 'get',
-      path: '/me',
+      method: "get",
+      path: "/me",
       middleware: [authenticate],
-      handler: AuthController.getMe
-    }
-  ]
+      handler: AuthController.getMe,
+    },
+  ],
 };
 
 export default authGroup;

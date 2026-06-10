@@ -1,8 +1,7 @@
-import { config } from '@/config/environment';
-import crypto from 'crypto';
+import { config } from "@/config/environment";
+import crypto from "crypto";
 
-const HMAC_SECRET =
-  process.env.HMAC_SECRET || 'test-hmac-secret-key-for-testing-min32chars';
+const HMAC_SECRET = process.env.HMAC_SECRET || "test-hmac-secret-key-for-testing-min32chars";
 
 /**
  * Generate HMAC headers for test requests, matching the frontend contract:
@@ -16,25 +15,14 @@ const HMAC_SECRET =
 export function signHmac(
   method: string,
   url: string,
-  body?: unknown
+  body?: unknown,
 ): { sig: string; ctime: string } {
   const ctime = Date.now().toString();
-  const path = url.startsWith(config.apiPrefix)
-    ? url.slice(config.apiPrefix.length) || '/'
-    : url;
-  const contentType = body ? 'application/json' : '';
-  const stringToSign = [
-    method.toUpperCase(),
-    contentType,
-    ctime,
-    path,
-    ''
-  ].join('\n');
+  const path = url.startsWith(config.apiPrefix) ? url.slice(config.apiPrefix.length) || "/" : url;
+  const contentType = body ? "application/json" : "";
+  const stringToSign = [method.toUpperCase(), contentType, ctime, path, ""].join("\n");
 
-  const sig = crypto
-    .createHmac('sha256', HMAC_SECRET)
-    .update(stringToSign)
-    .digest('base64');
+  const sig = crypto.createHmac("sha256", HMAC_SECRET).update(stringToSign).digest("base64");
 
   return { sig, ctime };
 }
@@ -45,12 +33,7 @@ export function signHmac(
  */
 export function signSocketHmac(): { sig: string; ctime: string } {
   const ctime = Date.now().toString();
-  const stringToSign = ['GET', 'application/json', ctime, '/socket', ''].join(
-    '\n'
-  );
-  const sig = crypto
-    .createHmac('sha256', HMAC_SECRET)
-    .update(stringToSign)
-    .digest('base64');
+  const stringToSign = ["GET", "application/json", ctime, "/socket", ""].join("\n");
+  const sig = crypto.createHmac("sha256", HMAC_SECRET).update(stringToSign).digest("base64");
   return { sig, ctime };
 }
