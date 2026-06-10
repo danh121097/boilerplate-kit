@@ -82,13 +82,31 @@ export async function login(
 /** Rotate refresh token: revoke old, issue new pair */
 export async function refresh(rawRefreshToken: string): Promise<AuthTokens> {
   const hashedToken = hashToken(rawRefreshToken);
-  const storedToken = await RefreshToken.findOne({
-    token: hashedToken,
-    isRevoked: false,
-  });
+  const storedToken = await RefreshToken.findOne({ token: hashedToken });
 
-  if (!storedToken || storedToken.expiresAt < new Date()) {
-    if (storedToken) await storedToken.deleteOne();
+  if (!storedToken) {
+    throw new AppError({
+      message: "Invalid refresh token!",
+      statusCode: 401,
+      errorType: "AUTHENTICATION_ERROR",
+    });
+  }
+
+  // Reuse detection: an already-revoked token presented again means it was
+  // rotated already — a sign of theft/replay. Nuke the user's whole token family
+  // (all refresh tokens + access tokens) so attacker and user must re-login.
+  if (storedToken.isRevoked) {
+    await RefreshToken.updateMany({ userId: storedToken.userId }, { isRevoked: true });
+    await revokeUserTokens(String(storedToken.userId));
+    throw new AppError({
+      message: "Refresh token reuse detected — all sessions have been revoked!",
+      statusCode: 401,
+      errorType: "AUTHENTICATION_ERROR",
+    });
+  }
+
+  if (storedToken.expiresAt < new Date()) {
+    await storedToken.deleteOne();
     throw new AppError({
       message: "Invalid or expired refresh token!",
       statusCode: 401,

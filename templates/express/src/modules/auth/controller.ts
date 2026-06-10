@@ -55,7 +55,9 @@ export async function refresh(req: Request, res: Response): Promise<void> {
 
 /** POST /api/auth/logout */
 export async function logout(req: Request, res: Response): Promise<void> {
-  const refreshToken = req.cookies.refreshToken;
+  // Accept the refresh token from the body (Bearer/localStorage CSR clients) or
+  // the httpOnly cookie (cookie/SSR clients) — same dual-mode as refresh.
+  const refreshToken = req.body?.refreshToken || req.cookies?.refreshToken;
   if (refreshToken) {
     await AuthService.logout(refreshToken);
   }
