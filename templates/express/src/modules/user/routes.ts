@@ -17,7 +17,7 @@ const userGroup: RouteGroup = {
     {
       method: "get",
       path: "/:id",
-      middleware: [authenticate],
+      middleware: [authenticate, authorize("admin")],
       handler: UserController.getUserById,
     },
   ],
