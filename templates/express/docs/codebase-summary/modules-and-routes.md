@@ -111,5 +111,5 @@ resolves to `POST /api/v1/auth/login`.
 | POST | `/auth/refresh` | authRateLimiter | rotates refresh token (reads cookie) |
 | POST | `/auth/logout` | authRateLimiter | revokes refresh + user access tokens |
 | GET | `/auth/me` | authenticate | current user profile |
-| GET | `/users` | authenticate, authorize('admin') | list users |
+| GET | `/users` | authenticate, requireMinRole('admin') | list users |
 | GET | `/users/:id` | authenticate | user by id |

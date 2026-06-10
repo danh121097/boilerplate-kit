@@ -21,7 +21,7 @@ src/
 │
 ├── middleware/
 │   ├── auth.ts               # authenticate: verify access token (header/cookie) + revocation
-│   ├── role.ts               # authorize(...roles): role-rank hierarchy guard
+│   ├── role.ts               # requireMinRole(...roles): role-rank hierarchy guard
 │   ├── hmac.ts               # verifyHmacRequest: HMAC sig/ctime gate for all API routes
 │   ├── rate-limit.ts         # global / auth / login limiters (Redis store when on)
 │   ├── error-handler.ts      # global error handler → standard JSON error shape

@@ -106,7 +106,7 @@ export default authGroup;
 `method` is the constrained `HttpMethod` union so `router[method]` matches the
 Express overloads with no casting. `bodySchema` is metadata (tooling reads it to
 generate examples) — runtime validation is still done by the `validate()`
-middleware. Protected routes add `authenticate` (and `authorize(...)` for
+middleware. Protected routes add `authenticate` (and `requireMinRole(...)` for
 role-gated routes) to the middleware chain.
 
 ## Environment access via `config`

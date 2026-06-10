@@ -26,7 +26,7 @@ app.use(cors({ origin: config.corsOrigin, credentials: true }));
 
 - **Authentication** — `authenticate` ([`middleware/auth.ts`](../../src/middleware/auth.ts))
   verifies the access token; see [auth-jwt-refresh.md](./auth-jwt-refresh.md).
-- **Authorization** — `authorize(...roles)` ([`middleware/role.ts`](../../src/middleware/role.ts))
+- **Authorization** — `requireMinRole(...roles)` ([`middleware/role.ts`](../../src/middleware/role.ts))
   enforces a role hierarchy and **must run after** `authenticate`:
 
 ```ts
@@ -36,9 +36,9 @@ const requiredRank = Math.min(...allowedRoles.map((r) => ROLE_RANK[r]));
 if (ROLE_RANK[req.user.role] < requiredRank) throw new AppError({ statusCode: 403, errorType: 'AUTHORIZATION_ERROR', ... });
 ```
 
-So `authorize('admin')` allows `admin` and `super_admin`; a higher role never
+So `requireMinRole('admin')` allows `admin` and `super_admin`; a higher role never
 needs to be listed explicitly. Missing `req.user` → 401; insufficient rank → 403.
-Example: `GET /users` uses `[authenticate, authorize('admin')]`.
+Example: `GET /users` uses `[authenticate, requireMinRole('admin')]`.
 
 ## Rate Limiting
 
