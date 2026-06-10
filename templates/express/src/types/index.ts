@@ -46,6 +46,12 @@ export interface EnvironmentConfig {
   jwtRefreshExpiry: string;
   hmacSecret: string;
   corsOrigin: string;
+  /** Extra allow-listed origins for the CSRF guard (CSR template origins, etc.). */
+  extraOrigins: string[];
+  /** Enable the Origin-allow-list CSRF guard on mutating methods (default off). */
+  enableCsrf: boolean;
+  /** Cookie `Domain` attribute; unset = host-only (same-origin proxy deploy). */
+  cookieDomain?: string;
   apiPrefix: string;
   redisEnabled: boolean;
   redisUrl: string;

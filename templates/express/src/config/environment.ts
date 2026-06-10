@@ -32,6 +32,15 @@ export const config: EnvironmentConfig = {
   jwtRefreshExpiry: process.env.JWT_REFRESH_EXPIRY || "7d",
   hmacSecret: getRequiredEnvVar("HMAC_SECRET"),
   corsOrigin: process.env.CORS_ORIGIN || "http://localhost:5173",
+  // Comma-separated extra origins allowed by the CSRF guard (e.g. CSR template origins).
+  extraOrigins: (process.env.EXTRA_ORIGINS || "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean),
+  // Off by default — same-origin proxy deploy closes CSRF via SameSite; opt in for defense-in-depth.
+  enableCsrf: process.env.ENABLE_CSRF === "true",
+  // Unset = host-only cookie; set for split-domain deploys (e.g. ".example.com").
+  cookieDomain: process.env.COOKIE_DOMAIN || undefined,
   apiPrefix: process.env.API_PREFIX || "/api/v1",
   // Redis is optional: not read via getRequiredEnvVar so the app boots fine when off.
   redisEnabled: process.env.REDIS_ENABLED === "true",

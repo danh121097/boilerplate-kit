@@ -3,6 +3,7 @@ import { errorHandler } from "./middleware/error-handler";
 import { verifyHmacRequest } from "./middleware/hmac";
 import { notFoundHandler } from "./middleware/not-found-handler";
 import { globalRateLimiter } from "./middleware/rate-limit";
+import { verifyOrigin } from "./middleware/verify-origin";
 import express, { type Express } from "express";
 import routes from "./routes";
 import compression from "compression";
@@ -36,6 +37,9 @@ app.use(cookieParser());
 
 // HMAC signature verification for all API routes
 app.use(config.apiPrefix, verifyHmacRequest);
+
+// CSRF Origin allow-list on mutating methods (no-op unless ENABLE_CSRF=true).
+app.use(config.apiPrefix, verifyOrigin);
 
 // Default rate limit for all API routes (100/min). Auth/login routes layer their
 // own stricter limiters on top via their route definitions.

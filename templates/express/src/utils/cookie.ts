@@ -1,12 +1,16 @@
 import { config } from '@/config/environment';
 import { CookieOptions, Response } from 'express';
 
-/** Shared cookie options for secure HTTP-only cookies */
+/** Shared cookie options for secure HTTP-only cookies.
+ * `domain` is undefined by default (host-only cookie, same-origin proxy deploy);
+ * set COOKIE_DOMAIN (e.g. ".example.com") for split-domain deploys where an SSR
+ * frontend on a sibling host must receive the cookie. */
 const baseCookieOptions: CookieOptions = {
   httpOnly: true,
   secure: config.isProduction,
   sameSite: config.isProduction ? 'strict' : 'lax',
-  path: '/'
+  path: '/',
+  domain: config.cookieDomain
 };
 
 /** Refresh cookie is scoped to auth routes only, derived from the API prefix. */
