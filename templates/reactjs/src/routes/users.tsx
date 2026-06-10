@@ -26,12 +26,12 @@ function UsersPage() {
       {!isLoading && !error && (
         <ul className="divide-y">
           {data?.map((user) => (
-            <li key={user.id} className="flex items-center justify-between py-2">
+            <li key={user._id} className="flex items-center justify-between py-2">
               <div>
                 <span className="font-medium">{user.name}</span>
                 <span className="ml-2 text-sm text-gray-500">{user.email}</span>
               </div>
-              <Badge variant="secondary">#{user.id}</Badge>
+              <Badge variant="secondary">#{user._id}</Badge>
             </li>
           ))}
         </ul>
