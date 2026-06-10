@@ -37,10 +37,10 @@ export const globalRateLimiter: RateLimitRequestHandler = rateLimit({
   },
 });
 
-/** General rate limit for auth endpoints: 20 requests per 15 minutes */
+/** General rate limit for auth endpoints: 30 requests per 15 minutes */
 export const authRateLimiter: RateLimitRequestHandler = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: 30,
   standardHeaders: true,
   legacyHeaders: false,
   skip: () => isTest,
@@ -53,10 +53,10 @@ export const authRateLimiter: RateLimitRequestHandler = rateLimit({
   },
 });
 
-/** Stricter limit for login: 10 requests per 15 minutes (brute force protection) */
+/** Stricter limit for login: 30 requests per 15 minutes (brute force protection) */
 export const loginRateLimiter: RateLimitRequestHandler = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 30,
   standardHeaders: true,
   legacyHeaders: false,
   skip: () => isTest,
