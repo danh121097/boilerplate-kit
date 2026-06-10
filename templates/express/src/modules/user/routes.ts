@@ -1,23 +1,23 @@
 import { authenticate } from "@/middleware/auth";
-import { authorize } from "@/middleware/role";
+import { requireMinRole } from "@/middleware/role";
 import type { RouteGroup } from "@/types/routing";
 import * as UserController from "./controller";
 
 const userGroup: RouteGroup = {
   prefix: "/users",
   routes: [
-    /** GET /users — list all users (admin only) */
+    /** GET /users — list all users (admin and above) */
     {
       method: "get",
       path: "/",
-      middleware: [authenticate, authorize("admin")],
+      middleware: [authenticate, requireMinRole("admin")],
       handler: UserController.listUsers,
     },
-    /** GET /users/:id — get user by ID (any authenticated user) */
+    /** GET /users/:id — get user by ID (admin and above) */
     {
       method: "get",
       path: "/:id",
-      middleware: [authenticate, authorize("admin")],
+      middleware: [authenticate, requireMinRole("admin")],
       handler: UserController.getUserById,
     },
   ],

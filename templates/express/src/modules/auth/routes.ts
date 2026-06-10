@@ -21,14 +21,12 @@ const authGroup: RouteGroup = {
       middleware: [loginRateLimiter, validate(loginSchema)],
       handler: AuthController.login,
     },
-    // Refresh token is read from httpOnly cookie — no body validation needed
     {
       method: "post",
       path: "/refresh",
       middleware: [authRateLimiter],
       handler: AuthController.refresh,
     },
-    // Refresh token is read from httpOnly cookie — no body validation needed
     {
       method: "post",
       path: "/logout",

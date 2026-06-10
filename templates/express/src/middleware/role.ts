@@ -14,14 +14,14 @@ const ROLE_RANK: Record<Role, number> = {
 };
 
 /**
- * Restrict access to the given role(s) or any higher-ranked role.
+ * Require AT LEAST the given role — that role or any higher-ranked one passes.
  * Must be used AFTER the authenticate middleware.
- * `authorize('admin')` allows admin and super_admin; `authorize('user')` allows
- * everyone authenticated.
+ * `requireMinRole('admin')` allows admin and super_admin; `requireMinRole('user')`
+ * allows everyone authenticated. The threshold semantics are explicit in the name
+ * (min role), so a single role is all you ever pass.
  */
-export function authorize(...allowedRoles: Role[]) {
-  // The least-privileged allowed role sets the bar; anyone at or above passes.
-  const requiredRank = Math.min(...allowedRoles.map((r) => ROLE_RANK[r]));
+export function requireMinRole(minRole: Role) {
+  const requiredRank = ROLE_RANK[minRole];
 
   return (req: Request, _res: Response, next: NextFunction): void => {
     if (!req.user) {
