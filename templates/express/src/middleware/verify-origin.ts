@@ -1,6 +1,6 @@
-import { config } from '@/config/environment';
-import { AppError } from '@/types';
-import { NextFunction, Request, Response } from 'express';
+import { config } from "@/config/environment";
+import { AppError } from "@/types";
+import { NextFunction, Request, Response } from "express";
 
 /**
  * CSRF defense via Origin/Referer allow-list — additive, opt-in.
@@ -14,7 +14,7 @@ import { NextFunction, Request, Response } from 'express';
  * same-origin reverse-proxy deployment already closes CSRF via SameSite=strict;
  * turn this on for defense-in-depth or split-domain deployments.
  */
-const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 export interface VerifyOriginOptions {
   enabled: boolean;
@@ -45,9 +45,9 @@ export function createVerifyOrigin(opts: VerifyOriginOptions) {
     const origin = resolveOrigin(req);
     if (!origin || !opts.allowList.includes(origin)) {
       throw new AppError({
-        message: 'CSRF: request origin is not allowed!',
+        message: "CSRF: request origin is not allowed!",
         statusCode: 403,
-        errorType: 'AUTHORIZATION_ERROR'
+        errorType: "AUTHORIZATION_ERROR",
       });
     }
 
@@ -55,8 +55,8 @@ export function createVerifyOrigin(opts: VerifyOriginOptions) {
   };
 }
 
-/** Default instance wired from env (CORS_ORIGIN + EXTRA_ORIGINS, gated by ENABLE_CSRF). */
+/** Default instance wired from config (corsOrigins allow-list, gated by ENABLE_CSRF). */
 export const verifyOrigin = createVerifyOrigin({
   enabled: config.enableCsrf,
-  allowList: [config.corsOrigin, ...config.extraOrigins]
+  allowList: config.corsOrigins,
 });

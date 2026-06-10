@@ -1,12 +1,12 @@
-import { socketAuth } from './auth-middleware';
-import { SOCKET_EVENT } from './events';
-import { socketHmac } from './hmac-middleware';
-import { config } from '@/config/environment';
-import { getRedis } from '@/config/redis';
-import { createAdapter } from '@socket.io/redis-adapter';
-import { Server, type Socket } from 'socket.io';
-import type { Server as HttpServer } from 'http';
-import type { Redis } from 'ioredis';
+import { socketAuth } from "./auth-middleware";
+import { SOCKET_EVENT } from "./events";
+import { socketHmac } from "./hmac-middleware";
+import { config } from "@/config/environment";
+import { getRedis } from "@/config/redis";
+import { createAdapter } from "@socket.io/redis-adapter";
+import { Server, type Socket } from "socket.io";
+import type { Server as HttpServer } from "http";
+import type { Redis } from "ioredis";
 
 /**
  * Socket.IO server attached to the HTTP server. Optional like the rest of the
@@ -20,12 +20,12 @@ let subClient: Redis | null = null;
 /** Create the Socket.IO server, wire auth + (optional) Redis adapter, return it. */
 export function initSocket(httpServer: HttpServer): Server {
   io = new Server(httpServer, {
-    cors: { origin: config.corsOrigin, credentials: true },
+    cors: { origin: config.corsOrigins, credentials: true },
     // Heartbeat: drop dead connections without flooding the wire (Socket.IO defaults).
     pingInterval: 25000,
     pingTimeout: 20000,
     // Cap inbound payloads at 1MB to avoid memory abuse from oversized messages.
-    maxHttpBufferSize: 1e6
+    maxHttpBufferSize: 1e6,
   });
 
   // Cross-instance delivery when Redis is on (pub + a duplicated sub connection).
@@ -42,7 +42,7 @@ export function initSocket(httpServer: HttpServer): Server {
   io.use(socketHmac);
   io.use(socketAuth);
 
-  io.on('connection', (socket: Socket) => {
+  io.on("connection", (socket: Socket) => {
     const userId = socket.data.user?.userId;
     if (userId) socket.join(`user:${userId}`);
 

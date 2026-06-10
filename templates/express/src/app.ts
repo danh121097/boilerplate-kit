@@ -4,6 +4,7 @@ import { verifyHmacRequest } from "./middleware/hmac";
 import { notFoundHandler } from "./middleware/not-found-handler";
 import { globalRateLimiter } from "./middleware/rate-limit";
 import { verifyOrigin } from "./middleware/verify-origin";
+import { logger } from "./utils/logger";
 import express, { type Express } from "express";
 import routes from "./routes";
 import compression from "compression";
@@ -17,18 +18,24 @@ const app: Express = express();
 // Security headers
 app.use(helmet());
 
-// Request logging (skip in test)
+// HTTP request logging routed through the app logger (one consistent output).
 if (!config.isTest) {
-  app.use(morgan(config.isProduction ? "combined" : "dev"));
+  app.use(
+    morgan(config.isProduction ? "combined" : "dev", {
+      stream: { write: (message) => logger.info(message.trim()) },
+    }),
+  );
 }
 
 // Response compression
 app.use(compression());
 
-// CORS with credentials support for cookie-based auth
+// CORS with credentials support for cookie-based auth. Allow-list = config.corsOrigins
+// (hard-coded list, shared with the CSRF guard); `cors` reflects whichever allow-listed
+// origin made the request into Access-Control-Allow-Origin.
 app.use(
   cors({
-    origin: config.corsOrigin,
+    origin: config.corsOrigins,
     credentials: true,
   }),
 );

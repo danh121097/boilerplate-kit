@@ -16,27 +16,36 @@ function getRequiredEnvVar(key: string): string {
 }
 
 const nodeEnv = process.env.NODE_ENV || "development";
+const isProduction = nodeEnv === "production";
+const isDevelopment = nodeEnv === "development";
+const isTest = nodeEnv === "test";
+
+/**
+ * Allowed browser origins for CORS + the CSRF guard. Hard-coded here (not env) so
+ * the list is easy to edit in one place — add your production frontend origin(s)
+ * below before deploying. Keep localhost out of the production list.
+ */
+const corsOrigins: string[] = isProduction
+  ? [
+      "https://app.example.com", // ← replace with your production frontend origin(s)
+    ]
+  : ["http://localhost:5173", "http://localhost:5174"];
 
 /** Validated environment configuration */
 export const config: EnvironmentConfig = {
-  isProduction: nodeEnv === "production",
-  isDevelopment: nodeEnv === "development",
-  isTest: nodeEnv === "test",
   port: parseInt(process.env.PORT || "3000", 10),
+  isProduction,
+  isDevelopment,
+  isTest,
   nodeEnv,
   mongodbUri: getRequiredEnvVar("MONGODB_URI"),
-  jwtAccessPrivateKey,
-  jwtAccessPublicKey,
+  hmacSecret: getRequiredEnvVar("HMAC_SECRET"),
   jwtRefreshSecret: getRequiredEnvVar("JWT_REFRESH_SECRET"),
   jwtAccessExpiry: process.env.JWT_ACCESS_EXPIRY || "15m",
   jwtRefreshExpiry: process.env.JWT_REFRESH_EXPIRY || "7d",
-  hmacSecret: getRequiredEnvVar("HMAC_SECRET"),
-  corsOrigin: process.env.CORS_ORIGIN || "http://localhost:5173",
-  // Comma-separated extra origins allowed by the CSRF guard (e.g. CSR template origins).
-  extraOrigins: (process.env.EXTRA_ORIGINS || "")
-    .split(",")
-    .map((o) => o.trim())
-    .filter(Boolean),
+  jwtAccessPrivateKey,
+  jwtAccessPublicKey,
+  corsOrigins,
   // Off by default — same-origin proxy deploy closes CSRF via SameSite; opt in for defense-in-depth.
   enableCsrf: process.env.ENABLE_CSRF === "true",
   // Unset = host-only cookie; set for split-domain deploys (e.g. ".example.com").

@@ -1,12 +1,12 @@
 /** Error types for frontend handling */
 export type ErrorType =
-  | 'VALIDATION_ERROR'
-  | 'AUTHENTICATION_ERROR'
-  | 'AUTHORIZATION_ERROR'
-  | 'NOT_FOUND'
-  | 'CONFLICT'
-  | 'RATE_LIMIT'
-  | 'INTERNAL_ERROR';
+  | "VALIDATION_ERROR"
+  | "AUTHENTICATION_ERROR"
+  | "AUTHORIZATION_ERROR"
+  | "NOT_FOUND"
+  | "CONFLICT"
+  | "RATE_LIMIT"
+  | "INTERNAL_ERROR";
 
 interface AppErrorParams {
   message: string;
@@ -19,11 +19,7 @@ export class AppError extends Error {
   public readonly statusCode: number;
   public readonly errorType: ErrorType;
 
-  constructor({
-    message,
-    statusCode = 500,
-    errorType = 'INTERNAL_ERROR'
-  }: AppErrorParams) {
+  constructor({ message, statusCode = 500, errorType = "INTERNAL_ERROR" }: AppErrorParams) {
     super(message);
     this.statusCode = statusCode;
     this.errorType = errorType;
@@ -45,9 +41,8 @@ export interface EnvironmentConfig {
   jwtAccessExpiry: string;
   jwtRefreshExpiry: string;
   hmacSecret: string;
-  corsOrigin: string;
-  /** Extra allow-listed origins for the CSRF guard (CSR template origins, etc.). */
-  extraOrigins: string[];
+  /** Allowed browser origins for CORS + the CSRF guard (hard-coded in config). */
+  corsOrigins: string[];
   /** Enable the Origin-allow-list CSRF guard on mutating methods (default off). */
   enableCsrf: boolean;
   /** Cookie `Domain` attribute; unset = host-only (same-origin proxy deploy). */
