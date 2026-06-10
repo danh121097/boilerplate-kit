@@ -1,11 +1,34 @@
 import { User } from "@/models/user";
 import { AppError } from "@/types";
+import {
+  // buildCursorMeta,
+  // parseCursorPagination,
+  parseOffsetPagination,
+  buildOffsetMeta,
+} from "@/utils/pagination";
 import { Request, Response } from "express";
+// import { Types } from "mongoose";
 
-/** List all users (admin only) */
-export async function listUsers(_req: Request, res: Response): Promise<void> {
-  const users = await User.find().select("-password");
-  res.json({ status: "success", data: users });
+/** List users (admin and above), offset-paginated via ?page&limit. */
+export async function listUsers(req: Request, res: Response): Promise<void> {
+  // --- Offset (page/limit)  ---
+  const { page, limit, skip } = parseOffsetPagination(req.query);
+  const [users, total] = await Promise.all([
+    User.find().select("-password").sort({ _id: -1 }).skip(skip).limit(limit),
+    User.countDocuments(),
+  ]);
+  res.json({ status: "success", data: users, meta: buildOffsetMeta(total, page, limit) });
+
+  // --- Cursor (cursor/limit)  ---
+  // const { cursor, limit } = parseCursorPagination(req.query);
+  // // $lt pairs with sort _id:-1; build the ObjectId so the range compares ids, not strings.
+  // const filter = cursor ? { _id: { $lt: new Types.ObjectId(cursor) } } : {};
+  // const rows = await User.find(filter)
+  //   .select("-password")
+  //   .sort({ _id: -1 })
+  //   .limit(limit + 1); // +1 row detects hasNext, trimmed off by buildCursorMeta
+  // const { items, meta } = buildCursorMeta(rows, limit);
+  // res.json({ status: "success", data: items, meta });
 }
 
 /** Get user by ID */

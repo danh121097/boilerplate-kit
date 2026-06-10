@@ -34,9 +34,11 @@ Behavior → proof. Proof column = test file under `src/__tests__/`, run via
 | JWT sign/verify, TTL parsing, RS256 alg pinning, forgery rejection | unit | implemented | `unit/jwt-utils.test.ts` (15) |
 | HMAC canonical string, signature compute/verify, timestamp freshness | unit | implemented | `unit/hmac-util.test.ts` (6) |
 | `authenticate` middleware: token extraction, errors, revocation check | unit | implemented | `unit/auth-middleware.test.ts` (4) |
-| `authorize` role-rank middleware (user/admin/super_admin) | unit | implemented | `unit/role-middleware.test.ts` (6) |
+| `requireMinRole` role-rank middleware (user/admin/super_admin) | unit | implemented | `unit/role-middleware.test.ts` (6) |
 | Zod register/login schemas + `validate` middleware | unit | implemented | `unit/auth-validation.test.ts` (5) |
 | Password strength validation | unit | implemented | `unit/password-utils.test.ts` (6) |
+| Pagination helpers: offset clamp/skip, meta math, cursor keyset+trim | unit | implemented | `unit/pagination.test.ts` (16) |
+| `GET /users` offset pagination: data/meta, clamp, `-password`, role/HMAC guards | integration | implemented | `integration/user-routes.test.ts` (7) |
 | Token revocation helpers (Redis on/off) | unit | implemented | `unit/token-revocation.test.ts` (6) |
 | Global error handler normalizes AppError → response shape | unit | implemented | `unit/error-handler.test.ts` (5) |
 | `AppError` construction | unit | implemented | `unit/app-error.test.ts` (2) |
