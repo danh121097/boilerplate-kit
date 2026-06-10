@@ -2,9 +2,9 @@ import { Badge } from "@/components/ui/badge";
 import { getUsersServerFn } from "@/server/get-users";
 import { defineQuery } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
-import type { User } from "@/services/users/types/user";
 import { createFileRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import type { User } from "@/services/users/types/user";
 
 /**
  * Users route — SSR-first via a server function.

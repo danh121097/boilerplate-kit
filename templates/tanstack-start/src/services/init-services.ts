@@ -1,27 +1,25 @@
 import { Api, ApiInterceptors } from "./core";
-import { registerServiceToken } from "./core/auth-token-storage";
-import { STORAGE_KEYS } from "@/enums";
-import type { ServiceRefreshConfig, ServiceTokenKeys } from "./core";
+import type { ServiceRefreshConfig } from "./core";
 
 /**
  * Declare every backend the app talks to in one place. Each entry wires a
- * service's base URL, the localStorage slots its access + refresh tokens live in,
- * and (optionally) its automatic token-refresh endpoint.
+ * service's base URL and (optionally) its automatic token-refresh endpoint.
+ *
+ * Auth is cookie-based: the backend sets httpOnly access + refresh token cookies,
+ * so there are no localStorage token slots to register — the browser attaches the
+ * cookie automatically (the axios client uses `withCredentials`).
  *
  * TanStack Start is SSR-first: this function must only be called on the CLIENT.
- * Server functions that need to call external APIs should create their own axios
- * instances or use fetch directly — they should not rely on this client-side
- * service registry.
+ * Server functions that need to call the API forward the request's cookie header
+ * directly (see `src/server/`); they do not rely on this client-side registry.
  *
- * Add a backend = add a row + its `VITE_*_API_URL` in `.env`. Rows with an empty
- * baseURL are skipped, so optional services stay dormant until their env var is
- * set. Give a row a `refresh` to enable per-service auto-refresh; omit it to opt
- * the service out (its 401s just clear that service's tokens).
+ * Add a backend = add a row + its `VITE_*_API_URL` in `.env` (the URL must include
+ * the API prefix, e.g. `http://localhost:3000/api/v1`). Rows with an empty baseURL
+ * are skipped. Give a row a `refresh` to enable per-service auto-refresh.
  */
 interface ServiceDefinition {
   name: string;
   baseURL: string;
-  tokenKeys: ServiceTokenKeys;
   refresh?: ServiceRefreshConfig;
 }
 
@@ -29,7 +27,6 @@ const SERVICES: ServiceDefinition[] = [
   {
     name: "MAIN",
     baseURL: import.meta.env.VITE_API_BASE_URL ?? "https://jsonplaceholder.typicode.com",
-    tokenKeys: { access: STORAGE_KEYS.ACCESS_TOKEN, refresh: STORAGE_KEYS.REFRESH_TOKEN },
     refresh: { endpoint: "/auth/refresh" },
   },
 ];
@@ -40,12 +37,11 @@ export function initServices(): void {
   for (const svc of SERVICES) {
     if (!svc.baseURL) continue;
     Api.setBaseURL(svc.baseURL, svc.name);
-    registerServiceToken(svc.name, svc.tokenKeys);
     if (svc.refresh) refreshByService[svc.name] = svc.refresh;
   }
 
   // On a 401 the interceptor calls the failing service's own refresh endpoint
-  // (sending the stored refresh token in the body), stores the new access +
-  // refresh tokens, and replays the request. Each service refreshes independently.
+  // (the httpOnly refresh cookie is sent automatically); the backend rotates the
+  // cookies and the request is replayed. Each service refreshes independently.
   Api.registerInterceptors(new ApiInterceptors(refreshByService));
 }

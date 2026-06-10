@@ -1,23 +1,19 @@
-import {
-  clearAuthTokens,
-  defineMutation,
-  defineQuery,
-  Model,
-  persistAccessToken,
-  persistRefreshToken,
-} from "@/services/core";
+import { defineMutation, defineQuery, Model } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
 import type { AuthResult, AuthUser, LoginPayload, RegisterPayload } from "./types/auth";
 
 /**
- * Auth service for the MAIN backend. Both tokens are persisted in localStorage:
- * the access token feeds the Bearer header; the refresh token is replayed in the
- * refresh request body. `logout` clears both. (The backend may also set an
- * httpOnly refresh cookie — harmless and still honored via `withCredentials`.)
+ * Auth service for the MAIN backend (cookie-based).
+ *
+ * login/register/logout simply call the backend: it sets (and on logout clears)
+ * the httpOnly access + refresh token cookies via Set-Cookie. The frontend never
+ * reads or stores tokens — subsequent requests authenticate via the cookie
+ * (the axios client uses `withCredentials`), and a 401 triggers a cookie-based
+ * refresh in the interceptor.
  *
  * SSR note: this model is initialized client-side via initServices(). Server
- * functions that need auth context should read from the request headers directly,
- * not from this client-side token store.
+ * functions that need auth context forward the request's cookie header directly,
+ * not this client-side service.
  */
 export class AuthModel extends Model {
   static {
@@ -26,35 +22,32 @@ export class AuthModel extends Model {
 
   static async login(payload: LoginPayload): Promise<AuthResult> {
     const res = await this.api.post<AuthResult>({ url: `${this.path}/login`, data: payload });
-    return this.storeSession(res.data);
+    return res.data;
   }
 
   static async register(payload: RegisterPayload): Promise<AuthResult> {
     const res = await this.api.post<AuthResult>({ url: `${this.path}/register`, data: payload });
-    return this.storeSession(res.data);
+    return res.data;
   }
 
   static async logout(): Promise<void> {
-    try {
-      await this.api.post({ url: `${this.path}/logout` });
-    } finally {
-      clearAuthTokens();
-    }
+    // The backend clears the auth cookies on this call.
+    await this.api.post({ url: `${this.path}/logout` });
   }
 
   static async getMe(): Promise<AuthUser> {
     const res = await this.api.get<{ user: AuthUser }>({ url: `${this.path}/me` });
     return res.data.user;
   }
-
-  /** Persist both tokens: access for the Bearer header, refresh for the refresh call. */
-  private static storeSession(result: AuthResult): AuthResult {
-    persistAccessToken(result.tokens.accessToken, this.service);
-    if (result.tokens.refreshToken) persistRefreshToken(result.tokens.refreshToken, this.service);
-    return result;
-  }
 }
 
+// Queries
+export const useMeQuery = defineQuery<AuthUser>({
+  key: queryKeys.auth.me,
+  fetcher: () => AuthModel.getMe(),
+});
+
+// Mutations
 export const useLoginMutation = defineMutation<AuthResult, LoginPayload>({
   key: queryKeys.auth.login,
   mutator: (payload) => AuthModel.login(payload),
@@ -68,9 +61,4 @@ export const useRegisterMutation = defineMutation<AuthResult, RegisterPayload>({
 export const useLogoutMutation = defineMutation({
   key: queryKeys.auth.logout,
   mutator: () => AuthModel.logout(),
-});
-
-export const useMeQuery = defineQuery<AuthUser>({
-  key: queryKeys.auth.me,
-  fetcher: () => AuthModel.getMe(),
 });

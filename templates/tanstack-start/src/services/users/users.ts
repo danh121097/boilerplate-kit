@@ -21,7 +21,10 @@ export class UsersModel extends Model {
   }
 }
 
+// Queries
 export const useUsersListQuery = defineQuery<User[]>({
   key: queryKeys.users.listClient,
-  fetcher: async () => (await UsersModel.list()).data,
+  fetcher: async () => await UsersModel.list().then((r) => r.data),
 });
+
+// Mutations

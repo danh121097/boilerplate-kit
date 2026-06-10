@@ -15,13 +15,6 @@ export function makeClient(
   return instance;
 }
 
-/** Extract the bare token from a request's Authorization header. */
-export function bearerOf(config: InternalAxiosRequestConfig): string {
-  const headers = config.headers as unknown as Record<string, unknown>;
-  const raw = String(headers?.authorization ?? headers?.Authorization ?? "");
-  return raw.replace("Bearer ", "");
-}
-
 /** A 200 response carrying `data` (mirrors a backend success envelope when wrapped). */
 export function ok(config: InternalAxiosRequestConfig, data: unknown): AxiosResponse {
   return { data, status: 200, statusText: "OK", headers: {}, config } as AxiosResponse;

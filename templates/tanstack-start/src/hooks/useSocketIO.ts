@@ -1,5 +1,4 @@
 import { SOCKET_EVENT, SOCKET_UNAUTHORIZED_MESSAGE } from "@/enums";
-import { getAccessToken } from "@/services/core/auth-token-storage";
 import { useSocketIOStore } from "@/stores/socket-io";
 import { useCallback, useEffect, useRef } from "react";
 import Base64 from "crypto-js/enc-base64";
@@ -23,8 +22,14 @@ function signHeader(): { sig: string; ctime: number } | Record<string, never> {
   return { sig, ctime };
 }
 
+/**
+ * Handshake auth payload. Auth is cookie-based: the httpOnly access-token cookie
+ * is sent automatically on the WS upgrade (the socket is created with
+ * `withCredentials: true`), so no token is placed here — only the role and the
+ * optional HMAC signature.
+ */
 function buildAuth() {
-  return { token: `Bearer ${getAccessToken() ?? ""}`, role: "user", ...signHeader() };
+  return { role: "user", ...signHeader() };
 }
 
 /**

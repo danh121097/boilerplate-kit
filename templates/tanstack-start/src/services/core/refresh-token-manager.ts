@@ -1,8 +1,8 @@
-import { clearServiceTokens, persistAccessToken } from "./auth-token-storage";
 import type { ApiService } from "./types";
 
-/** Performs the network refresh and resolves to a new access token. */
-export type TokenRefresher = () => Promise<string>;
+/** Performs the network refresh. The backend rotates the httpOnly token cookies
+ * as a side effect, so the refresher resolves with no value. */
+export type TokenRefresher = () => Promise<void>;
 
 interface RefreshTokenManagerOpts {
   service: ApiService;
@@ -13,34 +13,29 @@ interface RefreshTokenManagerOpts {
 /**
  * Serializes token refreshes for ONE service. A burst of concurrent 401s (e.g. a
  * page firing several requests at once) triggers exactly ONE network refresh —
- * every caller awaits the same in-flight promise, then retries with the new token.
+ * every caller awaits the same in-flight promise, then retries. The refreshed
+ * tokens live in httpOnly cookies set by the backend, so nothing is stored here.
  */
 export class RefreshTokenManager {
-  private inFlight: Promise<string> | null = null;
-  private readonly service: ApiService;
-  private readonly refresh: TokenRefresher;
+  private inFlight: Promise<void> | null = null;
+  private readonly doRefresh: TokenRefresher;
   private readonly onRefreshFailed: () => void;
 
   constructor(opts: RefreshTokenManagerOpts) {
-    this.service = opts.service;
-    this.refresh = opts.refresh;
+    this.doRefresh = opts.refresh;
     this.onRefreshFailed = opts.onRefreshFailed;
   }
 
   /**
-   * Returns a fresh access token, deduplicating concurrent calls. On failure it
-   * clears this service's token and fires the failure hook before rethrowing.
+   * Runs the refresh, deduplicating concurrent calls. On failure it fires the
+   * failure hook before rethrowing. On success the backend has rotated the
+   * auth cookies, so the caller can simply replay its request.
    */
-  getFreshToken(): Promise<string> {
+  refresh(): Promise<void> {
     if (this.inFlight) return this.inFlight;
 
-    this.inFlight = this.refresh()
-      .then((token) => {
-        persistAccessToken(token, this.service);
-        return token;
-      })
+    this.inFlight = this.doRefresh()
       .catch((error) => {
-        clearServiceTokens(this.service);
         this.onRefreshFailed();
         throw error;
       })

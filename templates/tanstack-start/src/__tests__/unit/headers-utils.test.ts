@@ -1,7 +1,5 @@
-import { installLocalStorage, simulateServerEnvironment } from "../helpers/fake-storage";
-import { persistAccessToken } from "@/services/core/auth-token-storage";
 import { HeadersUtils } from "@/services/core/headers-utils";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AxiosRequestHeaders, InternalAxiosRequestConfig } from "axios";
 
 function makeConfig(url = "/test", method = "get"): InternalAxiosRequestConfig {
@@ -12,34 +10,27 @@ function makeConfig(url = "/test", method = "get"): InternalAxiosRequestConfig {
   } as InternalAxiosRequestConfig;
 }
 
-describe("HeadersUtils", () => {
-  afterEach(() => vi.unstubAllGlobals());
+/**
+ * Cookie-based auth: HeadersUtils only attaches HMAC integrity headers. It never
+ * adds an Authorization header — the httpOnly access-token cookie is sent
+ * automatically by the browser (the axios client uses `withCredentials`).
+ */
+describe("HeadersUtils.setAuthHeaders", () => {
+  afterEach(() => vi.unstubAllEnvs());
 
-  describe("addAuthorizationHeader", () => {
-    beforeEach(() => installLocalStorage());
-
-    it("attaches Bearer token when token is stored", () => {
-      persistAccessToken("tok123", "MAIN");
-      const config = makeConfig();
-      HeadersUtils.addAuthorizationHeader(config, "MAIN");
-      expect(config.headers.authorization).toBe("Bearer tok123");
-    });
-
-    it("does not set authorization header when no token", () => {
-      const config = makeConfig();
-      HeadersUtils.addAuthorizationHeader(config, "MAIN");
-      expect(config.headers.authorization).toBeUndefined();
-    });
+  it("returns the headers unchanged when no HMAC secret is configured", () => {
+    const config = makeConfig();
+    const headers = HeadersUtils.setAuthHeaders(config);
+    expect(headers).toBe(config.headers);
+    expect(headers.authorization).toBeUndefined();
   });
 
-  describe("SSR guard — no authorization header on server", () => {
-    beforeEach(() => simulateServerEnvironment());
-
-    it("returns no authorization header when window is absent", () => {
-      const config = makeConfig();
-      HeadersUtils.addAuthorizationHeader(config, "MAIN");
-      // getAccessToken returns null on server → no header attached
-      expect(config.headers.authorization).toBeUndefined();
-    });
+  it("attaches HMAC signature headers (sig/ctime) when a secret is set", () => {
+    vi.stubEnv("VITE_HMAC_SECRET", "shared-secret");
+    const headers = HeadersUtils.setAuthHeaders(makeConfig("/users", "get"));
+    expect(typeof headers.sig).toBe("string");
+    expect(typeof headers.ctime).toBe("number");
+    // Still no bearer/authorization — auth is cookie-based.
+    expect(headers.authorization).toBeUndefined();
   });
 });

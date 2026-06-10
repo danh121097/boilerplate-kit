@@ -1,5 +1,4 @@
 import { createTokenRefresher } from "./auth-refresh-client";
-import { clearServiceTokens, getAccessToken } from "./auth-token-storage";
 import { HeadersUtils } from "./headers-utils";
 import { RefreshTokenManager } from "./refresh-token-manager";
 import type {
@@ -51,13 +50,15 @@ function isEnvelope(body: unknown): boolean {
 
 /**
  * A 401 is eligible for an automatic refresh only when the request has not
- * already been replayed, it is not the refresh call itself, and we hold an access
- * token for that service (so anonymous traffic never triggers a refresh storm).
+ * already been replayed and it is not the refresh call itself. Auth lives in
+ * httpOnly cookies (invisible to JS), so eligibility cannot gate on a stored
+ * token — a single replay-guarded attempt covers both expired-session and
+ * genuinely-anonymous cases (the latter just fails the refresh and is handled).
  */
 function canAttemptRefresh(config: InternalAxiosRequestConfig, options: RefreshOptions): boolean {
   if (config._retry) return false;
   if ((config.url ?? "").includes(options.endpoint)) return false;
-  return Boolean(getAccessToken(options.service));
+  return true;
 }
 
 interface ResponseInterceptorOpts {
@@ -83,20 +84,17 @@ function createResponseInterceptor(opts: ResponseInterceptorOpts) {
     const ctx = resolveRefresh(serviceOf(config));
     if (!ctx || !canAttemptRefresh(config, ctx.options)) return null;
     config._retry = true;
-    return ctx.manager.getFreshToken().then((token) => {
-      config.headers.authorization = `Bearer ${token}`;
-      return instance(config);
-    });
+    // The refresh rotates the httpOnly auth cookies; replay the original request
+    // as-is — the browser re-attaches the fresh cookie (no Bearer to set).
+    return ctx.manager.refresh().then(() => instance(config));
   };
 
-  /** Cleanup when a 401 cannot be recovered by a refresh: drop only that
-   * service's token, and reload only when the service has no refresh configured
-   * (nothing can recover it). A refresh-capable service handles its own reload
-   * on actual refresh failure via the manager. */
+  /** When a 401 cannot be recovered by a refresh, reload only if the service has
+   * no refresh configured (nothing can recover it). httpOnly cookies can't be
+   * cleared from JS — the backend clears them on logout / failed refresh. A
+   * refresh-capable service handles its own reload on actual refresh failure. */
   const handleUnauthorized = (config?: InternalAxiosRequestConfig) => {
-    const service = serviceOf(config);
-    clearServiceTokens(service);
-    if (!resolveRefresh(service)) reloadPage();
+    if (!resolveRefresh(serviceOf(config))) reloadPage();
   };
 
   const onSuccess = (response: AxiosResponse) => {
@@ -174,8 +172,9 @@ export class ApiInterceptors implements HttpInterceptorSetup {
     instance.interceptors.request.use(
       (config) => {
         config.serviceType = service;
+        // HMAC headers only — the httpOnly auth cookie is sent automatically
+        // (the axios instance is created with `withCredentials: true`).
         config.headers = HeadersUtils.setAuthHeaders(config);
-        HeadersUtils.addAuthorizationHeader(config, service);
         return config;
       },
       (error) => Promise.reject(error instanceof Error ? error : new Error(String(error))),
