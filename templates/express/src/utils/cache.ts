@@ -1,4 +1,5 @@
 import { getRedis } from "@/config/redis";
+import { logger } from "@/utils/logger";
 
 /**
  * Generic cache-aside helpers. They are transparent no-ops when Redis is off so
@@ -15,7 +16,7 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
     const raw = await client.get(key);
     return raw ? (JSON.parse(raw) as T) : null;
   } catch (err) {
-    console.warn("cacheGet failed:", (err as Error).message);
+    logger.warn("cacheGet failed", { err });
     return null;
   }
 }
@@ -27,7 +28,7 @@ export async function cacheSet(key: string, value: unknown, ttlSeconds: number):
   try {
     await client.set(key, JSON.stringify(value), "EX", ttlSeconds);
   } catch (err) {
-    console.warn("cacheSet failed:", (err as Error).message);
+    logger.warn("cacheSet failed", { err });
   }
 }
 
@@ -38,6 +39,6 @@ export async function cacheDel(key: string): Promise<void> {
   try {
     await client.del(key);
   } catch (err) {
-    console.warn("cacheDel failed:", (err as Error).message);
+    logger.warn("cacheDel failed", { err });
   }
 }

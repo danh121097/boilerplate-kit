@@ -1,5 +1,6 @@
 import { config } from "@/config/environment";
 import { getRedis } from "@/config/redis";
+import { logger } from "@/utils/logger";
 
 /**
  * User-level access-token revocation. Access tokens are short-lived and cannot be
@@ -34,7 +35,7 @@ export async function revokeUserTokens(userId: string): Promise<void> {
   try {
     await client.set(key(userId), String(now), "EX", accessTtlSeconds());
   } catch (err) {
-    console.warn("revokeUserTokens failed:", (err as Error).message);
+    logger.warn("revokeUserTokens failed", { err });
   }
 }
 
@@ -46,7 +47,7 @@ export async function getUserRevokedAt(userId: string): Promise<number | null> {
     const value = await client.get(key(userId));
     return value ? parseInt(value, 10) : null;
   } catch (err) {
-    console.warn("getUserRevokedAt failed:", (err as Error).message);
+    logger.warn("getUserRevokedAt failed", { err });
     return null;
   }
 }

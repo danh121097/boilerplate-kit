@@ -1,33 +1,29 @@
-import { config } from './environment';
-import { disconnectRedis } from './redis';
-import { closeSocket } from '@/socket';
-import mongoose from 'mongoose';
+import { config } from "./environment";
+import { disconnectRedis } from "./redis";
+import { closeSocket } from "@/socket";
+import { logger } from "@/utils/logger";
+import mongoose from "mongoose";
 
 /** Connect to MongoDB with event logging and graceful shutdown */
 export async function connectDatabase(): Promise<void> {
   try {
-    if (!config.isProduction) mongoose.set('debug', true);
-    // Fail fast (15s) instead of mongoose's 30s default so a down/unreachable DB
-    // surfaces a clear error and exits rather than hanging the boot silently.
-    await mongoose.connect(config.mongodbUri, {
-      serverSelectionTimeoutMS: 15000
-    });
-    console.log('MongoDB connected successfully');
+    if (!config.isProduction) mongoose.set("debug", true);
+    await mongoose.connect(config.mongodbUri);
+    logger.info("MongoDB connected successfully");
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(
-      `MongoDB connection failed: ${message}\n` +
-        `Is MongoDB running and reachable at ${config.mongodbUri}?`
-    );
+    logger.error("MongoDB connection failed", {
+      err: error,
+      uri: config.mongodbUri,
+    });
     process.exit(1);
   }
 
-  mongoose.connection.on('error', (err) => {
-    console.error('MongoDB error:', err);
+  mongoose.connection.on("error", (err) => {
+    logger.error("MongoDB error", { err });
   });
 
-  mongoose.connection.on('disconnected', () => {
-    console.warn('MongoDB disconnected');
+  mongoose.connection.on("disconnected", () => {
+    logger.warn("MongoDB disconnected");
   });
 }
 
@@ -35,10 +31,10 @@ export async function connectDatabase(): Promise<void> {
 async function gracefulShutdown(): Promise<void> {
   await closeSocket();
   await mongoose.connection.close();
-  console.log('MongoDB connection closed (app shutdown)');
+  logger.info("MongoDB connection closed (app shutdown)");
   await disconnectRedis();
   process.exit(0);
 }
 
-process.on('SIGINT', gracefulShutdown);
-process.on('SIGTERM', gracefulShutdown);
+process.on("SIGINT", gracefulShutdown);
+process.on("SIGTERM", gracefulShutdown);

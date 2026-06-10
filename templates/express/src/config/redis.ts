@@ -1,4 +1,5 @@
 import { config } from "./environment";
+import { logger } from "@/utils/logger";
 import Redis from "ioredis";
 
 /**
@@ -13,7 +14,7 @@ let client: Redis | null = null;
 /** Connect lazily; no-op when disabled. Never exits the process on failure. */
 export function connectRedis(): void {
   if (!config.redisEnabled) {
-    console.log("Redis disabled (REDIS_ENABLED!=true)");
+    logger.info("Redis disabled (REDIS_ENABLED!=true)");
     return;
   }
 
@@ -23,8 +24,8 @@ export function connectRedis(): void {
     maxRetriesPerRequest: 2,
   });
 
-  client.on("connect", () => console.log("Redis connected"));
-  client.on("error", (err) => console.error("Redis error:", err.message));
+  client.on("connect", () => logger.info("Redis connected"));
+  client.on("error", (err) => logger.error("Redis error", { err }));
 }
 
 /** Shared client, or null when Redis is disabled / not connected. */
