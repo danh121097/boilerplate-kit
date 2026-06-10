@@ -6,6 +6,7 @@ import {
   persistAccessToken,
   persistRefreshToken,
 } from "@/services/core";
+import { queryKeys } from "@/services/query-keys";
 import type { AuthResult, AuthUser, LoginPayload, RegisterPayload } from "./types/auth";
 
 /**
@@ -55,21 +56,21 @@ export class AuthModel extends Model {
 }
 
 export const useLoginMutation = defineMutation<AuthResult, LoginPayload>({
-  key: "auth.login",
+  key: queryKeys.auth.login,
   mutator: (payload) => AuthModel.login(payload),
 });
 
 export const useRegisterMutation = defineMutation<AuthResult, RegisterPayload>({
-  key: "auth.register",
+  key: queryKeys.auth.register,
   mutator: (payload) => AuthModel.register(payload),
 });
 
 export const useLogoutMutation = defineMutation({
-  key: "auth.logout",
+  key: queryKeys.auth.logout,
   mutator: () => AuthModel.logout(),
 });
 
 export const useMeQuery = defineQuery<AuthUser>({
-  key: "auth.me",
+  key: queryKeys.auth.me,
   fetcher: () => AuthModel.getMe(),
 });

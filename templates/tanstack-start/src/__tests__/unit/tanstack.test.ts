@@ -16,6 +16,18 @@ describe("defineQuery", () => {
   it("builds a parameterized query key", () => {
     expect(useUser.queryKey(7)).toEqual(["users.detail", 7]);
   });
+
+  it("exposes queryOptions for route-loader prefetch (ensureQueryData)", async () => {
+    const opts = useUsers.queryOptions();
+    expect(opts.queryKey).toEqual(["users.list"]);
+    expect(await opts.queryFn()).toEqual([]);
+  });
+
+  it("threads params into queryOptions key + fetcher", async () => {
+    const opts = useUser.queryOptions(7);
+    expect(opts.queryKey).toEqual(["users.detail", 7]);
+    expect(await opts.queryFn()).toBe("x");
+  });
 });
 
 describe("defineMutation", () => {

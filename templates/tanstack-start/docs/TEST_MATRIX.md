@@ -62,3 +62,15 @@ Behavior-to-proof mapping. Each row links a testable behavior to its proof locat
 | No auth header attached server-side | `unit/headers-utils.test.ts` | ✅ |
 | `reloadPage` guarded (typeof window check) | `src/services/core/interceptors.ts` (code review) | ✅ |
 | i18n reads env fallback server-side | `src/i18n/i18n.ts` (code review) | ✅ |
+
+## SSR Query Integration
+
+| Behavior | Test file | Status | Notes |
+|----------|-----------|--------|-------|
+| Prefetched query serializes in dehydrated state | `unit/ssr-dehydrate.test.tsx` | ✅ | Contract: key must be in dehydrate() output |
+| QueryClient default staleTime is 60_000 | `unit/ssr-dehydrate.test.tsx` | ✅ | Hydrated data stays fresh past first paint |
+| setupRouterSsrQueryIntegration wraps QueryClientProvider | `unit/ssr-dehydrate.test.tsx` | ✅ | Verified by useQueryClient() not throwing |
+| Route loader + component use identical query options | `src/routes/users.tsx` (code review) | ✅ | One `defineQuery` def feeds loader + hook — same key/fetcher |
+| `defineQuery.queryOptions()` returns key + fetcher for prefetch | `unit/tanstack.test.ts` | ✅ | Param-less + parameterized; lets loaders share the hook's definition |
+| No refetch on client after hydration | (manual: Network/React Query Devtools) | ⏳ pending | NOT unit-testable; manual browser check on `/users` still to be run |
+| Server function queried in route loader | `src/routes/users.tsx` (code review) | ✅ | ensureQueryData(useUsersList.queryOptions()) → getUsersServerFn |

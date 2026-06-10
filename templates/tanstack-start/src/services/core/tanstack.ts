@@ -22,12 +22,22 @@ interface DefineQueryConfig<TData, TParams = void> extends QueryDefOpts<TData, T
   fetcher: (params: TParams) => Promise<TData>;
 }
 
+/** A plain queryKey + queryFn object, consumable by ensureQueryData / prefetchQuery. */
+export interface QueryOptionsObject<TData, TParams = void> {
+  queryKey: QueryDefinitionKey<TParams>;
+  queryFn: () => Promise<TData>;
+}
+
 export interface QueryDefinition<TData, TParams = void> {
   (config?: UseQueryConfig<TData, TParams>): ReturnType<
     typeof useQuery<TData, ApiResponseError, TData, QueryDefinitionKey<TParams>>
   >;
   key: string;
   queryKey: (params?: TParams) => QueryDefinitionKey<TParams>;
+  /** Same key + fetcher as the hook, as a plain object — lets a route loader
+   * prefetch (ensureQueryData) the exact query the component reads, so SSR
+   * prefetch and client read share one definition. */
+  queryOptions: (params?: TParams) => QueryOptionsObject<TData, TParams>;
 }
 
 export function defineQuery<TData, TParams = void>(config: DefineQueryConfig<TData, TParams>) {
@@ -49,6 +59,10 @@ export function defineQuery<TData, TParams = void>(config: DefineQueryConfig<TDa
   const definition = use as QueryDefinition<TData, TParams>;
   definition.key = key;
   definition.queryKey = queryKey;
+  definition.queryOptions = (params?: TParams) => ({
+    queryKey: queryKey(params),
+    queryFn: () => fetcher(params as TParams),
+  });
   return definition;
 }
 

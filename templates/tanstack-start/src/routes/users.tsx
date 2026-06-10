@@ -1,37 +1,45 @@
 import { Badge } from "@/components/ui/badge";
 import { getUsersServerFn } from "@/server/get-users";
+import { defineQuery } from "@/services/core";
+import { queryKeys } from "@/services/query-keys";
 import type { User } from "@/services/users/types/user";
-import { queryOptions, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 
 /**
  * Users route — SSR-first via a server function.
  *
- * `getUsersServerFn` is the SINGLE source for this list: it runs on the server
- * (no client-only axios layer needed) and the SAME query options are shared by
- * both the route loader (SSR prefetch) and the component (read). One queryFn per
- * query key keeps the prefetched cache shape and the rendered shape identical —
- * mixing a server-fn loader with a different client fetcher on the same key would
- * leave the component reading data that never arrives during SSR.
+ * `useUsersList` is one `defineQuery` definition backed by `getUsersServerFn`
+ * (runs on the server — no client-only axios layer needed). The route loader
+ * prefetches it via `useUsersList.queryOptions()` and the component reads it via
+ * the `useUsersList()` hook: one key + one fetcher shared by both, so the
+ * prefetched cache shape and the rendered shape can never disagree.
  *
- * Client-side auth-aware fetching still lives in `@/services` (UsersModel /
- * useUsersListQuery) for routes that need the Bearer/refresh service layer.
+ * The router's QueryClient is dehydrated on the server and hydrated on the client
+ * (setupRouterSsrQueryIntegration in router.tsx), so the loader's prefetched cache
+ * survives the SSR boundary: the hook reads it on the client too, without a second
+ * fetch on hydration.
+ *
+ * The axios service layer's client-side list query lives under a distinct key
+ * (`useUsersListQuery`, key "users.list.client") so a server-fn query and an
+ * auth-aware client query never collide on one key.
  */
-const usersQueryOptions = queryOptions<User[]>({
-  queryKey: ["users.list"],
-  queryFn: () => getUsersServerFn(),
+const useUsersList = defineQuery<User[]>({
+  key: queryKeys.users.list,
+  fetcher: () => getUsersServerFn(),
 });
 
 export const Route = createFileRoute("/users")({
-  loader: ({ context: { queryClient } }) => queryClient.ensureQueryData(usersQueryOptions),
+  loader: ({ context: { queryClient } }) =>
+    queryClient.ensureQueryData(useUsersList.queryOptions()),
   component: UsersPage,
 });
 
 function UsersPage() {
   const { t } = useTranslation();
-  // Loader pre-populates the cache, so useQuery reads it synchronously on first render.
-  const { data, isLoading, error } = useQuery(usersQueryOptions);
+  // Loader prefetches + the client hydrates that cache, so the hook reads it
+  // synchronously on first render — server AND client — with no refetch on hydrate.
+  const { data, isLoading, error } = useUsersList();
   const users = data ?? [];
 
   return (

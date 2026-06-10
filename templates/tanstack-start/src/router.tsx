@@ -1,8 +1,9 @@
 import { routeTree } from "./routeTree.gen";
 import { initI18n } from "@/i18n/i18n";
 import { initServices } from "@/services";
-import { keepPreviousData, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { keepPreviousData, QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
+import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
 import { I18nextProvider } from "react-i18next";
 
 /** Router context shape — exposed to every route loader and component. */
@@ -18,8 +19,14 @@ export interface RouterContext {
  * file and call getRouter() on every request (SSR) or once on the client.
  *
  * A fresh QueryClient is created each call so SSR requests don't share state.
- * Providers are in Wrap so they survive the full render tree without leaking
- * across requests.
+ * setupRouterSsrQueryIntegration dehydrates that client on the server and hydrates
+ * it on the client, so a query prefetched in a route loader (ensureQueryData) is
+ * read straight from the hydrated cache — no duplicate fetch on the client after
+ * hydration. It also provides QueryClientProvider itself, so Wrap only adds i18n.
+ *
+ * A non-zero default staleTime keeps SSR-fetched data fresh past first paint;
+ * with staleTime 0 the hydrated data would be stale-on-mount and refetch anyway,
+ * defeating the prefetch. defaultPreloadStaleTime 0 keeps intent-preloads fresh.
  *
  * initServices() wires the axios client (baseURL + interceptors). It is invoked
  * client-side only — the service layer is browser-only, and SSR data is fetched
@@ -39,6 +46,9 @@ export function getRouter() {
         retry: false,
         refetchOnWindowFocus: true,
         placeholderData: keepPreviousData,
+        // Hydrated SSR data must not be stale-on-mount, or the client refetches
+        // immediately and the server prefetch is wasted.
+        staleTime: 60_000,
       },
     },
   });
@@ -51,14 +61,17 @@ export function getRouter() {
     context: { queryClient: client },
     scrollRestoration: true,
     defaultPreload: "intent",
-    // Providers must be in Wrap (runs on every render) rather than as static
-    // module-level singletons so each SSR request gets its own instances.
+    defaultPreloadStaleTime: 0,
+    // QueryClientProvider is supplied by setupRouterSsrQueryIntegration below;
+    // Wrap (runs every render) only adds the per-request i18n instance.
     Wrap: ({ children }: { children: React.ReactNode }) => (
-      <QueryClientProvider client={client}>
-        <I18nextProvider i18n={i18n}>{children}</I18nextProvider>
-      </QueryClientProvider>
+      <I18nextProvider i18n={i18n}>{children}</I18nextProvider>
     ),
   });
+
+  // Dehydrate/hydrate the QueryClient across the SSR boundary + stream resolving
+  // queries; also wraps the tree in QueryClientProvider (wrapQueryClient default).
+  setupRouterSsrQueryIntegration({ router, queryClient: client });
 
   return router;
 }

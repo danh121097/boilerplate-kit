@@ -1,4 +1,5 @@
 import { defineQuery, Model } from "@/services/core";
+import { queryKeys } from "@/services/query-keys";
 import type { UpdateUserPayload, User } from "./types/user";
 
 /** Domain model for the /users endpoint — initialized via initServices(). */
@@ -21,6 +22,6 @@ export class UsersModel extends Model {
 }
 
 export const useUsersListQuery = defineQuery<User[]>({
-  key: "users.list",
+  key: queryKeys.users.listClient,
   fetcher: async () => (await UsersModel.list()).data,
 });

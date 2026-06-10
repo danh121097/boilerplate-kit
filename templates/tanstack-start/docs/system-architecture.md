@@ -16,24 +16,44 @@ Detailed sub-topics:
 | Concern | reactjs (SPA) | tanstack-start (SSR) |
 |---|---|---|
 | Rendering | Client-only | SSR + hydration |
-| Entry | `src/main.tsx` | `src/client.tsx` + `src/ssr.tsx` |
-| Config | `vite.config.ts` | `app.config.ts` (Vinxi) |
+| Entry | `src/main.tsx` | Virtual modules (#tanstack-router-entry, #tanstack-start-entry) |
+| Config | `vite.config.ts` | `vite.config.ts` (with `@tanstack/react-start` Vite plugin) |
+| Router factory | N/A | `getRouter()` in `src/router.tsx` |
 | Server functions | None | `createServerFn` in `src/server/` |
 | Service layer scope | Client-only | Client-only (SSR-guarded) |
 | localStorage guards | Not required | Required (`typeof window`) |
 
-## SSR Entry Points
+## SSR + TanStack Start Vite Plugin
+
+TanStack Start v1.168+ uses a Vite plugin that generates virtual entry modules
+on every build/dev run. There are no explicit `client.tsx` or `ssr.tsx` files.
+Instead:
+
+- `src/router.tsx` exports `getRouter()` — a factory called once per SSR request
+  and once on the client (cached thereafter)
+- The Vite plugin wires this factory into virtual modules that handle browser
+  hydration and server rendering automatically
+- `src/routes/__root.tsx` renders the full HTML document (`<html>`, `<head>`,
+  `<body>`, `<HeadContent />`, `<Scripts />`)
+
+## getRouter Factory + QueryClient Lifecycle
 
 ```
-src/client.tsx   — browser hydration (runs once per page load)
-  initServices() → wires axios base URLs + interceptors
-  initI18n()     → reads localStorage locale
-  hydrateRoot()  → mounts React + providers
+getRouter() is called:
+  1. Per SSR request (server-side) → fresh QueryClient per request
+  2. Once on client (cached by the virtual entry) → singleton QueryClient
 
-src/ssr.tsx      — server render handler (runs per request)
-  createAppRouter() → fresh QueryClient + router per request
-  initI18n()        → reads env var fallback (no localStorage)
-  InnerWrap         → QueryClientProvider + I18nextProvider
+Per call:
+  • Create fresh QueryClient with staleTime: 60_000
+  • Create fresh i18n instance (reads localStorage if window is defined)
+  • Create router with context: { queryClient }
+  • Call setupRouterSsrQueryIntegration({ router, queryClient })
+    → dehydrates on server, hydrates on client, wraps in QueryClientProvider
+  • Return router
+
+On server: router renders → HTML includes dehydrated QueryClient state
+On client: hydrated state is restored → route components read cache without
+  duplicate fetches
 ```
 
 ## Route Loader + Server Function Pattern
@@ -41,15 +61,21 @@ src/ssr.tsx      — server render handler (runs per request)
 ```
 Browser request → SSR render
   → route loader (runs on server)
-      → queryClient.ensureQueryData({ queryFn: getUsersServerFn })
-          → createServerFn handler (server-only, direct fetch)
+      → queryClient.ensureQueryData(useUsersList.queryOptions())
+          → getUsersServerFn() (server-only handler, direct fetch)
   → React renders with pre-populated cache
+  → HTML includes dehydrated QueryClient state
   → HTML streamed to browser
+
+Client hydration
+  → dehydrated cache restored into QueryClient
+  → route components useQuery() reads hydrated cache synchronously
+  → NO duplicate fetch (data already available locally)
 
 Client navigation
   → route loader (runs on client)
       → queryClient.ensureQueryData
-          → RPCs to server fn endpoint (automatic)
+          → getRpcUrl() + HTTP fetch to server fn endpoint (automatic)
   → React re-renders with fresh data
 ```
 
