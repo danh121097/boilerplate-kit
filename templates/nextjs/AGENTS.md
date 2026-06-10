@@ -8,6 +8,7 @@ Package manager: **pnpm**.
 Project-specific guidance lives in [`CLAUDE.md`](./CLAUDE.md) and [`docs/`](./docs/README.md).
 
 <!-- HARNESS:BEGIN -->
+
 ## Harness
 
 This repo uses Harness (markdown-first). Before work, read:
@@ -26,4 +27,5 @@ repository-harness:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/hoangnb24/repository-harness/main/scripts/install-harness.sh | bash -s -- --merge --yes
 ```
+
 <!-- HARNESS:END -->

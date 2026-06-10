@@ -1,14 +1,20 @@
 import axios, { type AxiosInstance } from "axios";
-import type { ApiRequestConfig, ApiService, HttpInterceptorSetup, ServiceConfig } from "./types";
+import type {
+  ApiRequestConfig,
+  ApiService,
+  CursorResponse,
+  HttpInterceptorSetup,
+  PaginatedResponse,
+  ServiceConfig,
+} from "./types";
 
 /**
  * Shared HTTP API client with multi-service support and injectable interceptors.
  * Register interceptors via Api.registerInterceptors() before any API calls.
  *
- * NOTE: This client is client-side only. In Next.js App Router, only call it
- * from "use client" components, client-side hooks, or useEffect. Never call it
- * during SSR/RSC — auth-token-storage is SSR-guarded but network calls from
- * the server bypass the browser cookie jar.
+ * Client-side only — use from "use client" components or hooks. For SSR data
+ * fetching use the server helpers in src/server/ which forward auth cookies
+ * directly via fetch().
  */
 export class Api {
   private static _interceptors: HttpInterceptorSetup | null = null;
@@ -78,6 +84,15 @@ export class Api {
   get<T>(config: ApiRequestConfig = {}) {
     return this.makeRequest<T>("get", config);
   }
+
+  paginate<T>(config: ApiRequestConfig = {}) {
+    return this.makeRequest<T[]>("get", config) as unknown as Promise<PaginatedResponse<T>>;
+  }
+
+  cursorPaginate<T>(config: ApiRequestConfig = {}) {
+    return this.makeRequest<T[]>("get", config) as unknown as Promise<CursorResponse<T>>;
+  }
+
   post<T>(config: ApiRequestConfig = {}) {
     return this.makeRequest<T>("post", config);
   }

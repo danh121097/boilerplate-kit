@@ -18,13 +18,14 @@ templates/nextjs/
 ├── docs/                     # Full documentation (this directory)
 └── src/
     ├── app/
-    │   ├── layout.tsx        # RootLayout (RSC) — imports globals.css, wraps <Providers>
-    │   ├── providers.tsx     # "use client": QueryClientProvider + I18nextProvider + initServices
+    │   ├── layout.tsx        # RootLayout (RSC, suppressHydrationWarning) → <Providers>
+    │   ├── providers.tsx     # "use client": QueryClient + i18n + initServices (useEffect)
     │   ├── globals.css       # @import "tailwindcss"; @theme tokens; .dark
     │   ├── page.tsx          # Home ("use client")
     │   ├── counter/page.tsx  # Counter ("use client", Zustand)
     │   ├── users/page.tsx    # Users ("use client", React Query)
-    │   └── form/page.tsx     # Form ("use client", RHF + zod)
+    │   ├── form/page.tsx     # Form ("use client", RHF + zod)
+    │   └── auth-demo/        # Auth demo (RSC → server data + client login/logout)
     ├── components/ui/        # button, input, card, badge, form-field
     ├── enums/
     │   ├── storage-keys.ts   # NEXT_PUBLIC_APP_NAME-prefixed keys
@@ -35,16 +36,21 @@ templates/nextjs/
     │   ├── i18n.ts           # initI18n(), setLocale() — SSR-guarded
     │   └── locales/en.ts, ja.ts
     ├── lib/utils.ts          # cn()
+    ├── server/               # SSR helpers (RSC only)
+    │   ├── server-api.ts     # serverApiGet<T>()
+    │   ├── get-me.ts         # getMeServerData()
+    │   └── get-users.ts      # getUsersServerData()
     ├── services/
-    │   ├── core/             # See services-and-stores.md
-    │   ├── auth/
-    │   ├── users/
+    │   ├── core/             # Api, interceptors, HMAC, tanstack (see services-and-stores.md)
+    │   ├── auth/contract.ts, auth.ts, session.ts
+    │   ├── users/contract.ts, users.ts
+    │   ├── query-keys.ts     # Aggregated React Query keys
     │   ├── index.ts
     │   └── init-services.ts
     ├── stores/
     │   └── counter.ts
     └── __tests__/
-        ├── helpers/fake-storage.ts, http-mocks.ts
-        ├── unit/             # 7 unit test files
-        └── integration/      # 2 integration test files
+        ├── helpers/http-mocks.ts
+        ├── unit/             # 7 unit test files (hmac, headers, api, model, refresh-manager, tanstack, query-keys)
+        └── integration/      # 2 integration test files (auth-service, interceptors-refresh)
 ```

@@ -3,7 +3,7 @@
 import { initI18n } from "@/i18n/i18n";
 import { initServices } from "@/services/init-services";
 import { keepPreviousData, QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { I18nextProvider } from "react-i18next";
 import type { ReactNode } from "react";
 
@@ -11,10 +11,15 @@ import type { ReactNode } from "react";
  * App-wide client providers: React Query + i18n.
  *
  * Marked "use client" — this is the boundary where the client-side service
- * layer is initialized. initServices() wires baseURLs and interceptors;
- * initI18n() sets up i18next with the persisted locale. Both are SSR-safe
- * (localStorage guards ensure they only touch storage in the browser).
+ * layer is initialized. initServices() wires baseURLs + interceptors (cookie-based
+ * auth, no token storage); initI18n() sets up i18next with the persisted locale.
  */
+
+// Register the client service layer (axios baseURL + HMAC/refresh interceptors)
+// once at module load — BEFORE any component renders or query runs. A useEffect
+// fires after child effects, so the first query (e.g. a hard reload of /users)
+// would request without HMAC → 401. Client-only; the server uses serverApiGet.
+if (typeof window !== "undefined") initServices();
 
 function makeQueryClient() {
   return new QueryClient({
@@ -48,17 +53,8 @@ interface ProvidersProps {
 
 export function Providers({ children }: ProvidersProps) {
   const [queryClient] = useState(() => getQueryClient());
-  const initialized = useRef(false);
-  // useState lazy initializer: i18n instance is created once and stable across renders,
-  // so it's safe to pass directly to I18nextProvider without accessing a ref in render.
+  // Lazy init: one stable i18n instance across renders.
   const [i18nInstance] = useState(initI18n);
-
-  useEffect(() => {
-    if (!initialized.current) {
-      initServices();
-      initialized.current = true;
-    }
-  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

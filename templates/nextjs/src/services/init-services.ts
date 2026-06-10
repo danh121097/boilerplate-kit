@@ -1,34 +1,28 @@
+import { authContract } from "./auth/contract";
 import { Api, ApiInterceptors } from "./core";
-import { registerServiceToken } from "./core/auth-token-storage";
-import { STORAGE_KEYS } from "@/enums";
-import type { ServiceRefreshConfig, ServiceTokenKeys } from "./core";
+import type { ServiceRefreshConfig } from "./core";
 
 /**
- * Declare every backend the app talks to in one place. Each entry wires a
- * service's base URL, the localStorage slots its access + refresh tokens live in,
- * and (optionally) its automatic token-refresh endpoint.
+ * Declare every backend the app talks to in one place (base URL + optional
+ * auto-refresh endpoint). Cookie-based auth → no localStorage token slots. Call
+ * on the CLIENT only; server functions forward the request cookie directly.
  *
- * Add a backend = add a row + its `NEXT_PUBLIC_*_API_URL` in `.env`. Rows with an
- * empty baseURL are skipped, so optional services stay dormant until their env var
- * is set. Give a row a `refresh` to enable per-service auto-refresh; omit it to
- * opt the service out (its 401s just clear that service's tokens).
- *
- * Call initServices() once in the client-side providers tree (app/providers.tsx),
- * not at module scope — localStorage guards require a browser context.
+ * Add a backend = a row + its `NEXT_PUBLIC_*_API_URL` in `.env` (URL includes the
+ * API prefix, e.g. `http://localhost:3000/api/v1`); empty-baseURL rows are skipped.
  */
 interface ServiceDefinition {
   name: string;
   baseURL: string;
-  tokenKeys: ServiceTokenKeys;
   refresh?: ServiceRefreshConfig;
 }
 
 const SERVICES: ServiceDefinition[] = [
   {
     name: "MAIN",
-    baseURL: process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://jsonplaceholder.typicode.com",
-    tokenKeys: { access: STORAGE_KEYS.ACCESS_TOKEN, refresh: STORAGE_KEYS.REFRESH_TOKEN },
-    refresh: { endpoint: "/auth/refresh" },
+    baseURL: process.env.NEXT_PUBLIC_API_BASE_URL ?? "",
+    // reloadOnFailure: true — most endpoints need auth, so a failed refresh means
+    // the session is truly dead → reload to a clean (logged-out) state.
+    refresh: { endpoint: authContract.paths.refresh, reloadOnFailure: true },
   },
 ];
 
@@ -38,12 +32,11 @@ export function initServices(): void {
   for (const svc of SERVICES) {
     if (!svc.baseURL) continue;
     Api.setBaseURL(svc.baseURL, svc.name);
-    registerServiceToken(svc.name, svc.tokenKeys);
     if (svc.refresh) refreshByService[svc.name] = svc.refresh;
   }
 
   // On a 401 the interceptor calls the failing service's own refresh endpoint
-  // (sending the stored refresh token in the body), stores the new access +
-  // refresh tokens, and replays the request. Each service refreshes independently.
+  // (the httpOnly refresh cookie is sent automatically); the backend rotates the
+  // cookies and the request is replayed. Each service refreshes independently.
   Api.registerInterceptors(new ApiInterceptors(refreshByService));
 }

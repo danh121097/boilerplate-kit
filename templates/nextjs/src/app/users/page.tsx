@@ -5,13 +5,11 @@ import { useUsersListQuery } from "@/services/users";
 import { useTranslation } from "react-i18next";
 
 /**
- * Users page — client component that fetches via the axios service layer
- * through React Query. Service calls are client-side only (SSR-guarded storage).
+ * Users page — client component that fetches via the axios service layer through
+ * React Query (cookie-based auth, no token storage).
  *
- * For server-prefetch + HydrationBoundary, call UsersModel.list() in a server
- * component using fetch() directly, then dehydrate state into <HydrationBoundary>.
- * The starter demonstrates the simpler client-fetch pattern; the server-prefetch
- * pattern is documented in docs/system-architecture/.
+ * For server-side fetching forward the request cookie in a Server Component via
+ * `getUsersServerData()` (`@/server/get-users`) — see the `/auth-demo` route.
  */
 export default function UsersPage() {
   const { t } = useTranslation();
@@ -31,13 +29,13 @@ export default function UsersPage() {
 
       {!isLoading && !error && (
         <ul className="divide-y">
-          {data?.map((user) => (
-            <li key={user.id} className="flex items-center justify-between py-2">
+          {data?.data.map((user) => (
+            <li key={user._id} className="flex items-center justify-between py-2">
               <div>
                 <span className="font-medium">{user.name}</span>
                 <span className="ml-2 text-sm text-gray-500">{user.email}</span>
               </div>
-              <Badge variant="secondary">#{user.id}</Badge>
+              <Badge variant="secondary">#{user._id}</Badge>
             </li>
           ))}
         </ul>

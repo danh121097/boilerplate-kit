@@ -5,19 +5,19 @@ Zustand, shadcn/ui + Tailwind v4, JWT auth with HMAC-signed requests.
 
 ## Stack
 
-| Concern | Choice |
-|---------|--------|
-| Framework | Next.js 16 (App Router) |
-| Language | TypeScript 5 (strict) |
-| Data fetching | TanStack React Query 5 |
-| State | Zustand 5 |
-| Forms | react-hook-form + zod |
-| UI primitives | shadcn/ui (new-york) |
-| Styling | Tailwind CSS v4 |
-| HTTP | axios 1.x |
-| i18n | react-i18next (en/ja) |
-| Tests | Vitest 3 (node env) |
-| Package manager | pnpm |
+| Concern         | Choice                  |
+| --------------- | ----------------------- |
+| Framework       | Next.js 16 (App Router) |
+| Language        | TypeScript 5 (strict)   |
+| Data fetching   | TanStack React Query 5  |
+| State           | Zustand 5               |
+| Forms           | react-hook-form + zod   |
+| UI primitives   | shadcn/ui (new-york)    |
+| Styling         | Tailwind CSS v4         |
+| HTTP            | axios 1.x               |
+| i18n            | react-i18next (en/ja)   |
+| Tests           | Vitest 3 (node env)     |
+| Package manager | pnpm                    |
 
 ## Quick Start
 
@@ -45,22 +45,22 @@ pnpm format       # Prettier
 
 Copy `.env.example` to `.env.local` and fill in:
 
-| Variable | Description |
-|----------|-------------|
-| `NEXT_PUBLIC_API_BASE_URL` | Backend API base URL |
-| `NEXT_PUBLIC_APP_NAME` | Prefix for localStorage keys |
-| `NEXT_PUBLIC_LANGUAGE_CODE` | Default locale (`en` or `ja`) |
-| `NEXT_PUBLIC_HMAC_SECRET` | HMAC signing secret (must match backend) |
+| Variable                    | Description                               |
+| --------------------------- | ----------------------------------------- |
+| `NEXT_PUBLIC_API_BASE_URL`  | Backend API base URL                      |
+| `NEXT_PUBLIC_APP_NAME`      | Prefix for localStorage keys              |
+| `NEXT_PUBLIC_LANGUAGE_CODE` | Default locale (`en` or `ja`)             |
+| `NEXT_PUBLIC_HMAC_SECRET`   | HMAC signing secret (must match backend)  |
 | `NEXT_PUBLIC_BUILD_VERSION` | Version string sent as `x-version` header |
 
 ## Routes
 
-| Path | Description |
-|------|-------------|
-| `/` | Home + locale toggle |
-| `/counter` | Zustand counter (client) |
-| `/users` | User list via React Query + axios service layer |
-| `/form` | react-hook-form + zod validation |
+| Path       | Description                                     |
+| ---------- | ----------------------------------------------- |
+| `/`        | Home + locale toggle                            |
+| `/counter` | Zustand counter (client)                        |
+| `/users`   | User list via React Query + axios service layer |
+| `/form`    | react-hook-form + zod validation                |
 
 ## SSR Safety
 

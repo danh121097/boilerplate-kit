@@ -12,7 +12,9 @@ import LanguageDetector from "i18next-browser-languagedetector";
 function getSavedLanguage(): string {
   try {
     if (typeof localStorage !== "undefined") {
-      return localStorage.getItem(STORAGE_KEYS.LANGUAGE) || process.env.NEXT_PUBLIC_LANGUAGE_CODE || "en";
+      return (
+        localStorage.getItem(STORAGE_KEYS.LANGUAGE) || process.env.NEXT_PUBLIC_LANGUAGE_CODE || "en"
+      );
     }
   } catch {
     // localStorage unavailable (private browsing strict mode) — ignore
@@ -28,7 +30,7 @@ export function initI18n(): typeof i18next {
     lng: getSavedLanguage(),
     fallbackLng: "en",
     interpolation: { escapeValue: false },
-    detection: { order: [] }, // locale detection handled via STORAGE_KEYS
+    detection: { order: [], lookupLocalStorage: STORAGE_KEYS.LANGUAGE }, // locale detection handled via STORAGE_KEYS
   });
   return i18next;
 }

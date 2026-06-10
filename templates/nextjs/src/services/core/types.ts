@@ -46,6 +46,45 @@ export interface ApiResponse<T = unknown> {
   error_code?: number;
 }
 
+/** Offset pagination metadata — mirrors the express `OffsetMeta`. */
+export interface OffsetMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
+
+/** Cursor (keyset) pagination metadata — mirrors the express `CursorMeta`. */
+export interface CursorMeta {
+  limit: number;
+  nextCursor: string | null;
+  hasNext: boolean;
+}
+
+/** List envelope with offset `meta` — matches the express `{ status, data, meta }`. */
+export interface PaginatedResponse<T> extends ApiResponse<T[]> {
+  meta: OffsetMeta;
+}
+
+/** Cursor list envelope: `ApiResponse` with a list `data` + cursor `meta`. */
+export interface CursorResponse<T> extends ApiResponse<T[]> {
+  meta: CursorMeta;
+}
+
+/** Query params for offset pagination (`?page&limit`). */
+export interface PaginationParams {
+  page?: number;
+  limit?: number;
+}
+
+/** Query params for cursor pagination (`?cursor&limit`). */
+export interface CursorParams {
+  cursor?: string;
+  limit?: number;
+}
+
 export interface ApiResponseError {
   status: string;
   message: string;

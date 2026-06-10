@@ -1,17 +1,13 @@
-import { installLocalStorage } from "../helpers/fake-storage";
-import { persistAccessToken } from "@/services/core/auth-token-storage";
 import { HeadersUtils } from "@/services/core/headers-utils";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { InternalAxiosRequestConfig } from "axios";
 
 function configWith(headers: Record<string, unknown> = {}) {
   return { url: "/x", method: "get", headers } as unknown as InternalAxiosRequestConfig;
 }
 
-describe("headers-utils", () => {
-  beforeEach(() => installLocalStorage());
+describe("HeadersUtils", () => {
   afterEach(() => {
-    vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });
 
@@ -25,19 +21,13 @@ describe("headers-utils", () => {
     const result = HeadersUtils.setAuthHeaders(configWith({ "Content-Type": "application/json" }));
     expect(result).toHaveProperty("sig");
     expect(result).toHaveProperty("ctime");
-    expect(result["Content-Type"]).toBe("application/json"); // original kept
+    expect(result["Content-Type"]).toBe("application/json");
   });
 
-  it("addAuthorizationHeader attaches a Bearer token when one is stored", () => {
-    persistAccessToken("abc", "MAIN");
-    const config = configWith();
-    HeadersUtils.addAuthorizationHeader(config, "MAIN");
-    expect(config.headers.authorization).toBe("Bearer abc");
-  });
-
-  it("addAuthorizationHeader is a no-op when no token is stored", () => {
-    const config = configWith();
-    HeadersUtils.addAuthorizationHeader(config, "MAIN");
-    expect(config.headers.authorization).toBeUndefined();
+  it("does not add an Authorization header (cookie-first — no Bearer)", () => {
+    vi.stubEnv("NEXT_PUBLIC_HMAC_SECRET", "shared-secret");
+    const result = HeadersUtils.setAuthHeaders(configWith());
+    expect(result).not.toHaveProperty("authorization");
+    expect(result).not.toHaveProperty("Authorization");
   });
 });

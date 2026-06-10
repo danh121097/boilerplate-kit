@@ -1,9 +1,8 @@
 export default {
-  nav: { home: "Home", counter: "Counter", users: "Users", form: "Form" },
+  nav: { home: "Home", counter: "Counter", users: "Users", form: "Form", authDemo: "Auth Demo" },
   home: {
     welcome: "Welcome",
-    description:
-      "Next.js 16 + App Router + TanStack Query + Zustand + shadcn/ui + Tailwind v4.",
+    description: "Next.js 16 + App Router + TanStack Query + Zustand + shadcn/ui + Tailwind v4.",
     open_dialog: "Open a shadcn/ui dialog",
   },
   counter: { title: "Zustand counter", count: "Count" },

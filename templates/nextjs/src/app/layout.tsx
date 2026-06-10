@@ -1,4 +1,5 @@
 import { Providers } from "./providers";
+import { SiteHeader } from "@/components/site-header";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
@@ -20,8 +21,11 @@ interface RootLayoutProps {
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body>
-        <Providers>{children}</Providers>
+      <body className="min-h-screen bg-gray-50 text-gray-900" suppressHydrationWarning>
+        <Providers>
+          <SiteHeader />
+          <main className="mx-auto max-w-3xl px-6 py-8">{children}</main>
+        </Providers>
       </body>
     </html>
   );

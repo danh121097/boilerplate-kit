@@ -1,6 +1,5 @@
 export * from "./api";
 export * from "./auth-refresh-client";
-export * from "./auth-token-storage";
 export * from "./headers-utils";
 export * from "./hmac-signature";
 export * from "./interceptors";

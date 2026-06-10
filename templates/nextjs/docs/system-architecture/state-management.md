@@ -34,9 +34,21 @@ On the server a new client is created per request (isolation).
 ## i18n State — react-i18next
 
 `initI18n()` sets up i18next with en/ja locales. The active locale is persisted
-to `STORAGE_KEYS.LANGUAGE` in localStorage (SSR-guarded). Switching locale:
+to `STORAGE_KEYS.LANGUAGE` in localStorage (SSR-guarded; no-op on server).
+Switching locale:
 
 ```ts
 import { setLocale } from "@/i18n/i18n";
-setLocale("ja"); // changes language + persists to localStorage
+setLocale("ja"); // changes language + persists to localStorage (client only)
 ```
+
+## Auth State — Derived from Session Query
+
+Auth state is not a separate store. The `useAuth()` hook (in `src/services/auth/session.ts`)
+derives from the client's `useMeQuery()`:
+
+```ts
+const { user, isAuthenticated, isLoading } = useAuth();
+```
+
+For server components, call `getMeServerData()` directly from `@/server/get-me`.

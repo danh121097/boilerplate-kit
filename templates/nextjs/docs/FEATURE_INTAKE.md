@@ -12,14 +12,18 @@ Every implementation prompt enters the intake gate before code changes.
 ## Lanes
 
 ### Tiny
+
 Low-risk docs, copy, narrow edits. Single file, no interface changes.
 
 ### Normal
+
 Multi-file feature work. Requires story packet + proof row in TEST_MATRIX.
 
 ### High-Risk
+
 Auth, data model, security, breaking API changes. Requires full story packet
-+ design doc + validation plan.
+
+- design doc + validation plan.
 
 ## Intake Checklist
 

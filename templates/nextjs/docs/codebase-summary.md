@@ -22,10 +22,15 @@ src/
 │   └── form/page.tsx     # react-hook-form + zod ("use client")
 ├── components/ui/        # shadcn/ui primitives (button, badge, card, input, form-field)
 ├── stores/               # Zustand stores (counter)
+├── server/               # SSR helpers (RSC/async component only)
+│   ├── server-api.ts     # serverApiGet<T>() — SSR fetch with auth cookies + HMAC
+│   ├── get-me.ts         # getMeServerData() — fetch current user server-side
+│   └── get-users.ts      # getUsersServerData() — fetch users list server-side
 ├── services/             # Axios service layer (client-side only)
-│   ├── core/             # Api, interceptors, HMAC, SSR-guarded token storage, tanstack helpers
-│   ├── auth/             # AuthModel + query/mutation definitions
-│   ├── users/            # UsersModel + useUsersListQuery
+│   ├── core/             # Api, interceptors, HMAC, tanstack helpers
+│   ├── auth/             # AuthModel + query/mutation definitions, contract
+│   ├── users/            # UsersModel + useUsersListQuery, contract
+│   ├── query-keys.ts     # Aggregated React Query keys from service contracts
 │   ├── index.ts          # Barrel export
 │   └── init-services.ts  # Wire baseURLs + interceptors (called in useEffect)
 ├── i18n/                 # react-i18next setup + en/ja locales
@@ -33,7 +38,7 @@ src/
 ├── lib/                  # cn() utility
 ├── hooks/                # Custom React hooks (useAppVersion)
 └── __tests__/            # Vitest suite (helpers + unit + integration)
-    ├── helpers/          # fake-storage, http-mocks
-    ├── unit/             # auth-token-storage, hmac, headers, api, model, refresh-manager, tanstack
+    ├── helpers/          # http-mocks, fake-http (no storage tests — tokens are httpOnly)
+    ├── unit/             # hmac-signature, headers-utils, api, model, refresh-token-manager, tanstack, query-keys
     └── integration/      # auth-service, interceptors-refresh
 ```
