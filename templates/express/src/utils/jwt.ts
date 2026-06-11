@@ -14,6 +14,7 @@ type TokenUse = "access" | "refresh";
 export function signAccessToken(payload: JwtPayload): string {
   return jwt.sign({ ...payload, token_use: "access" }, config.jwtAccessPrivateKey, {
     algorithm: "RS256",
+    issuer: Array.isArray(config.corsOrigins) ? config.corsOrigins[0] : config.corsOrigins, // single-origin issuer
     expiresIn: config.jwtAccessExpiry as string & jwt.SignOptions["expiresIn"],
   });
 }
@@ -38,6 +39,7 @@ export function verifyAccessToken(token: string): JwtPayload {
 export function signRefreshToken(payload: JwtPayload): string {
   return jwt.sign({ ...payload, token_use: "refresh" }, config.jwtRefreshSecret, {
     algorithm: "HS256",
+    issuer: Array.isArray(config.corsOrigins) ? config.corsOrigins[0] : config.corsOrigins, // single-origin issuer
     expiresIn: config.jwtRefreshExpiry as string & jwt.SignOptions["expiresIn"],
     jwtid: crypto.randomUUID(),
   });
