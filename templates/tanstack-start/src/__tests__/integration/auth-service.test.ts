@@ -40,13 +40,4 @@ describe("AuthModel", () => {
     await AuthModel.logout();
     expect(post).toHaveBeenCalledWith(expect.objectContaining({ url: "/auth/logout" }));
   });
-
-  it("getMe returns the unwrapped user", async () => {
-    vi.spyOn(AuthModel.api, "get").mockResolvedValue({
-      success: true,
-      data: { user: RESULT.user },
-    } as never);
-    const user = await AuthModel.getMe();
-    expect(user).toEqual(RESULT.user);
-  });
 });

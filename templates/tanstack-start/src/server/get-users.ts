@@ -1,11 +1,11 @@
-import { serverApiGet } from "./server-api";
+import { serverApiPaginate } from "./server-api";
 import { usersContract } from "@/services/users/contract";
 import { createServerFn } from "@tanstack/react-start";
+import type { PaginatedResponse } from "@/services/core";
 import type { User } from "@/services/users/types/user";
 
 export const getUsersServerFn = createServerFn({ method: "GET" }).handler(
-  async (): Promise<User[]> => {
-    const body = await serverApiGet<User[]>(usersContract.paths.list);
-    return body ?? [];
+  async (): Promise<PaginatedResponse<User> | null> => {
+    return serverApiPaginate<User>(usersContract.paths.list);
   },
 );

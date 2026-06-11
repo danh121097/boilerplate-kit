@@ -3,32 +3,14 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuth, useLoginMutation, useLogoutMutation, useSessionQuery } from "@/services/auth";
+import { prefetchQueries } from "@/services/core";
 import { useUsersListQuery } from "@/services/users";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import type { FormEvent } from "react";
 
-/**
- * Cookie-auth demo (SSR session + CSR login).
- *
- * Demonstrates the cookie-first flow end-to-end against the Express backend:
- *  1. The route loader resolves the session ON THE SERVER (`getMeServerFn` forwards
- *     the request cookie to GET /auth/me) — there is NO token in JS to read, login
- *     state is DERIVED from the server's answer and rendered without a flash.
- *       user → already logged in (skip the form); null → show login.
- *  2. Login → the backend sets httpOnly cookies; `auth.me` is invalidated so the
- *     session re-resolves and the UI flips to the logged-in view.
- *  3. The users request authenticates with the cookie alone (`withCredentials`).
- *  4. Logout → the backend clears the cookies; `auth.me` re-resolves → null → form.
- *
- * Requires the Express template running and these env vars (see `.env.example`):
- *   VITE_API_BASE_URL=http://localhost:3000/api/v1
- *   VITE_HMAC_SECRET=<must equal the backend HMAC_SECRET>
- */
 export const Route = createFileRoute("/auth-demo")({
-  // Resolve the session on the server so the page renders the right auth state.
-  loader: ({ context: { queryClient } }) =>
-    queryClient.ensureQueryData(useSessionQuery.queryOptions()),
+  loader: prefetchQueries(useSessionQuery),
   component: AuthDemoPage,
 });
 
@@ -36,8 +18,6 @@ function AuthDemoPage() {
   const [email, setEmail] = useState("harrynguyen@admin.com");
   const [password, setPassword] = useState("Admin@123");
 
-  // `isAuthenticated`/`user` are DERIVED from the session query (prefetched by the
-  // loader, hydrated here — no flash); they can never drift from the real cookie.
   const { user, isAuthenticated, isLoading } = useAuth();
 
   const login = useLoginMutation();

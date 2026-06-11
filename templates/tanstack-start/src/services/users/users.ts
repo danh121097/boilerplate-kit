@@ -1,17 +1,12 @@
 import { usersContract } from "./contract";
+import { getUsersServerFn } from "@/server/get-users";
 import { defineQuery, Model } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
 import type { UpdateUserPayload, User } from "./types/user";
-import type { PaginatedResponse, PaginationParams } from "@/services/core";
 
-/** Domain model for the /users endpoint — initialized via initServices(). */
 export class UsersModel extends Model {
   static {
     Model.setup.call(this, { path: usersContract.base, service: usersContract.service });
-  }
-
-  static listPaginated(params: PaginationParams = {}): Promise<PaginatedResponse<User>> {
-    return this.api.paginate<User>({ params });
   }
 
   static async get(id: number): Promise<User> {
@@ -26,9 +21,8 @@ export class UsersModel extends Model {
 }
 
 // Queries
-export const useUsersListQuery = defineQuery<PaginatedResponse<User>>({
-  key: queryKeys.users.listClient,
-  fetcher: () => UsersModel.listPaginated(),
-});
 
-// Mutations
+export const useUsersListQuery = defineQuery({
+  key: queryKeys.users.list,
+  fetcher: () => getUsersServerFn(),
+});

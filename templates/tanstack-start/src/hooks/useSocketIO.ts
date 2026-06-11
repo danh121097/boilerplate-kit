@@ -4,15 +4,6 @@ import { useCallback, useEffect, useRef } from "react";
 import Base64 from "crypto-js/enc-base64";
 import HmacSHA256 from "crypto-js/hmac-sha256";
 
-/**
- * Build the per-handshake `{ sig, ctime }` headers expected by HMAC-protected
- * backends. Returns an empty object when `VITE_HMAC_SECRET` is not set — the
- * server can then accept the bare bearer token alone (or reject).
- *
- * SECURITY: a `VITE_*` env var is exposed to every browser client. Production
- * deployments should sign on the server (a dedicated API route or a BFF
- * proxy) and forward the resulting headers to the socket handshake.
- */
 function signHeader(): { sig: string; ctime: number } | Record<string, never> {
   const secret = import.meta.env.VITE_HMAC_SECRET;
   if (!secret) return {};
@@ -22,23 +13,10 @@ function signHeader(): { sig: string; ctime: number } | Record<string, never> {
   return { sig, ctime };
 }
 
-/**
- * Handshake auth payload. Auth is cookie-based: the httpOnly access-token cookie
- * is sent automatically on the WS upgrade (the socket is created with
- * `withCredentials: true`), so no token is placed here — only the role and the
- * optional HMAC signature.
- */
 function buildAuth() {
   return { role: "user", ...signHeader() };
 }
 
-/**
- * Manages a Socket.IO connection for the calling component — connects on mount,
- * disconnects on unmount, and reuses an existing store socket instead of stacking
- * connections. Cookie-based auth: the httpOnly access cookie rides the WS upgrade
- * (`withCredentials`); the handshake carries only role + optional HMAC sig.
- * SSR-safe: the effect runs client-only and socket.io-client is lazy-imported.
- */
 export function useSocketIO() {
   const { socket, authenticated, setSocketIO } = useSocketIOStore();
   // Keep a ref to the socket so event-handler closures stay stable across renders.

@@ -5,12 +5,6 @@ import ja from "./locales/ja";
 import i18next from "i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
 
-/**
- * SSR-safe language read: localStorage is browser-only; on the server fall back to
- * VITE_LANGUAGE_CODE or "en". Because the server can't see the saved language, the
- * `<html lang>` it renders may differ from the client — `__root.tsx` marks that
- * element `suppressHydrationWarning` so the divergence isn't flagged as a mismatch.
- */
 function getSavedLanguage(): string {
   try {
     if (typeof window === "undefined") {

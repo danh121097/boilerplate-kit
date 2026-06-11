@@ -1,6 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiResponseError } from "./types";
-import type { MutationOptions, UseMutationOptions, UseQueryOptions } from "@tanstack/react-query";
+import type {
+  MutationOptions,
+  QueryClient,
+  UseMutationOptions,
+  UseQueryOptions,
+} from "@tanstack/react-query";
 
 type QueryDefinitionKey<TParams> = readonly [string] | readonly [string, TParams];
 
@@ -60,6 +65,21 @@ export function defineQuery<TData, TParams = void>(config: DefineQueryConfig<TDa
     queryFn: () => fetcher(params as TParams),
   });
   return definition;
+}
+
+/**
+ * Build a route `loader` that prefetches one or more query definitions into the
+ * router's QueryClient. The router's SSR-query integration (set up once in
+ * `router.tsx`) dehydrates them, so the matching `useXxx()` hook hydrates with no
+ * refetch. Declare loaders without the boilerplate arrow:
+ *
+ *   loader: prefetchQueries(useSessionQuery, useUsersListQuery),
+ */
+export function prefetchQueries(
+  ...defs: Array<{ queryOptions: () => QueryOptionsObject<unknown> }>
+) {
+  return ({ context }: { context: { queryClient: QueryClient } }) =>
+    Promise.all(defs.map((def) => context.queryClient.ensureQueryData(def.queryOptions())));
 }
 
 type MutationDefOpts<TData, TVars, TCtx = unknown> = Omit<

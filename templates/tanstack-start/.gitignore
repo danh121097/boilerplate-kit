@@ -10,11 +10,12 @@ dist
 *.local
 .DS_Store
 
-# Lockfiles — the template ships PM-agnostic; commit yours after scaffolding.
+# Lock files — the template ships PM-agnostic; commit yours after scaffolding.
 pnpm-lock.yaml
 package-lock.json
 yarn.lock
 bun.lockb
+.tanstack
 
 # env files
 .env

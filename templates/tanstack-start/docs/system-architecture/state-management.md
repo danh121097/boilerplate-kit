@@ -54,10 +54,13 @@ key would make the prefetched cache shape and the rendered data disagree.
 (`queryKeys.users.*`, `queryKeys.auth.*`) — reference it instead of inline strings
 so keys stay unique and greppable. A unit test asserts the registry has no duplicates.
 
-**Multi-source caveat**: the SSR server-fn list (`useUsersList`, `queryKeys.users.list`,
-in `routes/users.tsx`) and the auth-aware client list (`useUsersListQuery`,
-`queryKeys.users.listClient`, in `@/services`) are deliberately under DISTINCT keys so
-the two fetchers never collide. Keep server-fn and client-service queries on separate keys.
+**One query per resource**: the users list is a single `useUsersListQuery`
+(`queryKeys.users.list`, in `@/services/users`) backed by `getUsersServerFn` — it
+resolves on the server during SSR and via RPC on the client, returning the
+`PaginatedResponse<User>` envelope (keeps `meta`). The route loader prefetches
+`useUsersListQuery.queryOptions()` and the component reads the same hook, so the
+SSR-hydrated cache renders with no refetch. Avoid defining a second query (e.g. an
+axios client variant) for the same resource — one key, one fetcher, one shape.
 
 ## Client state — Zustand
 

@@ -1,34 +1,24 @@
 import { Badge } from "@/components/ui/badge";
-import { getUsersServerFn } from "@/server/get-users";
-import { defineQuery } from "@/services/core";
-import { queryKeys } from "@/services/query-keys";
+import { prefetchQueries } from "@/services/core";
+import { useUsersListQuery } from "@/services/users";
 import { createFileRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import type { User } from "@/services/users/types/user";
 
 /**
- * Users route — SSR-first. One `defineQuery` backed by `getUsersServerFn` (server
- * only): the loader prefetches it and the component reads the same key/fetcher, so
- * the SSR-hydrated cache renders on the client with no refetch. Distinct key from
- * the axios client list (`useUsersListQuery`, "users.list.client").
+ * Users route — SSR-first. The loader prefetches `useUsersListQuery` (backed by
+ * `getUsersServerFn`) so the server renders the full list; the client hydrates
+ * that cache and renders with no extra refetch. Returns a `PaginatedResponse`
+ * envelope — `data` holds the user array, `meta` holds pagination info.
  */
-const useUsersList = defineQuery<User[]>({
-  key: queryKeys.users.list,
-  fetcher: () => getUsersServerFn(),
-});
-
 export const Route = createFileRoute("/users")({
-  loader: ({ context: { queryClient } }) =>
-    queryClient.ensureQueryData(useUsersList.queryOptions()),
+  loader: prefetchQueries(useUsersListQuery),
   component: UsersPage,
 });
 
 function UsersPage() {
   const { t } = useTranslation();
-  // Loader prefetches + the client hydrates that cache, so the hook reads it
-  // synchronously on first render — server AND client — with no refetch on hydrate.
-  const { data, isLoading, error } = useUsersList();
-  const users = data ?? [];
+  const { data, isLoading, error } = useUsersListQuery();
+  const users = data?.data ?? [];
 
   return (
     <section>

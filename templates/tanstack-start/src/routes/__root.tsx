@@ -19,8 +19,7 @@ interface RouterContext {
  * Root route — defines the full HTML document shell.
  *
  * The modern TanStack Start (Vite-based) API requires the root route to render
- * the complete HTML document: <html>, <head>, <body>, <HeadContent />, and
- * <Scripts />. This replaces the old vinxi pattern where client.tsx and ssr.tsx
+ * the complete HTML document. This replaces the old vinxi pattern where client.tsx and ssr.tsx
  * managed the document shell separately.
  *
  * head() injects the stylesheet link server-side so the first paint is styled.
