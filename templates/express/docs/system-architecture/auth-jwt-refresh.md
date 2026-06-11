@@ -17,15 +17,25 @@ tokens delivered as httpOnly cookies. Source:
 | Sent as | `Authorization: Bearer` **or** `accessToken` cookie | `refreshToken` httpOnly cookie |
 | Stored server-side | no | yes — SHA-256 hash in `RefreshToken` collection |
 | `token_use` claim | `access` | `refresh` |
+| `iss` (issuer) claim | primary CORS origin | primary CORS origin |
 
-The two algorithms plus the `token_use` claim are defense in depth: a refresh
-token can never satisfy access verification, and vice versa.
+The two algorithms, the `token_use` claim, and the `iss` (issuer) claim are
+defense in depth: a refresh token can never satisfy access verification, and a
+token minted for another origin/deployment is rejected. Issuer is a single
+canonical value (`TOKEN_ISSUER` = the primary CORS origin); when no origin is
+configured it is `undefined`, which disables the check on BOTH sign and verify
+(jsonwebtoken skips an undefined issuer) so local/dev setups keep working.
 
 ```ts
-// utils/jwt.ts
+// utils/jwt.ts — TOKEN_ISSUER is set on sign AND enforced on verify
+const TOKEN_ISSUER = Array.isArray(config.corsOrigins)
+  ? config.corsOrigins[0]
+  : config.corsOrigins;
+
 export function signAccessToken(payload: JwtPayload): string {
   return jwt.sign({ ...payload, token_use: 'access' }, config.jwtAccessPrivateKey, {
     algorithm: 'RS256',
+    issuer: TOKEN_ISSUER,
     expiresIn: config.jwtAccessExpiry,
   });
 }
@@ -33,6 +43,7 @@ export function signAccessToken(payload: JwtPayload): string {
 export function signRefreshToken(payload: JwtPayload): string {
   return jwt.sign({ ...payload, token_use: 'refresh' }, config.jwtRefreshSecret, {
     algorithm: 'HS256',
+    issuer: TOKEN_ISSUER,
     expiresIn: config.jwtRefreshExpiry,
     jwtid: crypto.randomUUID(),   // unique jti → two tokens are never byte-identical
   });
@@ -40,7 +51,8 @@ export function signRefreshToken(payload: JwtPayload): string {
 ```
 
 `verifyAccessToken` / `verifyRefreshToken` pin the algorithm (`algorithms:
-['RS256' | 'HS256']`) and assert the matching `token_use`, throwing otherwise.
+['RS256' | 'HS256']`), enforce the `issuer`, and assert the matching `token_use` —
+throwing otherwise. Verification order: signature → algorithm → issuer → `token_use`.
 
 The RSA keypair is loaded at startup by [`config/keys.ts`](../../src/config/keys.ts):
 it reads `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH`, runs a sign/verify

@@ -10,19 +10,28 @@ import jwt from "jsonwebtoken";
  */
 type TokenUse = "access" | "refresh";
 
+/**
+ * Canonical token issuer — the primary CORS origin. Set on sign AND enforced on
+ * verify so a token minted for another origin/deployment is rejected. Undefined
+ * when no origin is configured, which disables the check on both sides (jsonwebtoken
+ * skips an undefined issuer), keeping local/dev setups working.
+ */
+const TOKEN_ISSUER = Array.isArray(config.corsOrigins) ? config.corsOrigins[0] : config.corsOrigins;
+
 /** Sign a short-lived access token (RS256, 15min default) */
 export function signAccessToken(payload: JwtPayload): string {
   return jwt.sign({ ...payload, token_use: "access" }, config.jwtAccessPrivateKey, {
     algorithm: "RS256",
-    issuer: Array.isArray(config.corsOrigins) ? config.corsOrigins[0] : config.corsOrigins, // single-origin issuer
+    issuer: TOKEN_ISSUER,
     expiresIn: config.jwtAccessExpiry as string & jwt.SignOptions["expiresIn"],
   });
 }
 
-/** Verify access token with the public key; pin RS256 + require token_use=access */
+/** Verify access token with the public key; pin RS256 + issuer + token_use=access */
 export function verifyAccessToken(token: string): JwtPayload {
   const decoded = jwt.verify(token, config.jwtAccessPublicKey, {
     algorithms: ["RS256"],
+    issuer: TOKEN_ISSUER,
   }) as JwtPayload & { token_use?: TokenUse };
   if (decoded.token_use !== "access") {
     throw new Error("Invalid token_use claim");
@@ -39,16 +48,17 @@ export function verifyAccessToken(token: string): JwtPayload {
 export function signRefreshToken(payload: JwtPayload): string {
   return jwt.sign({ ...payload, token_use: "refresh" }, config.jwtRefreshSecret, {
     algorithm: "HS256",
-    issuer: Array.isArray(config.corsOrigins) ? config.corsOrigins[0] : config.corsOrigins, // single-origin issuer
+    issuer: TOKEN_ISSUER,
     expiresIn: config.jwtRefreshExpiry as string & jwt.SignOptions["expiresIn"],
     jwtid: crypto.randomUUID(),
   });
 }
 
-/** Verify refresh token; pin HS256 + require token_use=refresh */
+/** Verify refresh token; pin HS256 + issuer + token_use=refresh */
 export function verifyRefreshToken(token: string): JwtPayload {
   const decoded = jwt.verify(token, config.jwtRefreshSecret, {
     algorithms: ["HS256"],
+    issuer: TOKEN_ISSUER,
   }) as JwtPayload & { token_use?: TokenUse };
   if (decoded.token_use !== "refresh") {
     throw new Error("Invalid token_use claim");

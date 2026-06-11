@@ -31,7 +31,7 @@ Behavior → proof. Proof column = test file under `src/__tests__/`, run via
 | Auth service: register, login, refresh rotation, logout revocation, getMe, user pre-save hook | integration | implemented | `integration/auth-service.test.ts` (17) |
 | `GET /api/v1/health` returns status + db + redis | integration | implemented | `integration/health-check.test.ts` (1) |
 | Socket.IO HMAC handshake + targeted emit end-to-end | integration | implemented | `integration/socket.test.ts` (3) |
-| JWT sign/verify, TTL parsing, RS256 alg pinning, forgery rejection | unit | implemented | `unit/jwt-utils.test.ts` (15) |
+| JWT sign/verify, TTL parsing, RS256 alg pinning, issuer + token_use enforcement, forgery rejection | unit | implemented | `unit/jwt-utils.test.ts` (16) |
 | HMAC canonical string, signature compute/verify, timestamp freshness | unit | implemented | `unit/hmac-util.test.ts` (6) |
 | `authenticate` middleware: token extraction, errors, revocation check | unit | implemented | `unit/auth-middleware.test.ts` (4) |
 | `requireMinRole` role-rank middleware (user/admin/super_admin) | unit | implemented | `unit/role-middleware.test.ts` (6) |

@@ -77,18 +77,29 @@ describe("JWT Utils", () => {
     });
 
     it("rejects a correctly-signed RS256 token whose token_use is not access", () => {
-      // valid signature + algorithm, but wrong token_use → token_use guard fires
+      // valid signature + algorithm + issuer, but wrong token_use → token_use guard fires
       const token = jwt.sign({ ...payload, token_use: "refresh" }, config.jwtAccessPrivateKey, {
         algorithm: "RS256",
+        issuer: Array.isArray(config.corsOrigins) ? config.corsOrigins[0] : config.corsOrigins,
       });
       expect(() => verifyAccessToken(token)).toThrow(/token_use/i);
+    });
+
+    it("rejects a correctly-signed token minted with a different issuer", () => {
+      // right key + algorithm + token_use, but a foreign issuer → issuer guard fires
+      const token = jwt.sign({ ...payload, token_use: "access" }, config.jwtAccessPrivateKey, {
+        algorithm: "RS256",
+        issuer: "https://attacker.example.com",
+      });
+      expect(() => verifyAccessToken(token)).toThrow(/issuer/i);
     });
   });
 
   it("verifyRefreshToken rejects a token whose token_use is not refresh", () => {
-    // valid HS256 signature, but token_use=access → token_use guard fires
+    // valid HS256 signature + issuer, but token_use=access → token_use guard fires
     const token = jwt.sign({ ...payload, token_use: "access" }, config.jwtRefreshSecret, {
       algorithm: "HS256",
+      issuer: Array.isArray(config.corsOrigins) ? config.corsOrigins[0] : config.corsOrigins,
     });
     expect(() => verifyRefreshToken(token)).toThrow(/token_use/i);
   });
