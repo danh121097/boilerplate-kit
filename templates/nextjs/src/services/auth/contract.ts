@@ -14,7 +14,6 @@ export const authContract = {
   },
   keys: {
     me: "auth.me",
-    meClient: "auth.me.client",
     login: "auth.login",
     register: "auth.register",
     logout: "auth.logout",

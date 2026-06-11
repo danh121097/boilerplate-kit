@@ -1,6 +1,12 @@
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import { cookies } from "next/headers";
-import type { ApiResponse } from "@/services/core/types";
+import type {
+  ApiResponse,
+  CursorParams,
+  CursorResponse,
+  PaginatedResponse,
+  PaginationParams,
+} from "@/services/core/types";
 
 /**
  * Server-side authenticated fetch — SSR counterpart of the browser-only axios
@@ -34,24 +40,63 @@ function hmacHeaders(method: string, path: string, contentType: string): Record<
 }
 
 /**
- * Authenticated SSR GET. Unwraps the backend envelope and returns its `data` as
- * `T`, or null if unauthenticated / failed — so callers pass the inner payload
- * type (e.g. `User[]`, `{ user }`), not the whole `{ status, data }` wrapper.
- * Never throws — returns null as the sentinel for "no session / fetch failed".
+ * Authenticated SSR GET core — forwards the auth cookies + HMAC and returns the
+ * parsed body (full envelope), or null when unauthenticated / failed. The HMAC
+ * signs the path only; `query` is appended as the `?key=value` string. Never
+ * throws — null is the sentinel for "no session / fetch failed".
  */
-export async function serverApiGet<T>(path: string): Promise<T | null> {
+async function authedFetch<R>(
+  path: string,
+  query?: Record<string, string | number>,
+): Promise<R | null> {
   try {
     const cookie = await authCookieHeader();
     if (!cookie) return null; // no session → skip the round-trip
 
-    const res = await fetch(`${API_BASE}${path}`, {
+    const qs = query
+      ? `?${new URLSearchParams(Object.entries(query).map(([k, v]) => [k, String(v)])).toString()}`
+      : "";
+    const res = await fetch(`${API_BASE}${path}${qs}`, {
       headers: { cookie, ...hmacHeaders("GET", path, "") },
       cache: "no-store",
     });
     if (!res.ok) return null;
-    const body: ApiResponse<T> = await res.json();
-    return body?.data ?? null;
+    return (await res.json()) as R;
   } catch {
     return null;
   }
+}
+
+/** Single resource — unwraps the envelope's `data`. Returns null on failure. */
+export async function serverApiGet<T>(path: string): Promise<T | null> {
+  const body = await authedFetch<ApiResponse<T>>(path);
+  return body?.data ?? null;
+}
+
+/**
+ * Paginated list — returns the FULL `{ status, data, meta }` envelope (keeps the
+ * offset pagination metadata, unlike `serverApiGet` which unwraps `data`).
+ */
+export function serverApiPaginate<T>(
+  path: string,
+  params?: PaginationParams,
+): Promise<PaginatedResponse<T> | null> {
+  return authedFetch<PaginatedResponse<T>>(
+    path,
+    params as Record<string, string | number> | undefined,
+  );
+}
+
+/**
+ * Cursor (keyset) paginated list — like `serverApiPaginate` but for `?cursor&limit`
+ * endpoints; returns the full envelope with cursor `meta` (`nextCursor`, `hasNext`).
+ */
+export function serverApiCursorPaginate<T>(
+  path: string,
+  params?: CursorParams,
+): Promise<CursorResponse<T> | null> {
+  return authedFetch<CursorResponse<T>>(
+    path,
+    params as Record<string, string | number> | undefined,
+  );
 }

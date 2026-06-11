@@ -33,7 +33,7 @@ export class AuthModel extends Model {
 
 // Queries
 export const useMeQuery = defineQuery<AuthUser>({
-  key: queryKeys.auth.meClient,
+  key: queryKeys.auth.me,
   fetcher: () => AuthModel.getMe(),
 });
 
@@ -41,17 +41,17 @@ export const useMeQuery = defineQuery<AuthUser>({
 export const useLoginMutation = defineMutation<AuthResult, LoginPayload>({
   key: queryKeys.auth.login,
   mutator: (payload) => AuthModel.login(payload),
-  invalidates: [queryKeys.auth.meClient],
+  invalidates: [queryKeys.auth.me],
 });
 
 export const useRegisterMutation = defineMutation<AuthResult, RegisterPayload>({
   key: queryKeys.auth.register,
   mutator: (payload) => AuthModel.register(payload),
-  invalidates: [queryKeys.auth.meClient],
+  invalidates: [queryKeys.auth.me],
 });
 
 export const useLogoutMutation = defineMutation({
   key: queryKeys.auth.logout,
   mutator: () => AuthModel.logout(),
-  invalidates: [queryKeys.auth.meClient],
+  invalidates: [queryKeys.auth.me],
 });

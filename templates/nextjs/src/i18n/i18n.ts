@@ -5,10 +5,6 @@ import ja from "./locales/ja";
 import i18next from "i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
 
-/**
- * Read the persisted locale from localStorage. SSR-guarded: falls back to the
- * NEXT_PUBLIC_LANGUAGE_CODE env var (or "en") when window is not available.
- */
 function getSavedLanguage(): string {
   try {
     if (typeof localStorage !== "undefined") {

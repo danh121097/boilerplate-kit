@@ -4,7 +4,6 @@ import { queryKeys } from "@/services/query-keys";
 import type { UpdateUserPayload, User } from "./types/user";
 import type { PaginatedResponse, PaginationParams } from "@/services/core";
 
-/** Domain model for the /users endpoint — initialized via initServices(). */
 export class UsersModel extends Model {
   static {
     Model.setup.call(this, { path: usersContract.base, service: usersContract.service });
@@ -27,6 +26,6 @@ export class UsersModel extends Model {
 
 // Queries
 export const useUsersListQuery = defineQuery<PaginatedResponse<User>>({
-  key: queryKeys.users.listClient,
+  key: queryKeys.users.list,
   fetcher: () => UsersModel.listPaginated(),
 });

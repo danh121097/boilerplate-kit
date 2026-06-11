@@ -11,6 +11,5 @@ export const usersContract = {
   },
   keys: {
     list: "users.list",
-    listClient: "users.list.client",
   },
 } as const;

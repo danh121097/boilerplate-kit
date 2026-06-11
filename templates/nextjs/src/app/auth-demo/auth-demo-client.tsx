@@ -8,12 +8,13 @@ import { useLoginMutation, useLogoutMutation } from "@/services/auth";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { AuthUser } from "@/services/auth/types/auth";
+import type { PaginatedResponse } from "@/services/core";
 import type { User } from "@/services/users/types/user";
 import type { FormEvent } from "react";
 
 interface AuthDemoClientProps {
   initialUser: AuthUser | null;
-  initialUsers: User[];
+  initialUsers: PaginatedResponse<User> | null;
 }
 
 /** Auth-pending skeleton — shown while the RSC is re-rendering after login. */
@@ -139,11 +140,12 @@ export function AuthDemoClient({ initialUser, initialUsers }: AuthDemoClientProp
           <h2 className="font-semibold">Users — fetched server-side with the cookie (no Bearer)</h2>
         </div>
 
-        {initialUsers.length === 0 ? (
+        {/* Read the array from the PaginatedResponse envelope; treat null/empty the same way */}
+        {(initialUsers?.data ?? []).length === 0 ? (
           <p className="text-sm text-gray-500">No users returned (check backend connection).</p>
         ) : (
           <ul className="divide-y">
-            {initialUsers.map((u) => (
+            {(initialUsers?.data ?? []).map((u) => (
               <li key={u.email} className="flex items-center justify-between py-2">
                 <span className="font-medium">{u.name}</span>
                 <span className="text-sm text-gray-500">{u.email}</span>

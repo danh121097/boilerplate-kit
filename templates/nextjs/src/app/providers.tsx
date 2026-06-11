@@ -1,10 +1,12 @@
 "use client";
 
 import { initI18n } from "@/i18n/i18n";
+import { makeQueryClient } from "@/services/core/query-client";
 import { initServices } from "@/services/init-services";
-import { keepPreviousData, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { I18nextProvider } from "react-i18next";
+import type { QueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
 /**
@@ -20,18 +22,6 @@ import type { ReactNode } from "react";
 // fires after child effects, so the first query (e.g. a hard reload of /users)
 // would request without HMAC → 401. Client-only; the server uses serverApiGet.
 if (typeof window !== "undefined") initServices();
-
-function makeQueryClient() {
-  return new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-        refetchOnWindowFocus: true,
-        placeholderData: keepPreviousData,
-      },
-    },
-  });
-}
 
 // Hold a single QueryClient across renders (not at module scope to avoid
 // sharing state between server requests in SSR).

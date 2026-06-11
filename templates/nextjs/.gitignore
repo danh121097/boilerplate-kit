@@ -5,6 +5,12 @@ out/
 # Dependencies
 node_modules/
 
+# Lock files — the template ships PM-agnostic; commit yours after scaffolding.
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+bun.lockb
+
 # Environment variables
 .env
 .env.local

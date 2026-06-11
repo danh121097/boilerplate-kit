@@ -14,7 +14,7 @@ describe("queryKeys registry", () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
-  it("keeps the SSR server-fn list and the client list on distinct keys", () => {
-    expect(queryKeys.users.list).not.toBe(queryKeys.users.listClient);
+  it("keeps the users list and session keys distinct", () => {
+    expect(queryKeys.users.list).not.toBe(queryKeys.auth.me);
   });
 });
