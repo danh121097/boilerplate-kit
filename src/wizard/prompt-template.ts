@@ -3,11 +3,11 @@ import { TEMPLATES, type Template } from "../types.js";
 import { select, isCancel } from "@clack/prompts";
 
 const LABELS: Record<Template, string> = {
-  vuejs: "VueJS · Pinia · Reka UI · Tailwind",
-  nuxtjs: "NuxtJS · Pinia · Reka UI · Tailwind",
-  reactjs: "ReactJS · TanStack Router · shadcn/ui · Tailwind",
-  nextjs: "NextJS · App Router · shadcn/ui · Tailwind",
-  "tanstack-start": "TanStack Start · shadcn/ui · Tailwind",
+  vuejs: "VueJS · Pinia · Reka UI · Tailwind v4",
+  nuxtjs: "NuxtJS · Pinia · Reka UI · Tailwind v4",
+  reactjs: "ReactJS · TanStack Router · shadcn/ui · Tailwind v4",
+  nextjs: "NextJS · App Router · shadcn/ui · Tailwind v4",
+  "tanstack-start": "TanStack Start · shadcn/ui · Tailwind v4",
   express: "Express · Mongoose · Socket.io · JWT · Redis",
 };
 
