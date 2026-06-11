@@ -1,7 +1,6 @@
 import { defineQuery, Model } from "@/services/core";
 import type { UpdateUserPayload, User } from "./types/user";
 
-/** Domain model for the /users endpoint — initialized via initServices(). */
 export class UsersModel extends Model {
   static {
     Model.setup.call(this, { path: "/users", service: "MAIN" });

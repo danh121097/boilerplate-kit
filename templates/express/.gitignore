@@ -18,12 +18,13 @@ src/keys/*
 !src/keys/setup.sh
 !src/keys/.gitkeep
 
-# lockfiles — scaffolder regenerates from the chosen package manager
+# Lock files — the template ships PM-agnostic; commit yours after scaffolding.
 package-lock.json
 yarn.lock
 pnpm-lock.yaml
 bun.lock
 bun.lockb
+
 
 # typescript
 *.tsbuildinfo
