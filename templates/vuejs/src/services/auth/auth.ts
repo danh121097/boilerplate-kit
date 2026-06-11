@@ -1,3 +1,4 @@
+import { authContract } from "./contract";
 import {
   clearAuthTokens,
   defineMutation,
@@ -6,6 +7,7 @@ import {
   persistAccessToken,
   persistRefreshToken,
 } from "@/services/core";
+import { queryKeys } from "@/services/query-keys";
 import type { AuthResult, AuthUser, LoginPayload, RegisterPayload } from "./types/auth";
 
 /**
@@ -20,29 +22,32 @@ import type { AuthResult, AuthUser, LoginPayload, RegisterPayload } from "./type
  */
 export class AuthModel extends Model {
   static {
-    Model.setup.call(this, { path: "/auth" });
+    Model.setup.call(this, { path: authContract.base, service: authContract.service });
   }
 
   static async login(payload: LoginPayload): Promise<AuthResult> {
-    const res = await this.api.post<AuthResult>({ url: `${this.path}/login`, data: payload });
+    const res = await this.api.post<AuthResult>({ url: authContract.paths.login, data: payload });
     return this.storeSession(res.data);
   }
 
   static async register(payload: RegisterPayload): Promise<AuthResult> {
-    const res = await this.api.post<AuthResult>({ url: `${this.path}/register`, data: payload });
+    const res = await this.api.post<AuthResult>({
+      url: authContract.paths.register,
+      data: payload,
+    });
     return this.storeSession(res.data);
   }
 
   static async logout(): Promise<void> {
     try {
-      await this.api.post({ url: `${this.path}/logout` });
+      await this.api.post({ url: authContract.paths.logout });
     } finally {
       clearAuthTokens();
     }
   }
 
   static async getMe(): Promise<AuthUser> {
-    const res = await this.api.get<{ user: AuthUser }>({ url: `${this.path}/me` });
+    const res = await this.api.get<{ user: AuthUser }>({ url: authContract.paths.me });
     return res.data.user;
   }
 
@@ -55,21 +60,21 @@ export class AuthModel extends Model {
 }
 
 export const useLoginMutation = defineMutation<AuthResult, LoginPayload>({
-  key: "auth.login",
+  key: queryKeys.auth.login,
   mutator: (payload) => AuthModel.login(payload),
 });
 
 export const useRegisterMutation = defineMutation<AuthResult, RegisterPayload>({
-  key: "auth.register",
+  key: queryKeys.auth.register,
   mutator: (payload) => AuthModel.register(payload),
 });
 
 export const useLogoutMutation = defineMutation({
-  key: "auth.logout",
+  key: queryKeys.auth.logout,
   mutator: () => AuthModel.logout(),
 });
 
 export const useMeQuery = defineQuery<AuthUser>({
-  key: "auth.me",
+  key: queryKeys.auth.me,
   fetcher: () => AuthModel.getMe(),
 });

@@ -1,3 +1,4 @@
+import { authContract } from "./auth/contract";
 import { Api, ApiInterceptors } from "./core";
 import { registerServiceToken } from "./core/auth-token-storage";
 import { STORAGE_KEYS } from "@/enums";
@@ -25,7 +26,7 @@ const SERVICES: ServiceDefinition[] = [
     name: "MAIN",
     baseURL: import.meta.env.VITE_API_BASE_URL ?? "https://jsonplaceholder.typicode.com",
     tokenKeys: { access: STORAGE_KEYS.ACCESS_TOKEN, refresh: STORAGE_KEYS.REFRESH_TOKEN },
-    refresh: { endpoint: "/auth/refresh" },
+    refresh: { endpoint: authContract.paths.refresh },
   },
 ];
 

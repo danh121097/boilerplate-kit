@@ -1,25 +1,27 @@
+import { usersContract } from "./contract";
 import { defineQuery, Model } from "@/services/core";
+import { queryKeys } from "@/services/query-keys";
 import type { UpdateUserPayload, User } from "./types/user";
 
 export class UsersModel extends Model {
   static {
-    Model.setup.call(this, { path: "/users", service: "MAIN" });
+    Model.setup.call(this, { path: usersContract.base, service: usersContract.service });
   }
 
   static list() {
-    return this.api.get<User[]>();
+    return this.api.get<User[]>({ url: usersContract.paths.list });
   }
 
   static get(id: number) {
-    return this.api.get<User>({ url: `${this.path}/${id}` });
+    return this.api.get<User>({ url: usersContract.paths.byId(id) });
   }
 
   static update(id: number, payload: UpdateUserPayload) {
-    return this.api.patch<User>({ url: `${this.path}/${id}`, data: payload });
+    return this.api.patch<User>({ url: usersContract.paths.byId(id), data: payload });
   }
 }
 
 export const useUsersListQuery = defineQuery<User[]>({
-  key: "users.list",
+  key: queryKeys.users.list,
   fetcher: async () => (await UsersModel.list()).data,
 });
