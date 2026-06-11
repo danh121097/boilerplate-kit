@@ -21,6 +21,7 @@ export class UsersModel extends Model {
   }
 }
 
+// Queries
 export const useUsersListQuery = defineQuery<User[]>({
   key: queryKeys.users.list,
   fetcher: async () => (await UsersModel.list()).data,

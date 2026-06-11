@@ -10,16 +10,6 @@ import {
 import { queryKeys } from "@/services/query-keys";
 import type { AuthResult, AuthUser, LoginPayload, RegisterPayload } from "./types/auth";
 
-/**
- * Auth service for the MAIN backend. Both tokens are persisted in localStorage:
- * the access token feeds the Bearer header; the refresh token is replayed in the
- * refresh request body. `logout` clears both. (The backend may also set an
- * httpOnly refresh cookie — harmless and still honored via `withCredentials`.)
- *
- * The response interceptor already unwraps the backend envelope, so a method
- * typed `post<T>` resolves to the payload `T` via a single `.data` — pass the
- * PAYLOAD type as `T` (not the `{ data }` envelope) and read `.data` once.
- */
 export class AuthModel extends Model {
   static {
     Model.setup.call(this, { path: authContract.base, service: authContract.service });
@@ -59,6 +49,14 @@ export class AuthModel extends Model {
   }
 }
 
+// Queries
+export const useMeQuery = defineQuery<AuthUser>({
+  key: queryKeys.auth.me,
+  fetcher: () => AuthModel.getMe(),
+});
+
+// Mutations
+
 export const useLoginMutation = defineMutation<AuthResult, LoginPayload>({
   key: queryKeys.auth.login,
   mutator: (payload) => AuthModel.login(payload),
@@ -72,9 +70,4 @@ export const useRegisterMutation = defineMutation<AuthResult, RegisterPayload>({
 export const useLogoutMutation = defineMutation({
   key: queryKeys.auth.logout,
   mutator: () => AuthModel.logout(),
-});
-
-export const useMeQuery = defineQuery<AuthUser>({
-  key: queryKeys.auth.me,
-  fetcher: () => AuthModel.getMe(),
 });
