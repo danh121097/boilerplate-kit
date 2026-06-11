@@ -8,9 +8,9 @@ grounded in real files under `app/` (the Nuxt `srcDir`), plus `i18n/` and
 The app boots through ordered `app/plugins/*`, which run on **both server and
 client**: `01.init-services.ts` wires the HTTP layer (base URLs, token slots,
 refresh interceptors) before any page-level data fetch; then `02.vue-query.ts`
-installs TanStack Vue Query, `03.directives.ts` registers the `v-track`
-directive, and `04.vee-validate.ts` registers the bare vee-validate components.
-The root component `app/app.vue` renders `<NuxtLayout><NuxtPage /></NuxtLayout>`.
+installs TanStack Vue Query and `03.directives.ts` registers the `v-track`
+directive. The root component `app/app.vue` renders
+`<NuxtLayout><NuxtPage /></NuxtLayout>`.
 
 ## Topics
 

@@ -1,8 +1,5 @@
 import type { Directive } from "vue";
 
-/**
- * Demo `v-track="'event_name'"` directive. Wire to your analytics provider.
- */
 const vTrack: Directive<HTMLElement, string> = {
   mounted(el, binding) {
     el.addEventListener("click", () => {

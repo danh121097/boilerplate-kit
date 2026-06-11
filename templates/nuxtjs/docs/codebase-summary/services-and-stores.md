@@ -85,13 +85,15 @@ module augmentation adding `serviceType` and `_retry` to the request config.
 
 ### Auth (`app/services/auth/auth.ts`)
 
-`AuthModel extends Model` (path `/auth`). Methods: `login`, `register` (both
-persist the access token via `storeSession`), `logout` (clears all tokens),
-`getMe`. The response interceptor already unwraps the envelope, so each method
-reads `res.data` once. Exposes `useLoginMutation`, `useRegisterMutation`,
-`useLogoutMutation`, `useMeQuery`. Types in `types/auth.ts`
-(`AuthUser`, `AuthTokens`, `LoginPayload`, `RegisterPayload`, `AuthResult`) —
-note `refreshToken` is optional client-side (it lives in the cookie).
+`AuthModel extends Model` (path `/auth`). Methods: `login`, `register`, `logout`.
+Cookie-first: the backend sets httpOnly access/refresh cookies, so there is no
+client-side token persistence. The response interceptor already unwraps the
+envelope, so each method reads `res.data` once. Exposes `useLoginMutation`,
+`useRegisterMutation`, `useLogoutMutation`. The canonical session read is
+`useSessionQuery` (in `session.ts`, via `serverApiGet` so it prefetches on SSR
+with the forwarded cookie) — there is no duplicate axios `getMe`. Types in
+`types/auth.ts` (`AuthUser`, `AuthTokens`, `LoginPayload`, `RegisterPayload`,
+`AuthResult`) — note `refreshToken` is optional client-side (it lives in the cookie).
 
 ### Users (`app/services/users/users.ts`)
 

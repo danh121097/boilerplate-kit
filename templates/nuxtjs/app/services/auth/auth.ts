@@ -1,68 +1,47 @@
-import { clearAuthTokens, defineMutation, defineQuery, Model, persistAccessToken, persistRefreshToken } from "@/services/core";
-import type { AuthResult, AuthUser, LoginPayload, RegisterPayload } from "./types/auth";
+import { authContract } from "./contract";
+import { defineMutation, Model } from "@/services/core";
+import { queryKeys } from "@/services/query-keys";
+import type { AuthResult, LoginPayload, RegisterPayload } from "./types/auth";
 
-/**
- * Auth service for the MAIN backend. Both tokens are persisted in localStorage:
- * the access token feeds the Bearer header; the refresh token is replayed in the
- * refresh request body. `logout` clears both. (The backend may also set an
- * httpOnly refresh cookie — harmless and still honored via `withCredentials`.)
- *
- * The response interceptor already unwraps the backend envelope, so a method
- * typed `post<T>` resolves to the payload `T` via a single `.data` — pass the
- * PAYLOAD type as `T` (not the `{ data }` envelope) and read `.data` once.
- */
 export class AuthModel extends Model {
   static {
-    Model.setup.call(this, { path: "/auth" });
+    Model.setup.call(this, { path: authContract.base, service: authContract.service });
   }
 
   static async login(payload: LoginPayload): Promise<AuthResult> {
-    const res = await this.api.post<AuthResult>({ url: `${this.path}/login`, data: payload });
-    return this.storeSession(res.data);
+    const res = await this.api.post<AuthResult>({ url: authContract.paths.login, data: payload });
+    return res.data;
   }
 
   static async register(payload: RegisterPayload): Promise<AuthResult> {
-    const res = await this.api.post<AuthResult>({ url: `${this.path}/register`, data: payload });
-    return this.storeSession(res.data);
+    const res = await this.api.post<AuthResult>({
+      url: authContract.paths.register,
+      data: payload,
+    });
+    return res.data;
   }
 
   static async logout(): Promise<void> {
-    try {
-      await this.api.post({ url: `${this.path}/logout` });
-    } finally {
-      clearAuthTokens();
-    }
-  }
-
-  static async getMe(): Promise<AuthUser> {
-    const res = await this.api.get<{ user: AuthUser }>({ url: `${this.path}/me` });
-    return res.data.user;
-  }
-
-  /** Persist both tokens: access for the Bearer header, refresh for the refresh call. */
-  private static storeSession(result: AuthResult): AuthResult {
-    persistAccessToken(result.tokens.accessToken, this.service);
-    if (result.tokens.refreshToken) persistRefreshToken(result.tokens.refreshToken, this.service);
-    return result;
+    await this.api.post({ url: authContract.paths.logout });
   }
 }
 
+// Mutations
+
 export const useLoginMutation = defineMutation<AuthResult, LoginPayload>({
-  key: "auth.login",
+  key: queryKeys.auth.login,
   mutator: (payload) => AuthModel.login(payload),
+  invalidates: [queryKeys.auth.me, queryKeys.users.list],
 });
 
 export const useRegisterMutation = defineMutation<AuthResult, RegisterPayload>({
-  key: "auth.register",
+  key: queryKeys.auth.register,
   mutator: (payload) => AuthModel.register(payload),
+  invalidates: [queryKeys.auth.me, queryKeys.users.list],
 });
 
 export const useLogoutMutation = defineMutation({
-  key: "auth.logout",
+  key: queryKeys.auth.logout,
   mutator: () => AuthModel.logout(),
-});
-
-export const useMeQuery = defineQuery<AuthUser>({
-  key: "auth.me",
-  fetcher: () => AuthModel.getMe(),
+  invalidates: [queryKeys.auth.me, queryKeys.users.list],
 });

@@ -31,7 +31,7 @@ Proof column = run `pnpm test` (Vitest). Cases counted from the test sources.
 | Model.setup: wires path/service/Api onto subclass, honors explicit service, isolates config between subclasses | `app/__tests__/unit/model.test.ts` | 3 | unit | implemented |
 | Refresh single-flight: dedupes concurrent calls, refreshes again after settle, clears token + fires `onRefreshFailed` on reject | `app/__tests__/unit/refresh-token-manager.test.ts` | 3 | unit | implemented |
 | TanStack `defineQuery` / `defineMutation`: key exposure, param-less + parameterized query keys, mutation key | `app/__tests__/unit/tanstack.test.ts` | 4 | unit | implemented |
-| Auth service: login/register persist access token, logout clears (even on request failure), `getMe` unwraps user | `app/__tests__/integration/auth-service.test.ts` | 5 | integration | implemented |
+| Auth service: login/register return the result (no localStorage side-effect), logout calls the endpoint and surfaces request failures | `app/__tests__/integration/auth-service.test.ts` | 4 | integration | implemented |
 | Interceptor refresh + 401 replay: refresh once and replay, single-flight concurrent 401s, keep token on non-auth replay failure, give up after one retry (no loop), skip refresh for anonymous traffic | `app/__tests__/integration/interceptors-refresh.test.ts` | 5 | integration | implemented |
 
 **Total: 41 cases** (`pnpm test`).

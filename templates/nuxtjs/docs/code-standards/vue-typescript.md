@@ -134,7 +134,7 @@ flag set. Consequences:
 
 ```ts
 const { errorMessage, value } = useField<string | number>(() => props.name);
-export const useMeQuery = defineQuery<AuthUser>({ key: "auth.me", fetcher: () => AuthModel.getMe() });
+export const useSessionQuery = defineQuery<AuthUser | null>({ key: "auth.me", fetcher: () => serverApiGet(authContract.paths.me) });
 ```
 
 Validate via `pnpm typecheck` (`nuxt typecheck`).

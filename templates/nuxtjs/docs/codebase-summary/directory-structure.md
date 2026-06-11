@@ -12,8 +12,7 @@ templates/nuxtjs/
 │   ├── plugins/            # Ordered bootstrap (server + client)
 │   │   ├── 01.init-services.ts   # Wire Api base URLs, token slots, refresh interceptors
 │   │   ├── 02.vue-query.ts       # Install TanStack Vue Query (universal QueryClient)
-│   │   ├── 03.directives.ts      # Register demo v-track directive
-│   │   └── 04.vee-validate.ts    # Register global VeeForm/VeeField/VeeError
+│   │   └── 03.directives.ts      # Register demo v-track directive
 │   ├── pages/              # File-based routes
 │   │   ├── index.vue       # Home — Reka UI dialog demo
 │   │   ├── counter.vue     # Pinia counter store demo

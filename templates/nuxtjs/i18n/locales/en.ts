@@ -1,5 +1,5 @@
 export default {
-  nav: { home: "Home", counter: "Counter", users: "Users", form: "Form" },
+  nav: { home: "Home", counter: "Counter", users: "Users", form: "Form", authDemo: "Auth Demo" },
   home: {
     welcome: "Welcome",
     description: "Nuxt 4 + Reka UI + Pinia + TanStack Vue Query + Tailwind v4 + i18n.",

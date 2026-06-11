@@ -1,12 +1,11 @@
-import { useStorageKeys } from "@/enums/storage-keys";
+import { authContract } from "@/services/auth/contract";
 import { Api, ApiInterceptors } from "@/services/core";
-import { registerServiceToken } from "@/services/core/auth-token-storage";
-import type { ServiceRefreshConfig, ServiceTokenKeys } from "@/services/core";
+import type { ServiceRefreshConfig } from "@/services/core";
 
 /**
  * Bootstrap the shared `Api` client before any page-level data fetches run.
- * Runs on BOTH server and client (no `.client`/`.server` suffix); reads service
- * base URLs + appName from runtimeConfig so SSR + CSR resolve the same origins.
+ * Runs client-only (.client suffix) — the axios interceptors are browser-side;
+ * SSR data fetches the backend directly via `serverApiGet` (cookie forwarded).
  *
  * Declare every backend in `services` below — add a row + its runtimeConfig key
  * (a `NUXT_PUBLIC_*` env var) to wire another authenticated backend. Rows with
@@ -18,17 +17,14 @@ export default defineNuxtPlugin(() => {
   const services: Array<{
     name: string;
     baseURL: string;
-    tokenKeys: ServiceTokenKeys;
     refresh?: ServiceRefreshConfig;
   }> = [
     {
       name: "MAIN",
       baseURL: pub.apiBaseUrl || "https://jsonplaceholder.typicode.com",
-      tokenKeys: {
-        access: () => useStorageKeys("ACCESS_TOKEN"),
-        refresh: () => useStorageKeys("REFRESH_TOKEN"),
-      },
-      refresh: { endpoint: "/auth/refresh" },
+      // reloadOnFailure: true — most endpoints need auth, so a failed refresh means
+      // the session is truly dead → reload to a clean (logged-out) state.
+      refresh: { endpoint: authContract.paths.refresh, reloadOnFailure: true },
     },
   ];
 
@@ -37,12 +33,11 @@ export default defineNuxtPlugin(() => {
   for (const svc of services) {
     if (!svc.baseURL) continue;
     Api.setBaseURL(svc.baseURL, svc.name);
-    registerServiceToken(svc.name, svc.tokenKeys);
     if (svc.refresh) refreshByService[svc.name] = svc.refresh;
   }
 
   // On a 401 the interceptor calls the failing service's own refresh endpoint
-  // (sending the stored refresh token in the body), stores the new access +
-  // refresh tokens, and replays the request. Each service refreshes independently.
+  // (the httpOnly refresh cookie is sent automatically); the backend rotates the
+  // cookies and the request is replayed. Each service refreshes independently.
   Api.registerInterceptors(new ApiInterceptors(refreshByService));
 });

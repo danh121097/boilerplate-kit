@@ -19,6 +19,7 @@ function toggleLocale() {
         <NuxtLink to="/counter" class="hover:text-indigo-600">{{ t("nav.counter") }}</NuxtLink>
         <NuxtLink to="/users" class="hover:text-indigo-600">{{ t("nav.users") }}</NuxtLink>
         <NuxtLink to="/form" class="hover:text-indigo-600">{{ t("nav.form") }}</NuxtLink>
+        <NuxtLink to="/auth-demo" class="hover:text-indigo-600">{{ t("nav.authDemo") }}</NuxtLink>
         <button
           class="ml-auto rounded-md border px-2 py-0.5 text-xs hover:bg-gray-100"
           @click="toggleLocale"

@@ -133,7 +133,7 @@ token is cleared only on an actual auth failure
 
 The standard API response shape `{ status, data, message?, error_code? }`
 (`ApiResponse<T>` in `app/services/core/types.ts`). Service methods unwrap the
-envelope and return `data` to callers (e.g. `getMe` returns the user object).
+envelope and return `data` to callers (e.g. `serverApiGet` returns the `data` payload).
 
 ## HMAC Canonical String
 

@@ -14,7 +14,6 @@ Nuxt runs `app/plugins/*` alphabetically; the numeric prefixes pin the order:
 | `01.init-services.ts` | **server + client** | Base URLs + token slots + interceptors for the shared `Api` client |
 | `02.vue-query.ts` | server + client | One `QueryClient`, installs `VueQueryPlugin` on `nuxtApp.vueApp` |
 | `03.directives.ts` | server + client | Registers app-wide directives (`v-track`) |
-| `04.vee-validate.ts` | server + client | Registers global `<VeeForm>` / `<VeeField>` / `<VeeError>` |
 
 `01` must precede everything because the HTTP layer (base URLs + interceptors)
 must exist before any page-level `useQuery` fetches a request during SSR.
@@ -109,7 +108,7 @@ Nitro SSR request
   ├─ run plugins (server)
   │     ├─ 01.init-services  → Api base URLs + token slots + ApiInterceptors
   │     ├─ 02.vue-query      → QueryClient (so SSR useQuery is safe)
-  │     ├─ 03.directives / 04.vee-validate
+  │     ├─ 03.directives     → v-track
   │     └─ render app.vue → NuxtLayout → NuxtPage  (HTML)
   ▼ ship HTML + payload
 Client hydration

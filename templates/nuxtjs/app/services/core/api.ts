@@ -1,5 +1,12 @@
 import axios, { type AxiosInstance } from "axios";
-import type { ApiRequestConfig, ApiService, HttpInterceptorSetup, ServiceConfig } from "./types";
+import type {
+  ApiRequestConfig,
+  ApiService,
+  CursorResponse,
+  HttpInterceptorSetup,
+  PaginatedResponse,
+  ServiceConfig,
+} from "./types";
 
 /**
  * Shared HTTP API client with multi-service support and injectable interceptors.
@@ -73,21 +80,34 @@ export class Api {
   get<T>(config: ApiRequestConfig = {}) {
     return this.makeRequest<T>("get", config);
   }
+
+  paginate<T>(config: ApiRequestConfig = {}) {
+    return this.makeRequest<T[]>("get", config) as unknown as Promise<PaginatedResponse<T>>;
+  }
+
+  cursorPaginate<T>(config: ApiRequestConfig = {}) {
+    return this.makeRequest<T[]>("get", config) as unknown as Promise<CursorResponse<T>>;
+  }
+
   post<T>(config: ApiRequestConfig = {}) {
     return this.makeRequest<T>("post", config);
   }
+
   postFormData<T>(config: ApiRequestConfig = {}) {
     return this.makeRequest<T>("post", {
       ...config,
       customHeaders: { "Content-Type": "multipart/form-data" },
     });
   }
+
   put<T>(config: ApiRequestConfig = {}) {
     return this.makeRequest<T>("put", config);
   }
+
   patch<T>(config: ApiRequestConfig = {}) {
     return this.makeRequest<T>("patch", config);
   }
+
   delete<T>(config: ApiRequestConfig = {}) {
     return this.makeRequest<T>("delete", config);
   }

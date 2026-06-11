@@ -9,9 +9,8 @@
  * a Nuxt request scope (composable / plugin / setup). Don't read it at module top-level.
  */
 function buildKeys(prefix: string) {
+  // Auth tokens are NOT stored client-side (cookie-first httpOnly auth) — no token keys here.
   return {
-    ACCESS_TOKEN: `${prefix}_ACCESS_TOKEN`,
-    REFRESH_TOKEN: `${prefix}_REFRESH_TOKEN`,
     LANGUAGE: `${prefix}_LANGUAGE`,
     THEME: `${prefix}_THEME`,
   } as const;
@@ -23,7 +22,7 @@ export type StorageKey = StorageKeyMap[keyof StorageKeyMap];
 let cached: StorageKeyMap | null = null;
 
 /**
- * Resolve a single prefixed storage key by name, e.g. `useStorageKeys("ACCESS_TOKEN")`.
+ * Resolve a single prefixed storage key by name, e.g. `useStorageKeys("LANGUAGE")`.
  * The `name` param autocompletes to the keys declared in `buildKeys`. Safe to
  * call on server or client (the prefix map is resolved lazily and cached).
  */

@@ -13,19 +13,14 @@ export interface BaseInputProps {
   label?: string;
   /** Force the error border + colour. */
   error?: boolean;
-  /** Native input type. */
   type?: InputType;
   /** Visual variant — `default` (outlined) | `filled` (subtle background). */
   variant?: InputVariant;
-  /** Readonly state. */
   readonly?: boolean;
-  /** Disabled state. */
   disabled?: boolean;
   /** Placeholder text (also used to determine if the floating label should lift). */
   placeholder?: string;
-  /** Auto-focus on mount. */
   autofocus?: boolean;
-  /** Max length of the input value. */
   maxlength?: number;
   /** Centre the input text + floating label. */
   center?: boolean;

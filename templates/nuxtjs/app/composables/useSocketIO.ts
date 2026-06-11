@@ -1,25 +1,8 @@
 import { SOCKET_EVENT, SOCKET_UNAUTHORIZED_MESSAGE } from "@/enums";
-import { getAccessToken } from "@/services/core/auth-token-storage";
+import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import { useSocketIOStore } from "@/stores/socket-io";
 import { io, type Socket } from "socket.io-client";
-import Base64 from "crypto-js/enc-base64";
-import HmacSHA256 from "crypto-js/hmac-sha256";
 
-/**
- * Initialize a socket.io connection scoped to the current component tree.
- *
- * SSR notes:
- * - `io()` constructor is safe on the server (lazy, no socket opened until `.connect()`).
- * - `getAuthToken()` returns null on the server (the underlying storage is SSR-guarded).
- * - `onMounted(connectSocket)` fires only on the client, so no WebSocket handshake
- *   happens during Nitro SSR rendering.
- *
- * Auth payload: `{ token: 'Bearer <localStorage access_token>', role: 'user', sig, ctime }`.
- *
- * SECURITY: signing in the browser requires exposing the secret via a PUBLIC
- * runtime config (`public.hmacSecret`). For production prefer signing in a Nitro
- * server route / BFF and forwarding the headers to the handshake.
- */
 export function useSocketIO() {
   const storeSocketIO = useSocketIOStore();
 
@@ -27,22 +10,21 @@ export function useSocketIO() {
 
   const runtime = useRuntimeConfig();
   const URL = runtime.public.appEndpoint || "";
-  const HMAC_SECRET = runtime.public.hmacSecret || "";
 
-  /**
-   * Per-handshake `{ sig, ctime }` headers the HMAC-protected backend expects:
-   *   ["GET", "application/json", ctime, "/socket", ""].join("\n")  // Base64 HMAC
-   * Empty object when no secret is configured (server then rejects).
-   */
-  function signHeader(): { sig: string; ctime: number } | Record<string, never> {
-    if (!HMAC_SECRET) return {};
-    const ctime = Date.now();
-    const stringToSign = ["GET", "application/json", ctime, "/socket", ""].join("\n");
-    return { sig: Base64.stringify(HmacSHA256(stringToSign, HMAC_SECRET)), ctime };
+  function signHeader() {
+    const sig = HMACSignatureGenerator.signRequest({
+      method: "GET",
+      path: "/socket",
+      contentType: "application/json",
+    });
+    if (!sig) return {};
+    return { sig: sig.sig, ctime: sig.ctime };
   }
 
+  /** Cookie-only auth — no Bearer. The browser sends the httpOnly access-token
+   * cookie via the `withCredentials` socket option. */
   function buildAuth() {
-    return { token: `Bearer ${getAccessToken() ?? ""}`, role: "user", ...signHeader() };
+    return { role: "user", ...signHeader() };
   }
 
   const socket = io(URL, {

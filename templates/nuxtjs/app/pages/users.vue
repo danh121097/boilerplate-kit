@@ -13,7 +13,7 @@ const { data, isLoading, error } = useUsersListQuery();
       {{ t("users.error", { message: error.error_message || error.message }) }}
     </p>
     <ul v-else class="divide-y">
-      <li v-for="user in data" :key="user._id" class="flex items-center justify-between py-2">
+      <li v-for="user in data?.data" :key="user._id" class="flex items-center justify-between py-2">
         <div>
           <span class="font-medium">{{ user.name }}</span>
           <span class="ml-2 text-sm text-gray-500">{{ user.email }}</span>

@@ -1,48 +1,43 @@
-import { installLocalStorage } from "../helpers/fake-storage";
-import { getAccessToken, persistAccessToken } from "@/services/core/auth-token-storage";
 import { RefreshTokenManager } from "@/services/core/refresh-token-manager";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const tick = () => new Promise((r) => setTimeout(r, 5));
 
 describe("RefreshTokenManager", () => {
-  beforeEach(() => installLocalStorage());
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => vi.restoreAllMocks());
 
-  it("dedupes concurrent calls into a single refresh and persists the access token", async () => {
+  it("dedupes concurrent calls into a single refresh", async () => {
     let runs = 0;
     const mgr = new RefreshTokenManager({
       service: "MAIN",
       refresh: async () => {
         runs += 1;
         await tick();
-        return `T${runs}`;
       },
       onRefreshFailed: () => {},
     });
 
-    const [a, b, c] = await Promise.all([mgr.getFreshToken(), mgr.getFreshToken(), mgr.getFreshToken()]);
+    await Promise.all([mgr.refresh(), mgr.refresh(), mgr.refresh()]);
 
     expect(runs).toBe(1); // single-flight
-    expect([a, b, c]).toEqual(["T1", "T1", "T1"]);
-    expect(getAccessToken("MAIN")).toBe("T1"); // persisted
   });
 
   it("refreshes again after the in-flight one settles", async () => {
     let runs = 0;
     const mgr = new RefreshTokenManager({
       service: "MAIN",
-      refresh: async () => `T${++runs}`,
+      refresh: async () => {
+        runs += 1;
+      },
       onRefreshFailed: () => {},
     });
 
-    expect(await mgr.getFreshToken()).toBe("T1");
-    expect(await mgr.getFreshToken()).toBe("T2");
+    await mgr.refresh();
+    await mgr.refresh();
     expect(runs).toBe(2);
   });
 
-  it("clears both service tokens and fires onRefreshFailed when refresh rejects", async () => {
-    persistAccessToken("OLD", "MAIN");
+  it("fires onRefreshFailed and rethrows when refresh rejects", async () => {
     const onRefreshFailed = vi.fn();
     const mgr = new RefreshTokenManager({
       service: "MAIN",
@@ -52,8 +47,7 @@ describe("RefreshTokenManager", () => {
       onRefreshFailed,
     });
 
-    await expect(mgr.getFreshToken()).rejects.toThrow("refresh failed");
+    await expect(mgr.refresh()).rejects.toThrow("refresh failed");
     expect(onRefreshFailed).toHaveBeenCalledTimes(1);
-    expect(getAccessToken("MAIN")).toBeNull(); // cleared
   });
 });

@@ -33,6 +33,14 @@ export default defineNuxtConfig({
       { code: "en", file: "en.ts" },
       { code: "ja", file: "ja.ts" },
     ],
+    // Persist the chosen locale under the namespaced LANGUAGE key (mirrors
+    // STORAGE_KEYS.LANGUAGE = `${APP_NAME}_LANGUAGE`) instead of the default
+    // `i18n_redirected`, so the app's storage keys stay consistent.
+    detectBrowserLanguage: {
+      useCookie: true,
+      cookieKey: `${process.env.NUXT_PUBLIC_APP_NAME}_LANGUAGE`,
+      redirectOn: "root",
+    },
   },
 
   runtimeConfig: {

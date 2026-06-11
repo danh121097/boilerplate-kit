@@ -36,6 +36,16 @@ export interface QueryDefinition<TData, TParams = void> {
   (config?: UseQueryConfig<TData, TParams>): UseQueryReturnType<TData, ApiResponseError>;
   key: string;
   queryKey: (params?: TParams) => QueryDefinitionKey<TParams>;
+  /**
+   * Plain `{ queryKey, queryFn }` for SSR prefetch: `await
+   * useQueryClient().ensureQueryData(def.queryOptions())` in a page resolves the
+   * query on the server (dehydrated → hydrated), so the same `useXxx()` hook
+   * reads it without a refetch — Vue Query stays the single source + cache.
+   */
+  queryOptions: (params?: TParams) => {
+    queryKey: QueryDefinitionKey<TParams>;
+    queryFn: () => Promise<TData>;
+  };
 }
 
 export function defineQuery<TData, TParams = void>(config: DefineQueryConfig<TData, TParams>) {
@@ -58,6 +68,10 @@ export function defineQuery<TData, TParams = void>(config: DefineQueryConfig<TDa
   const definition = use as QueryDefinition<TData, TParams>;
   definition.key = key;
   definition.queryKey = queryKey;
+  definition.queryOptions = (params?: TParams) => ({
+    queryKey: queryKey(params),
+    queryFn: () => fetcher(params as TParams),
+  });
   return definition;
 }
 
@@ -74,12 +88,9 @@ interface DefineMutationConfig<TData, TVars, TCtx = unknown> {
 }
 
 export interface MutationDefinition<TData, TVars, TCtx = unknown> {
-  (overrides?: MutationDefOpts<TData, TVars, TCtx>): UseMutationReturnType<
-    TData,
-    ApiResponseError,
-    TVars,
-    TCtx
-  >;
+  (
+    overrides?: MutationDefOpts<TData, TVars, TCtx>,
+  ): UseMutationReturnType<TData, ApiResponseError, TVars, TCtx>;
   key: string;
 }
 

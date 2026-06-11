@@ -50,7 +50,7 @@ like composables:
 
 ```ts
 export const useLoginMutation = defineMutation<AuthResult, LoginPayload>({ /* ... */ });
-export const useMeQuery = defineQuery<AuthUser>({ /* ... */ });
+export const useSessionQuery = defineQuery<AuthUser | null>({ /* ... */ });
 ```
 
 ## Stores — `useXStore`

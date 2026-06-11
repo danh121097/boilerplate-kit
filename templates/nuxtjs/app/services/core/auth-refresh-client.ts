@@ -1,80 +1,32 @@
 import { Api } from "./api";
-import { getRefreshToken, persistRefreshToken } from "./auth-token-storage";
 import { HMACSignatureGenerator } from "./hmac-signature";
 import type { ApiService } from "./types";
-import type { InternalAxiosRequestConfig } from "axios";
 import axios from "axios";
 
 /**
- * Dedicated, interceptor-free call to the token-refresh endpoint.
- *
- * Kept on a bare axios instance — NOT the app client — so a 401 returned by the
- * refresh request itself can never recurse back into the refresh interceptor.
- *
- * The refresh token is read from localStorage and sent in the request body. The
- * backend rotates the pair and returns the new access (+ refresh) tokens; the new
- * refresh token is persisted here and the access token is handed to the caller.
- * (`withCredentials` is kept so a backend that prefers an httpOnly refresh cookie
- * still works without code changes.)
- */
-
-/** Tolerates the common envelope shapes a backend may wrap the new tokens in. */
-interface RefreshResponseBody {
-  data?: { tokens?: { accessToken?: string; refreshToken?: string }; accessToken?: string; refreshToken?: string };
-  tokens?: { accessToken?: string; refreshToken?: string };
-  accessToken?: string;
-  refreshToken?: string;
-}
-
-function extractAccessToken(body: RefreshResponseBody): string {
-  const token =
-    body.data?.tokens?.accessToken ??
-    body.data?.accessToken ??
-    body.tokens?.accessToken ??
-    body.accessToken;
-  if (!token) throw new Error("Refresh response did not contain an access token");
-  return token;
-}
-
-function extractRefreshToken(body: RefreshResponseBody): string | undefined {
-  return (
-    body.data?.tokens?.refreshToken ??
-    body.data?.refreshToken ??
-    body.tokens?.refreshToken ??
-    body.refreshToken
-  );
-}
-
-/**
- * Build a refresher bound to a service + endpoint. Returns a thunk the
- * single-flight manager calls; it yields the freshly minted access token and
- * persists the rotated refresh token as a side effect.
+ * Build a refresher bound to a service + endpoint, for the single-flight manager.
+ * Runs on a bare axios instance (NOT the app client) so a 401 from the refresh
+ * call can't recurse into the refresh interceptor. Cookie-based: the browser sends
+ * the httpOnly refresh cookie, the backend rotates both cookies, the caller replays
+ * its request — no token touches JS. Client-only (called from the interceptor).
  */
 export function createTokenRefresher(endpoint: string, service: ApiService) {
-  return async (): Promise<string> => {
-    const headers: Record<string, string | number> = {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    };
-    // This bare client skips the app interceptors (to avoid refresh recursion),
-    // so it must attach the same HMAC headers the backend requires of every
-    // request — otherwise the refresh call itself is rejected. No-op when no
-    // secret is configured.
-    const signature = HMACSignatureGenerator.generateSignature({
-      url: endpoint,
-      method: "post",
-      headers,
-    } as unknown as InternalAxiosRequestConfig);
+  return async (): Promise<void> => {
+    const headers: Record<string, string | number> = { Accept: "application/json" };
+    // The bare client skips app interceptors, so it must attach HMAC itself or the
+    // refresh is rejected. Body less request → no Content-Type → sign "" to match
+    // what the backend verifies. `endpoint` is the path after baseURL (no prefix).
+    const signature = HMACSignatureGenerator.signRequest({
+      method: "POST",
+      path: endpoint,
+      contentType: "",
+    });
     if (signature) Object.assign(headers, signature);
 
-    const { data } = await axios.post<RefreshResponseBody>(
-      `${Api.getBaseURL(service)}${endpoint}`,
-      { refreshToken: getRefreshToken(service) ?? undefined },
-      { withCredentials: true, headers },
-    );
-
-    const rotated = extractRefreshToken(data);
-    if (rotated) persistRefreshToken(rotated, service);
-    return extractAccessToken(data);
+    // Empty body — the httpOnly refresh cookie carries the credential.
+    await axios.post(`${Api.getBaseURL(service)}${endpoint}`, undefined, {
+      withCredentials: true,
+      headers,
+    });
   };
 }

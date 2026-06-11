@@ -1,26 +1,31 @@
-import { defineQuery, Model } from "@/services/core";
+import { usersContract } from "./contract";
+import { defineQuery, Model, serverApiPaginate } from "@/services/core";
+import { queryKeys } from "@/services/query-keys";
 import type { UpdateUserPayload, User } from "./types/user";
+import type { PaginatedResponse } from "@/services/core";
 
 /** Domain model for the /users endpoint — initialized via initServices(). */
 export class UsersModel extends Model {
   static {
-    Model.setup.call(this, { path: "/users" });
+    Model.setup.call(this, { path: usersContract.base, service: usersContract.service });
   }
 
-  static list() {
-    return this.api.get<User[]>();
+  static async get(id: number): Promise<User> {
+    const res = await this.api.get<User>({ url: usersContract.paths.byId(id) });
+    return res.data;
   }
 
-  static get(id: number) {
-    return this.api.get<User>({ url: `${this.path}/${id}` });
-  }
-
-  static update(id: number, payload: UpdateUserPayload) {
-    return this.api.patch<User>({ url: `${this.path}/${id}`, data: payload });
+  static async update(id: number, payload: UpdateUserPayload): Promise<User> {
+    const res = await this.api.patch<User>({ url: usersContract.paths.byId(id), data: payload });
+    return res.data;
   }
 }
 
-export const useUsersListQuery = defineQuery<User[]>({
-  key: "users.list",
-  fetcher: () => UsersModel.list().then((r) => r.data),
+// Queries
+
+export const useUsersListQuery = defineQuery<PaginatedResponse<User> | null>({
+  key: queryKeys.users.list,
+  fetcher: () => serverApiPaginate<User>(usersContract.paths.list),
 });
+
+// Mutations
