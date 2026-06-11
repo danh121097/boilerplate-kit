@@ -1,3 +1,4 @@
+import { getApiBaseUrl } from "@/services/core/api-config";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import { cookies } from "next/headers";
 import type {
@@ -19,7 +20,7 @@ import type {
  *
  * Next 15: cookies() is async — must be awaited before reading values.
  */
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+const API_BASE = getApiBaseUrl();
 
 /** Rebuild a Cookie header from ONLY the auth cookies (never the whole jar). */
 async function authCookieHeader(): Promise<string> {

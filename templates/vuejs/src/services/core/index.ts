@@ -1,4 +1,5 @@
 export * from "./api";
+export * from "./api-config";
 export * from "./auth-refresh-client";
 export * from "./auth-token-storage";
 export * from "./headers-utils";

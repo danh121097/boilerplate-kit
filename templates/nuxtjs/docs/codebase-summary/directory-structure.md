@@ -51,7 +51,7 @@ templates/nuxtjs/
 ## Notes
 
 - **No `server/` routes** — the directory exists but is empty; this template is a
-  frontend that talks to an external backend (configure via `NUXT_PUBLIC_API_BASE_URL`).
+  frontend that talks to an external backend (configure via `NUXT_PUBLIC_APP_ENDPOINT`).
 - **Tests** live under `app/__tests__/` (unit + integration), with shared
   `helpers/` (`fake-storage`, `http-mocks`). Config: `vitest.config.ts`.
 - **Config files** at root: `eslint.config.ts`, `prettier.config.ts`,

@@ -15,8 +15,8 @@ The Vue template read `import.meta.env.VITE_*` (inlined at build time). Nuxt use
 // nuxt.config.ts
 runtimeConfig: {
   public: {
-    apiBaseUrl: "",
     appEndpoint: "",
+    apiPrefix: "/api/v1",
     appName: "",
     languageCode: "en",
     hmacSecret: "",
@@ -31,8 +31,8 @@ server-only. Each key is overridable at runtime by a matching env var, camelCase
 
 | Runtime key | Env var override | Used by |
 | --- | --- | --- |
-| `public.apiBaseUrl` | `NUXT_PUBLIC_API_BASE_URL` | `01.init-services.ts` (MAIN base URL) |
-| `public.appEndpoint` | `NUXT_PUBLIC_APP_ENDPOINT` | `useSocketIO.ts` (Socket.IO URL) |
+| `public.appEndpoint` | `NUXT_PUBLIC_APP_ENDPOINT` | `01.init-services.ts` via getApiBaseUrl() (origin + /api/v1) |
+| `public.apiPrefix` | `NUXT_PUBLIC_API_PREFIX` | `api-config.ts` (REST prefix, default `/api/v1`) |
 | `public.appName` | `NUXT_PUBLIC_APP_NAME` | `storage-keys.ts` (localStorage prefix) |
 | `public.languageCode` | `NUXT_PUBLIC_LANGUAGE_CODE` | locale fallback |
 | `public.hmacSecret` | `NUXT_PUBLIC_HMAC_SECRET` | `hmac-signature.ts`, `useSocketIO.ts` |

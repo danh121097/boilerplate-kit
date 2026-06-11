@@ -109,7 +109,7 @@ server rendering reads return `null` and writes no-op, keeping the code SSR-safe
 ## `runtimeConfig`
 
 Nuxt's runtime configuration object. Secrets and per-env values (e.g.
-`apiBaseUrl`, `hmacSecret`, `buildVersion`) are declared under
+`appEndpoint`, `apiPrefix`, `hmacSecret`, `buildVersion`) are declared under
 `runtimeConfig.public` in `nuxt.config.ts` and read at request scope via
 `useRuntimeConfig()` — never from `import.meta.env`. `public.*` values are
 client-readable; non-public keys stay server-only.

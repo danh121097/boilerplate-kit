@@ -137,7 +137,8 @@ Want more? Run `npx shadcn-vue@latest add <component>` — `components.json` is 
 ## Environment
 
 ```
-VITE_API_BASE_URL=https://jsonplaceholder.typicode.com
+VITE_APP_ENDPOINT=http://localhost:3000
+VITE_API_PREFIX=/api/v1
 VITE_LANGUAGE_CODE=en
 # Optional — only used when your backend requires HMAC-signed requests
 # VITE_HMAC_SECRET=

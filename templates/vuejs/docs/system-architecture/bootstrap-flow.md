@@ -35,7 +35,7 @@ base URL it: sets the base URL, registers the localStorage token slot, and (if a
 const SERVICES = [
   {
     name: "MAIN",
-    baseURL: import.meta.env.VITE_API_BASE_URL ?? "https://jsonplaceholder.typicode.com",
+    baseURL: getApiBaseUrl(), // VITE_APP_ENDPOINT + /api/v1
     tokenKey: STORAGE_KEYS.AUTH_TOKEN,
     refresh: { endpoint: "/auth/refresh" },
   },

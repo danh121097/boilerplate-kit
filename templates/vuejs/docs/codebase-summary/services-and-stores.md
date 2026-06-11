@@ -51,7 +51,7 @@ are skipped; presence of `refresh` enables per-service auto-refresh.
 ```ts
 const SERVICES: ServiceDefinition[] = [
   { name: "MAIN",
-    baseURL: import.meta.env.VITE_API_BASE_URL ?? "https://jsonplaceholder.typicode.com",
+    baseURL: getApiBaseUrl(), // VITE_APP_ENDPOINT + /api/v1
     tokenKey: STORAGE_KEYS.AUTH_TOKEN,
     refresh: { endpoint: "/auth/refresh" } },
 ];

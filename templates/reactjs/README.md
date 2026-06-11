@@ -43,7 +43,8 @@ pnpm dev
 Copy `.env.example` → `.env` and fill in the values:
 
 ```
-VITE_API_BASE_URL=https://jsonplaceholder.typicode.com
+VITE_APP_ENDPOINT=http://localhost:3000
+VITE_API_PREFIX=/api/v1
 VITE_APP_NAME=MY_APP
 VITE_LANGUAGE_CODE=en
 VITE_HMAC_SECRET=           # must match backend HMAC_SECRET

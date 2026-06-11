@@ -39,13 +39,14 @@ forwarding only the auth cookies (via HMAC signature) to the backend.
 All client-visible configuration uses `NEXT_PUBLIC_*` prefix so Next.js inlines
 the values at build time:
 
-| Variable                    | Used in                                             |
-| --------------------------- | --------------------------------------------------- |
-| `NEXT_PUBLIC_API_BASE_URL`  | `init-services.ts` — sets the MAIN service base URL |
-| `NEXT_PUBLIC_APP_NAME`      | `enums/storage-keys.ts` — localStorage key prefix   |
-| `NEXT_PUBLIC_HMAC_SECRET`   | `hmac-signature.ts` — HMAC signing                  |
-| `NEXT_PUBLIC_BUILD_VERSION` | `hmac-signature.ts` — `x-version` header            |
-| `NEXT_PUBLIC_LANGUAGE_CODE` | `i18n/i18n.ts` — default locale fallback            |
+| Variable                    | Used in                                                                                                         |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_APP_ENDPOINT`  | `init-services.ts` via getApiBaseUrl() — backend origin; REST base is origin + /api/v1 (Socket.IO uses it bare) |
+| `NEXT_PUBLIC_API_PREFIX`    | `api-config.ts` — REST version prefix appended to the endpoint (default `/api/v1`)                              |
+| `NEXT_PUBLIC_APP_NAME`      | `enums/storage-keys.ts` — localStorage key prefix                                                               |
+| `NEXT_PUBLIC_HMAC_SECRET`   | `hmac-signature.ts` — HMAC signing                                                                              |
+| `NEXT_PUBLIC_BUILD_VERSION` | `hmac-signature.ts` — `x-version` header                                                                        |
+| `NEXT_PUBLIC_LANGUAGE_CODE` | `i18n/i18n.ts` — default locale fallback                                                                        |
 
 **Note:** `NEXT_PUBLIC_HMAC_SECRET` is client-readable. For a stronger guarantee,
 move signing into a Next.js Route Handler and keep the secret server-only

@@ -101,7 +101,7 @@ To prevent cross-request data leaks:
 All env vars use the `VITE_` prefix (TanStack Start uses Vite internally):
 
 ```
-VITE_API_BASE_URL    — backend base URL
+VITE_APP_ENDPOINT    — backend origin (getApiBaseUrl appends /api/v1; Socket.IO uses it bare)
 VITE_APP_NAME        — localStorage key prefix
 VITE_LANGUAGE_CODE   — default locale
 VITE_HMAC_SECRET     — HMAC signing secret (client-readable, soft layer)

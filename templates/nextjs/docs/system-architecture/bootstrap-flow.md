@@ -8,7 +8,7 @@ Next.js build
         └── <Providers>          ("use client" boundary)
               ├── initI18n()     (i18next setup, SSR-safe)
               ├── initServices() (called in useEffect — browser only)
-              │     ├── Api.setBaseURL(NEXT_PUBLIC_API_BASE_URL, "MAIN")
+              │     ├── Api.setBaseURL(getApiBaseUrl(), "MAIN")  // NEXT_PUBLIC_APP_ENDPOINT + /api/v1
               │     └── Api.registerInterceptors(new ApiInterceptors({
               │           MAIN: { endpoint: "/auth/refresh", reloadOnFailure: true }
               │         }))

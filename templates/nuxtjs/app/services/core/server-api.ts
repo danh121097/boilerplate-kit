@@ -1,3 +1,4 @@
+import { getApiBaseUrl } from "./api-config";
 import { HMACSignatureGenerator } from "./hmac-signature";
 import type {
   ApiResponse,
@@ -14,15 +15,16 @@ import type {
  * attaches the httpOnly cookie (same-site); during SSR the browser cookie isn't
  * auto-sent, so it is forwarded from the incoming request headers.
  *
- * `path` is AFTER the API prefix — the contract path (e.g. "/auth/me"); the prefix
- * lives in `runtimeConfig.public.apiBaseUrl` and the backend's HMAC verify strips
- * it, so the signed path matches. Mirrors the `serverApiGet` helper in next/tanstack.
+ * `path` is AFTER the API prefix — the contract path (e.g. "/auth/me"). The base
+ * (`getApiBaseUrl()` = appEndpoint + "/api/v1") carries the prefix and the backend's
+ * HMAC verify strips it, so the signed path matches. Mirrors `serverApiGet` in
+ * next/tanstack.
  */
 async function authedFetch<R>(
   path: string,
   query?: Record<string, string | number>,
 ): Promise<R | null> {
-  const apiBase = useRuntimeConfig().public.apiBaseUrl;
+  const apiBase = getApiBaseUrl();
   const headers: Record<string, string> = {};
 
   const sig = HMACSignatureGenerator.signRequest({ method: "GET", path, contentType: "" });

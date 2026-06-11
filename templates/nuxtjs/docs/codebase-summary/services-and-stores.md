@@ -104,10 +104,11 @@ with the forwarded cookie) — there is no duplicate axios `getMe`. Types in
 
 Runs on server + client (no `.client`/`.server` suffix). Reads
 `useRuntimeConfig().public`, declares a `services` array (MAIN defaults to
-`apiBaseUrl || jsonplaceholder`, token slot `AUTH_TOKEN`, refresh `/auth/refresh`),
+`getApiBaseUrl() (appEndpoint + /api/v1)`, token slot `AUTH_TOKEN`, refresh `/auth/refresh`),
 and for each: `Api.setBaseURL`, `registerServiceToken`, collects refresh config.
 Finally `Api.registerInterceptors(new ApiInterceptors(refreshByService))`. Add a
-row + `NUXT_PUBLIC_*` key to wire another authenticated backend.
+row + `NUXT_PUBLIC_*` key to wire another authenticated backend. The REST base URL
+is computed via `getApiBaseUrl()` which appends `/api/v1` to the `appEndpoint` origin.
 
 ## Stores (`app/stores/`)
 

@@ -58,14 +58,15 @@ Bound to `runtimeConfig.public` in `nuxt.config.ts` (read via
 | Env var | runtimeConfig key | Purpose |
 | --- | --- | --- |
 | `NUXT_PUBLIC_APP_NAME` | `appName` | localStorage key prefix |
-| `NUXT_PUBLIC_API_BASE_URL` | `apiBaseUrl` | MAIN backend base URL |
+| `NUXT_PUBLIC_APP_ENDPOINT` | `appEndpoint` | Backend origin; `getApiBaseUrl()` appends `/api/v1` (Socket.IO uses it bare) |
+| `NUXT_PUBLIC_API_PREFIX` | `apiPrefix` | REST version prefix (default `/api/v1`) |
 | `NUXT_PUBLIC_APP_ENDPOINT` | `appEndpoint` | Socket.IO endpoint |
 | `NUXT_PUBLIC_LANGUAGE_CODE` | `languageCode` | default locale code |
 | `NUXT_PUBLIC_HMAC_SECRET` | `hmacSecret` | HMAC request signing secret |
 | `NUXT_PUBLIC_BUILD_VERSION` | `buildVersion` | sent as `x-version` header |
 
-`apiBaseUrl` falls back to `https://jsonplaceholder.typicode.com` so the starter
-runs unconfigured (see `app/plugins/01.init-services.ts`). See `.env.example`.
+`appEndpoint` falls back to `http://localhost:3000` so the starter
+runs unconfigured (see `app/plugins/01.init-services.ts`); the REST base is `appEndpoint + /api/v1`. See `.env.example`.
 
 ## Key Constraints
 

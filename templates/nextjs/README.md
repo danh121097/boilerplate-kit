@@ -47,7 +47,8 @@ Copy `.env.example` to `.env.local` and fill in:
 
 | Variable                    | Description                               |
 | --------------------------- | ----------------------------------------- |
-| `NEXT_PUBLIC_API_BASE_URL`  | Backend API base URL                      |
+| `NEXT_PUBLIC_APP_ENDPOINT`   | Backend origin (REST base = origin + /api/v1; Socket.IO uses it bare) |
+| `NEXT_PUBLIC_API_PREFIX`    | REST version prefix appended to the endpoint (default `/api/v1`) |
 | `NEXT_PUBLIC_APP_NAME`      | Prefix for localStorage keys              |
 | `NEXT_PUBLIC_LANGUAGE_CODE` | Default locale (`en` or `ja`)             |
 | `NEXT_PUBLIC_HMAC_SECRET`   | HMAC signing secret (must match backend)  |

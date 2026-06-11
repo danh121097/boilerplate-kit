@@ -1,5 +1,5 @@
 import { authContract } from "@/services/auth/contract";
-import { Api, ApiInterceptors } from "@/services/core";
+import { Api, ApiInterceptors, getApiBaseUrl } from "@/services/core";
 import type { ServiceRefreshConfig } from "@/services/core";
 
 /**
@@ -12,8 +12,6 @@ import type { ServiceRefreshConfig } from "@/services/core";
  * an empty baseURL are skipped, so optional services stay dormant until set.
  */
 export default defineNuxtPlugin(() => {
-  const { public: pub } = useRuntimeConfig();
-
   const services: Array<{
     name: string;
     baseURL: string;
@@ -21,7 +19,7 @@ export default defineNuxtPlugin(() => {
   }> = [
     {
       name: "MAIN",
-      baseURL: pub.apiBaseUrl || "https://jsonplaceholder.typicode.com",
+      baseURL: getApiBaseUrl(),
       // reloadOnFailure: true — most endpoints need auth, so a failed refresh means
       // the session is truly dead → reload to a clean (logged-out) state.
       refresh: { endpoint: authContract.paths.refresh, reloadOnFailure: true },

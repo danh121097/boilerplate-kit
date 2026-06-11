@@ -62,8 +62,8 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      apiBaseUrl: "",
       appEndpoint: "",
+      apiPrefix: "/api/v1",
       appName: "",
       languageCode: "en",
       hmacSecret: "",

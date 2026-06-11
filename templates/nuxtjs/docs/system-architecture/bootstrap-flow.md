@@ -36,7 +36,7 @@ export default defineNuxtPlugin(() => {
   const services = [
     {
       name: "MAIN",
-      baseURL: pub.apiBaseUrl || "https://jsonplaceholder.typicode.com",
+      baseURL: getApiBaseUrl(), // appEndpoint + /api/v1
       tokenKey: () => useStorageKeys("AUTH_TOKEN"),
       refresh: { endpoint: "/auth/refresh" },
     },

@@ -78,10 +78,10 @@ Vite exposes `import.meta.env.VITE_*` to the client. Ones the app reads:
 
 | Var | Used by | Effect |
 | --- | --- | --- |
-| `VITE_API_BASE_URL` | `init-services.ts` | MAIN backend base URL (falls back to a placeholder API). |
+| `VITE_APP_ENDPOINT` | `init-services.ts via getApiBaseUrl()` | Backend origin; REST base is origin + /api/v1 (Socket.IO uses it bare). |
+| `VITE_API_PREFIX` | `api-config.ts` | REST version prefix appended to the endpoint (default `/api/v1`). |
 | `VITE_HMAC_SECRET` | `hmac-signature.ts`, `useSocketIO.ts` | Enables HMAC signing when set. |
 | `VITE_BUILD_VERSION` | `hmac-signature.ts` | `x-version` header (default `1.0.0`). |
-| `VITE_APP_ENDPOINT` | `useSocketIO.ts` | Socket.IO server URL. |
 | `VITE_LANGUAGE_CODE` | `i18n.ts` | Default locale fallback. |
 | `VITE_APP_NAME` | `storage-keys.ts` | Prefix for localStorage keys. |
 

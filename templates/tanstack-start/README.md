@@ -33,7 +33,7 @@ and a battle-tested client service layer.
 
 ```bash
 pnpm install
-cp .env.example .env   # fill in VITE_API_BASE_URL etc.
+cp .env.example .env   # fill in VITE_APP_ENDPOINT etc.
 pnpm dev               # SSR dev server on http://localhost:3000
 ```
 
@@ -58,7 +58,8 @@ without the client token registry.
 
 ```
 VITE_APP_NAME=          # prefix for localStorage keys
-VITE_API_BASE_URL=      # backend base URL (defaults to jsonplaceholder)
+VITE_APP_ENDPOINT=http://localhost:3000  # backend origin (REST base = origin + /api/v1; Socket.IO uses it bare)
+VITE_API_PREFIX=/api/v1
 VITE_LANGUAGE_CODE=en   # default locale
 VITE_HMAC_SECRET=       # HMAC signing secret (must match backend)
 VITE_BUILD_VERSION=     # injected by CI for x-version header

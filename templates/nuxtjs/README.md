@@ -145,7 +145,8 @@ For complex interactive primitives (dialog, popover, dropdown, accordion, combob
 
 ```
 NUXT_PUBLIC_APP_NAME=PRISM_APP
-NUXT_PUBLIC_API_BASE_URL=https://jsonplaceholder.typicode.com
+NUXT_PUBLIC_APP_ENDPOINT=http://localhost:3000
+NUXT_PUBLIC_API_PREFIX=/api/v1
 NUXT_PUBLIC_LANGUAGE_CODE=en
 ```
 

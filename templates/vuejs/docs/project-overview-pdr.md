@@ -48,11 +48,11 @@ pnpm format       # prettier --write .
 
 Declared in `env.d.ts` (all optional, read via `import.meta.env`):
 
-`VITE_APP_NAME`, `VITE_API_BASE_URL`, `VITE_APP_ENDPOINT` (Socket.IO),
+`VITE_APP_NAME`, `VITE_APP_ENDPOINT`,
 `VITE_LANGUAGE_CODE`, `VITE_HMAC_SECRET`, `VITE_BUILD_VERSION`.
 
-`VITE_API_BASE_URL` defaults to `https://jsonplaceholder.typicode.com` so the
-starter runs unconfigured (see `src/services/init-services.ts`).
+`VITE_APP_ENDPOINT` defaults to `http://localhost:3000` so the
+starter runs unconfigured (see `src/services/init-services.ts`); the REST base is `VITE_APP_ENDPOINT + /api/v1`.
 
 ## Key Constraints
 

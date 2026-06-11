@@ -1,5 +1,5 @@
 import { authContract } from "./auth/contract";
-import { Api, ApiInterceptors } from "./core";
+import { Api, ApiInterceptors, getApiBaseUrl } from "./core";
 import type { ServiceRefreshConfig } from "./core";
 
 /**
@@ -7,8 +7,8 @@ import type { ServiceRefreshConfig } from "./core";
  * auto-refresh endpoint). Cookie-based auth → no localStorage token slots. Call
  * on the CLIENT only; server functions forward the request cookie directly.
  *
- * Add a backend = a row + its `VITE_*_API_URL` in `.env` (URL includes the API
- * prefix, e.g. `http://localhost:3000/api/v1`); empty-baseURL rows are skipped.
+ * Add a backend = a row + its endpoint env; `getApiBaseUrl()` appends the
+ * `/api/v1` prefix to `VITE_APP_ENDPOINT`. Empty-baseURL rows are skipped.
  */
 interface ServiceDefinition {
   name: string;
@@ -19,7 +19,7 @@ interface ServiceDefinition {
 const SERVICES: ServiceDefinition[] = [
   {
     name: "MAIN",
-    baseURL: import.meta.env.VITE_API_BASE_URL,
+    baseURL: getApiBaseUrl(),
     // reloadOnFailure: true — most endpoints need auth, so a failed refresh means
     // the session is truly dead → reload to a clean (logged-out) state. Safe here:
     // client axios calls are gated behind auth and the session bootstrap runs via

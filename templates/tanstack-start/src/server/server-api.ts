@@ -1,3 +1,4 @@
+import { getApiBaseUrl } from "@/services/core/api-config";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import { getCookie } from "@tanstack/react-start/server";
 import type {
@@ -17,7 +18,7 @@ import type {
  * Deployment: the SSR server only gets the cookie when it shares a site with the
  * backend (same host in dev; same registrable domain / same-origin proxy in prod).
  */
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
+const API_BASE = getApiBaseUrl();
 
 /** Rebuild a Cookie header from ONLY the auth cookies (never the whole jar). */
 function authCookieHeader(): string {

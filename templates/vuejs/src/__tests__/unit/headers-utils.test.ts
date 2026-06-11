@@ -16,6 +16,7 @@ describe("headers-utils", () => {
   });
 
   it("setAuthHeaders passes headers through unchanged when no HMAC secret", () => {
+    vi.stubEnv("VITE_HMAC_SECRET", "");
     const headers = { "Content-Type": "application/json" };
     expect(HeadersUtils.setAuthHeaders(configWith(headers))).toEqual(headers);
   });
