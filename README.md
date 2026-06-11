@@ -3,7 +3,7 @@
 Scaffold an opinionated starter in seconds. One CLI, six curated stacks:
 
 - **Vue 3** + Vite + Vue Router + Pinia + Reka UI + TanStack Query + Tailwind v4
-- **Nuxt 4** + Pinia + TanStack Query + Nuxt UI + Tailwind
+- **Nuxt 4** + Pinia + TanStack Query + Nuxt UI + Tailwind v4
 - **React 19** + Vite + TanStack Router + Zustand + shadcn/ui + Tailwind v4
 - **Next.js 16** (App Router) + TanStack Query + Zustand + shadcn/ui + Tailwind v4
 - **TanStack Start** + TanStack Query + Zustand + shadcn/ui + Tailwind v4
