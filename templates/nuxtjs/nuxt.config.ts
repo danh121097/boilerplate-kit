@@ -11,6 +11,23 @@ export default defineNuxtConfig({
 
   css: ["@/css/main.css", "@/css/main.scss"],
 
+  app: {
+    baseURL: "/",
+    head: {
+      htmlAttrs: { lang: "en" },
+      charset: "utf-8",
+      viewport: "width=device-width, initial-scale=1",
+      title: "Nuxt.js Starter",
+      meta: [
+        {
+          name: "description",
+          content: "Nuxt.js Starter project with TypeScript, Pinia, i18n, and TailwindCSS.",
+        },
+      ],
+      link: [],
+    },
+  },
+
   vite: {
     plugins: [tailwindcss()],
   },
