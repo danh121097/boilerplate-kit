@@ -46,9 +46,9 @@ function RootLayout() {
   }
 
   return (
-    // suppressHydrationWarning: `lang` is decided client-side from localStorage
-    // (the server can't know it without a cookie), and browser extensions mutate
-    // <html>/<body> attributes before React hydrates — neither is a real mismatch.
+    // `lang` comes from the LANGUAGE cookie, resolved on the server too, so SSR and
+    // client agree. suppressHydrationWarning still guards browser extensions that
+    // mutate <html>/<body> attributes before React hydrates — not a real mismatch.
     <html lang={i18n.language} suppressHydrationWarning>
       <head>
         <HeadContent />

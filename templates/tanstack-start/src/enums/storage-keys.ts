@@ -1,12 +1,13 @@
 const APP_PREFIX = import.meta.env.VITE_APP_NAME || "PRISM_APP";
 
 /**
- * Centralised localStorage key registry. Always go through this map so a single
- * rename ripples cleanly and stale keys are easy to spot.
+ * Centralised cookie key registry for UI preferences. Always go through this map
+ * so a single rename ripples cleanly and stale keys are easy to spot.
  *
- * SSR note: localStorage is browser-only. Any code that reads STORAGE_KEYS at
- * module evaluation time is safe — these are just string constants. The actual
- * localStorage.getItem/setItem calls must be guarded by typeof window checks.
+ * Preferences live in cookies (not localStorage) so SSR can read them on the
+ * request — see `utils/cookie-storage` (`readCookie`/`writeCookie`) and the
+ * isomorphic LANGUAGE read in `i18n/i18n.ts`. The values here are just the cookie
+ * names. (THEME is reserved for a future theme toggle — same cookie mechanism.)
  */
 export const STORAGE_KEYS = {
   LANGUAGE: `${APP_PREFIX}_LANGUAGE`,

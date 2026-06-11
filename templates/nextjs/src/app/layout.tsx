@@ -1,5 +1,7 @@
 import { Providers } from "./providers";
 import { SiteHeader } from "@/components/site-header";
+import { STORAGE_KEYS } from "@/enums";
+import { cookies } from "next/headers";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
@@ -15,14 +17,21 @@ interface RootLayoutProps {
 }
 
 /**
- * Root layout — server component. Wraps the entire app in client-side providers
- * (React Query + i18n) via the "use client" Providers boundary.
+ * Root layout — server component. Reads the LANGUAGE cookie on the server so the
+ * `<html lang>` and the i18n instance render in the right locale on first paint
+ * (no flash, no hydration drift). Reading a per-request cookie opts the app into
+ * dynamic rendering — expected for a cookie-personalized SSR app.
  */
-export default function RootLayout({ children }: RootLayoutProps) {
+export default async function RootLayout({ children }: RootLayoutProps) {
+  const lang =
+    (await cookies()).get(STORAGE_KEYS.LANGUAGE)?.value ??
+    process.env.NEXT_PUBLIC_LANGUAGE_CODE ??
+    "en";
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={lang} suppressHydrationWarning>
       <body className="min-h-screen bg-gray-50 text-gray-900" suppressHydrationWarning>
-        <Providers>
+        <Providers initialLanguage={lang}>
           <SiteHeader />
           <main className="mx-auto max-w-3xl px-6 py-8">{children}</main>
         </Providers>

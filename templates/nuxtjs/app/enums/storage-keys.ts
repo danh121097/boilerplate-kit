@@ -1,6 +1,11 @@
 /**
- * Centralised localStorage key registry. Always go through this map so a single
- * rename ripples cleanly and stale keys are easy to spot.
+ * Centralised cookie key registry for UI preferences. Always go through this map
+ * so a single rename ripples cleanly and stale keys are easy to spot.
+ *
+ * Preferences live in cookies (not localStorage) so SSR can read them on the
+ * request. LANGUAGE is managed by `@nuxtjs/i18n` (`detectBrowserLanguage.useCookie`
+ * with `cookieKey: ${APP_NAME}_LANGUAGE` in `nuxt.config.ts`); THEME is reserved
+ * for a future theme toggle (use a cookie so SSR can read it too).
  *
  * Keys are prefixed by `NUXT_PUBLIC_APP_NAME` (resolved via `useRuntimeConfig()`)
  * to namespace this app's keys from anything else on the origin.

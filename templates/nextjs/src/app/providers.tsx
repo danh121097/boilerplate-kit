@@ -39,12 +39,15 @@ function getQueryClient() {
 
 interface ProvidersProps {
   children: ReactNode;
+  /** Locale resolved on the server from the LANGUAGE cookie (root layout) so the
+   * first client render matches SSR — no language flash. */
+  initialLanguage?: string;
 }
 
-export function Providers({ children }: ProvidersProps) {
+export function Providers({ children, initialLanguage }: ProvidersProps) {
   const [queryClient] = useState(() => getQueryClient());
-  // Lazy init: one stable i18n instance across renders.
-  const [i18nInstance] = useState(initI18n);
+  // Lazy init: one stable i18n instance across renders, seeded with the SSR locale.
+  const [i18nInstance] = useState(() => initI18n(initialLanguage));
 
   return (
     <QueryClientProvider client={queryClient}>
