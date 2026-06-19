@@ -49,8 +49,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build",
-    "release": "npm publish --access public",
-    "publish:npm": "npm version patch && bun run build && npm publish --access public && git push && git push --tags && gh release create v$(node -p \"require('./package.json').version\") --generate-notes --latest"
+    "publish:npm": "npm version patch && pnpm build && npm publish --access public && git push && git push --tags && gh release create v$(node -p \"require('./package.json').version\") --generate-notes --latest"
   },
   "dependencies": {
     "@clack/prompts": "^1.4.0",
