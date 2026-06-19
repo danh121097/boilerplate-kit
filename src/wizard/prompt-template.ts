@@ -7,7 +7,7 @@ const LABELS: Record<Template, string> = {
   nuxtjs: "NuxtJS · Pinia · TanStack Query · Reka UI",
   reactjs: "ReactJS · TanStack Router · TanStack Query · Zustand · shadcn/ui",
   nextjs: "NextJS · App Router · TanStack Query · Zustand · shadcn/ui",
-  "tanstack-start": "TanStack Start · TanStack Query · Zustand · shadcn/ui",
+  "tanstack-start": "TanStack Start · TanStack Ecosystem · Zustand · shadcn/ui",
   express: "Express · Mongoose · Socket.io · JWT · Redis · Postman",
   nestjs: "NestJS · Mongoose · Socket.io · JWT · Redis · Swagger",
 };
