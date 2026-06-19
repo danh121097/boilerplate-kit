@@ -1,18 +1,37 @@
 # create-prism-app
 
-Scaffold an opinionated starter in seconds. One CLI, a growing collection of curated stacks:
+[![npm version](https://img.shields.io/npm/v/create-prism-app.svg)](https://www.npmjs.com/package/create-prism-app)
+[![license](https://img.shields.io/npm/l/create-prism-app.svg)](./LICENSE)
+[![node](https://img.shields.io/node/v/create-prism-app.svg)](https://nodejs.org)
 
-- **Vue 3** + Vite + Vue Router + Pinia + TanStack Query + Reka UI + Tailwind v4
-- **Nuxt 4** + Pinia + TanStack Query + Reka UI + Tailwind v4
-- **React 19** + Vite + TanStack Router + TanStack Query + Zustand + shadcn/ui + Tailwind v4
-- **Next.js 16** (App Router) + TanStack Query + Zustand + shadcn/ui + Tailwind v4
-- **TanStack Start** + TanStack Ecosystem + Zustand + shadcn/ui + Tailwind v4
-- **Express 5** (backend) + TypeScript + Mongoose + Socket.io + Redis + JWT auth + Postman
-- **NestJS 11** (backend) + TypeScript + Mongoose + Socket.io + Redis + JWT auth + Swagger
+> Scaffold a production-grade, opinionated full-stack starter in seconds — one CLI, a growing collection of curated stacks.
 
-> Status: alpha — phase 01 scaffolding only. CLI surface, template fetch, and the starters land in subsequent phases.
+Every starter ships with sensible defaults, auth flows, typed config, tests, and
+agent-ready docs — wired together so you can `install` and start building instead
+of bikeshedding setup.
 
-## Usage (once published)
+```sh
+npm create prism-app@latest
+```
+
+## Stacks
+
+| Stack | Highlights |
+| ----- | ---------- |
+| **Vue 3** | Vite · Vue Router · Pinia · TanStack Query · Reka UI · Tailwind v4 |
+| **Nuxt 4** | Pinia · TanStack Query · Reka UI · Tailwind v4 |
+| **React 19** | Vite · TanStack Router · TanStack Query · Zustand · shadcn/ui · Tailwind v4 |
+| **Next.js 16** | App Router · TanStack Query · Zustand · shadcn/ui · Tailwind v4 |
+| **TanStack Start** | TanStack Ecosystem · Zustand · shadcn/ui · Tailwind v4 |
+| **Express 5** | TypeScript · Mongoose · Socket.io · Redis · JWT auth · Postman |
+| **NestJS 11** | TypeScript · Mongoose · Socket.io · Redis · JWT auth · Swagger |
+
+Backends share the same security model — RS256 JWT access + refresh rotation
+(reuse-detected), HMAC-signed requests, RBAC, optional Redis, and Socket.io.
+
+## Quick start
+
+Interactive (pick a stack, name, package manager):
 
 ```sh
 npm  create prism-app@latest
@@ -21,66 +40,84 @@ yarn create prism-app
 bun  create prism-app
 ```
 
-Non-interactive:
+Or with `npx`:
 
 ```sh
-npm create prism-app@latest -- --template react --name my-app --pm pnpm --git --install
+npx create-prism-app@latest
 ```
+
+Non-interactive (CI / scripted):
+
+```sh
+npm create prism-app@latest -- \
+  --name my-app --template nestjs --pm pnpm --git --install
+```
+
+## Options
+
+| Flag | Description |
+| ---- | ----------- |
+| `--name <dir>` | Target directory (also the project name) |
+| `--template <id>` | `vuejs` · `nuxtjs` · `reactjs` · `nextjs` · `tanstack-start` · `express` · `nestjs` |
+| `--pm <manager>` | `pnpm` · `bun` · `yarn` · `npm` |
+| `--git` / `--no-git` | Initialize a git repository (default: prompt) |
+| `--install` / `--no-install` | Install dependencies after scaffolding |
+| `--force` | Scaffold into a non-empty directory |
+| `--ref <branch\|tag\|sha>` | Template ref to fetch (default: `latest`) |
+| `--latest` | Bump every dependency to its newest version before install |
+| `--harness` | Install the optional repository-harness durable CLI into the scaffold |
+| `--version` / `--help` | Print version / usage |
+
+Requires **Node.js >= 20**.
+
+## How it works
+
+Templates live in [`templates/`](./templates) and are fetched on demand with
+[`giget`](https://github.com/unjs/giget) from
+`github:danh121097/boilerplate-kit/templates/<name>#latest` — so you always get
+the current starter without installing every stack. After fetching, the CLI
+rewrites `package.json`, optionally runs git init + dependency install, and prints
+next steps.
 
 ## Privacy
 
 Zero telemetry. The CLI does not collect, transmit, or store any usage data.
 
-## Development
+## Contributing a stack
 
-### Quick smoke test
+The collection is designed to grow. A new stack is just a folder under
+`templates/<name>/` plus three small CLI touch-points:
+
+1. Add the starter to `templates/<name>/` (must include `package.json` + `README.md`).
+2. Register the key in `src/types.ts` (`TEMPLATES`) and label it in `src/wizard/prompt-template.ts`.
+3. Update the registry test in `src/__tests__/template-registry.test.ts`.
+
+See an existing backend (`templates/nestjs`) or frontend (`templates/reactjs`)
+for the conventions, then open a PR.
+
+## Development
 
 ```sh
 pnpm install
 pnpm build
 node dist/cli.mjs --version
+pnpm test
 ```
 
-### Local link — run `create-prism-app` from anywhere
+Link the binary to run it from anywhere:
 
 ```sh
-pnpm install
-pnpm build
-npm link              # registers the binary on your PATH (npm's global bin is already in $PATH)
+npm link                       # registers `create-prism-app` on your PATH
 create-prism-app --version
+npm unlink -g create-prism-app # undo
 ```
 
-To unregister later: `npm unlink -g create-prism-app`.
-
-### Scaffolding from local templates (no GitHub round-trip)
-
-When you `npm link` this repo, the CLI **auto-detects** the sibling `templates/`
-directory next to its binary (via `realpath` on the symlinked `dist/cli.mjs`)
-and copies from it. No env vars needed:
-
-```sh
-# from anywhere
-cd /tmp
-create-prism-app my-vue-app --template vuejs --pm pnpm
-cd my-vue-app && pnpm install && pnpm dev
-```
-
-In production (`npm install create-prism-app`) the published package ships only
-`dist/` — no sibling `templates/` exists, so the CLI falls back to giget +
-`github:danh121097/boilerplate-kit/templates/<name>#latest`.
-
-You can force a specific local templates root with **`BOILERPLATE_KIT_LOCAL`**:
-
-```sh
-export BOILERPLATE_KIT_LOCAL=/some/other/templates    # absolute path
-# or
-BOILERPLATE_KIT_LOCAL=1 create-prism-app …            # resolves to ${cwd}/templates
-```
-
-Templates are copied with `node_modules`, `dist`, `.vite`, lockfiles, and the
-auto-generated `auto-imports.d.ts` / `components.d.ts` filtered out — so you can
-safely scaffold even when you've been running install/build inside `templates/<name>/`.
+When linked, the CLI auto-detects the sibling `templates/` directory (via
+`realpath` on `dist/cli.mjs`) and copies locally — no GitHub round-trip. Force a
+specific templates root with `BOILERPLATE_KIT_LOCAL=/abs/path` (or `=1` for
+`$cwd/templates`). Local copies skip `node_modules`, build output, lockfiles,
+keys, and generated typings, so scaffolding stays clean.
 
 ## License
 
-MIT
+[MIT](./LICENSE) © danh121097
