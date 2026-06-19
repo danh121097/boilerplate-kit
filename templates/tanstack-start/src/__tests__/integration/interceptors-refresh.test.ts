@@ -1,4 +1,4 @@
-import { httpError, makeClient, ok } from "../helpers/http-mocks";
+import { httpError, makeClient, ok } from "@/__tests__/helpers/http-mocks";
 import { Api } from "@/services/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { InternalAxiosRequestConfig } from "axios";

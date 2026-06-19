@@ -1,4 +1,4 @@
-import { Input } from "./input";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/utils";
 import { forwardRef, useId } from "react";
 import type { InputHTMLAttributes } from "react";

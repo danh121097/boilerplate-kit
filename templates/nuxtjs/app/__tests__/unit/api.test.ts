@@ -1,4 +1,4 @@
-import { ok } from "../helpers/http-mocks";
+import { ok } from "@/__tests__/helpers/http-mocks";
 import { Api } from "@/services/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { AxiosAdapter, InternalAxiosRequestConfig } from "axios";

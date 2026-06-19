@@ -1,4 +1,4 @@
-import { serverApiPaginate } from "./server-api";
+import { serverApiPaginate } from "@/server/server-api";
 import { usersContract } from "@/services/users/contract";
 import type { PaginatedResponse } from "@/services/core";
 import type { User } from "@/services/users/types/user";

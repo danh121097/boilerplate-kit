@@ -3,8 +3,8 @@ import { readCookie, writeCookie } from "@/utils";
 import { createIsomorphicFn } from "@tanstack/react-start";
 import { getCookie } from "@tanstack/react-start/server";
 import { initReactI18next } from "react-i18next";
-import en from "./locales/en";
-import ja from "./locales/ja";
+import en from "@/i18n/locales/en";
+import ja from "@/i18n/locales/ja";
 import i18next from "i18next";
 
 /**

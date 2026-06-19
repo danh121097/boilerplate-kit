@@ -1,1 +1,1 @@
-export { vTrack } from "./v-track";
+export { vTrack } from "@/directives/v-track";

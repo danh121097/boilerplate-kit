@@ -1,12 +1,12 @@
-import { getApiBaseUrl } from "./api-config";
-import { HMACSignatureGenerator } from "./hmac-signature";
+import { getApiBaseUrl } from "@/services/core/api-config";
+import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import type {
   ApiResponse,
   CursorParams,
   CursorResponse,
   PaginatedResponse,
   PaginationParams,
-} from "./types";
+} from "@/services/core/types";
 
 /**
  * Authenticated GET helpers for the backend (express) — a SEPARATE service, so

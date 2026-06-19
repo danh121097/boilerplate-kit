@@ -1,5 +1,5 @@
-import { queryClient } from "./providers/query-client-provider";
-import { routeTree } from "./routeTree.gen";
+import { queryClient } from "@/providers/query-client-provider";
+import { routeTree } from "@/routeTree.gen";
 import { createRouter } from "@tanstack/react-router";
 
 /**

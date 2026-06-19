@@ -1,13 +1,13 @@
-import { createTokenRefresher } from "./auth-refresh-client";
-import { HeadersUtils } from "./headers-utils";
-import { RefreshTokenManager } from "./refresh-token-manager";
+import { createTokenRefresher } from "@/services/core/auth-refresh-client";
+import { HeadersUtils } from "@/services/core/headers-utils";
+import { RefreshTokenManager } from "@/services/core/refresh-token-manager";
 import type {
   ApiResponseError,
   ApiService,
   HttpInterceptorSetup,
   RefreshOptions,
   ServiceRefreshConfig,
-} from "./types";
+} from "@/services/core/types";
 import type { AxiosError, AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from "axios";
 
 const REFRESH_DEFAULTS: Omit<RefreshOptions, "service"> = {

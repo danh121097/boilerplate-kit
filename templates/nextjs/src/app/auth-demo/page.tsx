@@ -1,4 +1,4 @@
-import { AuthDemoClient } from "./auth-demo-client";
+import { AuthDemoClient } from "@/app/auth-demo/auth-demo-client";
 import { getMeServerData } from "@/server/get-me";
 import { getUsersServerData } from "@/server/get-users";
 

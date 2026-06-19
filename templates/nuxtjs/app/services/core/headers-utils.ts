@@ -1,4 +1,4 @@
-import { HMACSignatureGenerator } from "./hmac-signature";
+import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import type { AxiosRequestHeaders, InternalAxiosRequestConfig } from "axios";
 
 export class HeadersUtils {

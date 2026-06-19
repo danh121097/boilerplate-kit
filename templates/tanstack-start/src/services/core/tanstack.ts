@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ApiResponseError } from "./types";
+import type { ApiResponseError } from "@/services/core/types";
 import type {
   MutationOptions,
   QueryClient,

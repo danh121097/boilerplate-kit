@@ -1,4 +1,4 @@
-import { useMeQuery } from "./auth";
+import { useMeQuery } from "@/services/auth/auth";
 
 export function useAuth() {
   const session = useMeQuery();

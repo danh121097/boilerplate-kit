@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Eye, EyeOff, Search, X } from "lucide-vue-next";
-import type { BaseInputProps, InputType, InputVariant } from "./input.props";
+import type { BaseInputProps, InputType, InputVariant } from "@/components/ui/input.props";
 
 interface Props extends BaseInputProps {
   /** v-model value. */

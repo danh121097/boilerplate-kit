@@ -8,12 +8,12 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from './routes/__root'
-import { Route as UsersRouteImport } from './routes/users'
-import { Route as FormRouteImport } from './routes/form'
-import { Route as CounterRouteImport } from './routes/counter'
-import { Route as AuthDemoRouteImport } from './routes/auth-demo'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as rootRouteImport } from '@/routes/__root'
+import { Route as UsersRouteImport } from '@/routes/users'
+import { Route as FormRouteImport } from '@/routes/form'
+import { Route as CounterRouteImport } from '@/routes/counter'
+import { Route as AuthDemoRouteImport } from '@/routes/auth-demo'
+import { Route as IndexRouteImport } from '@/routes/index'
 
 const UsersRoute = UsersRouteImport.update({
   id: '/users',
@@ -130,7 +130,7 @@ export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
 
-import type { getRouter } from './router.tsx'
+import type { getRouter } from '@/router.tsx'
 import type { createStart } from '@tanstack/react-start'
 declare module '@tanstack/react-start' {
   interface Register {

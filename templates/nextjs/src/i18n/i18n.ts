@@ -1,8 +1,8 @@
 import { STORAGE_KEYS } from "@/enums";
 import { readCookie, writeCookie } from "@/utils";
 import { initReactI18next } from "react-i18next";
-import en from "./locales/en";
-import ja from "./locales/ja";
+import en from "@/i18n/locales/en";
+import ja from "@/i18n/locales/ja";
 import i18next from "i18next";
 
 /** Client fallback: read the saved locale from the LANGUAGE cookie (a Server

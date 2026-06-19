@@ -1,4 +1,4 @@
-import { installLocalStorage } from "../helpers/fake-storage";
+import { installLocalStorage } from "@/__tests__/helpers/fake-storage";
 import { getAccessToken, persistAccessToken } from "@/services/core/auth-token-storage";
 import { RefreshTokenManager } from "@/services/core/refresh-token-manager";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

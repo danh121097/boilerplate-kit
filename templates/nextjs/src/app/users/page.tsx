@@ -1,4 +1,4 @@
-import { UsersListClient } from "./users-list-client";
+import { UsersListClient } from "@/app/users/users-list-client";
 import { getUsersServerData } from "@/server/get-users";
 import { HydratedQueries } from "@/server/hydrated-queries";
 import { queryKeys } from "@/services/query-keys";

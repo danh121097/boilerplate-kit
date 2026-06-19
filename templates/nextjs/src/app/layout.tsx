@@ -1,10 +1,10 @@
-import { Providers } from "./providers";
+import { Providers } from "@/app/providers";
 import { SiteHeader } from "@/components/site-header";
 import { STORAGE_KEYS } from "@/enums";
 import { cookies } from "next/headers";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import "./globals.css";
+import "@/app/globals.css";
 
 export const metadata: Metadata = {
   title: "Next.js Starter",

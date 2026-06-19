@@ -1,4 +1,4 @@
-import { serverApiPaginate } from "./server-api";
+import { serverApiPaginate } from "@/server/server-api";
 import { usersContract } from "@/services/users/contract";
 import { createServerFn } from "@tanstack/react-start";
 import type { PaginatedResponse } from "@/services/core";

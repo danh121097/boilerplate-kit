@@ -1,7 +1,7 @@
-import { usersContract } from "./contract";
+import { usersContract } from "@/services/users/contract";
 import { defineQuery, Model, serverApiPaginate } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
-import type { UpdateUserPayload, User } from "./types/user";
+import type { UpdateUserPayload, User } from "@/services/users/types/user";
 import type { PaginatedResponse } from "@/services/core";
 
 export class UsersModel extends Model {

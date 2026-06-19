@@ -1,7 +1,7 @@
-import { Api } from "./api";
-import { getRefreshToken, persistRefreshToken } from "./auth-token-storage";
-import { HMACSignatureGenerator } from "./hmac-signature";
-import type { ApiService } from "./types";
+import { Api } from "@/services/core/api";
+import { getRefreshToken, persistRefreshToken } from "@/services/core/auth-token-storage";
+import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
+import type { ApiService } from "@/services/core/types";
 import type { InternalAxiosRequestConfig } from "axios";
 import axios from "axios";
 

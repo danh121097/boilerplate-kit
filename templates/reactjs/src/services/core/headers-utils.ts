@@ -1,6 +1,6 @@
-import { getAccessToken } from "./auth-token-storage";
-import { HMACSignatureGenerator } from "./hmac-signature";
-import type { ApiService } from "./types";
+import { getAccessToken } from "@/services/core/auth-token-storage";
+import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
+import type { ApiService } from "@/services/core/types";
 import type { AxiosRequestHeaders, InternalAxiosRequestConfig } from "axios";
 
 export class HeadersUtils {

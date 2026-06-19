@@ -1,5 +1,5 @@
-import { installLocalStorage } from "../helpers/fake-storage";
-import { bearerOf, httpError, makeClient, ok } from "../helpers/http-mocks";
+import { installLocalStorage } from "@/__tests__/helpers/fake-storage";
+import { bearerOf, httpError, makeClient, ok } from "@/__tests__/helpers/http-mocks";
 import { STORAGE_KEYS } from "@/enums";
 import { Api } from "@/services/core";
 import { getAccessToken, getRefreshToken } from "@/services/core/auth-token-storage";

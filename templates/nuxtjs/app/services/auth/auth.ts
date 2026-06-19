@@ -1,7 +1,7 @@
-import { authContract } from "./contract";
+import { authContract } from "@/services/auth/contract";
 import { defineMutation, Model } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
-import type { AuthResult, LoginPayload, RegisterPayload } from "./types/auth";
+import type { AuthResult, LoginPayload, RegisterPayload } from "@/services/auth/types/auth";
 
 export class AuthModel extends Model {
   static {

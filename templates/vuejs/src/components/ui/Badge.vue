@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { badgeVariants } from "./badge.variants";
+import { badgeVariants } from "@/components/ui/badge.variants";
 
 type Variant = "default" | "secondary" | "success" | "warning" | "danger";
 

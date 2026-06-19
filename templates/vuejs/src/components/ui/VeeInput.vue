@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useField } from "vee-validate";
-import type { BaseInputProps } from "./input.props";
+import type { BaseInputProps } from "@/components/ui/input.props";
 
 interface Props extends BaseInputProps {
   /** Field name — must match the form schema key. */

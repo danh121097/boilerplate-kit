@@ -1,5 +1,5 @@
-import { clearServiceTokens, persistAccessToken } from "./auth-token-storage";
-import type { ApiService } from "./types";
+import { clearServiceTokens, persistAccessToken } from "@/services/core/auth-token-storage";
+import type { ApiService } from "@/services/core/types";
 
 /** Performs the network refresh and resolves to a new access token. */
 export type TokenRefresher = () => Promise<string>;

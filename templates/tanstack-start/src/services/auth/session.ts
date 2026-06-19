@@ -1,7 +1,7 @@
 import { getMeServerFn } from "@/server/get-me";
 import { defineQuery } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
-import type { AuthUser } from "./types/auth";
+import type { AuthUser } from "@/services/auth/types/auth";
 
 /**
  * Canonical session query — backed by `getMeServerFn` (resolves on the server

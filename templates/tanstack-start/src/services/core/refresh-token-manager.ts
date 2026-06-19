@@ -1,4 +1,4 @@
-import type { ApiService } from "./types";
+import type { ApiService } from "@/services/core/types";
 
 /** Performs the network refresh. The backend rotates the httpOnly token cookies
  * as a side effect, so the refresher resolves with no value. */

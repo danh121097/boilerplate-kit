@@ -1,2 +1,2 @@
-export * from "./socket-events";
-export * from "./storage-keys";
+export * from "@/enums/socket-events";
+export * from "@/enums/storage-keys";

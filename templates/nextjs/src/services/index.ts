@@ -1,3 +1,3 @@
-export * from "./auth";
-export * from "./users";
-export * from "./core";
+export * from "@/services/auth";
+export * from "@/services/users";
+export * from "@/services/core";

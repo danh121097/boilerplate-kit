@@ -1,7 +1,7 @@
-import { authContract } from "./contract";
+import { authContract } from "@/services/auth/contract";
 import { serverApiGet, defineQuery } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
-import type { AuthUser } from "./types/auth";
+import type { AuthUser } from "@/services/auth/types/auth";
 
 export const useSessionQuery = defineQuery<AuthUser | null>({
   key: queryKeys.auth.me,

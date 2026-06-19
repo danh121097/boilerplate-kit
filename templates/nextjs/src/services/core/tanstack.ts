@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ApiResponseError } from "./types";
+import type { ApiResponseError } from "@/services/core/types";
 import type { MutationOptions, UseMutationOptions, UseQueryOptions } from "@tanstack/react-query";
 
 type QueryDefinitionKey<TParams> = readonly [string] | readonly [string, TParams];

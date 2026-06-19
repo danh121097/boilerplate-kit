@@ -1,6 +1,6 @@
-import { Api } from "./api";
-import { HMACSignatureGenerator } from "./hmac-signature";
-import type { ApiService } from "./types";
+import { Api } from "@/services/core/api";
+import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
+import type { ApiService } from "@/services/core/types";
 import axios from "axios";
 
 /**

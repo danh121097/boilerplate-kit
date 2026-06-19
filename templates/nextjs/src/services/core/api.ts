@@ -6,7 +6,7 @@ import type {
   HttpInterceptorSetup,
   PaginatedResponse,
   ServiceConfig,
-} from "./types";
+} from "@/services/core/types";
 
 /**
  * Shared HTTP API client with multi-service support and injectable interceptors.

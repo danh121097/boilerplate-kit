@@ -1,8 +1,8 @@
-import { authContract } from "./auth/contract";
-import { Api, ApiInterceptors, getApiBaseUrl } from "./core";
-import { registerServiceToken } from "./core/auth-token-storage";
+import { authContract } from "@/services/auth/contract";
+import { Api, ApiInterceptors, getApiBaseUrl } from "@/services/core";
+import { registerServiceToken } from "@/services/core/auth-token-storage";
 import { STORAGE_KEYS } from "@/enums";
-import type { ServiceRefreshConfig, ServiceTokenKeys } from "./core";
+import type { ServiceRefreshConfig, ServiceTokenKeys } from "@/services/core";
 
 /**
  * Declare every backend the app talks to in one place. Each entry wires a

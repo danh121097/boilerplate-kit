@@ -1,5 +1,5 @@
-import { authContract } from "./auth/contract";
-import { usersContract } from "./users/contract";
+import { authContract } from "@/services/auth/contract";
+import { usersContract } from "@/services/users/contract";
 
 /**
  * Central registry of React Query / mutation keys, aggregated from each module's

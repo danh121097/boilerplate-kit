@@ -1,4 +1,4 @@
-import { getServerQueryClient } from "./query-client";
+import { getServerQueryClient } from "@/server/query-client";
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import type { QueryKey } from "@tanstack/react-query";
 import type { ReactNode } from "react";

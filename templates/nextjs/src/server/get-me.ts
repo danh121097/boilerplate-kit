@@ -1,4 +1,4 @@
-import { serverApiGet } from "./server-api";
+import { serverApiGet } from "@/server/server-api";
 import { authContract } from "@/services/auth/contract";
 import type { AuthUser } from "@/services/auth/types/auth";
 

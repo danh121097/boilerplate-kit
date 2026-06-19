@@ -1,4 +1,4 @@
-import { installLocalStorage } from "../helpers/fake-storage";
+import { installLocalStorage } from "@/__tests__/helpers/fake-storage";
 import {
   clearAuthTokens,
   clearServiceTokens,

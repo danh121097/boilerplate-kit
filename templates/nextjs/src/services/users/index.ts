@@ -1,3 +1,3 @@
-export * from "./contract";
-export * from "./users";
-export * from "./types/user";
+export * from "@/services/users/contract";
+export * from "@/services/users/users";
+export * from "@/services/users/types/user";

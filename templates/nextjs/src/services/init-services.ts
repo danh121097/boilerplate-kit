@@ -1,6 +1,6 @@
-import { authContract } from "./auth/contract";
-import { Api, ApiInterceptors, getApiBaseUrl } from "./core";
-import type { ServiceRefreshConfig } from "./core";
+import { authContract } from "@/services/auth/contract";
+import { Api, ApiInterceptors, getApiBaseUrl } from "@/services/core";
+import type { ServiceRefreshConfig } from "@/services/core";
 
 /**
  * Declare every backend the app talks to in one place (base URL + optional
