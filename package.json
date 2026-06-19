@@ -1,6 +1,6 @@
 {
   "name": "create-prism-app",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Scaffold a production-grade, opinionated full-stack starter in seconds — Vue, Nuxt, React, Next.js, TanStack Start, Express, NestJS, and growing.",
   "type": "module",
   "license": "MIT",
