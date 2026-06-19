@@ -1,0 +1,43 @@
+# dependencies
+/node_modules
+
+# build output
+dist/
+/build
+
+# testing
+/coverage
+.nyc_output
+
+# env files — never commit real secrets
+.env*
+!.env.example
+
+# JWT signing keys — never commit the private key
+src/keys/*
+!src/keys/setup.sh
+!src/keys/.gitkeep
+
+# Lock files — the template ships PM-agnostic; commit yours after scaffolding.
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+bun.lock
+bun.lockb
+
+# typescript
+*.tsbuildinfo
+
+# logs
+*-debug.log*
+logs.txt
+
+# misc
+.DS_Store
+*.pem
+
+# repository-harness durable layer (optional, never committed)
+harness.db
+harness.db-*
+scripts/bin/harness-cli
+scripts/bin/harness-cli.exe

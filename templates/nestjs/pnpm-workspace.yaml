@@ -1,0 +1,5 @@
+allowBuilds:
+  '@scarf/scarf': false
+  '@swc/core': true
+  bcrypt: true
+  mongodb-memory-server: true

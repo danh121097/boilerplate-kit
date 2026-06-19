@@ -1,0 +1,45 @@
+# Local dev dependencies (MongoDB + Redis) for the boilerplate.
+# The app itself runs on the host (`pnpm dev`); only the datastores live in
+# containers. Ports map to localhost so the default .env works as-is:
+#   MONGODB_URI=mongodb://localhost:27017/nestjs-starter
+#   REDIS_URL=redis://localhost:6379
+#
+# Usage:
+#   docker compose up -d        # start in background
+#   docker compose ps           # status / health
+#   docker compose down         # stop (keeps data volumes)
+#   docker compose down -v      # stop AND wipe data
+
+services:
+  mongo:
+    image: mongo:latest
+    container_name: nestjs-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:latest
+    container_name: nestjs-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  mongo-data:
+  redis-data:
