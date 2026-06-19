@@ -3,12 +3,13 @@ import { TEMPLATES, type Template } from "../types.js";
 import { select, isCancel } from "@clack/prompts";
 
 const LABELS: Record<Template, string> = {
-  vuejs: "VueJS · Pinia · Reka UI · Tailwind v4",
-  nuxtjs: "NuxtJS · Pinia · Reka UI · Tailwind v4",
-  reactjs: "ReactJS · TanStack Router · shadcn/ui · Tailwind v4",
-  nextjs: "NextJS · App Router · shadcn/ui · Tailwind v4",
-  "tanstack-start": "TanStack Start · shadcn/ui · Tailwind v4",
-  express: "Express · Mongoose · Socket.io · JWT · Redis",
+  vuejs: "VueJS · Pinia · TanStack Query · Reka UI",
+  nuxtjs: "NuxtJS · Pinia · TanStack Query · Reka UI",
+  reactjs: "ReactJS · TanStack Router · TanStack Query · Zustand · shadcn/ui",
+  nextjs: "NextJS · App Router · TanStack Query · Zustand · shadcn/ui",
+  "tanstack-start": "TanStack Start · TanStack Query · Zustand · shadcn/ui",
+  express: "Express · Mongoose · Socket.io · JWT · Redis · Postman",
+  nestjs: "NestJS · Mongoose · Socket.io · JWT · Redis · Swagger",
 };
 
 export async function promptTemplate(): Promise<Template> {

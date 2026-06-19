@@ -20,6 +20,8 @@ const MAX_ATTEMPTS = 2;
 const LOCAL_COPY_EXCLUDE = new Set([
   "node_modules",
   "dist",
+  "coverage",
+  "tsconfig.tsbuildinfo",
   ".vite",
   // Nuxt
   ".nuxt",
@@ -33,6 +35,10 @@ const LOCAL_COPY_EXCLUDE = new Set([
   "bun.lock",
   // Never copy a contributor's local env into a scaffold (.env.example still ships).
   ".env",
+  // Never copy a contributor's locally-generated RSA signing keys into a scaffold.
+  // The backend templates regenerate them on first run (`pnpm keys` / predev).
+  "rsa.private",
+  "rsa.public",
   // Auto-generated typings (unplugin-* / Nuxt)
   "auto-imports.d.ts",
   "components.d.ts",

@@ -5,6 +5,7 @@ export const TEMPLATES = [
   "nextjs",
   "tanstack-start",
   "express",
+  "nestjs",
 ] as const;
 export type Template = (typeof TEMPLATES)[number];
 
