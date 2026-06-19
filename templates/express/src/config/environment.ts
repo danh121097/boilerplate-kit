@@ -1,4 +1,4 @@
-import { loadRsaKeyPair } from "./keys";
+import { loadRsaKeyPair } from "@/config/keys";
 import { EnvironmentConfig } from "@/types";
 import dotenv from "dotenv";
 

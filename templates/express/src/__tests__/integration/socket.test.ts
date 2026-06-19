@@ -1,4 +1,4 @@
-import { signSocketHmac } from "../helpers/hmac-sign";
+import { signSocketHmac } from "@/__tests__/helpers/hmac-sign";
 import { closeSocket, initSocket } from "@/socket";
 import { SOCKET_EVENT } from "@/socket/events";
 import { signAccessToken } from "@/utils/jwt";

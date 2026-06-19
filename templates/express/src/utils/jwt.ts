@@ -40,24 +40,25 @@ export function verifyAccessToken(token: string): JwtPayload {
 }
 
 /**
- * Sign a long-lived refresh token (RS256, 7d default).
- * A random jti is embedded so two tokens for the same user signed within the
- * same second are never byte-identical — required for safe rotation, since the
- * token is hashed and looked up in the DB by that hash.
+ * Sign a long-lived refresh token (HS256, 7d default). HS256 (symmetric) is
+ * appropriate because the refresh token is only ever verified by this auth server
+ * (never sent to third parties). A random jti is embedded so two tokens for the
+ * same user signed within the same second are never byte-identical — required for
+ * safe rotation, since the token is hashed and looked up in the DB by that hash.
  */
 export function signRefreshToken(payload: JwtPayload): string {
   return jwt.sign({ ...payload, token_use: "refresh" }, config.jwtRefreshSecret, {
-    algorithm: "RS256",
+    algorithm: "HS256",
     issuer: TOKEN_ISSUER,
     expiresIn: config.jwtRefreshExpiry as string & jwt.SignOptions["expiresIn"],
     jwtid: crypto.randomUUID(),
   });
 }
 
-/** Verify refresh token; pin RS256 + issuer + token_use=refresh */
+/** Verify refresh token with the symmetric secret; pin HS256 + issuer + token_use=refresh */
 export function verifyRefreshToken(token: string): JwtPayload {
   const decoded = jwt.verify(token, config.jwtRefreshSecret, {
-    algorithms: ["RS256"],
+    algorithms: ["HS256"],
     issuer: TOKEN_ISSUER,
   }) as JwtPayload & { token_use?: TokenUse };
   if (decoded.token_use !== "refresh") {

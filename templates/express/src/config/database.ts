@@ -1,5 +1,5 @@
-import { config } from "./environment";
-import { disconnectRedis } from "./redis";
+import { config } from "@/config/environment";
+import { disconnectRedis } from "@/config/redis";
 import { closeSocket } from "@/socket";
 import { logger } from "@/utils/logger";
 import mongoose from "mongoose";

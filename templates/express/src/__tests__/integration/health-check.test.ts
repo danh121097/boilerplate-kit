@@ -1,4 +1,4 @@
-import { signHmac } from "../helpers/hmac-sign";
+import { signHmac } from "@/__tests__/helpers/hmac-sign";
 import { describe, it, expect } from "vitest";
 import app from "@/app";
 import request from "supertest";

@@ -1,7 +1,7 @@
 import { authenticate } from "@/middleware/auth";
 import { requireMinRole } from "@/middleware/role";
 import type { RouteGroup } from "@/types/routing";
-import * as UserController from "./controller";
+import * as UserController from "@/modules/user/controller";
 
 const userGroup: RouteGroup = {
   prefix: "/users",

@@ -101,8 +101,9 @@ Socket.IO adapter.
   query results.
 - **HMAC** request signing on every API route — see
   [hmac-verification.md](./hmac-verification.md).
-- **Secrets via env** — `HMAC_SECRET`, `JWT_REFRESH_SECRET`, and the RSA key paths
-  are required (`getRequiredEnvVar` throws if missing); never commit them.
+- **Secrets via env** — `HMAC_SECRET`, `JWT_REFRESH_SECRET` (≥32 chars), and the
+  RSA key paths (`JWT_PRIVATE_KEY_PATH`, `JWT_PUBLIC_KEY_PATH`) are required
+  (`getRequiredEnvVar` throws if missing); never commit them.
 
 ## See Also
 

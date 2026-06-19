@@ -1,8 +1,8 @@
-import { socketAuth } from "./auth-middleware";
-import { SOCKET_EVENT } from "./events";
-import { socketHmac } from "./hmac-middleware";
 import { config } from "@/config/environment";
 import { getRedis } from "@/config/redis";
+import { socketAuth } from "@/socket/auth-middleware";
+import { SOCKET_EVENT } from "@/socket/events";
+import { socketHmac } from "@/socket/hmac-middleware";
 import { createAdapter } from "@socket.io/redis-adapter";
 import { Server, type Socket } from "socket.io";
 import type { Server as HttpServer } from "http";

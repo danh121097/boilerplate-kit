@@ -1,4 +1,4 @@
-import { SOCKET_UNAUTHORIZED } from "./events";
+import { SOCKET_UNAUTHORIZED } from "@/socket/events";
 import { DEFAULT_CONTENT_TYPE, SOCKET_HMAC_PATH, verifyHmac } from "@/utils/hmac";
 import type { Socket } from "socket.io";
 

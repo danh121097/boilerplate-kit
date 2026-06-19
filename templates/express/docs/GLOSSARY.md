@@ -145,7 +145,16 @@ cutoff, invalidating still-valid JWTs early. No-op when Redis is off
 
 ## RSA Keys
 
-The asymmetric key pair (private/public) used to sign and verify JWT access
-tokens with RS256. Loaded at startup by `loadRsaKeyPair`; the algorithm is
-pinned to RS256 to prevent `alg` downgrade forgery (`src/config/keys.ts`,
+The asymmetric key pair (private/public) used to sign and verify JWT **access**
+tokens with RS256. Asymmetric so any resource server can verify with the public
+key without holding signing power. Loaded at startup by `loadRsaKeyPair`; the
+algorithm is pinned to RS256 to prevent `alg` downgrade forgery
+(`src/config/keys.ts`, `src/utils/jwt.ts`).
+
+## JWT_REFRESH_SECRET
+
+The symmetric secret (≥32 chars, required) used to sign and verify JWT **refresh**
+tokens with HS256. Symmetric is correct here because refresh tokens are only ever
+verified by this auth server and never handed to third parties; the algorithm is
+pinned to HS256 to prevent `alg` downgrade forgery (`src/config/environment.ts`,
 `src/utils/jwt.ts`).

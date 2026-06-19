@@ -1,4 +1,4 @@
-import { SOCKET_UNAUTHORIZED } from "./events";
+import { SOCKET_UNAUTHORIZED } from "@/socket/events";
 import { JwtPayload } from "@/types/auth";
 import { verifyAccessToken } from "@/utils/jwt";
 import { getUserRevokedAt } from "@/utils/token-revocation";

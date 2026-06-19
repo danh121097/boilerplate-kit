@@ -1,4 +1,4 @@
-import { signHmac, signSocketHmac } from "../helpers/hmac-sign";
+import { signHmac, signSocketHmac } from "@/__tests__/helpers/hmac-sign";
 import { socketHmac } from "@/socket/hmac-middleware";
 import { describe, expect, it, vi } from "vitest";
 import type { Socket } from "socket.io";

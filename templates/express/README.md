@@ -9,7 +9,7 @@ Opinionated Node.js + TypeScript backend built on Express 5. Production-grade st
 | Runtime        | Node.js + TypeScript (dev/run via [Bun](https://bun.sh), Node-compatible) |
 | Framework      | Express 5                                                              |
 | Database       | MongoDB via Mongoose                                                   |
-| Auth           | JWT access tokens (RS256, file keys) + refresh tokens (httpOnly cookie) |
+| Auth           | JWT access tokens (RS256, file keys) + refresh tokens (HS256 symmetric secret, httpOnly cookie) |
 | API signing    | Optional HMAC request signing (`src/middleware/hmac.ts`)              |
 | Realtime       | Socket.io (+ optional `@socket.io/redis-adapter`)                     |
 | Cache / limits | Redis (optional) — distributed rate-limit, cache, token revocation     |
@@ -46,8 +46,8 @@ All variables are documented in [`.env.example`](.env.example). Key ones:
 | `MONGODB_URI`           | MongoDB connection string                                  |
 | `API_PREFIX`            | Base path all routes mount under (default `/api/v1`)       |
 | `CORS_ORIGIN`           | Allowed CORS origin                                        |
-| `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH` | RS256 key file paths                    |
-| `JWT_REFRESH_SECRET`    | Secret for refresh tokens (min 32 chars)                   |
+| `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH` | RS256 key file paths (access) |
+| `JWT_REFRESH_SECRET`    | HS256 symmetric secret for refresh tokens (≥32 chars, required) |
 | `JWT_ACCESS_EXPIRY` / `JWT_REFRESH_EXPIRY` | Token lifetimes                         |
 | `HMAC_SECRET`           | Secret for HMAC request signing                            |
 | `REDIS_ENABLED` / `REDIS_URL` | Toggle + connection for Redis features               |

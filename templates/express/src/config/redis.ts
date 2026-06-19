@@ -1,4 +1,4 @@
-import { config } from "./environment";
+import { config } from "@/config/environment";
 import { logger } from "@/utils/logger";
 import Redis from "ioredis";
 

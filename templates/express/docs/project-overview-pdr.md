@@ -18,7 +18,7 @@ limiting, and an optional Redis tier — all behind a declarative module pattern
 | Realtime | Socket.IO 4 (`src/socket/*`) |
 | Optional cache/state | Redis via ioredis (`src/config/redis.ts`) |
 | Validation | Zod 4 (`src/modules/*/validation.ts`) |
-| Auth | JWT (RS256 access, HS256 refresh) + bcrypt + httpOnly cookies |
+| Auth | JWT (RS256 access + HS256 refresh) + bcrypt + httpOnly cookies |
 | Package manager | bun (scripts call `bun`) |
 | Tests | Vitest + supertest + `mongodb-memory-server` |
 
@@ -26,7 +26,8 @@ limiting, and an optional Redis tier — all behind a declarative module pattern
 
 - **Access token** — RS256 JWT (private/public RSA keypair), 15min default,
   `token_use: "access"`. Sent via `Authorization: Bearer` or `accessToken` cookie.
-- **Refresh token** — HS256 JWT, 7d default, `token_use: "refresh"`, random `jti`.
+- **Refresh token** — HS256 JWT signed with symmetric secret `JWT_REFRESH_SECRET`, 7d default,
+  `token_use: "refresh"`, random `jti`.
   Stored SHA-256-hashed in MongoDB; rotated on every `/auth/refresh` (old revoked,
   new issued). Delivered as an httpOnly cookie scoped to `{API_PREFIX}/auth`.
 - **Revocation** — logout / ban records a per-user "revoked at" timestamp in Redis;
@@ -67,8 +68,10 @@ bun run postman:generate  # bun scripts/postman/sync.ts
 `JWT_ACCESS_EXPIRY`, `JWT_REFRESH_EXPIRY`, `HMAC_SECRET`, `REDIS_ENABLED`,
 `REDIS_URL`, `POSTMAN_API_KEY`, `POSTMAN_COLLECTION_UID`.
 
-`MONGODB_URI`, `JWT_REFRESH_SECRET` and `HMAC_SECRET` are **required** — boot
-throws if missing (`src/config/environment.ts`). Redis vars are optional.
+`MONGODB_URI`, `HMAC_SECRET`, `JWT_REFRESH_SECRET` (symmetric secret, min 32
+chars), and the RSA key paths (`JWT_PRIVATE_KEY_PATH`, `JWT_PUBLIC_KEY_PATH`) are
+**required** — boot throws if missing (`src/config/environment.ts`). Redis vars
+are optional.
 
 ## Constraints
 

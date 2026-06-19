@@ -13,7 +13,7 @@ to a focused page under [`system-architecture/`](./system-architecture/).
 | HTTP framework | Express 5 |
 | Data store | MongoDB via Mongoose |
 | Access tokens | JWT **RS256** (RSA keypair), 15 min default |
-| Refresh tokens | JWT **HS256** secret, 7 day default, httpOnly cookie, DB-tracked + rotated |
+| Refresh tokens | JWT **HS256** (symmetric secret), 7 day default, httpOnly cookie, DB-tracked + rotated |
 | Request integrity | HMAC-SHA256 signature on every API route (and socket handshake) |
 | Realtime | Socket.IO (HMAC + JWT gated handshake) |
 | Optional cache / scale | Redis (rate-limit store, token revocation, cache, socket adapter) |

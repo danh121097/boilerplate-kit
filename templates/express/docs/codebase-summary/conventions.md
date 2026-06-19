@@ -79,7 +79,7 @@ the group as `const x: RouteGroup = { ... }` so the compiler checks every route.
 
 Never read `process.env` outside `src/config/environment.ts`. That file calls
 `dotenv.config()` once, validates required vars (`getRequiredEnvVar` throws on
-missing `MONGODB_URI` / `JWT_REFRESH_SECRET` / `HMAC_SECRET`), and exports a
+missing `MONGODB_URI` / `HMAC_SECRET` / RSA key paths), and exports a
 typed `config: EnvironmentConfig`. Everywhere else:
 
 ```ts
@@ -91,10 +91,11 @@ app.use(config.apiPrefix, routes);
 Booleans `isProduction` / `isDevelopment` / `isTest` are derived from `NODE_ENV`
 — branch on those, not raw strings.
 
-## RSA Keys
+## Token Signing Keys
 
-Access tokens are RS256-signed with an RSA keypair loaded by
-`src/config/keys.ts` → `loadRsaKeyPair()`:
+**Access** tokens are RS256-signed with the RSA keypair loaded by
+`src/config/keys.ts` → `loadRsaKeyPair()` — asymmetric so resource servers can
+verify with the public key without holding signing power:
 
 - Reads PEM files from `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH`, then runs a
   sign/verify **self-test** so a mismatched pair fails at boot, not at runtime.
@@ -103,9 +104,12 @@ Access tokens are RS256-signed with an RSA keypair loaded by
 - Generate real keys with `src/keys/setup.sh` (the `predev` script does this
   automatically if `rsa.private` is absent). Keep `rsa.private` out of git.
 
-Refresh tokens use HS256 with `JWT_REFRESH_SECRET` (symmetric) — different
-algorithm + a `token_use` claim mean a refresh token can never pass access
-verification.
+**Refresh** tokens are HS256-signed with the symmetric secret `JWT_REFRESH_SECRET`
+(≥32 chars, required). Symmetric is the right tool because refresh tokens are
+only ever verified by this auth server — never sent to third parties. They differ
+from access tokens by the `token_use` claim, expiry, and that they are DB-tracked,
+httpOnly-cookie-delivered, rotated, and reuse-detected. The `token_use` claim
+means a refresh token can never pass access verification.
 
 ## Optional-Tier Pattern
 

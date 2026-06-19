@@ -12,16 +12,27 @@ tokens delivered as httpOnly cookies. Source:
 
 | | Access token | Refresh token |
 | --- | --- | --- |
-| Algorithm | **RS256** (RSA private/public keypair) | **HS256** (shared secret) |
+| Algorithm | **RS256** (RSA private/public keypair) | **HS256** (symmetric secret) |
 | Lifetime | `JWT_ACCESS_EXPIRY` (default `15m`) | `JWT_REFRESH_EXPIRY` (default `7d`) |
 | Sent as | `Authorization: Bearer` **or** `accessToken` cookie | `refreshToken` httpOnly cookie |
 | Stored server-side | no | yes — SHA-256 hash in `RefreshToken` collection |
 | `token_use` claim | `access` | `refresh` |
 | `iss` (issuer) claim | primary CORS origin | primary CORS origin |
 
-The two algorithms, the `token_use` claim, and the `iss` (issuer) claim are
-defense in depth: a refresh token can never satisfy access verification, and a
-token minted for another origin/deployment is rejected. Issuer is a single
+Access tokens use **RS256** (asymmetric): signed with the RSA private key and
+verifiable by any party holding the public key — the right tool when a token may
+be checked by many resource servers. Refresh tokens use **HS256** (symmetric),
+signed with `JWT_REFRESH_SECRET`, because they are **only ever verified by this
+auth server** and never handed to third parties; a symmetric secret is the
+correct, simpler choice there. This is an intentional separation of concerns, not
+an inconsistency. Refresh validity is established primarily by the DB hash lookup
+(`isRevoked` + `expiresAt`) on the hot path — the HS256 signature is a secondary
+check. The two types also differ by the `token_use` claim, expiry, and that
+refresh tokens are DB-tracked, delivered in an httpOnly cookie, rotated, and
+reuse-detected. The `token_use` claim and the `iss` (issuer) claim are defense in
+depth: a refresh token can never satisfy access verification, and a token minted
+for another origin/deployment is rejected.
+Issuer is a single
 canonical value (`TOKEN_ISSUER` = the primary CORS origin); when no origin is
 configured it is `undefined`, which disables the check on BOTH sign and verify
 (jsonwebtoken skips an undefined issuer) so local/dev setups keep working.
@@ -50,16 +61,20 @@ export function signRefreshToken(payload: JwtPayload): string {
 }
 ```
 
-`verifyAccessToken` / `verifyRefreshToken` pin the algorithm (`algorithms:
-['RS256' | 'HS256']`), enforce the `issuer`, and assert the matching `token_use` —
-throwing otherwise. Verification order: signature → algorithm → issuer → `token_use`.
+`verifyAccessToken` pins `algorithms: ['RS256']` and verifies against
+`config.jwtAccessPublicKey`; `verifyRefreshToken` pins `algorithms: ['HS256']`
+and verifies against `config.jwtRefreshSecret`. Both enforce the `issuer` and
+assert the matching `token_use` — throwing otherwise. Verification order:
+signature → algorithm → issuer → `token_use`.
 
 The RSA keypair is loaded at startup by [`config/keys.ts`](../../src/config/keys.ts):
 it reads `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH`, runs a sign/verify
 self-test, and only `test`/`development` may fall back to an ephemeral in-memory
 keypair — any other env throws (fail-closed, never forge tokens silently). The
-`JwtPayload` carries `{ userId, email, role }` only — never `exp`/`iat` (owned by
-`expiresIn`).
+keypair signs and verifies **access** tokens. Refresh tokens are signed and
+verified with `JWT_REFRESH_SECRET` — a symmetric secret (≥32 chars, required).
+The `JwtPayload` carries `{ userId, email, role }` only — never `exp`/`iat`
+(owned by `expiresIn`).
 
 ## RefreshToken Model
 

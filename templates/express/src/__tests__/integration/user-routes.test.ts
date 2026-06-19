@@ -1,5 +1,5 @@
-import { createTestUser } from "../helpers/create-test-user";
-import { signHmac } from "../helpers/hmac-sign";
+import { createTestUser } from "@/__tests__/helpers/create-test-user";
+import { signHmac } from "@/__tests__/helpers/hmac-sign";
 import { User } from "@/models/user";
 import { describe, it, expect } from "vitest";
 import app from "@/app";

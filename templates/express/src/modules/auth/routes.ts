@@ -1,8 +1,8 @@
-import { loginSchema, registerSchema, validate } from "./validation";
+import { loginSchema, registerSchema, validate } from "@/modules/auth/validation";
 import { authenticate } from "@/middleware/auth";
 import { authRateLimiter, loginRateLimiter } from "@/middleware/rate-limit";
 import type { RouteGroup } from "@/types/routing";
-import * as AuthController from "./controller";
+import * as AuthController from "@/modules/auth/controller";
 
 const authGroup: RouteGroup = {
   prefix: "/auth",

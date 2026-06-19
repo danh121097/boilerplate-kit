@@ -121,7 +121,8 @@ jwt.verify(token, config.jwtAccessPublicKey, { algorithms: ['RS256'] });
 ```
 
 `environment.ts` loads `.env`, validates required vars via `getRequiredEnvVar`
-(throws on missing `MONGODB_URI`, `JWT_REFRESH_SECRET`, `HMAC_SECRET`), applies
+(throws on missing `MONGODB_URI`, `HMAC_SECRET`, `JWT_REFRESH_SECRET`, RSA key
+paths), applies
 defaults for the rest, and exposes everything through the `EnvironmentConfig`
 type. Optional features (Redis) are read without `getRequiredEnvVar` so the app
 boots when they are off.
