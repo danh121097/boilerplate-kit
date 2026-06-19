@@ -2,13 +2,13 @@ import { DEFAULT_REF, TEMPLATES, getSource } from "../fetcher/template-registry.
 import { describe, expect, it } from "vitest";
 
 describe("template-registry", () => {
-  it("default ref is 'latest'", () => {
-    expect(DEFAULT_REF).toBe("latest");
+  it("default ref is 'master'", () => {
+    expect(DEFAULT_REF).toBe("master");
   });
 
   it("renders the expected giget spec for every template at the default ref", () => {
     for (const t of TEMPLATES) {
-      expect(getSource(t)).toBe(`github:danh121097/boilerplate-kit/templates/${t}#latest`);
+      expect(getSource(t)).toBe(`github:danh121097/boilerplate-kit/templates/${t}#master`);
     }
   });
 

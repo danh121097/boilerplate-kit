@@ -1,7 +1,7 @@
 {
   "name": "create-prism-app",
-  "version": "0.0.0",
-  "description": "Scaffold an opinionated frontend starter (Vue, Nuxt, React, Next.js, or TanStack Start) in seconds.",
+  "version": "1.0.0",
+  "description": "Scaffold a production-grade, opinionated full-stack starter in seconds — Vue, Nuxt, React, Next.js, TanStack Start, Express, NestJS, and growing.",
   "type": "module",
   "license": "MIT",
   "author": "danh121097@gmail.com",
@@ -48,7 +48,11 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "prepublishOnly": "pnpm build"
+    "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build",
+    "release": "pnpm publish --access public",
+    "release:patch": "pnpm version patch && git push --follow-tags",
+    "release:minor": "pnpm version minor && git push --follow-tags",
+    "release:major": "pnpm version major && git push --follow-tags"
   },
   "dependencies": {
     "@clack/prompts": "^1.4.0",
