@@ -1,8 +1,8 @@
-import { HmacService, DEFAULT_CONTENT_TYPE, SOCKET_HMAC_PATH } from "@/common/hmac.service";
-import { TokenRevocationService } from "@/common/token-revocation.service";
-import { TokenService } from "@/common/token.service";
+import { HmacService, DEFAULT_CONTENT_TYPE, SOCKET_HMAC_PATH } from "@/common/services/hmac.service";
+import { TokenRevocationService } from "@/common/services/token-revocation.service";
+import { TokenService } from "@/common/services/token.service";
 import { JwtPayload } from "@/common/types/auth.types";
-import { SOCKET_EVENT, SOCKET_UNAUTHORIZED } from "@/realtime/events";
+import { SOCKET_EVENT, SOCKET_UNAUTHORIZED } from "@/modules/realtime/events";
 import { Injectable } from "@nestjs/common";
 import {
   OnGatewayConnection,

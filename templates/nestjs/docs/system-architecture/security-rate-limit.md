@@ -96,7 +96,7 @@ const storage = client ? new ThrottlerStorageRedisService(client) : undefined;
 
 [`redis/redis.service.ts`](../../src/redis/redis.service.ts) wraps a single shared
 ioredis client (from the `@Global` `RedisModule`) used by the throttler store,
-the cache helper (`src/common/cache.service.ts`), token revocation, and the
+the cache helper (`src/common/services/cache.service.ts`), token revocation, and the
 socket adapter. It is intentionally optional:
 
 - Disabled unless `REDIS_ENABLED=true`; otherwise `getClient()` returns `null`
@@ -113,7 +113,7 @@ cross-instance Socket.IO adapter.
 ## Other Hardening
 
 - **Password strength** — `PasswordService.validatePasswordStrength`
-  (`src/common/password.service.ts`) requires ≥8 chars with lowercase, uppercase,
+  (`src/modules/auth/password.service.ts`) requires ≥8 chars with lowercase, uppercase,
   digit, and special char on register.
 - **bcrypt** (cost 12) for password storage; `select: false` keeps the hash out
   of query results.

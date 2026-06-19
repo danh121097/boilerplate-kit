@@ -1,8 +1,8 @@
 import { AppException } from "@/common/exceptions/app.exception";
-import { PasswordService } from "@/common/password.service";
-import { TokenRevocationService } from "@/common/token-revocation.service";
-import { TokenService } from "@/common/token.service";
+import { TokenRevocationService } from "@/common/services/token-revocation.service";
+import { TokenService } from "@/common/services/token.service";
 import { AuthTokens, JwtPayload, Role } from "@/common/types/auth.types";
+import { PasswordService } from "@/modules/auth/password.service";
 import { RefreshToken, RefreshTokenDocument } from "@/schemas/refresh-token.schema";
 import { User, UserDocument } from "@/schemas/user.schema";
 import { Injectable } from "@nestjs/common";

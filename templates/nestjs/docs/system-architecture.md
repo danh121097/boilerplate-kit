@@ -58,7 +58,7 @@ close Mongo, Redis, and the WS server gracefully.
   revocation, socket adapter) degrades to a safe no-op when Redis is off and
   fails open on Redis errors — an outage never locks users out or 500s a route.
 - **HMAC contract is shared with the frontend.** The canonical string and
-  Base64-HMAC-SHA256 encoding in `src/common/hmac.service.ts` MUST byte-match the
+  Base64-HMAC-SHA256 encoding in `src/common/services/hmac.service.ts` MUST byte-match the
   client signer (`templates/vuejs` / `templates/nuxtjs`
   `src/services/core/hmac-signature.ts`). See
   [hmac-verification.md](./system-architecture/hmac-verification.md).

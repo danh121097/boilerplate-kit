@@ -71,7 +71,7 @@ envelope (`NOT_FOUND`). See
 
 ## Pagination
 
-List endpoints use the reusable helpers in `src/common/pagination.util.ts`. Two
+List endpoints use the reusable helpers in `src/common/utils/pagination.util.ts`. Two
 equal strategies — pick per list; both keep the `{ status, data }` envelope and
 add a sibling `meta`.
 

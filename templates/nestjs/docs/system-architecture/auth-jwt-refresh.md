@@ -2,12 +2,12 @@
 
 Token-based auth with short-lived access tokens and rotating, DB-tracked refresh
 tokens delivered as httpOnly cookies, with reuse detection. Source:
-[`common/token.service.ts`](../../src/common/token.service.ts),
-[`common/cookie.util.ts`](../../src/common/cookie.util.ts),
+[`common/services/token.service.ts`](../../src/common/services/token.service.ts),
+[`modules/auth/cookie.util.ts`](../../src/modules/auth/cookie.util.ts),
 [`schemas/refresh-token.schema.ts`](../../src/schemas/refresh-token.schema.ts),
 [`modules/auth/auth.service.ts`](../../src/modules/auth/auth.service.ts),
 [`common/guards/security.guard.ts`](../../src/common/guards/security.guard.ts),
-[`common/token-revocation.service.ts`](../../src/common/token-revocation.service.ts).
+[`common/services/token-revocation.service.ts`](../../src/common/services/token-revocation.service.ts).
 
 ## Two Token Types
 
@@ -37,7 +37,7 @@ CORS origin; when no origin is configured it is `undefined`, which disables the
 check on BOTH sign and verify so local/dev setups keep working.
 
 ```ts
-// common/token.service.ts
+// common/services/token.service.ts
 signAccessToken(payload: JwtPayload): string {
   return jwt.sign({ ...payload, token_use: "access" }, this.config.jwtAccessPrivateKey, {
     algorithm: "RS256", issuer: this.issuer, expiresIn: this.config.jwtAccessExpiry,
@@ -92,7 +92,7 @@ expired documents.
 
 ## Cookies
 
-[`common/cookie.util.ts`](../../src/common/cookie.util.ts) sets both tokens as
+[`modules/auth/cookie.util.ts`](../../src/modules/auth/cookie.util.ts) sets both tokens as
 httpOnly cookies:
 
 ```ts
@@ -174,7 +174,7 @@ protects every non-`@Public` route:
 
 Access tokens are short-lived and can't be individually unsigned, so logout /
 refresh-reuse records a per-user "revoked at" epoch in Redis
-([`token-revocation.service.ts`](../../src/common/token-revocation.service.ts)).
+([`token-revocation.service.ts`](../../src/common/services/token-revocation.service.ts)).
 Any access token with `iat < revokedAt` is rejected by the guard's JWT step and
 the socket auth gate. The key auto-expires after one access-token lifetime
 (`accessTtlSeconds()`). When Redis is disabled, `revokeUserTokens` and

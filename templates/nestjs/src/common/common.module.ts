@@ -1,13 +1,12 @@
-import { CacheService } from "@/common/cache.service";
 import { AppException } from "@/common/exceptions/app.exception";
 import { HttpExceptionFilter } from "@/common/filters/http-exception.filter";
-import { HmacService } from "@/common/hmac.service";
 import { AppLogger } from "@/common/logger/app-logger.service";
 import { LoggerMiddleware } from "@/common/middleware/logger.middleware";
-import { PasswordService } from "@/common/password.service";
 import { ZodValidationPipe } from "@/common/pipes/zod-validation.pipe";
-import { TokenRevocationService } from "@/common/token-revocation.service";
-import { TokenService } from "@/common/token.service";
+import { CacheService } from "@/common/services/cache.service";
+import { HmacService } from "@/common/services/hmac.service";
+import { TokenRevocationService } from "@/common/services/token-revocation.service";
+import { TokenService } from "@/common/services/token.service";
 import { RefreshToken, RefreshTokenSchema } from "@/schemas/refresh-token.schema";
 import { User, UserSchema } from "@/schemas/user.schema";
 import { Global, MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
@@ -37,7 +36,6 @@ import { MongooseModule } from "@nestjs/mongoose";
   providers: [
     AppLogger,
     TokenService,
-    PasswordService,
     TokenRevocationService,
     CacheService,
     HmacService,
@@ -56,7 +54,6 @@ import { MongooseModule } from "@nestjs/mongoose";
     MongooseModule,
     AppLogger,
     TokenService,
-    PasswordService,
     TokenRevocationService,
     CacheService,
     HmacService,

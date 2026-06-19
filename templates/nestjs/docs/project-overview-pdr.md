@@ -16,7 +16,7 @@ module / controller / service / provider model with a single composite
 | Runtime / language | Node.js, TypeScript 5 (strict, `target` ES2022, `module` commonjs, decorators on) |
 | Framework | NestJS 11 (`@nestjs/platform-express`) |
 | Database | MongoDB via `@nestjs/mongoose` (`src/database/*`, `src/schemas/*`) |
-| Realtime | Socket.IO 4 via `@nestjs/websockets` / `@nestjs/platform-socket.io` (`src/realtime/*`) |
+| Realtime | Socket.IO 4 via `@nestjs/websockets` / `@nestjs/platform-socket.io` (`src/modules/realtime/*`) |
 | Optional cache/state | Redis via ioredis (`src/redis/*`) |
 | Validation | Zod 4 + `nestjs-zod` DTOs (`createZodDto`) + global `ZodValidationPipe` |
 | Auth | JWT (RS256 access + HS256 refresh) + bcrypt + httpOnly cookies |
@@ -54,14 +54,14 @@ handshake) must carry `sig` + `ctime` headers. The HMAC step of `SecurityGuard`
 recomputes an HMAC-SHA256 over `[method, contentType, ctime, path, ""].join("\n")`
 and compares in constant time; timestamps older than 5 minutes are rejected
 (replay protection). The signed `path` is derived by stripping the global API
-prefix from `req.originalUrl` (`derivePath`). See `src/common/hmac.service.ts`
+prefix from `req.originalUrl` (`derivePath`). See `src/common/services/hmac.service.ts`
 and `src/common/guards/security.guard.ts`.
 
 ## Optional Redis Tier
 
 `REDIS_ENABLED=false` runs the app fully without Redis. Turning it on activates
 features that each fail open / no-op when off: distributed throttler storage, the
-`cache` helper (`src/common/cache.service.ts`), access-token revocation, and the
+`cache` helper (`src/common/services/cache.service.ts`), access-token revocation, and the
 cross-instance Socket.IO adapter (`RedisIoAdapter`).
 
 ## Scripts (`package.json`)

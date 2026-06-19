@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 
 import { AppException } from "@/common/exceptions/app.exception";
-import { PasswordService } from "@/common/password.service";
+import { PasswordService } from "@/modules/auth/password.service";
 
 const svc = new PasswordService();
 

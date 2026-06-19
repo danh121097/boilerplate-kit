@@ -1,6 +1,6 @@
 import { AppException } from "@/common/exceptions/app.exception";
-import { buildOffsetMeta, parseOffsetPagination } from "@/common/pagination.util";
 import { OffsetMeta } from "@/common/types/pagination.types";
+import { buildOffsetMeta, parseOffsetPagination } from "@/common/utils/pagination.util";
 import { User, UserDocument } from "@/schemas/user.schema";
 import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";

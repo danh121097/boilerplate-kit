@@ -12,7 +12,7 @@ import {
   buildOffsetMeta,
   parseCursorPagination,
   parseOffsetPagination,
-} from "@/common/pagination.util";
+} from "@/common/utils/pagination.util";
 
 describe("parseOffsetPagination", () => {
   describe("page clamping", () => {

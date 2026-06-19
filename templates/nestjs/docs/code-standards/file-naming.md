@@ -11,7 +11,7 @@ purpose at a glance.
 ```
 src/common/guards/security.guard.ts
 src/common/filters/http-exception.filter.ts
-src/common/token-revocation.service.ts
+src/common/services/token-revocation.service.ts
 src/config/app-config.service.ts
 src/modules/auth/auth.controller.ts
 ```
@@ -42,7 +42,7 @@ modules.
 
 Aim for **≤ ~200 LOC** per file. Split before a file gets large:
 
-- Extract helpers into `src/common/*.util.ts` or a dedicated provider.
+- Extract helpers into `src/common/utils/*.util.ts` or a dedicated provider.
 - Extract shared types into `src/common/types/`.
 - Break a fat service into smaller methods or a second provider/module.
 

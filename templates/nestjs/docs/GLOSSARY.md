@@ -109,7 +109,7 @@ Mirrors the four concerns an Express middleware chain would handle.
 The exact byte string both client and server sign for request integrity:
 `[METHOD, contentType, ctime, path, ""].join("\n")` (trailing empty element
 yields a final newline). Signed HMAC-SHA256, Base64-encoded. Defined in
-`HmacService` (`src/common/hmac.service.ts`); enforced for **every** request by
+`HmacService` (`src/common/services/hmac.service.ts`); enforced for **every** request by
 the HMAC step of `SecurityGuard`.
 
 ## Path Derivation
@@ -132,7 +132,7 @@ login (`src/modules/auth/auth.service.ts`).
 
 A cookie inaccessible to JavaScript (`document.cookie`), set with the `HttpOnly`
 flag. Used for `accessToken` and `refreshToken` so XSS cannot read them
-(`src/common/cookie.util.ts`).
+(`src/modules/auth/cookie.util.ts`).
 
 ## AppException
 
@@ -174,7 +174,7 @@ the HMAC step both account for it (HMAC via `derivePath`).
 A user-level cutoff timestamp (stored in Redis when enabled) recorded on
 logout / refresh-reuse. The JWT step of `SecurityGuard` rejects any access token
 whose `iat` predates the cutoff, invalidating still-valid JWTs early. No-op and
-fail-open when Redis is off (`src/common/token-revocation.service.ts`).
+fail-open when Redis is off (`src/common/services/token-revocation.service.ts`).
 
 ## RSA Keys
 
@@ -182,7 +182,7 @@ The asymmetric key pair (private/public) used to sign and verify JWT **access**
 tokens with RS256 — the private key signs, the distributable public key verifies.
 Loaded + self-tested at startup by `AppConfigService` (`src/config/keys.ts`); the
 algorithm is pinned to RS256 to prevent `alg` downgrade forgery
-(`src/common/token.service.ts`). Generate keys with `pnpm keys` (portable Node
+(`src/common/services/token.service.ts`). Generate keys with `pnpm keys` (portable Node
 script) or `src/keys/setup.sh` (openssl).
 
 ## JWT_REFRESH_SECRET
@@ -192,11 +192,11 @@ The symmetric secret (≥ 32 chars, required at boot) used to sign and verify JW
 tokens are only ever verified by this auth server — never handed to a third
 party. The algorithm is pinned to HS256 to prevent `alg` downgrade forgery. The
 `token_use` claim ("access" vs "refresh") means a refresh token can never pass
-access verification (`src/common/token.service.ts`).
+access verification (`src/common/services/token.service.ts`).
 
 ## RedisIoAdapter
 
-A custom Socket.IO adapter (`src/realtime/redis-io.adapter.ts`) installed in
+A custom Socket.IO adapter (`src/modules/realtime/redis-io.adapter.ts`) installed in
 `main.ts` only when `REDIS_ENABLED=true`. It wires the
 `@socket.io/redis-adapter` pub/sub so emits reach clients across instances. The
 shared pub client is owned by `RedisModule`; the adapter duplicates it for the

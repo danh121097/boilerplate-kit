@@ -3,7 +3,7 @@
 Every route (and the Socket.IO handshake) is gated by an HMAC-SHA256 signature so
 the server can verify a request came from a client holding the shared secret and
 was not replayed. Source:
-[`common/hmac.service.ts`](../../src/common/hmac.service.ts),
+[`common/services/hmac.service.ts`](../../src/common/services/hmac.service.ts),
 [`common/guards/security.guard.ts`](../../src/common/guards/security.guard.ts).
 
 ## The Canonical String
@@ -12,7 +12,7 @@ Client and server both build the **exact same** string and sign it. The trailing
 empty element produces a final newline — it MUST be present:
 
 ```ts
-// common/hmac.service.ts
+// common/services/hmac.service.ts
 [method.toUpperCase(), contentType, String(ctime), path, ""].join("\n")
 ```
 
@@ -77,7 +77,7 @@ So the signed `path` equals what the client signs (its base-relative path with n
 
 ## `verifyHmac` Checks
 
-[`hmac.service.ts`](../../src/common/hmac.service.ts) returns `null` when valid,
+[`hmac.service.ts`](../../src/common/services/hmac.service.ts) returns `null` when valid,
 else a short reason string:
 
 1. **Missing signature** → `'missing signature'`.

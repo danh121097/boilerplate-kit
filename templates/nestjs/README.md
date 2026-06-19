@@ -112,12 +112,14 @@ src/
 ├── main.ts             # Bootstrap: middleware, global prefix, CORS, Swagger, WS adapter
 ├── app.module.ts       # Root module: wires every feature module + global guards
 ├── config/             # ConfigModule + Zod env schema + AppConfigService + key loader
-├── common/             # @Global: SecurityGuard, services, pipe, filter, decorators, throttler
+├── common/             # @Global: SecurityGuard, services/, utils/, pipe, filter, decorators, throttler/, swagger/
 ├── database/           # MongooseModule.forRootAsync
 ├── schemas/            # Mongoose @Schema classes (user, refresh-token)
-├── modules/            # feature modules (auth, user): controller/service/(dto)/module
-├── realtime/           # @WebSocketGateway + RedisIoAdapter + emit helpers
-├── health/             # GET /health
+├── modules/            # feature modules (auth, user, health, realtime): controller/service/(dto)/module
+│   ├── auth/           # + password.service + cookie.util (auth-domain helpers)
+│   ├── user/
+│   ├── health/         # GET /health
+│   └── realtime/       # @WebSocketGateway + RedisIoAdapter + emit helpers
 ├── redis/              # @Global shared ioredis client (optional)
 └── keys/               # setup.sh + generated RSA keys (gitignored)
 

@@ -13,10 +13,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AppConfigService } from "@/config/app-config.service";
 import { AppLogger } from "@/common/logger/app-logger.service";
-import { CacheService } from "@/common/cache.service";
+import { CacheService } from "@/common/services/cache.service";
 import { ConfigService } from "@nestjs/config";
 import { RedisService } from "@/redis/redis.service";
-import { TokenRevocationService } from "@/common/token-revocation.service";
+import { TokenRevocationService } from "@/common/services/token-revocation.service";
 import type { EnvVars } from "@/config/env.schema";
 
 // ── Stubs ──────────────────────────────────────────────────────────────────

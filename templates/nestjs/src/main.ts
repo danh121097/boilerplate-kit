@@ -1,7 +1,7 @@
 import { AppModule } from "@/app.module";
-import { buildHmacBootstrapJs, hmacRequestInterceptor } from "@/common/swagger-hmac-interceptor";
+import { buildHmacBootstrapJs, hmacRequestInterceptor } from "@/common/swagger/hmac-interceptor";
 import { AppConfigService } from "@/config/app-config.service";
-import { RedisIoAdapter } from "@/realtime/redis-io.adapter";
+import { RedisIoAdapter } from "@/modules/realtime/redis-io.adapter";
 import { RedisService } from "@/redis/redis.service";
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";

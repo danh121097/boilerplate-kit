@@ -2,10 +2,10 @@
 
 A WebSocket layer attached to the same HTTP server via `@nestjs/websockets`,
 gated by the same security model as the REST API (HMAC then JWT). Source:
-[`realtime/events.gateway.ts`](../../src/realtime/events.gateway.ts),
-[`realtime/redis-io.adapter.ts`](../../src/realtime/redis-io.adapter.ts),
-[`realtime/socket-emit.service.ts`](../../src/realtime/socket-emit.service.ts),
-[`realtime/events.ts`](../../src/realtime/events.ts).
+[`realtime/events.gateway.ts`](../../src/modules/realtime/events.gateway.ts),
+[`realtime/redis-io.adapter.ts`](../../src/modules/realtime/redis-io.adapter.ts),
+[`realtime/socket-emit.service.ts`](../../src/modules/realtime/socket-emit.service.ts),
+[`realtime/events.ts`](../../src/modules/realtime/events.ts).
 
 ## Setup
 
@@ -99,7 +99,7 @@ Same `verifyAccessToken` + user-level revocation check as the HTTP JWT step
 
 ## Events
 
-[`realtime/events.ts`](../../src/realtime/events.ts) is the central event-name
+[`realtime/events.ts`](../../src/modules/realtime/events.ts) is the central event-name
 registry (reference these constants instead of string literals):
 
 | Constant | Value | Direction |
@@ -110,7 +110,7 @@ registry (reference these constants instead of string literals):
 
 ## Emitting From Services
 
-[`realtime/socket-emit.service.ts`](../../src/realtime/socket-emit.service.ts) is
+[`realtime/socket-emit.service.ts`](../../src/modules/realtime/socket-emit.service.ts) is
 an injectable that lets any module push to clients without coupling to the
 gateway. Both helpers **no-op** when the server isn't initialized (tests, CLI,
 pre-listen) and reach other instances when the Redis adapter is on:

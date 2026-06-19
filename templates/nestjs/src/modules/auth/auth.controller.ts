@@ -1,10 +1,10 @@
-import { clearTokenCookies, setTokenCookies } from "@/common/cookie.util";
 import { CurrentUser } from "@/common/decorators/current-user.decorator";
 import { Public } from "@/common/decorators/public.decorator";
 import { AppException } from "@/common/exceptions/app.exception";
 import { JwtPayload } from "@/common/types/auth.types";
 import { AppConfigService } from "@/config/app-config.service";
 import { AuthService } from "@/modules/auth/auth.service";
+import { clearTokenCookies, setTokenCookies } from "@/modules/auth/cookie.util";
 import { LoginDto } from "@/modules/auth/dto/login.dto";
 import { RefreshDto } from "@/modules/auth/dto/refresh.dto";
 import { RegisterDto } from "@/modules/auth/dto/register.dto";

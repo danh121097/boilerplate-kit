@@ -1,9 +1,9 @@
 import { IS_PUBLIC_KEY } from "@/common/decorators/public.decorator";
 import { ROLES_KEY } from "@/common/decorators/roles.decorator";
 import { AppException } from "@/common/exceptions/app.exception";
-import { HmacService } from "@/common/hmac.service";
-import { TokenRevocationService } from "@/common/token-revocation.service";
-import { TokenService } from "@/common/token.service";
+import { HmacService } from "@/common/services/hmac.service";
+import { TokenRevocationService } from "@/common/services/token-revocation.service";
+import { TokenService } from "@/common/services/token.service";
 import { ROLE_RANK, Role } from "@/common/types/auth.types";
 import { AppConfigService } from "@/config/app-config.service";
 import {

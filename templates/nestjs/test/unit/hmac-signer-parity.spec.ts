@@ -6,8 +6,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { HmacService } from "@/common/hmac.service";
-import { MAX_TIMESTAMP_AGE_MS } from "@/common/hmac.service";
+import { HmacService } from "@/common/services/hmac.service";
+import { MAX_TIMESTAMP_AGE_MS } from "@/common/services/hmac.service";
 import {
   buildBadSignatureHeaders,
   buildExpiredHmacHeaders,

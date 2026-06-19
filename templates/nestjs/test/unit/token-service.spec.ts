@@ -8,7 +8,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { AppConfigService } from "@/config/app-config.service";
-import { TokenService } from "@/common/token.service";
+import { TokenService } from "@/common/services/token.service";
 import { ConfigService } from "@nestjs/config";
 import type { EnvVars } from "@/config/env.schema";
 

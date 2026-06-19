@@ -1,5 +1,5 @@
-import { SocketEvent } from "@/realtime/events";
-import { EventsGateway } from "@/realtime/events.gateway";
+import { SocketEvent } from "@/modules/realtime/events";
+import { EventsGateway } from "@/modules/realtime/events.gateway";
 import { Injectable } from "@nestjs/common";
 
 /**

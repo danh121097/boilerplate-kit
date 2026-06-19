@@ -1,5 +1,5 @@
-import { EventsGateway } from "@/realtime/events.gateway";
-import { SocketEmitService } from "@/realtime/socket-emit.service";
+import { EventsGateway } from "@/modules/realtime/events.gateway";
+import { SocketEmitService } from "@/modules/realtime/socket-emit.service";
 import { Module } from "@nestjs/common";
 
 /**
