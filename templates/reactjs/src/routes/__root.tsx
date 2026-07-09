@@ -1,9 +1,6 @@
-import { Button } from "@/components/ui/button";
 import { setLocale } from "@/i18n/i18n";
 import { useAuthStore } from "@/stores/auth";
-import { createRootRouteWithContext, Link, Outlet, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
-import { useTranslation } from "react-i18next";
+import { createRootRouteWithContext } from "@tanstack/react-router";
 import type { QueryClient } from "@tanstack/react-query";
 
 interface RouterContext {

@@ -1,6 +1,4 @@
-import { cn } from "@/utils";
 import { LoaderCircle } from "lucide-react";
-import { forwardRef, useRef } from "react";
 import type { ButtonHTMLAttributes } from "react";
 
 export type ButtonVariant = "primary" | "secondary" | "outline" | "ghost" | "danger" | "unstyled";
@@ -79,7 +77,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     const isUnstyled = variant === "unstyled";
 
     const shapeClass =
-      shape === "circle" ? "rounded-full" : shape === "square" ? "rounded-md aspect-square px-0" : "rounded-md";
+      shape === "circle"
+        ? "rounded-full"
+        : shape === "square"
+          ? "rounded-md aspect-square px-0"
+          : "rounded-md";
 
     const classes = isUnstyled
       ? className

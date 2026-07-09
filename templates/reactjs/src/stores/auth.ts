@@ -1,6 +1,5 @@
 import { AuthModel } from "@/services/auth/auth";
 import { getAccessToken } from "@/services/core";
-import { create } from "zustand";
 import type { AuthUser } from "@/services/auth/types/auth";
 
 interface AuthState {

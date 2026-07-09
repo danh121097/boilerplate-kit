@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from "node:fs";
 import js from "@eslint/js";
 import prettier from "eslint-config-prettier";
 import perfectionist from "eslint-plugin-perfectionist";
@@ -26,12 +27,22 @@ const sortImportsByKind = [
   },
 ];
 
+const autoImportFile = "./.eslintrc-auto-import.json";
+const autoImportGlobals = existsSync(autoImportFile)
+  ? Object.fromEntries(
+      Object.keys(JSON.parse(readFileSync(autoImportFile, "utf8")).globals).map((name) => [
+        name,
+        "readonly",
+      ]),
+    )
+  : {};
+
 export default [
-  { ignores: ["dist/", "src/routeTree.gen.ts"] },
+  { ignores: ["dist/", "src/routeTree.gen.ts", "auto-imports.d.ts"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    languageOptions: { globals: { ...globals.browser } },
+    languageOptions: { globals: { ...globals.browser, ...autoImportGlobals } },
     plugins: { perfectionist, "react-hooks": reactHooks },
     rules: {
       "perfectionist/sort-imports": sortImportsByKind,

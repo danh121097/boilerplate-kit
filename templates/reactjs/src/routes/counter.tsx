@@ -1,7 +1,5 @@
-import { Button } from "@/components/ui/button";
 import { useCounterStore } from "@/stores/counter";
 import { createFileRoute } from "@tanstack/react-router";
-import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/counter")({
   component: CounterPage,

@@ -1,8 +1,6 @@
-import { Badge } from "@/components/ui/badge";
 import { useUsersListQuery } from "@/services/users";
 import { useAuthStore } from "@/stores/auth";
-import { createFileRoute, redirect } from "@tanstack/react-router";
-import { useTranslation } from "react-i18next";
+import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/users")({
   // Protected: token presence (sync) decides access before the profile loads.

@@ -1,7 +1,6 @@
 import { SOCKET_EVENT, SOCKET_UNAUTHORIZED_MESSAGE } from "@/enums";
 import { getAccessToken } from "@/services/core/auth-token-storage";
 import { useSocketIOStore } from "@/stores/socket-io";
-import { useCallback, useEffect, useRef } from "react";
 import { io, type Socket } from "socket.io-client";
 import Base64 from "crypto-js/enc-base64";
 import HmacSHA256 from "crypto-js/hmac-sha256";
