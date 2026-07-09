@@ -1,0 +1,16 @@
+# Dependencies & build output
+node_modules
+dist
+.expo
+web-build
+coverage
+
+# Lockfiles
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+bun.lock
+bun.lockb
+
+# Expo-generated ambient types
+expo-env.d.ts

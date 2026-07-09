@@ -1,0 +1,10 @@
+# pnpm-only config. Other PMs (npm/yarn/bun) ignore this file.
+# - strictDepBuilds: false — don't fail install on unapproved build scripts.
+# - minimumReleaseAge: 0 — install latest versions even when freshly published.
+strictDepBuilds: false
+minimumReleaseAge: 0
+# Flat node_modules so React Native / Metro can resolve transitive deps
+# (e.g. react-native-css-interop via NativeWind). Mirrors the .npmrc setting.
+nodeLinker: hoisted
+allowBuilds:
+  esbuild: true

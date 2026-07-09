@@ -84,6 +84,15 @@ describe("resolveOptions (non-interactive)", () => {
     expect(opts.install).toBe(true);
   });
 
+  it("resolves the react-native template in non-interactive mode", async () => {
+    const opts = await resolveOptions({
+      name: "x",
+      template: "react-native",
+      pm: "pnpm",
+    });
+    expect(opts.template).toBe("react-native");
+  });
+
   it("throws when --name is missing in non-interactive mode", async () => {
     await expect(
       resolveOptions({ template: "vuejs", pm: "pnpm" }),

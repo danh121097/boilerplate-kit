@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "react-native-starter",
+    "slug": "react-native-starter",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "prismapp",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-localization"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

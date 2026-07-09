@@ -23,6 +23,7 @@ npm create prism-app@latest
 | **React 19** | Vite · TanStack Router · TanStack Query · Zustand · shadcn/ui · Tailwind v4 |
 | **Next.js 16** | App Router · TanStack Query · Zustand · shadcn/ui · Tailwind v4 |
 | **TanStack Start** | TanStack Ecosystem · Zustand · shadcn/ui · Tailwind v4 |
+| **React Native** | Expo · Expo Router · NativeWind · TanStack Query · Zustand · SecureStore · JWT auth |
 | **Express 5** | TypeScript · Mongoose · Socket.io · Redis · JWT auth · Postman |
 | **NestJS 11** | TypeScript · Mongoose · Socket.io · Redis · JWT auth · Swagger |
 
@@ -58,7 +59,7 @@ npm create prism-app@latest -- \
 | Flag | Description |
 | ---- | ----------- |
 | `--name <dir>` | Target directory (also the project name) |
-| `--template <id>` | `vuejs` · `nuxtjs` · `reactjs` · `nextjs` · `tanstack-start` · `express` · `nestjs` |
+| `--template <id>` | `vuejs` · `nuxtjs` · `reactjs` · `nextjs` · `tanstack-start` · `react-native` · `express` · `nestjs` |
 | `--pm <manager>` | `pnpm` · `bun` · `yarn` · `npm` |
 | `--git` / `--no-git` | Initialize a git repository (default: prompt) |
 | `--install` / `--no-install` | Install dependencies after scaffolding |

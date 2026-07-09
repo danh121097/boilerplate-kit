@@ -4,6 +4,7 @@ export const TEMPLATES = [
   "reactjs",
   "nextjs",
   "tanstack-start",
+  "react-native",
   "express",
   "nestjs",
 ] as const;
