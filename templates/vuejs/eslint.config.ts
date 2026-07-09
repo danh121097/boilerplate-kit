@@ -1,4 +1,4 @@
-import autoImport from "./.eslintrc-auto-import.json" with { type: "json" };
+import { existsSync, readFileSync } from "node:fs";
 import js from "@eslint/js";
 import prettier from "eslint-config-prettier";
 import perfectionist from "eslint-plugin-perfectionist";
@@ -30,9 +30,17 @@ const sortImportsByKind = [
 
 // unplugin-auto-import injects composables/utilities (ref, computed, cn, ...) as
 // globals; register them so .vue/.ts files don't trip `no-undef`.
-const autoImportGlobals = Object.fromEntries(
-  Object.keys(autoImport.globals).map((name) => [name, "readonly"]),
-);
+// .eslintrc-auto-import.json is gitignored (written on dev/build) — read it only
+// if present so a fresh checkout can lint before the first build.
+const autoImportFile = "./.eslintrc-auto-import.json";
+const autoImportGlobals = existsSync(autoImportFile)
+  ? Object.fromEntries(
+      Object.keys(JSON.parse(readFileSync(autoImportFile, "utf8")).globals).map((name) => [
+        name,
+        "readonly",
+      ]),
+    )
+  : {};
 
 export default [
   { ignores: ["dist/", "auto-imports.d.ts", "components.d.ts"] },
