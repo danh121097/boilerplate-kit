@@ -1,5 +1,20 @@
 export default {
-  nav: { home: "ホーム", counter: "カウンター", users: "ユーザー", form: "フォーム", authDemo: "認証デモ" },
+  nav: {
+    home: "ホーム",
+    counter: "カウンター",
+    users: "ユーザー",
+    form: "フォーム",
+    login: "ログイン",
+    logout: "ログアウト",
+  },
+  login: {
+    title: "ログイン",
+    email: "メールアドレス",
+    password: "パスワード",
+    submit: "ログイン",
+    submitting: "ログイン中…",
+    error: "ログインに失敗しました",
+  },
   home: {
     welcome: "ようこそ",
     description: "Next.js 16 + App Router + TanStack Query + Zustand + shadcn/ui + Tailwind v4.",

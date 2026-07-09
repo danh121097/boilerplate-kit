@@ -1,11 +1,23 @@
 <script setup lang="ts">
 import { setLocale } from "@/plugins/i18n";
+import { useAuthStore } from "@/stores/auth";
 
-const { t, locale } = useI18n();
+const router = useRouter();
+const authStore = useAuthStore();
+
+const { isAuthenticated } = storeToRefs(authStore);
+const { locale, t } = useI18n();
+
+onMounted(() => authStore.hydrate());
 
 function toggleLocale() {
   const next = locale.value === "en" ? "ja" : "en";
   setLocale(next);
+}
+
+async function onLogout() {
+  await authStore.logout();
+  router.push({ name: "login" });
 }
 </script>
 
@@ -19,12 +31,19 @@ function toggleLocale() {
         <RouterLink to="/counter" class="hover:text-indigo-600">{{ t("nav.counter") }}</RouterLink>
         <RouterLink to="/users" class="hover:text-indigo-600">{{ t("nav.users") }}</RouterLink>
         <RouterLink to="/form" class="hover:text-indigo-600">{{ t("nav.form") }}</RouterLink>
-        <button
-          class="ml-auto rounded-md border px-2 py-0.5 text-xs hover:bg-gray-100"
+        <RouterLink v-if="!isAuthenticated" to="/login" class="ml-auto hover:text-indigo-600">
+          {{ t("nav.login") }}
+        </RouterLink>
+        <Button v-else variant="unstyled" class="ml-auto hover:text-indigo-600" @click="onLogout">
+          {{ t("nav.logout") }}
+        </Button>
+        <Button
+          variant="unstyled"
+          class="rounded-md border px-2 py-0.5 text-xs hover:bg-gray-100"
           @click="toggleLocale"
         >
           {{ locale.toUpperCase() }}
-        </button>
+        </Button>
       </nav>
     </header>
     <main class="mx-auto max-w-3xl px-6 py-8">

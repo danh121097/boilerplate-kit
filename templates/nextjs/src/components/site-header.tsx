@@ -1,6 +1,9 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { setLocale } from "@/i18n/i18n";
+import { useLogoutMutation } from "@/services/auth";
+import { useAuth } from "@/services/auth/session";
 import { usePathname } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import Link from "next/link";
@@ -10,13 +13,15 @@ const NAV = [
   { href: "/counter", key: "nav.counter" },
   { href: "/users", key: "nav.users" },
   { href: "/form", key: "nav.form" },
-  { href: "/auth-demo", key: "nav.authDemo" },
 ] as const;
 
-/** App header + nav — client component (i18n labels + locale toggle). */
+/** App header + nav — client component (i18n labels + locale toggle + auth). */
 export function SiteHeader() {
-  const { t, i18n } = useTranslation();
   const pathname = usePathname();
+  const logout = useLogoutMutation();
+
+  const { t, i18n } = useTranslation();
+  const { isAuthenticated } = useAuth();
 
   const toggleLocale = () => setLocale(i18n.language === "en" ? "ja" : "en");
 
@@ -36,12 +41,27 @@ export function SiteHeader() {
             </Link>
           );
         })}
-        <button
-          className="ml-auto rounded-md border px-2 py-0.5 text-xs hover:bg-gray-100"
+        {isAuthenticated ? (
+          <Button
+            variant="unstyled"
+            className="ml-auto hover:text-indigo-600"
+            onClick={() => logout.mutate()}
+            disabled={logout.isPending}
+          >
+            {t("nav.logout")}
+          </Button>
+        ) : (
+          <Link href="/login" className="ml-auto hover:text-indigo-600">
+            {t("nav.login")}
+          </Link>
+        )}
+        <Button
+          variant="unstyled"
+          className="rounded-md border px-2 py-0.5 text-xs hover:bg-gray-100"
           onClick={toggleLocale}
         >
           {i18n.language.toUpperCase()}
-        </button>
+        </Button>
       </nav>
     </header>
   );

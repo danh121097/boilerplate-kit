@@ -4,7 +4,16 @@ export default {
     counter: "カウンター",
     users: "ユーザー",
     form: "フォーム",
-    authDemo: "認証デモ",
+    login: "ログイン",
+    logout: "ログアウト",
+  },
+  login: {
+    title: "ログイン",
+    email: "メールアドレス",
+    password: "パスワード",
+    submit: "ログイン",
+    submitting: "ログイン中…",
+    error: "ログインに失敗しました",
   },
   home: {
     welcome: "ようこそ",

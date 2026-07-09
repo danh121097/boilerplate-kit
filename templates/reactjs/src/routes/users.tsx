@@ -1,9 +1,16 @@
 import { Badge } from "@/components/ui/badge";
 import { useUsersListQuery } from "@/services/users";
-import { createFileRoute } from "@tanstack/react-router";
+import { useAuthStore } from "@/stores/auth";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/users")({
+  // Protected: token presence (sync) decides access before the profile loads.
+  beforeLoad: ({ location }) => {
+    if (!useAuthStore.getState().isAuthenticated) {
+      throw redirect({ to: "/login", search: { redirect: location.href } });
+    }
+  },
   component: UsersPage,
 });
 

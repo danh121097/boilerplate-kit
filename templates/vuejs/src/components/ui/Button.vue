@@ -6,7 +6,7 @@ export type ButtonShape = "rounded" | "square" | "circle";
 export type ButtonSize = "sm" | "md" | "lg";
 
 interface Props {
-  /** Visual style — primary (filled), secondary (muted), outline, ghost, danger, or unstyled (bare wrapper) */
+  /** Visual style — primary (filled), secondary (muted), outline, ghost, danger, or unstyled (bare button, no base styles) */
   variant?: ButtonVariant;
   /** Button shape — rounded pill (default), square icon, or circle */
   shape?: ButtonShape;
@@ -77,7 +77,7 @@ const outerClasses = computed(() =>
 
 function handleClick(e: MouseEvent) {
   if (isDisabled.value) return;
-  rippleEffect(e);
+  if (!isUnstyled.value) rippleEffect(e);
   emits("click", e);
 }
 
@@ -109,12 +109,11 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <component
-    :is="isUnstyled ? 'div' : 'button'"
+  <button
     ref="innerRef"
     :class="isUnstyled ? undefined : outerClasses"
-    :type="isUnstyled ? undefined : props.type"
-    :disabled="isUnstyled ? undefined : isDisabled"
+    :type="props.type"
+    :disabled="isDisabled"
     @click="handleClick"
   >
     <template v-if="isUnstyled">
@@ -124,7 +123,7 @@ onBeforeUnmount(() => {
       <LoaderCircle v-if="loading" class="size-4 animate-spin" aria-hidden />
       <slot v-else />
     </template>
-  </component>
+  </button>
 </template>
 
 <style scoped lang="scss">

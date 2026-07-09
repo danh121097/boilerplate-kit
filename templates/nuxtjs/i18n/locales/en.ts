@@ -1,5 +1,20 @@
 export default {
-  nav: { home: "Home", counter: "Counter", users: "Users", form: "Form", authDemo: "Auth Demo" },
+  nav: {
+    home: "Home",
+    counter: "Counter",
+    users: "Users",
+    form: "Form",
+    login: "Login",
+    logout: "Logout",
+  },
+  login: {
+    title: "Sign in",
+    email: "Email",
+    password: "Password",
+    submit: "Sign in",
+    submitting: "Signing in…",
+    error: "Sign in failed",
+  },
   home: {
     welcome: "Welcome",
     description: "Nuxt 4 + Reka UI + Pinia + TanStack Vue Query + Tailwind v4 + i18n.",

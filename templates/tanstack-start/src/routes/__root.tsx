@@ -1,5 +1,8 @@
 /// <reference types="vite/client" />
+import { Button } from "@/components/ui/button";
 import { setLocale } from "@/i18n/i18n";
+import { useLogoutMutation } from "@/services/auth";
+import { useAuth } from "@/services/auth/session";
 import {
   createRootRouteWithContext,
   HeadContent,
@@ -39,6 +42,10 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 
 function RootLayout() {
   const { t, i18n } = useTranslation();
+  // Session comes from the `/auth/me` query (resolved on server + client);
+  // login/logout mutations invalidate it so this control flips reactively.
+  const { isAuthenticated } = useAuth();
+  const logout = useLogoutMutation();
 
   function toggleLocale() {
     const next = i18n.language === "en" ? "ja" : "en";
@@ -68,15 +75,30 @@ function RootLayout() {
             <Link to="/form" className="hover:text-indigo-600 [&.active]:text-indigo-600">
               {t("nav.form")}
             </Link>
-            <Link to="/auth-demo" className="hover:text-indigo-600 [&.active]:text-indigo-600">
-              {t("nav.authDemo")}
-            </Link>
-            <button
-              className="ml-auto rounded-md border px-2 py-0.5 text-xs hover:bg-gray-100"
+            {isAuthenticated ? (
+              <Button
+                variant="unstyled"
+                className="ml-auto hover:text-indigo-600"
+                onClick={() => logout.mutate()}
+                disabled={logout.isPending}
+              >
+                {t("nav.logout")}
+              </Button>
+            ) : (
+              <Link
+                to="/login"
+                className="ml-auto hover:text-indigo-600 [&.active]:text-indigo-600"
+              >
+                {t("nav.login")}
+              </Link>
+            )}
+            <Button
+              variant="unstyled"
+              className="rounded-md border px-2 py-0.5 text-xs hover:bg-gray-100"
               onClick={toggleLocale}
             >
               {i18n.language.toUpperCase()}
-            </button>
+            </Button>
           </nav>
         </header>
         <main className="mx-auto max-w-3xl px-6 py-8">
