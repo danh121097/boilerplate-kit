@@ -22,7 +22,10 @@ export class HMACSignatureGenerator {
 
     const path = this.normalizeUrl(config.url || "");
     const method = config.method?.toUpperCase() || "";
-    const contentType = (config.headers["Content-Type"] as string) || "application/json";
+    const pinned = config.headers?.["Content-Type"] as string | undefined;
+    const isMultipart = typeof pinned === "string" && pinned.startsWith("multipart");
+    const hasBody = config.data !== undefined && config.data !== null;
+    const contentType = isMultipart ? pinned : hasBody ? "application/json" : "";
     const ctime = Date.now();
     const xVersion = import.meta.env.VITE_BUILD_VERSION || "1.0.0";
 

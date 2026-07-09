@@ -16,10 +16,12 @@ function serverSign(
   return createHmac("sha256", secret).update(stringToSign).digest("base64");
 }
 
-function configFor(url: string, method: string, contentType = "application/json") {
+function configFor(url: string, method: string, opts: { contentType?: string; data?: unknown } = {}) {
+  const { contentType = "application/json", data } = opts;
   return {
     url,
     method,
+    data,
     headers: { "Content-Type": contentType },
   } as unknown as InternalAxiosRequestConfig;
 }
@@ -32,19 +34,30 @@ describe("hmac-signature", () => {
     expect(HMACSignatureGenerator.generateSignature(configFor("/users", "get"))).toBeNull();
   });
 
-  it("produces a signature matching the server's canonical string", () => {
+  it("signs '' (empty contentType) for bodyless GET — matches server canonical string", () => {
     vi.stubEnv("VITE_HMAC_SECRET", "shared-secret");
+    // GET with no body → contentType signed as "" (axios omits Content-Type on bodyless requests)
     const sig = HMACSignatureGenerator.generateSignature(configFor("/users", "get"));
     expect(sig).not.toBeNull();
     expect(typeof sig!.ctime).toBe("number");
+    expect(sig!.sig).toBe(serverSign("shared-secret", "GET", "", sig!.ctime, "/users"));
+  });
+
+  it("signs 'application/json' for POST with a body — matches server canonical string", () => {
+    vi.stubEnv("VITE_HMAC_SECRET", "shared-secret");
+    const sig = HMACSignatureGenerator.generateSignature(
+      configFor("/auth/login", "post", { data: { email: "a@b.com" } }),
+    );
     expect(sig!.sig).toBe(
-      serverSign("shared-secret", "GET", "application/json", sig!.ctime, "/users"),
+      serverSign("shared-secret", "POST", "application/json", sig!.ctime, "/auth/login"),
     );
   });
 
   it("normalizes a URL without a leading slash before signing", () => {
     vi.stubEnv("VITE_HMAC_SECRET", "shared-secret");
-    const sig = HMACSignatureGenerator.generateSignature(configFor("users", "post"));
+    const sig = HMACSignatureGenerator.generateSignature(
+      configFor("users", "post", { data: { name: "x" } }),
+    );
     expect(sig!.sig).toBe(
       serverSign("shared-secret", "POST", "application/json", sig!.ctime, "/users"),
     );
