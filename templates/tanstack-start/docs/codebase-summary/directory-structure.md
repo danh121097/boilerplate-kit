@@ -14,7 +14,7 @@ templates/tanstack-start/
 ├── .env.example
 ├── .gitignore                 # includes routeTree.gen.ts, .output/, dist/
 ├── AGENTS.md / CLAUDE.md / README.md
-├── docs/                      # harness + technical docs
+├── docs/                      # technical docs
 └── src/
     ├── env.d.ts               # Vite env type declarations
     ├── main.tsx               # Legacy SPA entry (not used in SSR plugin flow)

@@ -19,11 +19,6 @@ bun.lockb
 # Build outputs
 dist/
 
-# Harness runtime (SQLite + compiled CLI — never commit)
-harness.db
-scripts/bin/harness-cli
-scripts/bin/harness-cli-*
-
 # Editor
 .vscode/
 .idea/

@@ -19,9 +19,3 @@ bun.lockb
 
 # TanStack Router auto-generated route tree — regenerated on every dev/build run.
 src/routeTree.gen.ts
-
-# repository-harness durable layer (optional, never committed)
-harness.db
-harness.db-*
-scripts/bin/harness-cli
-scripts/bin/harness-cli.exe

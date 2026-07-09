@@ -19,9 +19,3 @@ bun.lockb
 auto-imports.d.ts
 components.d.ts
 .eslintrc-auto-import.json
-
-# repository-harness durable layer (optional, never committed)
-harness.db
-harness.db-*
-scripts/bin/harness-cli
-scripts/bin/harness-cli.exe

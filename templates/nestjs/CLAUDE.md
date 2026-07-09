@@ -13,10 +13,8 @@ global `ZodValidationPipe`, and live Swagger docs at `/docs`. Package manager:
 
 ## Start Here
 
-1. Read [`AGENTS.md`](./AGENTS.md) — the agent reading list + harness entry point.
+1. Read [`AGENTS.md`](./AGENTS.md) — the agent reading list + entry point.
 2. Read [`docs/README.md`](./docs/README.md) — full documentation map.
-3. Classify any change through [`docs/FEATURE_INTAKE.md`](./docs/FEATURE_INTAKE.md)
-   before editing code.
 
 ## Principles
 
@@ -68,9 +66,6 @@ top-level `.md` is a thin index into a matching `docs/<topic>/` folder:
 ```
 docs/
 ├── README.md                # documentation map (start here)
-├── HARNESS.md FEATURE_INTAKE.md ARCHITECTURE.md CONTEXT_RULES.md   # harness front door
-├── TEST_MATRIX.md  HARNESS_BACKLOG.md  GLOSSARY.md
-├── decisions/  stories/  product/  templates/                     # harness records
 ├── project-overview-pdr.md  # vision, stack, scripts, constraints
 ├── codebase-summary.md      # → codebase-summary/* (structure, modules-and-routes, conventions)
 ├── code-standards.md        # → code-standards/* (file-naming, typescript-nestjs, lint, commits)

@@ -11,8 +11,8 @@ templates/nextjs/
 ├── pnpm-workspace.yaml
 ├── components.json           # shadcn/ui config (rsc: true, css: app/globals.css)
 ├── .env.example              # NEXT_PUBLIC_* vars
-├── .gitignore                # .next/, harness.db, harness-cli*
-├── AGENTS.md                 # Agent reading list + harness entry
+├── .gitignore                # .next/, dist/, env files
+├── AGENTS.md                 # Agent reading list
 ├── CLAUDE.md                 # Agent conventions + scripts
 ├── README.md                 # Quick start
 ├── docs/                     # Full documentation (this directory)

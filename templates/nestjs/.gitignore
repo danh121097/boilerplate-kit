@@ -35,9 +35,3 @@ logs.txt
 # misc
 .DS_Store
 *.pem
-
-# repository-harness durable layer (optional, never committed)
-harness.db
-harness.db-*
-scripts/bin/harness-cli
-scripts/bin/harness-cli.exe

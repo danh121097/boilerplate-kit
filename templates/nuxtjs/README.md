@@ -158,13 +158,10 @@ For private (server-only) secrets like HMAC signing, add unprefixed keys (`NUXT_
 - `pnpm build` → 7.19 MB / 1.72 MB gzipped
 - `pnpm typecheck` → clean (`vue-tsc` 3.x)
 
-## Documentation & Agent Harness
+## Documentation
 
 This template is agent-ready out of the box:
 
 - [`AGENTS.md`](./AGENTS.md) — agent entry point + reading list (Claude Code, Codex, Cursor, …).
 - [`CLAUDE.md`](./CLAUDE.md) — Claude Code guidance for this project.
-- [`docs/`](./docs/README.md) — full map: **harness layer** (feature intake, context rules, test matrix, decisions, templates) + **technical layer** (project overview, codebase summary, code standards, system architecture, design guidelines).
-
-The optional harness durable CLI (`harness-cli` + `harness.db`) is **not committed**;
-see `AGENTS.md` for the one-line install if you want it.
+- [`docs/`](./docs/README.md) — full map: project overview, codebase summary, code standards, system architecture, design guidelines.

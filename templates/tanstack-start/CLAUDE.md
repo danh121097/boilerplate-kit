@@ -15,10 +15,8 @@ server-side rendering, server functions (`createServerFn`), or edge deployment.
 
 ## Start Here
 
-1. Read [`AGENTS.md`](./AGENTS.md) — the agent reading list + harness entry point.
+1. Read [`AGENTS.md`](./AGENTS.md) — the agent reading list.
 2. Read [`docs/README.md`](./docs/README.md) — full documentation map.
-3. Classify any change through [`docs/FEATURE_INTAKE.md`](./docs/FEATURE_INTAKE.md)
-   before editing code.
 
 ## Principles
 

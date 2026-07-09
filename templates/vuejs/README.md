@@ -145,13 +145,10 @@ VITE_LANGUAGE_CODE=en
 # VITE_BUILD_VERSION=1.0.0
 ```
 
-## Documentation & Agent Harness
+## Documentation
 
 This template is agent-ready out of the box:
 
 - [`AGENTS.md`](./AGENTS.md) — agent entry point + reading list (Claude Code, Codex, Cursor, …).
 - [`CLAUDE.md`](./CLAUDE.md) — Claude Code guidance for this project.
-- [`docs/`](./docs/README.md) — full map: **harness layer** (feature intake, context rules, test matrix, decisions, templates) + **technical layer** (project overview, codebase summary, code standards, system architecture, design guidelines).
-
-The optional harness durable CLI (`harness-cli` + `harness.db`) is **not committed**;
-see `AGENTS.md` for the one-line install if you want it.
+- [`docs/`](./docs/README.md) — full map: project overview, codebase summary, code standards, system architecture, and design guidelines.

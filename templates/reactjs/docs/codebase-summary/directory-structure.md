@@ -14,7 +14,7 @@ templates/reactjs/
 ├── .env.example
 ├── .gitignore                 # includes routeTree.gen.ts
 ├── AGENTS.md / CLAUDE.md / README.md
-├── docs/                      # harness + technical docs
+├── docs/                      # technical docs
 └── src/
     ├── env.d.ts               # Vite env type declarations
     ├── main.tsx               # entry point

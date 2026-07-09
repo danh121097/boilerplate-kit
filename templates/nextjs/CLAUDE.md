@@ -11,10 +11,9 @@ Package manager: **pnpm**.
 
 ## Start Here
 
-1. Read [`AGENTS.md`](./AGENTS.md) — the agent reading list + harness entry point.
+1. Read [`AGENTS.md`](./AGENTS.md) — the agent reading list.
 2. Read [`docs/README.md`](./docs/README.md) — full documentation map.
-3. Classify any change through [`docs/FEATURE_INTAKE.md`](./docs/FEATURE_INTAKE.md)
-   before editing code.
+3. Read the docs before changing code; match existing patterns.
 
 ## Principles
 
@@ -56,9 +55,6 @@ top-level `.md` is a thin index into a matching `docs/<topic>/` folder:
 ```
 docs/
 ├── README.md                # documentation map (start here)
-├── HARNESS.md FEATURE_INTAKE.md ARCHITECTURE.md CONTEXT_RULES.md   # harness front door
-├── TEST_MATRIX.md  HARNESS_BACKLOG.md  GLOSSARY.md
-├── decisions/  stories/  product/  templates/                     # harness records
 ├── project-overview-pdr.md  # vision, stack, scripts, constraints
 ├── codebase-summary.md      # → codebase-summary/* (structure, services-and-stores, conventions)
 ├── code-standards.md        # → code-standards/* (file-naming, react-typescript, lint, commits)

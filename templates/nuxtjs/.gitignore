@@ -20,9 +20,3 @@ bun.lockb
 
 # logs
 *.log
-
-# repository-harness durable layer (optional, never committed)
-harness.db
-harness.db-*
-scripts/bin/harness-cli
-scripts/bin/harness-cli.exe
