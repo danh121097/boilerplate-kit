@@ -1,16 +1,8 @@
 /// <reference types="vite/client" />
-import { Button } from "@/components/ui/button";
 import { setLocale } from "@/i18n/i18n";
 import { useLogoutMutation } from "@/services/auth";
 import { useAuth } from "@/services/auth/session";
-import {
-  createRootRouteWithContext,
-  HeadContent,
-  Link,
-  Outlet,
-  Scripts,
-} from "@tanstack/react-router";
-import { useTranslation } from "react-i18next";
+import { createRootRouteWithContext, HeadContent, Scripts } from "@tanstack/react-router";
 import type { QueryClient } from "@tanstack/react-query";
 import appCss from "@/styles/tailwind.css?url";
 

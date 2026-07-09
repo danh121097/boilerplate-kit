@@ -1,8 +1,6 @@
-import { Badge } from "@/components/ui/badge";
 import { prefetchQueries } from "@/services/core";
 import { useUsersListQuery } from "@/services/users";
 import { createFileRoute } from "@tanstack/react-router";
-import { useTranslation } from "react-i18next";
 
 /**
  * Users route — SSR-first. The loader prefetches `useUsersListQuery` (backed by

@@ -1,5 +1,4 @@
 import { cn } from "@/utils";
-import { forwardRef } from "react";
 import type { InputHTMLAttributes } from "react";
 
 type InputProps = InputHTMLAttributes<HTMLInputElement>;

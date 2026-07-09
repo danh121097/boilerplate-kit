@@ -1,5 +1,4 @@
 import { STORAGE_KEYS } from "@/enums";
-import { readCookie, writeCookie } from "@/utils";
 import { createIsomorphicFn } from "@tanstack/react-start";
 import { getCookie } from "@tanstack/react-start/server";
 import { initReactI18next } from "react-i18next";

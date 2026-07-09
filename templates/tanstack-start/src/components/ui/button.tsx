@@ -1,6 +1,5 @@
 import { cn } from "@/utils";
 import { LoaderCircle } from "lucide-react";
-import { forwardRef, useRef } from "react";
 import type { ButtonHTMLAttributes } from "react";
 
 export type ButtonVariant = "primary" | "secondary" | "outline" | "ghost" | "danger" | "unstyled";
