@@ -1,7 +1,7 @@
+import { STORAGE_KEYS } from "@/enums";
 import { authContract } from "@/services/auth/contract";
 import { Api, ApiInterceptors, getApiBaseUrl } from "@/services/core";
 import { registerServiceToken } from "@/services/core/auth-token-storage";
-import { STORAGE_KEYS } from "@/enums";
 import type { ServiceRefreshConfig, ServiceTokenKeys } from "@/services/core";
 
 /**

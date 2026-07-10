@@ -20,7 +20,6 @@ type FormValues = z.infer<typeof schema>;
 /** Form page — client component, react-hook-form + zod validation. */
 export default function FormPage() {
   const { t } = useTranslation();
-  const [success, setSuccess] = useState(false);
 
   const {
     register,
@@ -30,6 +29,8 @@ export default function FormPage() {
     resolver: zodResolver(schema),
     defaultValues: { email: "", password: "" },
   });
+
+  const [success, setSuccess] = useState(false);
 
   const onSubmit = handleSubmit(() => {
     setSuccess(true);

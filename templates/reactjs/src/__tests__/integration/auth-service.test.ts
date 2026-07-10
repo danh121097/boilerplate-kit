@@ -1,6 +1,10 @@
 import { installLocalStorage } from "@/__tests__/helpers/fake-storage";
 import { AuthModel } from "@/services/auth";
-import { getAccessToken, getRefreshToken, persistAccessToken } from "@/services/core/auth-token-storage";
+import {
+  getAccessToken,
+  getRefreshToken,
+  persistAccessToken,
+} from "@/services/core/auth-token-storage";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -36,7 +40,10 @@ describe("AuthModel", () => {
 
   it("login does not persist refresh token when server omits it", async () => {
     const resultNoRefresh = { ...RESULT, tokens: { accessToken: "AT" } };
-    vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true, data: resultNoRefresh } as never);
+    vi.spyOn(AuthModel.api, "post").mockResolvedValue({
+      success: true,
+      data: resultNoRefresh,
+    } as never);
     await AuthModel.login({ email: "a@b.com", password: "x" });
     expect(getRefreshToken("MAIN")).toBeNull();
   });
@@ -63,7 +70,10 @@ describe("AuthModel", () => {
   });
 
   it("getMe returns the unwrapped user", async () => {
-    vi.spyOn(AuthModel.api, "get").mockResolvedValue({ success: true, data: { user: RESULT.user } } as never);
+    vi.spyOn(AuthModel.api, "get").mockResolvedValue({
+      success: true,
+      data: { user: RESULT.user },
+    } as never);
     const user = await AuthModel.getMe();
     expect(user).toEqual(RESULT.user);
   });

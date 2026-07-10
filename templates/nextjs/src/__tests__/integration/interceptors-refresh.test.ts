@@ -22,9 +22,9 @@ describe("interceptors — cookie refresh", () => {
   });
 
   it("refreshes once and replays the failed request transparently", async () => {
-    const post = vi.spyOn(axios, "post").mockResolvedValue(REFRESH_OK);
-
     let calls = 0;
+
+    const post = vi.spyOn(axios, "post").mockResolvedValue(REFRESH_OK);
     const client = makeClient(async (config) => {
       calls += 1;
       // First call 401s; after refresh the same request succeeds.
@@ -39,13 +39,13 @@ describe("interceptors — cookie refresh", () => {
   });
 
   it("single-flights concurrent 401s into ONE refresh", async () => {
+    let calls = 0;
+
     const post = vi
       .spyOn(axios, "post")
       .mockImplementation(
         () => new Promise((resolve) => setTimeout(() => resolve(REFRESH_OK), 10)),
       );
-
-    let calls = 0;
     const client = makeClient(async (config) => {
       calls += 1;
       return calls <= 3 ? httpError(config) : ok(config, { success: true, data: 1 });
@@ -83,8 +83,9 @@ describe("interceptors — cookie refresh", () => {
   });
 
   it("attempts refresh even without a stored token (cookie-first: no token gate)", async () => {
-    const post = vi.spyOn(axios, "post").mockResolvedValue(REFRESH_OK);
     let calls = 0;
+
+    const post = vi.spyOn(axios, "post").mockResolvedValue(REFRESH_OK);
     const client = makeClient(async (config) => {
       calls += 1;
       return calls === 1 ? httpError(config) : ok(config, { success: true, data: [] });

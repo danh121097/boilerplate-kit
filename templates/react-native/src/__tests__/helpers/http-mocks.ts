@@ -9,8 +9,8 @@ export function makeClient(
   refresh: Record<string, ServiceRefreshConfig> = { MAIN: { endpoint: "/auth/refresh" } },
   onSessionExpired?: SessionExpiredHandler,
 ) {
-  const instance = axios.create({ adapter });
   const interceptors = new ApiInterceptors(refresh, onSessionExpired);
+  const instance = axios.create({ adapter });
   interceptors.setupRequestInterceptor(instance, "MAIN");
   interceptors.setupResponseInterceptor(instance);
   return instance;

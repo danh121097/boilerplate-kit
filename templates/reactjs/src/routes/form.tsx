@@ -16,7 +16,6 @@ type FormValues = z.infer<typeof schema>;
 
 function FormPage() {
   const { t } = useTranslation();
-  const [success, setSuccess] = useState(false);
 
   const {
     register,
@@ -26,6 +25,8 @@ function FormPage() {
     resolver: zodResolver(schema),
     defaultValues: { email: "", password: "" },
   });
+
+  const [success, setSuccess] = useState(false);
 
   const onSubmit = handleSubmit(() => {
     setSuccess(true);

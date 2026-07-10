@@ -18,8 +18,9 @@ function buildAuth() {
 }
 
 export function useSocketIO() {
-  const { socket, authenticated, setSocketIO } = useSocketIOStore();
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { socket, authenticated, setSocketIO } = useSocketIOStore();
 
   const connectSocket = useCallback(() => {
     if (typeof window === "undefined") return;

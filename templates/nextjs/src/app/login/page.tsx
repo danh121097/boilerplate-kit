@@ -16,15 +16,17 @@ import type { FormEvent } from "react";
  * to Logout). No token is stored in JS; the backend sets httpOnly cookies.
  */
 export default function LoginPage() {
-  const { t } = useTranslation();
   const router = useRouter();
-  const { isAuthenticated } = useAuth();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
 
   const login = useLoginMutation({
     onSuccess: () => router.replace("/"),
   });
+
+  const { t } = useTranslation();
+  const { isAuthenticated } = useAuth();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   // Already signed in → no reason to show the form.
   useEffect(() => {

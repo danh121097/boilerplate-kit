@@ -20,10 +20,11 @@ export function SiteHeader() {
   const pathname = usePathname();
   const logout = useLogoutMutation();
 
-  const { t, i18n } = useTranslation();
-  const { isAuthenticated } = useAuth();
+  const { i18n, t } = useTranslation();
 
   const toggleLocale = () => setLocale(i18n.language === "en" ? "ja" : "en");
+
+  const { isAuthenticated } = useAuth();
 
   return (
     <header className="border-b bg-white">

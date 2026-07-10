@@ -1,5 +1,5 @@
-import { routeTree } from "@/routeTree.gen";
 import { initI18n } from "@/i18n/i18n";
+import { routeTree } from "@/routeTree.gen";
 import { initServices } from "@/services";
 import { keepPreviousData, QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";

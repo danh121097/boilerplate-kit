@@ -22,7 +22,11 @@ export default {
     open_dialog: "shadcn/ui ダイアログを開く",
   },
   counter: { title: "Zustand カウンター", count: "カウント" },
-  users: { title: "ユーザー (TanStack Query)", loading: "読み込み中…", error: "エラー: {{message}}" },
+  users: {
+    title: "ユーザー (TanStack Query)",
+    loading: "読み込み中…",
+    error: "エラー: {{message}}",
+  },
   form: {
     title: "フォーム (react-hook-form + zod)",
     email: "メールアドレス",

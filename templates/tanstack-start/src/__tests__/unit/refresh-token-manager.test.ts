@@ -11,6 +11,7 @@ const tick = () => new Promise((r) => setTimeout(r, 5));
 describe("RefreshTokenManager", () => {
   it("dedupes concurrent calls into a single refresh", async () => {
     let runs = 0;
+
     const mgr = new RefreshTokenManager({
       service: "MAIN",
       refresh: async () => {
@@ -27,6 +28,7 @@ describe("RefreshTokenManager", () => {
 
   it("refreshes again after the in-flight one settles", async () => {
     let runs = 0;
+
     const mgr = new RefreshTokenManager({
       service: "MAIN",
       refresh: async () => {

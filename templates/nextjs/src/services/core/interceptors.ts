@@ -68,10 +68,10 @@ interface ResponseInterceptorOpts {
 }
 
 function createResponseInterceptor(opts: ResponseInterceptorOpts) {
-  const { strictBlobError, instance, resolveRefresh } = opts;
-
   const serviceOf = (config?: InternalAxiosRequestConfig): ApiService =>
     (config?.serviceType ?? "MAIN") as ApiService;
+
+  const { strictBlobError, instance, resolveRefresh } = opts;
 
   /** Replay the original request after refreshing the right service; null when
    * not eligible (no refresh for this service, anonymous, already retried, ...).

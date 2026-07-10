@@ -104,9 +104,10 @@ describe("interceptors — token refresh (async storage)", () => {
   });
 
   it("does not attempt refresh for anonymous traffic (no token) but fires onSessionExpired", async () => {
+    let calls = 0;
+
     const post = jest.spyOn(axios, "post");
     const onSessionExpired = jest.fn();
-    let calls = 0;
     const client = makeClient(
       async (config) => {
         calls += 1;

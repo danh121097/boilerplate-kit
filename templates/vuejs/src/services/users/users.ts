@@ -1,6 +1,6 @@
-import { usersContract } from "@/services/users/contract";
 import { defineQuery, Model } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
+import { usersContract } from "@/services/users/contract";
 import type { UpdateUserPayload, User } from "@/services/users/types/user";
 
 export class UsersModel extends Model {

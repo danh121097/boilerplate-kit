@@ -12,15 +12,17 @@ export const Route = createFileRoute("/login")({
  * to Logout). No token is stored in JS; the backend sets httpOnly cookies.
  */
 function LoginPage() {
-  const { t } = useTranslation();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
 
   const login = useLoginMutation({
     onSuccess: () => navigate({ to: "/" }),
   });
+
+  const { t } = useTranslation();
+  const { isAuthenticated } = useAuth();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   // Already signed in → no reason to show the form.
   useEffect(() => {

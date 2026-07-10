@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
+import sortSetupDeclarations from "./eslint-rules/sort-setup-declarations";
 import js from "@eslint/js";
 import prettier from "eslint-config-prettier";
 import perfectionist from "eslint-plugin-perfectionist";
@@ -56,9 +57,15 @@ export default [
   },
   {
     languageOptions: { globals: { ...globals.browser, ...autoImportGlobals } },
-    plugins: { perfectionist },
+    plugins: {
+      perfectionist,
+      // Role-order declarations in <script setup> AND function bodies (composables,
+      // Pinia setup stores): props → composables → const → ref → computed → functions.
+      local: { rules: { "sort-setup-declarations": sortSetupDeclarations } },
+    },
     rules: {
       "perfectionist/sort-imports": sortImportsByKind,
+      "local/sort-setup-declarations": "warn",
       "vue/multi-word-component-names": "off",
       "vue/no-v-html": "off",
       "vue/html-self-closing": "off",

@@ -1,10 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiResponseError } from "@/services/core/types";
-import type {
-  MutationOptions,
-  UseMutationOptions,
-  UseQueryOptions,
-} from "@tanstack/react-query";
+import type { MutationOptions, UseMutationOptions, UseQueryOptions } from "@tanstack/react-query";
 
 type QueryDefinitionKey<TParams> = readonly [string] | readonly [string, TParams];
 
@@ -23,15 +19,15 @@ interface DefineQueryConfig<TData, TParams = void> extends QueryDefOpts<TData, T
 }
 
 export interface QueryDefinition<TData, TParams = void> {
-  (config?: UseQueryConfig<TData, TParams>): ReturnType<
-    typeof useQuery<TData, ApiResponseError, TData, QueryDefinitionKey<TParams>>
-  >;
+  (
+    config?: UseQueryConfig<TData, TParams>,
+  ): ReturnType<typeof useQuery<TData, ApiResponseError, TData, QueryDefinitionKey<TParams>>>;
   key: string;
   queryKey: (params?: TParams) => QueryDefinitionKey<TParams>;
 }
 
 export function defineQuery<TData, TParams = void>(config: DefineQueryConfig<TData, TParams>) {
-  const { fetcher, key, ...queryOptions } = config;
+  const { key, fetcher, ...queryOptions } = config;
 
   const queryKey = (params?: TParams): QueryDefinitionKey<TParams> =>
     params !== undefined ? [key, params] : [key];
@@ -65,9 +61,9 @@ interface DefineMutationConfig<TData, TVars, TCtx = unknown> {
 }
 
 export interface MutationDefinition<TData, TVars, TCtx = unknown> {
-  (overrides?: MutationDefOpts<TData, TVars, TCtx>): ReturnType<
-    typeof useMutation<TData, ApiResponseError, TVars, TCtx>
-  >;
+  (
+    overrides?: MutationDefOpts<TData, TVars, TCtx>,
+  ): ReturnType<typeof useMutation<TData, ApiResponseError, TVars, TCtx>>;
   key: string;
 }
 

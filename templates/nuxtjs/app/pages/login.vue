@@ -13,7 +13,11 @@ if (sessionUser.value) await navigateTo("/");
 
 // The login mutation invalidates `auth.me`; on success the session re-resolves and
 // we return home (the header flips to Logout). No token in JS — cookie-based auth.
-const { mutate: doLogin, isPending, error } = useLoginMutation({
+const {
+  mutate: doLogin,
+  isPending,
+  error,
+} = useLoginMutation({
   onSuccess: () => navigateTo("/"),
 });
 

@@ -8,8 +8,8 @@ export function makeClient(
   adapter: AxiosAdapter,
   refresh: Record<string, ServiceRefreshConfig> = { MAIN: { endpoint: "/auth/refresh" } },
 ) {
-  const instance = axios.create({ adapter });
   const interceptors = new ApiInterceptors(refresh);
+  const instance = axios.create({ adapter });
   interceptors.setupRequestInterceptor(instance, "MAIN");
   interceptors.setupResponseInterceptor(instance);
   return instance;

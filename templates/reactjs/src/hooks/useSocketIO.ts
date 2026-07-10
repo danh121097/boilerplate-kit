@@ -37,10 +37,10 @@ function buildAuth() {
  * - Exposes `socket`, `authenticated`, `connectSocket`, `destroySocket`.
  */
 export function useSocketIO() {
-  const { setSocketIO, authenticated } = useSocketIOStore();
   const socketRef = useRef<Socket | null>(null);
-
   const URL = import.meta.env.VITE_APP_ENDPOINT ?? "";
+
+  const { authenticated, setSocketIO } = useSocketIOStore();
 
   // Lazily create the socket instance once per hook mount.
   if (!socketRef.current) {

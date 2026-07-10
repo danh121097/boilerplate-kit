@@ -18,6 +18,7 @@ function buildAuth() {
 
 export function useSocketIO() {
   const { socket, authenticated, setSocketIO } = useSocketIOStore();
+
   // Keep a ref to the socket so event-handler closures stay stable across renders.
   const socketRef = useRef(socket);
 

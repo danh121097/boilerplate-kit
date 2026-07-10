@@ -5,6 +5,7 @@ import type { AxiosAdapter, InternalAxiosRequestConfig } from "axios";
 
 describe("Api", () => {
   let captured: InternalAxiosRequestConfig | undefined;
+
   const capture: AxiosAdapter = async (config) => {
     captured = config;
     return ok(config, { hello: 1 });
@@ -47,7 +48,10 @@ describe("Api", () => {
     });
 
     it("merges customHeaders into the request", async () => {
-      await new Api({ path: "/items" }).post({ customHeaders: { "X-Trace": "42" }, adapter: capture });
+      await new Api({ path: "/items" }).post({
+        customHeaders: { "X-Trace": "42" },
+        adapter: capture,
+      });
       expect(String(captured?.headers["X-Trace"])).toBe("42");
     });
 

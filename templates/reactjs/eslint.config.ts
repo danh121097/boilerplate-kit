@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
+import sortLeadingDeclarations from "./eslint-rules/sort-leading-declarations";
 import js from "@eslint/js";
 import prettier from "eslint-config-prettier";
 import perfectionist from "eslint-plugin-perfectionist";
@@ -42,10 +43,21 @@ export default [
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    languageOptions: { globals: { ...globals.browser, ...autoImportGlobals } },
-    plugins: { perfectionist, "react-hooks": reactHooks },
+    languageOptions: {
+      globals: { ...globals.browser, ...autoImportGlobals },
+      // Type-aware linting so local/sort-leading-declarations can tell a value
+      // binding from a function binding (order values before functions).
+      parserOptions: { projectService: true },
+    },
+    plugins: {
+      perfectionist,
+      "react-hooks": reactHooks,
+      local: { rules: { "sort-leading-declarations": sortLeadingDeclarations } },
+    },
     rules: {
       "perfectionist/sort-imports": sortImportsByKind,
+      // Group each function's leading declarations: let -> const -> destructuring.
+      "local/sort-leading-declarations": "warn",
       ...reactHooks.configs.recommended.rules,
       // Allow underscore-prefixed params/vars to be unused (e.g. _wrapperClassName omit-props).
       "@typescript-eslint/no-unused-vars": [

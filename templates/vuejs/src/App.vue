@@ -4,9 +4,9 @@ import { useAuthStore } from "@/stores/auth";
 
 const router = useRouter();
 const authStore = useAuthStore();
+const { locale, t } = useI18n();
 
 const { isAuthenticated } = storeToRefs(authStore);
-const { locale, t } = useI18n();
 
 onMounted(() => authStore.hydrate());
 

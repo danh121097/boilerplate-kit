@@ -16,6 +16,7 @@ export const Route = createFileRoute("/users")({
 function UsersPage() {
   const { t } = useTranslation();
   const { data, isLoading, error } = useUsersListQuery();
+
   const users = data?.data ?? [];
 
   return (

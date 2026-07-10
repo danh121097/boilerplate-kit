@@ -14,3 +14,6 @@ bun.lockb
 auto-imports.d.ts
 components.d.ts
 .eslintrc-auto-import.json
+
+# Docs are hand-authored — Prettier formats code only, not Markdown.
+*.md

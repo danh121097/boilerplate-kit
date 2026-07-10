@@ -14,3 +14,6 @@ bun.lockb
 
 # Expo-generated ambient types
 expo-env.d.ts
+
+# Docs are hand-authored — Prettier formats code only, not Markdown.
+*.md

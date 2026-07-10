@@ -42,10 +42,11 @@ export async function buildSocketAuth() {
  * - Exposes `socket`, `authenticated`, `connectSocket`, `destroySocket`.
  */
 export function useSocketIO() {
-  const { setSocketIO, authenticated } = useSocketIOStore();
   const socketRef = useRef<Socket | null>(null);
 
   const URL = process.env.EXPO_PUBLIC_APP_ENDPOINT ?? "";
+
+  const { authenticated, setSocketIO } = useSocketIOStore();
 
   // Lazily create the socket instance once per hook mount (no auth yet — the
   // token is attached asynchronously in connectSocket).

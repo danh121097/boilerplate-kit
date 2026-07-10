@@ -12,11 +12,12 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 });
 
 function RootLayout() {
-  const { t, i18n } = useTranslation();
-  const navigate = useNavigate();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const navigate = useNavigate();
   const hydrate = useAuthStore((s) => s.hydrate);
   const logout = useAuthStore((s) => s.logout);
+
+  const { i18n, t } = useTranslation();
 
   // Resolve the persisted session once on boot so the nav reflects it.
   useEffect(() => {

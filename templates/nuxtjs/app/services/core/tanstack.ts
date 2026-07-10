@@ -50,12 +50,15 @@ export interface QueryDefinition<TData, TParams = void> {
 
 export function defineQuery<TData, TParams = void>(config: DefineQueryConfig<TData, TParams>) {
   const { fetcher, key, ...queryOptions } = config;
+
   const queryKey = (params?: TParams): QueryDefinitionKey<TParams> =>
     params !== undefined ? [key, params] : [key];
 
   const use = (useConfig?: UseQueryConfig<TData, TParams>) => {
     const { params, ...overrides } = useConfig ?? {};
+
     const reactiveQueryKey = computed(() => queryKey(toValue(params)));
+
     const options = {
       ...queryOptions,
       ...overrides,

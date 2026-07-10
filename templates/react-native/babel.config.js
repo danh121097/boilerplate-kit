@@ -6,10 +6,7 @@
 module.exports = function (api) {
   api.cache(true);
   return {
-    presets: [
-      ["babel-preset-expo", { jsxImportSource: "nativewind" }],
-      "nativewind/babel",
-    ],
+    presets: [["babel-preset-expo", { jsxImportSource: "nativewind" }], "nativewind/babel"],
     plugins: [
       // Enables `static { ... }` class blocks (used by the service Models); not on
       // by default in the preset for the jest/test babel target.

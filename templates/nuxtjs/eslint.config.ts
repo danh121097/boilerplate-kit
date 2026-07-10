@@ -1,4 +1,5 @@
 import withNuxt from "./.nuxt/eslint.config.mjs";
+import sortSetupDeclarations from "./eslint-rules/sort-setup-declarations";
 import perfectionist from "eslint-plugin-perfectionist";
 
 // Order imports by syntax kind, not by source path:
@@ -41,5 +42,12 @@ export default withNuxt(
     rules: {
       "@typescript-eslint/no-extraneous-class": "off",
     },
+  },
+  {
+    // Role-order declarations in <script setup> AND function bodies (composables,
+    // Pinia setup stores): props → composables → const → ref → computed → functions.
+    files: ["**/*.vue", "**/*.ts"],
+    plugins: { local: { rules: { "sort-setup-declarations": sortSetupDeclarations } } },
+    rules: { "local/sort-setup-declarations": "warn" },
   },
 );

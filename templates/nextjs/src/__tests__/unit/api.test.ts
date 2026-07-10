@@ -5,6 +5,7 @@ import type { AxiosAdapter, InternalAxiosRequestConfig } from "axios";
 
 describe("Api", () => {
   let captured: InternalAxiosRequestConfig | undefined;
+
   const capture: AxiosAdapter = async (config) => {
     captured = config;
     return ok(config, { hello: 1 });

@@ -37,7 +37,9 @@ describe("interceptors — token refresh", () => {
     let calls = 0;
     const client = makeClient(async (config) => {
       calls += 1;
-      return bearerOf(config) === "NEW" ? ok(config, { success: true, data: ["item"] }) : httpError(config);
+      return bearerOf(config) === "NEW"
+        ? ok(config, { success: true, data: ["item"] })
+        : httpError(config);
     });
 
     const result = await client.get("/users");

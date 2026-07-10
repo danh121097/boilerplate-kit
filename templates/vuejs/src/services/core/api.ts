@@ -1,5 +1,10 @@
 import axios, { type AxiosInstance } from "axios";
-import type { ApiRequestConfig, ApiService, HttpInterceptorSetup, ServiceConfig } from "@/services/core/types";
+import type {
+  ApiRequestConfig,
+  ApiService,
+  HttpInterceptorSetup,
+  ServiceConfig,
+} from "@/services/core/types";
 
 /**
  * Shared HTTP API client with multi-service support and injectable interceptors.

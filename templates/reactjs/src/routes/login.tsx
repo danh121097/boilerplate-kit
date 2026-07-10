@@ -27,12 +27,12 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 function LoginPage() {
-  const { t } = useTranslation();
   const navigate = useNavigate();
-  const { redirect: redirectTo } = Route.useSearch();
   const setUser = useAuthStore((s) => s.setUser);
-  const { mutateAsync, isPending } = useLoginMutation();
-  const [error, setError] = useState("");
+
+  const { t } = useTranslation();
+  const { redirect: redirectTo } = Route.useSearch();
+  const { isPending, mutateAsync } = useLoginMutation();
 
   const {
     register,
@@ -42,6 +42,8 @@ function LoginPage() {
     resolver: zodResolver(schema),
     defaultValues: { email: "", password: "" },
   });
+
+  const [error, setError] = useState("");
 
   const onSubmit = handleSubmit(async (values) => {
     setError("");

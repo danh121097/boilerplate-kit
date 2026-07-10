@@ -20,7 +20,11 @@ import axios from "axios";
 
 /** Tolerates the common envelope shapes a backend may wrap the new tokens in. */
 interface RefreshResponseBody {
-  data?: { tokens?: { accessToken?: string; refreshToken?: string }; accessToken?: string; refreshToken?: string };
+  data?: {
+    tokens?: { accessToken?: string; refreshToken?: string };
+    accessToken?: string;
+    refreshToken?: string;
+  };
   tokens?: { accessToken?: string; refreshToken?: string };
   accessToken?: string;
   refreshToken?: string;

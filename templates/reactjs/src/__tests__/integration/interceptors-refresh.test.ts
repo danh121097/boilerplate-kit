@@ -13,7 +13,9 @@ import axios from "axios";
  */
 
 const TOKEN_KEY = STORAGE_KEYS.ACCESS_TOKEN;
-const NEW_TOKEN = { data: { success: true, data: { tokens: { accessToken: "NEW", refreshToken: "NEW_R" } } } } as never;
+const NEW_TOKEN = {
+  data: { success: true, data: { tokens: { accessToken: "NEW", refreshToken: "NEW_R" } } },
+} as never;
 
 describe("interceptors — token refresh", () => {
   beforeEach(() => {
@@ -33,7 +35,9 @@ describe("interceptors — token refresh", () => {
     let calls = 0;
     const client = makeClient(async (config) => {
       calls += 1;
-      return bearerOf(config) === "NEW" ? ok(config, { success: true, data: ["item"] }) : httpError(config);
+      return bearerOf(config) === "NEW"
+        ? ok(config, { success: true, data: ["item"] })
+        : httpError(config);
     });
 
     const result = await client.get("/users");
@@ -89,8 +93,9 @@ describe("interceptors — token refresh", () => {
   });
 
   it("does not attempt refresh for anonymous traffic (no token)", async () => {
-    const post = vi.spyOn(axios, "post");
     let calls = 0;
+
+    const post = vi.spyOn(axios, "post");
     const client = makeClient(async (config) => {
       calls += 1;
       return httpError(config);

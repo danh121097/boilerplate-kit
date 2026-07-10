@@ -17,8 +17,7 @@ export default {
   },
   home: {
     welcome: "ようこそ",
-    description:
-      "Vue 3 + Vite + Vue Router + Pinia + Reka UI + TanStack Query + Tailwind v4.",
+    description: "Vue 3 + Vite + Vue Router + Pinia + Reka UI + TanStack Query + Tailwind v4.",
     open_dialog: "Reka UI ダイアログを開く",
   },
   counter: { title: "Pinia カウンター", count: "カウント" },

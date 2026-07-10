@@ -16,7 +16,11 @@ function serverSign(
   return createHmac("sha256", secret).update(stringToSign).digest("base64");
 }
 
-function configFor(url: string, method: string, opts: { contentType?: string; data?: unknown } = {}) {
+function configFor(
+  url: string,
+  method: string,
+  opts: { contentType?: string; data?: unknown } = {},
+) {
   const { contentType = "application/json", data } = opts;
   return {
     url,

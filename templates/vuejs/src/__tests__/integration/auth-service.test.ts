@@ -50,7 +50,10 @@ describe("AuthModel", () => {
   });
 
   it("getMe returns the unwrapped user", async () => {
-    vi.spyOn(AuthModel.api, "get").mockResolvedValue({ success: true, data: { user: RESULT.user } } as never);
+    vi.spyOn(AuthModel.api, "get").mockResolvedValue({
+      success: true,
+      data: { user: RESULT.user },
+    } as never);
     const user = await AuthModel.getMe();
     expect(user).toEqual(RESULT.user);
   });

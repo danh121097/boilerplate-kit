@@ -6,9 +6,9 @@ import { io, type Socket } from "socket.io-client";
 export function useSocketIO() {
   const storeSocketIO = useSocketIOStore();
 
-  const { ioStore } = storeToRefs(storeSocketIO);
-
   const runtime = useRuntimeConfig();
+
+  const { ioStore } = storeToRefs(storeSocketIO);
   const URL = runtime.public.appEndpoint || "";
 
   function signHeader() {
@@ -90,6 +90,7 @@ export function useSocketIO() {
 /** Get the live socket from the store, lazy initializing one if none exists yet. */
 export function useIo() {
   const storeSocketIO = useSocketIOStore();
+
   const { ioStore } = storeToRefs(storeSocketIO);
 
   if (!ioStore.value.socket) {

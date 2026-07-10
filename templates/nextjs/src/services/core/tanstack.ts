@@ -27,7 +27,7 @@ export interface QueryDefinition<TData, TParams = void> {
 }
 
 export function defineQuery<TData, TParams = void>(config: DefineQueryConfig<TData, TParams>) {
-  const { fetcher, key, ...queryOptions } = config;
+  const { key, fetcher, ...queryOptions } = config;
 
   const queryKey = (params?: TParams): QueryDefinitionKey<TParams> =>
     params !== undefined ? [key, params] : [key];

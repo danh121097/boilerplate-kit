@@ -7,15 +7,15 @@ import LanguageDetector from "i18next-browser-languagedetector";
 
 function getSavedLanguage(): string {
   try {
-    return localStorage.getItem(STORAGE_KEYS.LANGUAGE) || import.meta.env.VITE_LANGUAGE_CODE || "en";
+    return (
+      localStorage.getItem(STORAGE_KEYS.LANGUAGE) || import.meta.env.VITE_LANGUAGE_CODE || "en"
+    );
   } catch {
     return import.meta.env.VITE_LANGUAGE_CODE || "en";
   }
 }
 
-const i18n = i18next
-  .use(LanguageDetector)
-  .use(initReactI18next);
+const i18n = i18next.use(LanguageDetector).use(initReactI18next);
 
 export function initI18n(): typeof i18next {
   void i18n.init({

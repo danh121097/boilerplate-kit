@@ -13,3 +13,6 @@ bun.lockb
 # Next.js generated
 .next
 next-env.d.ts
+
+# Docs are hand-authored — Prettier formats code only, not Markdown.
+*.md

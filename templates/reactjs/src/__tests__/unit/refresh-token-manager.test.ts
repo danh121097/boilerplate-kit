@@ -11,6 +11,7 @@ describe("RefreshTokenManager", () => {
 
   it("dedupes concurrent calls into a single refresh and persists the token", async () => {
     let runs = 0;
+
     const mgr = new RefreshTokenManager({
       service: "MAIN",
       refresh: async () => {
@@ -21,7 +22,11 @@ describe("RefreshTokenManager", () => {
       onRefreshFailed: () => {},
     });
 
-    const [a, b, c] = await Promise.all([mgr.getFreshToken(), mgr.getFreshToken(), mgr.getFreshToken()]);
+    const [a, b, c] = await Promise.all([
+      mgr.getFreshToken(),
+      mgr.getFreshToken(),
+      mgr.getFreshToken(),
+    ]);
 
     expect(runs).toBe(1); // single-flight
     expect([a, b, c]).toEqual(["T1", "T1", "T1"]);
@@ -30,6 +35,7 @@ describe("RefreshTokenManager", () => {
 
   it("refreshes again after the in-flight one settles", async () => {
     let runs = 0;
+
     const mgr = new RefreshTokenManager({
       service: "MAIN",
       refresh: async () => `T${++runs}`,

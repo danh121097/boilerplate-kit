@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint .",
+    "lint": "eslint . --fix && prettier --write .",
+    "lint:check": "eslint . && prettier --check .",
     "format": "prettier --write ."
   },
   "dependencies": {
@@ -44,6 +45,7 @@
     "@types/node": "^25.9.1",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
+    "@typescript-eslint/utils": "^8.60.1",
     "@vitejs/plugin-react": "^4.5.0",
     "eslint": "^10.4.0",
     "eslint-config-prettier": "^10.1.8",

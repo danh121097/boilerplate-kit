@@ -33,11 +33,10 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 });
 
 function RootLayout() {
-  const { t, i18n } = useTranslation();
-  // Session comes from the `/auth/me` query (resolved on server + client);
-  // login/logout mutations invalidate it so this control flips reactively.
-  const { isAuthenticated } = useAuth();
   const logout = useLogoutMutation();
+
+  const { i18n, t } = useTranslation();
+  const { isAuthenticated } = useAuth();
 
   function toggleLocale() {
     const next = i18n.language === "en" ? "ja" : "en";

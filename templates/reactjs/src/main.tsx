@@ -1,6 +1,6 @@
+import { initI18n } from "@/i18n/i18n";
 import { AppQueryClientProvider } from "@/providers/query-client-provider";
 import { router } from "@/router";
-import { initI18n } from "@/i18n/i18n";
 import { initServices } from "@/services";
 import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";

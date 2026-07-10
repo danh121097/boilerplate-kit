@@ -1,3 +1,4 @@
+import sortLeadingDeclarations from "./eslint-rules/sort-leading-declarations";
 import js from "@eslint/js";
 import prettier from "eslint-config-prettier";
 import perfectionist from "eslint-plugin-perfectionist";
@@ -55,10 +56,20 @@ export default [
     // its own `__DEV__` flag; test files add the Jest globals.
     languageOptions: {
       globals: { ...globals.browser, ...globals.node, ...globals.jest, __DEV__: "readonly" },
+      // Type-aware linting so local/sort-leading-declarations can tell a value
+      // binding from a function binding. The rule file lives outside tsconfig,
+      // so let it fall back to the default inferred project.
+      parserOptions: { projectService: { allowDefaultProject: ["eslint-rules/*.ts"] } },
     },
-    plugins: { perfectionist, "react-hooks": reactHooks },
+    plugins: {
+      perfectionist,
+      "react-hooks": reactHooks,
+      local: { rules: { "sort-leading-declarations": sortLeadingDeclarations } },
+    },
     rules: {
       "perfectionist/sort-imports": sortImportsByKind,
+      // Group each function's leading declarations: let -> const -> destructuring.
+      "local/sort-leading-declarations": "warn",
       ...reactHooks.configs.recommended.rules,
       // Allow underscore-prefixed params/vars to be unused (e.g. _wrapperClassName omit-props).
       "@typescript-eslint/no-unused-vars": [

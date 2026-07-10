@@ -15,3 +15,6 @@ src/routeTree.gen.ts
 .output
 .nitro
 .vinxi
+
+# Docs are hand-authored — Prettier formats code only, not Markdown.
+*.md

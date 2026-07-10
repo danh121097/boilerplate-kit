@@ -26,9 +26,9 @@ describe("interceptors — cookie-based token refresh", () => {
   });
 
   it("refreshes once and replays the failed request transparently", async () => {
-    const post = vi.spyOn(axios, "post").mockResolvedValue({ data: {} } as never);
-
     let calls = 0;
+
+    const post = vi.spyOn(axios, "post").mockResolvedValue({ data: {} } as never);
     const client = makeClient(async (config) => {
       calls += 1;
       return retried(config) ? ok(config, { success: true, data: ["item"] }) : httpError(config);
@@ -70,9 +70,9 @@ describe("interceptors — cookie-based token refresh", () => {
   });
 
   it("gives up after one retry (no infinite loop) when the replay still 401s", async () => {
-    const post = vi.spyOn(axios, "post").mockResolvedValue({ data: {} } as never);
-
     let calls = 0;
+
+    const post = vi.spyOn(axios, "post").mockResolvedValue({ data: {} } as never);
     const client = makeClient(async (config) => {
       calls += 1;
       return httpError(config);
@@ -84,9 +84,9 @@ describe("interceptors — cookie-based token refresh", () => {
   });
 
   it("propagates the error when the refresh call itself fails (e.g. no session)", async () => {
-    const post = vi.spyOn(axios, "post").mockRejectedValue(new Error("no refresh cookie"));
-
     let calls = 0;
+
+    const post = vi.spyOn(axios, "post").mockRejectedValue(new Error("no refresh cookie"));
     const client = makeClient(async (config) => {
       calls += 1;
       return httpError(config);

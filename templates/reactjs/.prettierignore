@@ -12,3 +12,6 @@ bun.lockb
 
 # TanStack Router generated (excluded from linter/formatter per its own header)
 src/routeTree.gen.ts
+
+# Docs are hand-authored — Prettier formats code only, not Markdown.
+*.md

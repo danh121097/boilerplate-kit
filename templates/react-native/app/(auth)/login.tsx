@@ -24,10 +24,7 @@ export default function LoginScreen() {
   const setUser = useAuthStore((s) => s.setUser);
 
   const { t } = useTranslation();
-
-  const { isPending, mutateAsync  } = useLoginMutation();
-
-  const [failed, setFailed] = useState(false);
+  const { isPending, mutateAsync } = useLoginMutation();
 
   const {
     control,
@@ -37,6 +34,8 @@ export default function LoginScreen() {
     resolver: zodResolver(schema),
     defaultValues: { email: "", password: "" },
   });
+
+  const [failed, setFailed] = useState(false);
 
   const onSubmit = handleSubmit(async (values) => {
     setFailed(false);
