@@ -38,7 +38,7 @@ const SERVICES: ServiceDefinition[] = [
  * Wire axios base URLs + interceptors. Called once from the root layout.
  *
  * @param onSessionExpired Invoked when a service's session is unrecoverable (a
- * non-refreshable 401 or a failed refresh). The app passes a handler that clears
+ * non-refreshable 401 or a refresh rejected with 401/403). The app passes a handler that clears
  * the auth store and navigates to `/login` — this replaces the web template's
  * `window.location.reload()` (there is no `window` on React Native). The handler
  * is passed in (not imported) so `init-services` stays free of a store/router

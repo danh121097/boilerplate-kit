@@ -13,14 +13,19 @@ export class HeadersUtils {
   }
 
   /**
-   * Attach the Bearer token from the matching storage slot for the service.
-   * SecureStore reads are async, so this is `async` — the request interceptor
-   * awaits it (axios awaits a promise-returning request interceptor).
+   * Attach the Bearer token from the matching storage slot for the service,
+   * unless the caller already set one (logout sends the token it read before
+   * clearing). SecureStore reads are async, so this is `async` — the request
+   * interceptor awaits it (axios awaits a promise-returning request interceptor).
    */
   static async addAuthorizationHeader(
     config: InternalAxiosRequestConfig,
     service: ApiService,
   ): Promise<void> {
+    const headers = (config.headers ?? {}) as unknown as Record<string, unknown>;
+    if (Object.keys(headers).some((k) => k.toLowerCase() === "authorization" && headers[k])) {
+      return;
+    }
     const token = await getAccessToken(service);
     if (token) config.headers.authorization = `Bearer ${token}`;
   }

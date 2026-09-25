@@ -19,23 +19,41 @@ QueryClient is created in `src/providers/query-client-provider.tsx` with:
 Local UI state lives in Zustand stores under `src/stores/`.
 
 ```ts
-// src/stores/auth.ts
-export const useAuthStore = create<AuthState>((set) => ({
-  token: null,
-  isLoggedIn: false,
-  setToken: (token) => set({ token, isLoggedIn: !!token }),
-  logout: () => set({ token: null, isLoggedIn: false }),
-}));
+// src/stores/auth.ts (shape)
+interface AuthState {
+  user: AuthUser | null;     // null when logged out, or signed in but not yet loaded
+  isAuthenticated: boolean;  // tokens are stored and the session is live
+  hydrated: boolean;         // boot-time SecureStore check finished
+  sessionExpired: boolean;   // last sign-out was involuntary → gate adds returnTo
+  expireSession(): void;     // onSessionExpired: logged out + sessionExpired
+  setUser(user): void;       // also resets sessionExpired
+  hydrate(): Promise<void>;  // read token → loadUser(); marks hydrated
+  loadUser(): Promise<void>; // getMe; safe to retry after a transient failure
+  logout(): Promise<void>;   // revoke refresh token, clear tokens + query cache
+}
 ```
+
+Auth state rules:
+- `hydrate()` keeps the user signed in (`isAuthenticated: true`, `user: null`)
+  when `getMe` fails for a non-auth reason (offline, 5xx, 429, timeout) and the
+  tokens are still stored; only a session-ending failure logs out.
+- `loadUser()` reads the session epoch before `getMe` and drops a late result
+  (success or failure) if a logout/expiry happened meanwhile.
+- `expireSession()` (from `onSessionExpired`) sets `sessionExpired: true`; the
+  `(app)` gate then redirects to `/login` with `returnTo`. `logout()` and
+  `setUser()` reset it.
+- `logout()` and the root layout's `onSessionExpired` handler both call
+  `queryClient.clear()`, so no cached server data survives into the next session.
 
 Stores are imported explicitly — no auto-import or global injection.
 
 ## Locale state
 
 Locale is tracked by i18next internally. `setLocale()` in `src/i18n/i18n.ts`
-calls `i18next.changeLanguage()` and persists to `STORAGE_KEYS.LANGUAGE` via
-SecureStore (async). The `useTranslation()` hook re-renders screens reactively
-on language change.
+calls `i18next.changeLanguage()`; it is not persisted — the starter re-detects
+the device locale on each boot. `STORAGE_KEYS.LANGUAGE` is reserved if you add
+persistence. The `useTranslation()` hook re-renders screens reactively on
+language change.
 
 ## Secure storage keys
 
@@ -43,10 +61,15 @@ on language change.
 all `expo-secure-store` keys, prefixed with app namespace to prevent collisions:
 
 ```ts
-AUTH_TOKEN:    `${APP_PREFIX}_AUTH_TOKEN`
+ACCESS_TOKEN:  `${APP_PREFIX}_ACCESS_TOKEN`
 REFRESH_TOKEN: `${APP_PREFIX}_REFRESH_TOKEN`
 LANGUAGE:      `${APP_PREFIX}_LANGUAGE`
+THEME:         `${APP_PREFIX}_THEME`
 ```
+
+`APP_PREFIX` is `EXPO_PUBLIC_APP_NAME` passed through
+`sanitizeStorageKeyPrefix()`: characters outside `[A-Za-z0-9._-]` (spaces
+included) become `_`, and an empty value falls back to `PRISM_APP`.
 
 **All reads/writes are async.** Use `await SecureStore.getItemAsync(key)` and
 `await SecureStore.setItemAsync(key, value)`.

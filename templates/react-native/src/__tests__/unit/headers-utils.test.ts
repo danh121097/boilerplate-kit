@@ -43,6 +43,13 @@ describe("headers-utils", () => {
     expect(config.headers.authorization).toBe("Bearer abc");
   });
 
+  it("addAuthorizationHeader keeps an Authorization header the caller already set", async () => {
+    await persistAccessToken("stored", "MAIN");
+    const config = configWith({ authorization: "Bearer explicit" });
+    await HeadersUtils.addAuthorizationHeader(config, "MAIN");
+    expect(config.headers.authorization).toBe("Bearer explicit");
+  });
+
   it("addAuthorizationHeader is a no-op when no token is stored", async () => {
     const config = configWith();
     await HeadersUtils.addAuthorizationHeader(config, "MAIN");

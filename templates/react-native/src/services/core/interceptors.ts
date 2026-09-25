@@ -1,6 +1,11 @@
 import { createTokenRefresher } from "@/services/core/auth-refresh-client";
-import { clearServiceTokens, getAccessToken } from "@/services/core/auth-token-storage";
+import {
+  clearServiceTokens,
+  getAccessToken,
+  getSessionEpoch,
+} from "@/services/core/auth-token-storage";
 import { HeadersUtils } from "@/services/core/headers-utils";
+import { SessionClearedError } from "@/services/core/refresh-errors";
 import { RefreshTokenManager } from "@/services/core/refresh-token-manager";
 import type {
   ApiResponseError,
@@ -87,14 +92,40 @@ function createResponseInterceptor(opts: ResponseInterceptorOpts) {
     });
   };
 
-  /** Cleanup when a 401 cannot be recovered by a refresh: drop that service's
+  /** Cleanup when an authenticated 401 cannot be recovered by a refresh: drop that service's
    * tokens and fire the injected session-expired callback (RN has no page reload;
-   * the app navigates back to /login). A refresh-capable service that actually
-   * fails its refresh fires the same callback via the manager's onRefreshFailed. */
+   * the app navigates back to /login). A refresh-capable service whose refresh is
+   * REJECTED (401/403) fires the same callback via the manager's onRefreshFailed;
+   * a transient refresh failure (offline, timeout, 429, 5xx) rejects the request
+   * with a retryable `RefreshUnavailableError` and keeps the tokens. */
   const handleUnauthorized = async (config?: InternalAxiosRequestConfig) => {
     const service = serviceOf(config);
     await clearServiceTokens(service);
     onSessionExpired(service);
+  };
+
+  /**
+   * Route a 401. Resolves to the replayed response when a refresh recovered it,
+   * or to null when the 401 should be rejected with the server's own body.
+   * - credential endpoints (`skipAuthRefresh`): passed through untouched;
+   * - the session was cleared after the request was sent (logout, expiry): rejects
+   *   `SessionClearedError` (`session_ended`) — no refresh, no clear, no expiry;
+   * - refreshable: refresh + replay;
+   * - a session that cannot be recovered: clear it and fire session-expired;
+   * - anonymous (no token): passed through.
+   */
+  const handle401 = async (
+    config: InternalAxiosRequestConfig | undefined,
+  ): Promise<AxiosResponse | null> => {
+    if (!config || config.skipAuthRefresh) return null;
+    const service = serviceOf(config);
+    if (config._sessionEpoch !== undefined && config._sessionEpoch !== getSessionEpoch(service)) {
+      throw new SessionClearedError();
+    }
+    const retry = await refreshAndRetry(config);
+    if (retry) return retry;
+    if (await getAccessToken(service)) await handleUnauthorized(config);
+    return null;
   };
 
   const onSuccess = async (response: AxiosResponse) => {
@@ -115,9 +146,8 @@ function createResponseInterceptor(opts: ResponseInterceptorOpts) {
       const body = response.data as EnvelopeBody;
       if (body.status === "success" || body.success === true) return response.data;
       if (body.error_code === 401) {
-        const retry = await refreshAndRetry(response.config);
+        const retry = await handle401(response.config);
         if (retry) return retry;
-        await handleUnauthorized(response.config);
       }
       return Promise.reject<ApiResponseError>(response.data as ApiResponseError);
     }
@@ -127,11 +157,11 @@ function createResponseInterceptor(opts: ResponseInterceptorOpts) {
   const onError = async (error: AxiosError<ApiResponseError>) => {
     if (error.response?.status === 401) {
       // Eligible → refresh + replay; let the replay's own outcome propagate so a
-      // transient post-refresh failure does not wrongly clear the new token.
-      const retry = await refreshAndRetry(error.config);
+      // transient post-refresh failure does not wrongly clear the new token. A
+      // failed refresh throws out of here as-is (rejected → session already
+      // expired by the manager; transient → retryable, tokens kept).
+      const retry = await handle401(error.config);
       if (retry) return retry;
-      // Not eligible (anonymous / already retried / no refresh) → genuine logout.
-      await handleUnauthorized(error.config);
     }
     if (error.code === "ERR_NETWORK" || error.code === "ERR_BLOCKED_BY_CLIENT") {
       console.error("Network error. Please check your internet connection.");
@@ -152,7 +182,7 @@ export class ApiInterceptors implements HttpInterceptorSetup {
    * @param refreshByService Map of service name → refresh config. A service is
    * auto-refreshed iff it appears here; omit a service to opt out.
    * @param onSessionExpired Called when a service's session is unrecoverable (a
-   * non-refreshable 401 or a failed refresh). The app wires this to clear auth
+   * non-refreshable 401, or the refresh endpoint rejecting with 401/403). The app wires this to clear auth
    * state + navigate to `/login`. Defaults to a no-op.
    */
   constructor(
@@ -186,6 +216,9 @@ export class ApiInterceptors implements HttpInterceptorSetup {
     instance.interceptors.request.use(
       async (config) => {
         config.serviceType = service;
+        // Stamped before the async token read: a clear landing mid-read still
+        // counts as "after send".
+        config._sessionEpoch = getSessionEpoch(service);
         config.headers = HeadersUtils.setAuthHeaders(config);
         await HeadersUtils.addAuthorizationHeader(config, service);
         return config;

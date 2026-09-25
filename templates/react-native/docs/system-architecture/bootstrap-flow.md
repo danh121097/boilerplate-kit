@@ -25,6 +25,8 @@ app/_layout.tsx (root layout)
   `Api.registerInterceptors()`. It also sets the `onSessionExpired` callback.
 - Token storage is **async** — all `SecureStore.getItemAsync()` calls return promises.
 - Hard logout: the interceptor calls `onSessionExpired()` callback (injected at
-  init time), which navigates to `/(auth)/login` via router redirect.
+  init time) only for an unrefreshable 401 or a refresh rejected with 401/403;
+  the handler clears the query cache and calls `expireSession()`; the `(app)`
+  gate then redirects to `/(auth)/login` with a `returnTo` path.
 - Expo Router generates typed route navigation automatically from the `app/`
   directory structure. No need for explicit route definitions.

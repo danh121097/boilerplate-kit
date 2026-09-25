@@ -9,7 +9,8 @@ src/services/
 ├── core/
 │   ├── api.ts              # Api class — multi-service axios wrapper
 │   ├── interceptors.ts     # ApiInterceptors — request (HMAC+Bearer) + response (refresh)
-│   ├── refresh-token-manager.ts  # Single-flight refresh deduplication
+│   ├── refresh-token-manager.ts  # Single-flight refresh + failure policy + epoch guard
+│   ├── refresh-errors.ts         # RefreshRejectedError / RefreshUnavailableError / SessionClearedError
 │   ├── auth-refresh-client.ts    # Bare axios refresh call (no interceptors)
 │   ├── auth-token-storage.ts     # Per-service expo-secure-store token registry (async)
 │   ├── headers-utils.ts    # HeadersUtils.setAuthHeaders / addAuthorizationHeader
@@ -40,7 +41,7 @@ src/services/
 
 ```
 src/stores/
-├── auth.ts       # useAuthStore: token / isLoggedIn / setToken / logout
+├── auth.ts       # useAuthStore: user / isAuthenticated / hydrated / hydrate / loadUser / logout
 └── socket-io.ts  # useSocketIOStore: socket connection state
 ```
 

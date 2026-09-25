@@ -1,8 +1,8 @@
 import { initI18n } from "@/i18n/i18n";
-import { AppQueryClientProvider } from "@/providers/query-client-provider";
+import { AppQueryClientProvider, queryClient } from "@/providers/query-client-provider";
 import { initServices } from "@/services";
 import { useAuthStore } from "@/stores/auth";
-import { router, Stack } from "expo-router";
+import { Stack } from "expo-router";
 import { useEffect } from "react";
 import { I18nextProvider } from "react-i18next";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -14,15 +14,18 @@ import "@/styles/global.css";
 // 1. i18n resources + device-locale detection.
 initI18n();
 // 2. axios base URLs + interceptors. The injected `onSessionExpired` replaces the
-//    web template's `window.location.reload()`: it resets auth state and routes
-//    back to /login when a 401 can't be recovered by a refresh.
+//    web template's `window.location.reload()`: it resets auth state when a 401
+//    can't be recovered by a refresh; the (app) gate then routes to /login.
 initServices(() => {
   // Idempotent: a burst of concurrent unrecoverable 401s must redirect ONCE, not
   // once per failed request. After the first reset `isAuthenticated` is false, so
   // later fires no-op until the next successful login.
   if (!useAuthStore.getState().isAuthenticated) return;
-  useAuthStore.setState({ user: null, isAuthenticated: false });
-  router.replace("/login");
+  // Drop every cached query so the next user never sees the previous user's data.
+  queryClient.clear();
+  // The (app) auth gate reacts to this and redirects to /login with a `returnTo`
+  // of the current screen — navigating here too would race it and drop the param.
+  useAuthStore.getState().expireSession();
 });
 
 export default function RootLayout() {

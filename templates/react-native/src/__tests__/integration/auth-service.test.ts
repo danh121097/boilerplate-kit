@@ -1,9 +1,11 @@
 import { resetSecureStore } from "@/__tests__/helpers/fake-secure-store";
-import { AuthModel } from "@/services/auth";
+import { AuthModel, LOGOUT_REFRESH_WAIT_MS } from "@/services/auth";
+import { RefreshTokenManager } from "@/services/core";
 import {
   getAccessToken,
   getRefreshToken,
   persistAccessToken,
+  persistRefreshToken,
 } from "@/services/core/auth-token-storage";
 
 jest.mock("expo-secure-store", () =>
@@ -60,6 +62,80 @@ describe("AuthModel", () => {
     jest.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
     await AuthModel.logout();
     expect(await getAccessToken("MAIN")).toBeNull();
+  });
+
+  it("logout sends the stored refresh token in the body so the server can revoke it", async () => {
+    await persistAccessToken("AT", "MAIN");
+    await persistRefreshToken("RT", "MAIN");
+    const post = jest.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
+    await AuthModel.logout();
+    expect(post).toHaveBeenCalledWith(
+      expect.objectContaining({ url: "/auth/logout", data: { refreshToken: "RT" } }),
+    );
+    expect(await getRefreshToken("MAIN")).toBeNull();
+  });
+
+  it("logout sends the access token read before the clear as an explicit Bearer header", async () => {
+    await persistAccessToken("AT", "MAIN");
+    await persistRefreshToken("RT", "MAIN");
+    let storedAtPost: string | null | undefined;
+    const post = jest.spyOn(AuthModel.api, "post").mockImplementation(async () => {
+      storedAtPost = await getAccessToken("MAIN");
+      return { success: true } as never;
+    });
+    await AuthModel.logout();
+    expect(storedAtPost).toBeNull(); // already cleared when the POST goes out
+    expect(post).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "/auth/logout",
+        data: { refreshToken: "RT" },
+        headers: { authorization: "Bearer AT" },
+        skipAuthRefresh: true,
+      }),
+    );
+  });
+
+  it("logout sends no Authorization header when no access token was held", async () => {
+    await persistRefreshToken("RT", "MAIN");
+    const post = jest.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
+    await AuthModel.logout();
+    expect(post.mock.calls[0]?.[0]).not.toHaveProperty("headers");
+  });
+
+  it("logout stops waiting for a hung refresh after the cap and revokes the current token", async () => {
+    jest.useFakeTimers();
+    let release: (error: Error) => void = () => {};
+    try {
+      await persistAccessToken("AT", "MAIN");
+      await persistRefreshToken("RT", "MAIN");
+      const hung = new RefreshTokenManager({
+        service: "MAIN",
+        // Does not settle until the test releases it.
+        refresh: () => new Promise((_resolve, reject) => (release = reject)),
+        onRefreshFailed: jest.fn(),
+      });
+      const pending = hung.getFreshToken().catch(() => undefined);
+      const post = jest.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
+
+      const loggingOut = AuthModel.logout();
+      await jest.advanceTimersByTimeAsync(LOGOUT_REFRESH_WAIT_MS - 1);
+      expect(post).not.toHaveBeenCalled(); // still waiting just under the cap
+      await jest.advanceTimersByTimeAsync(1);
+      await loggingOut;
+
+      expect(post).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { refreshToken: "RT" },
+          headers: { authorization: "Bearer AT" },
+        }),
+      );
+      expect(await getAccessToken("MAIN")).toBeNull();
+      expect(await getRefreshToken("MAIN")).toBeNull();
+      release(new Error("released"));
+      await pending; // leave no pending refresh behind for later tests
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("logout still clears the token even if the request fails", async () => {

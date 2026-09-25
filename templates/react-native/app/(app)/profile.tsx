@@ -3,18 +3,26 @@ import { Card } from "@/components/ui/card";
 import { Text } from "@/components/ui/text";
 import { useAuthStore } from "@/stores/auth";
 import { router, Stack } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 
 /** Profile — shows the signed-in user and a logout action. */
 export default function ProfileScreen() {
   const user = useAuthStore((s) => s.user);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const logout = useAuthStore((s) => s.logout);
+  const loadUser = useAuthStore((s) => s.loadUser);
 
   const { t } = useTranslation();
 
   const [pending, setPending] = useState(false);
+
+  // Signed in but the profile fetch failed transiently at boot (offline, 5xx):
+  // retry when the screen opens. Never after logout (no session → no /me call).
+  useEffect(() => {
+    if (isAuthenticated && !user) void loadUser();
+  }, [isAuthenticated, user, loadUser]);
 
   async function onLogout() {
     setPending(true);

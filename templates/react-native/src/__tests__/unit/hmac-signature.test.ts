@@ -1,4 +1,5 @@
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
+import { AxiosHeaders } from "axios";
 import { createHmac } from "node:crypto";
 import type { InternalAxiosRequestConfig } from "axios";
 
@@ -68,6 +69,29 @@ describe("hmac-signature", () => {
     );
   });
 
+  it.each([
+    ["text/plain", { "Content-Type": "text/plain" }],
+    ["application/x-www-form-urlencoded", { "content-type": "application/x-www-form-urlencoded" }],
+    ["multipart/form-data", AxiosHeaders.from({ "Content-Type": "multipart/form-data" })],
+  ])("signs the pinned %s when the request has a body", (expected, headers) => {
+    process.env.EXPO_PUBLIC_HMAC_SECRET = "shared-secret";
+    const config = {
+      url: "/upload",
+      method: "post",
+      headers,
+      data: "payload",
+    } as unknown as InternalAxiosRequestConfig;
+    const sig = HMACSignatureGenerator.generateSignature(config);
+    expect(sig!.sig).toBe(serverSign("shared-secret", "POST", expected, sig!.ctime, "/upload"));
+  });
+
+  it("signs an empty content-type for a bodyless POST even when a type is pinned", () => {
+    // axios strips Content-Type when there is no body, so the server reads "".
+    process.env.EXPO_PUBLIC_HMAC_SECRET = "shared-secret";
+    const sig = HMACSignatureGenerator.generateSignature(configFor("/auth/logout", "post"));
+    expect(sig!.sig).toBe(serverSign("shared-secret", "POST", "", sig!.ctime, "/auth/logout"));
+  });
+
   it("normalizes a URL without a leading slash before signing", () => {
     process.env.EXPO_PUBLIC_HMAC_SECRET = "shared-secret";
     const config = {
@@ -82,10 +106,51 @@ describe("hmac-signature", () => {
     );
   });
 
+  it("signs the path without an inline query string", () => {
+    process.env.EXPO_PUBLIC_HMAC_SECRET = "shared-secret";
+    const config = {
+      url: "/users?page=2&q=a",
+      method: "get",
+      headers: {},
+    } as unknown as InternalAxiosRequestConfig;
+    const sig = HMACSignatureGenerator.generateSignature(config);
+    expect(sig!.sig).toBe(serverSign("shared-secret", "GET", "", sig!.ctime, "/users"));
+  });
+
   it("includes the build version as x-version", () => {
     process.env.EXPO_PUBLIC_HMAC_SECRET = "shared-secret";
     process.env.EXPO_PUBLIC_BUILD_VERSION = "9.9.9";
     const sig = HMACSignatureGenerator.generateSignature(configFor("/x", "get"));
     expect(sig!["x-version"]).toBe("9.9.9");
+  });
+
+  it("the refresh client signs application/json because it always sends a JSON body", async () => {
+    process.env.EXPO_PUBLIC_HMAC_SECRET = "shared-secret";
+    jest.resetModules();
+    jest.doMock("expo-secure-store", () =>
+      require("@/__tests__/helpers/fake-secure-store").fakeSecureStore(),
+    );
+    const axiosMod = require("axios").default as typeof import("axios").default;
+    const post = jest.spyOn(axiosMod, "post").mockResolvedValue({
+      data: { data: { tokens: { accessToken: "A" } } },
+    } as never);
+    const { createTokenRefresher } = require("@/services/core/auth-refresh-client");
+
+    await createTokenRefresher("/auth/refresh", "MAIN")();
+
+    const [, body, opts] = post.mock.calls[0]!;
+    const headers = (opts as { headers: Record<string, string | number> }).headers;
+    expect(body).toEqual({ refreshToken: undefined });
+    expect(headers["Content-Type"]).toBe("application/json");
+    expect(headers.sig).toBe(
+      serverSign(
+        "shared-secret",
+        "POST",
+        "application/json",
+        Number(headers.ctime),
+        "/auth/refresh",
+      ),
+    );
+    post.mockRestore();
   });
 });

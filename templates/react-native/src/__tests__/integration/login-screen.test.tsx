@@ -8,8 +8,10 @@ jest.mock("expo-secure-store", () =>
 // jest hoists jest.mock() above imports; factories may only reference
 // out-of-scope vars whose names start with `mock`.
 const mockReplace = jest.fn();
+let mockParams: Record<string, string> = {};
 jest.mock("expo-router", () => ({
   router: { replace: (...args: unknown[]) => mockReplace(...args) },
+  useLocalSearchParams: () => mockParams,
 }));
 
 const mockMutateAsync = jest.fn();
@@ -42,6 +44,7 @@ const renderLogin = () =>
 describe("LoginScreen", () => {
   beforeEach(() => {
     mockReplace.mockClear();
+    mockParams = {};
     mockMutateAsync.mockReset();
   });
 
@@ -67,6 +70,23 @@ describe("LoginScreen", () => {
       expect(mockMutateAsync).toHaveBeenCalledWith({ email: "a@b.com", password: "password123" }),
     );
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/"));
+  });
+
+  it.each([
+    ["/profile", "/profile"],
+    ["//evil.example/phish", "/"],
+    ["https://evil.example", "/"],
+    ["/login", "/"],
+  ])("after sign-in returns to returnTo=%j → %s", async (returnTo, expected) => {
+    mockParams = { returnTo };
+    mockMutateAsync.mockResolvedValue({ user: USER, tokens: { accessToken: "AT" } });
+    renderLogin();
+
+    fireEvent.changeText(screen.getByTestId("login-email"), "a@b.com");
+    fireEvent.changeText(screen.getByTestId("login-password"), "password123");
+    fireEvent.press(screen.getByTestId("login-submit"));
+
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith(expected));
   });
 
   it("shows an error message when login fails", async () => {

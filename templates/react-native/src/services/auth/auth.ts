@@ -3,9 +3,12 @@ import {
   clearAuthTokens,
   defineMutation,
   defineQuery,
+  getAccessToken,
+  getRefreshToken,
   Model,
   persistAccessToken,
   persistRefreshToken,
+  RefreshTokenManager,
 } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
 import type {
@@ -15,13 +18,20 @@ import type {
   RegisterPayload,
 } from "@/services/auth/types/auth";
 
+/** Longest sign-out waits for an in-flight token refresh before revoking anyway. */
+export const LOGOUT_REFRESH_WAIT_MS = 15_000;
+
 export class AuthModel extends Model {
   static {
     Model.setup.call(this, { path: authContract.base, service: authContract.service });
   }
 
   static async login(payload: LoginPayload): Promise<AuthResult> {
-    const res = await this.api.post<AuthResult>({ url: authContract.paths.login, data: payload });
+    const res = await this.api.post<AuthResult>({
+      url: authContract.paths.login,
+      data: payload,
+      skipAuthRefresh: true,
+    });
     return this.storeSession(res.data);
   }
 
@@ -29,16 +39,55 @@ export class AuthModel extends Model {
     const res = await this.api.post<AuthResult>({
       url: authContract.paths.register,
       data: payload,
+      skipAuthRefresh: true,
     });
     return this.storeSession(res.data);
   }
 
+  /**
+   * Sign out: revoke the LATEST refresh token server-side, having already cleared
+   * every stored token locally.
+   *
+   * 1. Wait out any in-flight refresh (looping in case another starts meanwhile)
+   *    so the token we revoke is the rotated one, not the one it replaced — a
+   *    rotated-but-unrevoked token would stay valid on the server. The total wait
+   *    is capped (`LOGOUT_REFRESH_WAIT_MS`): after that, sign-out proceeds with
+   *    whatever token is stored, so a hung refresh cannot block it.
+   * 2. Read both tokens together, then clear local tokens synchronously after the
+   *    last check: this bumps the session epoch (a later refresh cannot re-save
+   *    anything) and, with no access token left, no new refresh can start.
+   * 3. POST `{ refreshToken }` — in the body, the app has no cookie jar — with the
+   *    access token read in step 2 as an explicit Bearer header (the interceptor
+   *    finds nothing to attach after the clear). `skipAuthRefresh` keeps a 401
+   *    here from refreshing or firing session-expired.
+   */
   static async logout(): Promise<void> {
+    let refreshToken: string | undefined;
+    let accessToken: string | undefined;
+
+    const deadline = Date.now() + LOGOUT_REFRESH_WAIT_MS;
     try {
-      await this.api.post({ url: authContract.paths.logout });
+      do {
+        await RefreshTokenManager.waitForPendingRefresh(
+          this.service,
+          Math.max(0, deadline - Date.now()),
+        );
+        const [refresh, access] = await Promise.all([
+          getRefreshToken(this.service),
+          getAccessToken(this.service),
+        ]);
+        refreshToken = refresh ?? undefined;
+        accessToken = access ?? undefined;
+      } while (RefreshTokenManager.hasPendingRefresh(this.service) && Date.now() < deadline);
     } finally {
       await clearAuthTokens();
     }
+    await this.api.post({
+      url: authContract.paths.logout,
+      data: { refreshToken },
+      skipAuthRefresh: true,
+      ...(accessToken && { headers: { authorization: `Bearer ${accessToken}` } }),
+    });
   }
 
   static async getMe(): Promise<AuthUser> {

@@ -4,14 +4,16 @@ import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 import { useLoginMutation } from "@/services/auth";
 import { useAuthStore } from "@/stores/auth";
+import { safeReturnPath } from "@/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { KeyboardAvoidingView, Platform, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { z } from "zod";
+import type { Href } from "expo-router";
 
 const schema = z.object({
   email: z.string().email("Invalid email"),
@@ -25,6 +27,8 @@ export default function LoginScreen() {
 
   const { t } = useTranslation();
   const { isPending, mutateAsync } = useLoginMutation();
+  // Set by the auth gate after a session expiry; validated (in-app paths only).
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
 
   const {
     control,
@@ -42,7 +46,7 @@ export default function LoginScreen() {
     try {
       const result = await mutateAsync(values);
       setUser(result.user);
-      router.replace("/");
+      router.replace(safeReturnPath(returnTo) as Href);
     } catch {
       setFailed(true);
     }

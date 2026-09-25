@@ -46,6 +46,7 @@ pnpm format       # prettier --write
 - `strict: true` + `noUncheckedIndexedAccess: true` in tsconfig.
 - Token storage is **async**—all SecureStore reads/writes return promises.
 - HMAC secret must match backend `HMAC_SECRET`; leave empty for backends without HMAC.
+  It ships in the bundle — anti-casual-abuse only, not a security boundary.
 - `EXPO_PUBLIC_*` environment variables are inlined at build time — no secrets.
-- Hard logout: router redirect to `/login` via injected `onSessionExpired` callback (no `window.location`).
+- Hard logout: injected `onSessionExpired` callback resets auth state; the `(app)` gate redirects to `/login?returnTo=…` (no `window.location`).
 - File size target ≤ 200 LOC per file; split early.
