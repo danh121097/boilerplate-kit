@@ -134,7 +134,9 @@ the user is signed out. This is by design on the server side.
 
 ## Logout
 
-`AuthModel.logout()` revokes the **latest** refresh token:
+`AuthModel.logout()` is the user's own sign-out and the only `"logout"` session
+end. It revokes the **latest** refresh token (the steps are shared with
+`revokeSession`, below, through one private helper that takes the end reason):
 0. It marks a logout as pending (`beginLogout`) synchronously, before any
    await: from then on no refresh starts or is joined, and a 401 rejects as
    `session_ended` without calling `/auth/refresh`.
@@ -158,9 +160,6 @@ the user is signed out. This is by design on the server side.
    refreshes, clears or ends the session.
 4. Whatever the response, it clears every stored token and calls
    `endSession("logout", service)`.
-
-Overlapping `loadUser()` calls of the same session share one `getMe`, so two
-screens hitting the same 401 run a single logout.
 
 The auth store then calls `resetQueriesToSignedOut(queryClient,
 queryKeys.auth.me)` — every cached query is reset and the session query is
@@ -187,9 +186,26 @@ are rolled back (compare-and-delete).
 
 ## Hard logout (session expired)
 
-When the refresh endpoint refuses the refresh with 401/403, the service's tokens
-are cleared and `endSession("expired", service)` notifies `onSessionEnded`
-listeners. The root layout subscribes `watchSessionEnd()` (in `stores/auth.ts`),
+Every session the server rejects ends as `"expired"`:
+- the refresh endpoint refuses the refresh with 401/403: the refresh manager
+  clears the service's tokens and calls `endSession("expired", service)`;
+- the session query (`getMe`) itself gets a 401 — at boot, or on the profile
+  screen's retry mid-session: `loadUser()` calls `AuthModel.revokeSession()`.
+
+`revokeSession()` runs the logout steps above (early token capture, lock,
+epoch bump, best-effort `POST /auth/logout`, clear) but ends with
+`endSession("expired", service)` and resolves `true`. `revokeSession(sinceEpoch?)`
+takes the epoch the caller read before its request (`loadUser` passes the one
+it read before `getMe`). It posts nothing and resolves `false` when the session
+already ended — the epoch moved since `sinceEpoch`, a logout is pending, or no
+token is stored — and the store then only resets its state.
+Concurrent callers share one in-flight revoke (one POST, one event); a
+`logout()` called during it awaits that revoke instead of posting again, and
+overlapping `loadUser()` calls of the same session share one `getMe`. When the
+revoke ended the session, `loadUser()` sets `sessionExpired: true` itself, so a
+boot 401 (not yet authenticated) also gets a `returnTo`.
+
+`endSession` notifies `onSessionEnded` listeners. The root layout subscribes `watchSessionEnd()` (in `stores/auth.ts`),
 which reacts only to the auth service: it resets every cached query to signed
 out (`resetQueriesOnSessionEnd`) and, when the session expired while
 authenticated, calls `useAuthStore.expireSession()` (`isAuthenticated: false`,
@@ -213,7 +229,7 @@ token is stored) and calls `getMe`:
 - success → authenticated with `user`;
 - a 401 (the refresh was refused, or the session query itself was refused) →
   logged out; unless the session already ended, the store runs
-  `AuthModel.logout()` to revoke and clear the tokens;
+  `AuthModel.revokeSession()` (revoke, clear, end as `"expired"`, `returnTo`);
 - any other failure (offline, 5xx, 429, timeout) with tokens still stored →
   **stays authenticated with `user: null`**. `loadUser()` retries; the profile
   screen calls it when it opens authenticated without a user (never after logout).

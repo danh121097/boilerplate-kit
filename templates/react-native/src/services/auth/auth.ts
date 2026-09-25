@@ -8,6 +8,8 @@ import {
   endSession,
   getAccessToken,
   getRefreshToken,
+  getSessionEpoch,
+  isLogoutPending,
   isUnauthorizedError,
   Model,
   persistAccessToken,
@@ -21,7 +23,7 @@ import type {
   LoginPayload,
   RegisterPayload,
 } from "@/services/auth/types/auth";
-import type { ApiService } from "@/services/core";
+import type { ApiService, SessionEndReason } from "@/services/core";
 
 /** Both stored tokens of `service`; a failed SecureStore read counts as none. */
 async function readTokenPair(service: ApiService) {
@@ -51,32 +53,79 @@ export class AuthModel extends Model {
   }
 
   /**
-   * Sign out: revoke the LATEST refresh token server-side, then drop every
-   * stored token — even when the request fails.
+   * Sign out (user action only): revoke the LATEST refresh token server-side,
+   * then drop every stored token — even when the request fails — and end the
+   * session as `logout` (no expiry, no return path). See `endServerSession`.
+   * During an in-flight revoke it waits for that one instead: the same tokens
+   * are revoked once and the session ends once (as `expired`).
+   */
+  static async logout(): Promise<void> {
+    // A revoke that backs out (session already ended elsewhere) leaves this
+    // one to be logged out normally.
+    if (this.revoking && (await this.revoking)) return;
+    await this.endServerSession("logout");
+  }
+
+  /**
+   * The server rejected the session outside a refused refresh (a 401 on the
+   * session query): revoke it like logout, but end it as `expired`, so the
+   * auth gate sends the user to /login with a `returnTo` of the current screen.
+   *
+   * Nothing is posted when the session already ended (logout pending, no token
+   * stored, or — with `sinceEpoch`, the epoch the caller read before its
+   * request — the epoch moved since): the caller only resets local state.
+   * Best effort — a failed POST still clears the tokens. Concurrent callers
+   * share one revoke. Resolves true when this call ended the session.
+   */
+  static revokeSession(sinceEpoch?: number): Promise<boolean> {
+    const service = this.service;
+    const epoch = getSessionEpoch(service);
+    if (sinceEpoch !== undefined && sinceEpoch !== epoch) return Promise.resolve(false);
+    if (this.revoking) return this.revoking;
+    if (isLogoutPending(service)) return Promise.resolve(false);
+    this.revoking = this.endServerSession("expired", epoch)
+      .catch(() => true) // the POST failed; the tokens are cleared and the session ended anyway
+      .finally(() => {
+        this.revoking = null;
+      });
+    return this.revoking;
+  }
+
+  private static revoking: Promise<boolean> | null = null;
+
+  /**
+   * The shared exit of `logout` and `revokeSession`:
    *
    * 1. Logout-pending from the first tick (before any await): no refresh starts
-   *    while logout waits or reads the tokens, and a 401 that would trigger one
-   *    rejects with `session_ended`.
+   *    while this waits or reads the tokens, and a 401 that would trigger one
+   *    rejects with `session_ended`. The token reads start in the same tick
+   *    (SecureStore is async) — that pair is the fallback below.
    * 2. Wait out any in-flight refresh (`withSessionLock`, capped at 15s) so the
    *    token revoked is the rotated one, not the one it replaced — a
    *    rotated-but-unrevoked token would stay valid on the server.
-   * 3. Read both tokens again and bump the epoch: a refresh landing later
-   *    writes nothing back. The pair read when logout started (those reads are
-   *    kicked off first, since SecureStore is async) is the fallback when
-   *    storage is empty by then.
+   * 3. Read both tokens again (falling back to the pair from step 1 when
+   *    storage is empty by then) and bump the epoch: a refresh landing later
+   *    writes nothing back. With `sinceEpoch` (revoke), a session that already
+   *    ended — epoch moved or nothing stored — is left alone: resolves false.
    * 4. POST `{ refreshToken }` — in the body, the app has no cookie jar — with
    *    the captured access token as an explicit Bearer header. The logout path
    *    is a refresh `skipPaths` entry, so its 401 is never refreshed.
-   * 5. Clear every stored token and end the session (`logout`: no expiry, no
-   *    return path).
+   * 5. Clear every stored token and `endSession(reason)`.
    */
-  static async logout(): Promise<void> {
+  private static async endServerSession(
+    reason: SessionEndReason,
+    sinceEpoch?: number,
+  ): Promise<boolean> {
     const service = this.service;
     const held = readTokenPair(service);
     const done = beginLogout(service);
     try {
-      await withSessionLock(service, async () => {
+      return await withSessionLock(service, async () => {
         const [stored, captured] = await Promise.all([readTokenPair(service), held]);
+        if (sinceEpoch !== undefined) {
+          const signedOut = !stored.access && !stored.refresh;
+          if (signedOut || getSessionEpoch(service) !== sinceEpoch) return false;
+        }
 
         const accessToken = stored.access ?? captured.access;
         const refreshToken = stored.refresh ?? captured.refresh;
@@ -89,8 +138,9 @@ export class AuthModel extends Model {
           });
         } finally {
           await clearAuthTokens();
-          endSession("logout", service);
+          endSession(reason, service);
         }
+        return true;
       });
     } finally {
       done();

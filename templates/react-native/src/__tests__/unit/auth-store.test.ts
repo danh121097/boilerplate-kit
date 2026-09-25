@@ -8,7 +8,7 @@ import {
   persistAccessToken,
   persistRefreshToken,
 } from "@/services/core/auth-token-storage";
-import { endSession } from "@/services/core/session";
+import { endSession, onSessionEnded } from "@/services/core/session";
 import { useAuthStore, watchSessionEnd } from "@/stores/auth";
 
 jest.mock("expo-secure-store", () =>
@@ -31,7 +31,12 @@ const REFRESH_UNAVAILABLE = {
 };
 
 function resetStore() {
-  useAuthStore.setState({ user: null, isAuthenticated: false, hydrated: false });
+  useAuthStore.setState({
+    user: null,
+    isAuthenticated: false,
+    hydrated: false,
+    sessionExpired: false,
+  });
 }
 
 describe("auth store", () => {
@@ -81,17 +86,45 @@ describe("auth store", () => {
       expect(await getRefreshToken("MAIN")).toBe("RT");
     });
 
-    it("logs out when the refresh was refused and tokens were cleared", async () => {
+    it("a boot 401 after the session already ended does not post logout", async () => {
       await persistAccessToken("AT", "MAIN");
       jest.spyOn(AuthModel, "getMe").mockImplementation(async () => {
         await clearServiceTokens("MAIN"); // what the refresh manager does on 401/403
         throw { status: "error", error_code: 401, message: "expired" };
       });
-      jest.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
+      const post = jest.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
 
       await useAuthStore.getState().hydrate();
 
       expect(useAuthStore.getState()).toMatchObject({ isAuthenticated: false, hydrated: true });
+      expect(post).not.toHaveBeenCalled();
+    });
+
+    it("a boot 401 with a live session revokes it and ends it as expired with a return path", async () => {
+      await persistAccessToken("AT", "MAIN");
+      await persistRefreshToken("RT", "MAIN");
+      jest
+        .spyOn(AuthModel, "getMe")
+        .mockRejectedValue({ status: "error", error_code: 401, message: "expired" });
+      const post = jest.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
+      const ended = jest.fn();
+      const unsubscribe = onSessionEnded(ended);
+
+      try {
+        await useAuthStore.getState().hydrate();
+      } finally {
+        unsubscribe();
+      }
+
+      expect(post).toHaveBeenCalledTimes(1);
+      expect(ended).toHaveBeenCalledTimes(1);
+      expect(ended).toHaveBeenCalledWith("expired", "MAIN");
+      // sessionExpired is what makes the (app) gate add a returnTo.
+      expect(useAuthStore.getState()).toMatchObject({
+        isAuthenticated: false,
+        hydrated: true,
+        sessionExpired: true,
+      });
     });
 
     it("ends the session (revokes and clears the tokens) on a 401 with tokens still stored", async () => {
@@ -133,19 +166,37 @@ describe("auth store", () => {
       expect(useAuthStore.getState()).toMatchObject({ user: USER, isAuthenticated: true });
     });
 
-    it("overlapping calls hitting the same 401 share one getMe and run a single logout", async () => {
+    it("a mid-session 401 on the profile retry revokes the session as expired", async () => {
+      await persistAccessToken("AT", "MAIN");
+      useAuthStore.setState({ isAuthenticated: true, hydrated: true });
+      jest
+        .spyOn(AuthModel, "getMe")
+        .mockRejectedValue({ status: "error", error_code: 401, message: "expired" });
+      const post = jest.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
+
+      await useAuthStore.getState().loadUser();
+
+      expect(post).toHaveBeenCalledTimes(1);
+      expect(useAuthStore.getState()).toMatchObject({
+        user: null,
+        isAuthenticated: false,
+        sessionExpired: true,
+      });
+      expect(await getAccessToken("MAIN")).toBeNull();
+    });
+
+    it("overlapping calls hitting the same 401 share one getMe and post logout once", async () => {
       await persistAccessToken("AT", "MAIN");
       await persistRefreshToken("RT", "MAIN");
       const getMe = jest
         .spyOn(AuthModel, "getMe")
         .mockRejectedValue({ status: "error", error_code: 401, message: "expired" });
-      const logout = jest.spyOn(AuthModel, "logout");
-      jest.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
+      const post = jest.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
 
       await Promise.all([useAuthStore.getState().loadUser(), useAuthStore.getState().loadUser()]);
 
       expect(getMe).toHaveBeenCalledTimes(1);
-      expect(logout).toHaveBeenCalledTimes(1);
+      expect(post).toHaveBeenCalledTimes(1);
       expect(useAuthStore.getState()).toMatchObject({ user: null, isAuthenticated: false });
     });
 

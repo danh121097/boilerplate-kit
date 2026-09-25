@@ -66,7 +66,7 @@ src/
     core/                axios client, interceptors, refresh, HMAC, token storage
     auth/                auth service (login / register / logout / me)
     users/               users service
-    init-services.ts     wire base URLs + interceptors + session-expired callback
+    init-services.ts     wire base URLs + interceptors + refresh options
   stores/                Zustand stores (auth, socket-io)
   styles/global.css      Tailwind entry (consumed by NativeWind/Metro)
 ```

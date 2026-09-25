@@ -38,6 +38,9 @@ Auth state rules:
   and keeps the user signed in (`isAuthenticated: true`, `user: null`)
   when `getMe` fails for a non-auth reason (offline, 5xx, 429, timeout) and the
   tokens are still stored; only a session-ending failure logs out.
+- `loadUser()` on a 401 revokes the session through `AuthModel.revokeSession()`
+  (ended as `"expired"`, so `sessionExpired: true` and the gate adds
+  `returnTo`), unless it already ended; overlapping calls share one `getMe`.
 - `loadUser()` reads the session epoch before `getMe` and drops a late result
   (success or failure) if a logout/expiry happened meanwhile.
 - `expireSession()` is called by `watchSessionEnd()` (subscribed by the root

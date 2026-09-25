@@ -48,5 +48,5 @@ pnpm format       # prettier --write
 - HMAC secret must match backend `HMAC_SECRET`; leave empty for backends without HMAC.
   It ships in the bundle — anti-casual-abuse only, not a security boundary.
 - `EXPO_PUBLIC_*` environment variables are inlined at build time — no secrets.
-- Hard logout: a refused refresh ends the session (`onSessionEnded`); `watchSessionEnd` resets auth state; the `(app)` gate redirects to `/login?returnTo=…` (no `window.location`).
+- Hard logout: a refused refresh, or a 401 on the session query (`AuthModel.revokeSession()`), ends the session as expired (`onSessionEnded`); `watchSessionEnd` resets auth state; the `(app)` gate redirects to `/login?returnTo=…` (no `window.location`).
 - File size target ≤ 200 LOC per file; split early.

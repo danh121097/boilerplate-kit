@@ -102,10 +102,16 @@ async function loadUserOnce(epoch: number): Promise<void> {
   } catch (error) {
     if (isStale()) return;
     if (isUnauthorizedError(error)) {
-      // The session query itself was refused: the session is over. Revoke and
-      // drop the tokens — unless it already ended (logout in progress).
-      if (!(error instanceof SessionEndedError)) await AuthModel.logout().catch(() => {});
-      useAuthStore.setState({ user: null, isAuthenticated: false });
+      // The session query itself was refused: the session is over. Revoke it as
+      // expired (the gate then adds a `returnTo`) — unless it already ended
+      // (logout in progress, refused refresh): then only reset local state.
+      const revoked =
+        !(error instanceof SessionEndedError) && (await AuthModel.revokeSession(epoch));
+      useAuthStore.setState({
+        user: null,
+        isAuthenticated: false,
+        ...(revoked && { sessionExpired: true }),
+      });
       return;
     }
     // Offline / 5xx / 429 / timeout / an unavailable refresh keep the tokens:
