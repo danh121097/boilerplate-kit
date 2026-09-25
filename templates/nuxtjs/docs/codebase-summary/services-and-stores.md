@@ -26,15 +26,17 @@ merge supported).
 Base class for domain services. Subclasses call `Model.setup({ path, service })`
 in a static block to bind an `Api` instance + path. See `AuthModel`, `UsersModel`.
 
-### Auth tokens (`auth-token-storage.ts`) — SSR-guarded
+### Session hint (`session-hint.ts`) + app prefix (`app-prefix.ts`)
 
-`localStorage` token registry. `isClient()` (`typeof window !== "undefined"`)
-guards every read/write, so during SSR `getAuthToken()` returns `null` and
-mutations silently no-op. Tokens are namespaced per service via a lazy
-`TokenKeyResolver` (the slot depends on the runtime app prefix, only knowable in
-a request scope). MAIN defaults to `useStorageKeys("AUTH_TOKEN")`; register more
-with `registerServiceToken(service, resolver)`. Helpers: `getAuthToken`,
-`persistAuthToken`, `clearAuthToken`, `clearAuthTokens`.
+Auth tokens are httpOnly cookies — nothing auth-related is stored by JS. The
+readable `<APP_NAME>_SESSION=1` cookie only says "a session is believed to exist"
+(set on login / register / refresh, cleared on logout / expiry; never used for
+authorization). `hasSessionHint()` reads `document.cookie` in the browser and the
+request cookie header during SSR. `clearSessionHint()` also bumps a session
+epoch: a refresh that lands after logout sees it changed and does not re-mark the
+session. `setAppPrefix()` (called by `01.init-services.ts` with
+`NUXT_PUBLIC_APP_NAME`) prefixes the hint cookie, the refresh Web Lock and its
+localStorage timestamp.
 
 ### HMAC signing (`hmac-signature.ts`) — via runtimeConfig
 
@@ -43,26 +45,34 @@ with `registerServiceToken(service, resolver)`. Helpers: `getAuthToken`,
 outside a request scope or when no secret). It signs
 `[method, contentType, ctime, path, ""].join("\n")` with HMAC-SHA256 (base64),
 returning `{ sig, ctime, "x-version" }` (version from `public.buildVersion`).
-Because the secret is `public`, it reaches the browser — for production, sign in
-a Nitro route and use a private `runtimeConfig.hmacSecret`.
+Because the browser signs too, the secret must stay `public` and reaches every
+client — treat it as anti-casual-abuse, not authentication. Moving it to a
+private `runtimeConfig.hmacSecret` would break browser signing; for an
+unforgeable signature, proxy browser traffic through a server route that signs.
 
 ### Headers (`headers-utils.ts`)
 
-`HeadersUtils.setAuthHeaders` attaches HMAC headers when present;
-`addAuthorizationHeader` attaches `Bearer <token>` from the service's slot.
+`HeadersUtils.setAuthHeaders` attaches HMAC headers when a secret is set. There
+is no Authorization header: auth rides on the httpOnly cookies
+(`withCredentials`).
 
 ### Refresh flow (`interceptors.ts`, `refresh-token-manager.ts`, `auth-refresh-client.ts`)
 
-- **Request interceptor** tags `config.serviceType`, adds HMAC + Bearer headers.
+- **Request interceptor** tags `config.serviceType` and `_sentAt`, adds HMAC headers.
 - **Response interceptor** unwraps recognized envelopes (`{ status }` or
   `{ success }`), unwraps `Blob` responses, and on **401** (HTTP status or
   `error_code: 401`) attempts a refresh-and-replay when eligible
-  (`canAttemptRefresh`: not already retried, not the refresh call, and a token
-  exists for that service — anonymous traffic never triggers a refresh storm).
+  (`canAttemptRefresh`: not already retried, not a credential endpoint —
+  login/register/logout/refresh 401s are never refreshed — and the readable
+  session-hint cookie is set, so anonymous 401s never call refresh; see
+  `session-hint.ts`). It never reloads the
+  page; rejections are normalized by `toApiError` (`api-errors.ts`).
 - **`RefreshTokenManager`** serializes refreshes per service: a burst of
   concurrent 401s yields exactly **one** network refresh (single-flight
-  `inFlight` promise); all callers await it, then replay with the new token. On
-  failure it clears the token and fires `onRefreshFailed` (page reload).
+  `inFlight` promise), run under a cross-tab `navigator.locks` lock and skipped
+  when another tab rotated the cookies after the request was sent. A refused
+  refresh fires `notifySessionExpired` (`session-events.ts`) →
+  `04.session-expiry.client.ts` clears the query cache and routes to `/login`.
 - **`createTokenRefresher`** hits `/auth/refresh` on a **bare** axios instance
   (NOT the app client, to avoid refresh recursion) with `withCredentials` so the
   httpOnly refresh cookie is sent; it re-attaches HMAC headers manually, and
@@ -85,7 +95,10 @@ module augmentation adding `serviceType` and `_retry` to the request config.
 
 ### Auth (`app/services/auth/auth.ts`)
 
-`AuthModel extends Model` (path `/auth`). Methods: `login`, `register`, `logout`.
+`AuthModel extends Model` (path `/auth`). Methods: `login`, `register` (both
+mark the session hint), `logout` (runs under the refresh lock via
+`withSessionLock`, so it never overlaps a refresh, and always clears the hint),
+`getMe`.
 Cookie-first: the backend sets httpOnly access/refresh cookies, so there is no
 client-side token persistence. The response interceptor already unwraps the
 envelope, so each method reads `res.data` once. Exposes `useLoginMutation`,
@@ -120,9 +133,9 @@ Pinia setup stores (explicit import only — `pinia.storesDirs: []`):
 ## Socket.IO (`app/composables/useSocketIO.ts`)
 
 `useSocketIO()` creates an `io()` connection scoped to the component tree.
-SSR-safe: `io()` is lazy (no socket opens until `.connect()`), `getAuthToken()`
-returns `null` on the server, and `onMounted(connectSocket)` only fires
-client-side. Auth payload is `{ token: 'Bearer <token>', role, sig, ctime }` —
+SSR-safe: `io()` is lazy (no socket opens until `.connect()`) and
+`onMounted(connectSocket)` only fires client-side. Auth payload is
+`{ role, sig, ctime }` (the httpOnly cookie authenticates) —
 `signHeader()` HMAC-signs `["GET","application/json",ctime,"/socket",""]` using
 `runtimeConfig.public.hmacSecret`. Throttled reconnect, event handlers keyed off
 `SOCKET_EVENT`, and `onScopeDispose` cleanup. Also exports `useIo()` (lazy

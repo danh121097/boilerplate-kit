@@ -3,6 +3,10 @@ import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import type { ApiService } from "@/services/core/types";
 import axios from "axios";
 
+/** A refresh that takes longer is abandoned as a transient failure (the
+ * session is kept; a later 401 refreshes again). */
+export const REFRESH_TIMEOUT_MS = 15_000;
+
 /**
  * Build a refresher bound to a service + endpoint, for the single-flight manager.
  * Runs on a bare axios instance (NOT the app client) so a 401 from the refresh
@@ -27,6 +31,7 @@ export function createTokenRefresher(endpoint: string, service: ApiService) {
     await axios.post(`${Api.getBaseURL(service)}${endpoint}`, undefined, {
       withCredentials: true,
       headers,
+      timeout: REFRESH_TIMEOUT_MS,
     });
   };
 }

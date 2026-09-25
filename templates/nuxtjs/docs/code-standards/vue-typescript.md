@@ -69,17 +69,13 @@ SFCs and the composables they call SSR-safe.
 ### Guard browser-only access with `isClient`
 
 Never touch `window`, `document`, or `localStorage` at module scope or during
-setup without a client guard. The token storage shows the pattern — server reads
-no-op and return `null`:
+setup without a client guard. The session-hint writer shows the pattern — on the
+server it is a no-op:
 
 ```ts
-function isClient(): boolean {
-  return typeof window !== "undefined" && typeof localStorage !== "undefined";
-}
-
-export function getAuthToken(service = "MAIN"): string | null {
-  if (!isClient()) return null;
-  return localStorage.getItem(resolveTokenKey(service));
+export function markSessionActive(): void {
+  if (typeof document === "undefined") return;
+  document.cookie = `${cookieName()}=1; path=/; max-age=${SESSION_HINT_MAX_AGE}; SameSite=Lax`;
 }
 ```
 

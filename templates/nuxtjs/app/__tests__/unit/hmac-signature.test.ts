@@ -1,3 +1,5 @@
+import { makeClient, ok } from "@/__tests__/helpers/http-mocks";
+import { HeadersUtils } from "@/services/core/headers-utils";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import { createHmac } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -62,6 +64,76 @@ describe("hmac-signature", () => {
     expect(sig!.sig).toBe(
       serverSign("shared-secret", "POST", "application/json", sig!.ctime, "/auth/login"),
     );
+  });
+
+  it("signs the Content-Type a request with a body actually pins (not always JSON)", () => {
+    stubSecret("shared-secret");
+    const sig = HMACSignatureGenerator.generateSignature(
+      configFor("/notes", "post", { data: "raw text", contentType: "text/plain" }),
+    );
+    expect(sig!.sig).toBe(serverSign("shared-secret", "POST", "text/plain", sig!.ctime, "/notes"));
+  });
+
+  it("defaults to application/json when a request with a body pins no Content-Type", () => {
+    stubSecret("shared-secret");
+    const sig = HMACSignatureGenerator.generateSignature({
+      url: "/notes",
+      method: "post",
+      data: { a: 1 },
+      headers: {},
+    } as unknown as InternalAxiosRequestConfig);
+    expect(sig!.sig).toBe(
+      serverSign("shared-secret", "POST", "application/json", sig!.ctime, "/notes"),
+    );
+  });
+
+  it("signs the path without ?query / #hash — the server verifies it stripped", () => {
+    stubSecret("shared-secret");
+    const sig = HMACSignatureGenerator.generateSignature(configFor("/users?page=2#top", "get"));
+    expect(sig!.sig).toBe(serverSign("shared-secret", "GET", "", sig!.ctime, "/users"));
+  });
+
+  it("signs a pinned Content-Type exactly as sent, charset included", () => {
+    stubSecret("shared-secret");
+    const config = configFor("/notes", "post", {
+      data: { a: 1 },
+      contentType: "application/json; charset=utf-8",
+    });
+    const headers = HeadersUtils.setAuthHeaders(config) as unknown as Record<string, unknown>;
+    expect(headers["Content-Type"]).toBe("application/json; charset=utf-8");
+    expect(headers.sig).toBe(
+      serverSign(
+        "shared-secret",
+        "POST",
+        "application/json; charset=utf-8",
+        Number(headers.ctime),
+        "/notes",
+      ),
+    );
+  });
+
+  it("a real request signs its sent Content-Type and the path without any query", async () => {
+    stubSecret("shared-secret");
+    const seen: InternalAxiosRequestConfig[] = [];
+    const client = makeClient(async (config) => {
+      seen.push(config);
+      return ok(config, { success: true });
+    });
+
+    await client.get("/users?page=2", { params: { limit: 5 } });
+    await client.post("/notes?draft=1", { a: 1 });
+
+    for (const [config, method, path] of [
+      [seen[0]!, "GET", "/users"],
+      [seen[1]!, "POST", "/notes"],
+    ] as const) {
+      const headers = config.headers;
+      const sent = config.data === undefined ? "" : String(headers.get("Content-Type") ?? "");
+      expect(headers.get("sig")).toBe(
+        serverSign("shared-secret", method, sent, Number(headers.get("ctime")), path),
+      );
+    }
+    expect(String(seen[1]!.headers.get("Content-Type"))).toBe("application/json");
   });
 
   it("normalizes a URL without a leading slash before signing", () => {

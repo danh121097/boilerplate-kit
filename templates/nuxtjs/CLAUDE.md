@@ -5,8 +5,8 @@ Guidance for Claude Code (and other coding agents) working in this repository.
 ## Project Overview
 
 Nuxt 4 + TypeScript SSR starter — `app/` srcDir, Pinia, TanStack Vue Query, Reka UI
-+ Tailwind v4, an SSR-guarded axios service layer with JWT bearer + httpOnly
-refresh-token rotation + HMAC-signed requests (secret via `runtimeConfig`),
++ Tailwind v4, an SSR-guarded axios service layer with httpOnly-cookie JWT
+auth + refresh-token rotation + HMAC-signed requests (secret via `runtimeConfig`),
 Socket.IO, and @nuxtjs/i18n. Package manager: **pnpm**.
 
 ## Start Here

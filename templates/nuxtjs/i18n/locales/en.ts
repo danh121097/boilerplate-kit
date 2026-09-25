@@ -7,6 +7,10 @@ export default {
     login: "Login",
     logout: "Logout",
   },
+  session: {
+    unavailable: "Could not reach the server. You are still signed in.",
+    retry: "Retry",
+  },
   login: {
     title: "Sign in",
     email: "Email",

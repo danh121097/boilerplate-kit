@@ -12,8 +12,11 @@ export class HeadersUtils {
       : (config.headers as AxiosRequestHeaders);
   }
 
-  /** Attach Bearer token from the matching storage slot for the service. */
+  /** Attach Bearer token from the matching storage slot for the service, unless
+   * the caller already set one (logout sends the token it captured). */
   static addAuthorizationHeader(config: InternalAxiosRequestConfig, service: ApiService): void {
+    const headers = config.headers as unknown as { has?: (name: string) => boolean };
+    if (headers.has ? headers.has("authorization") : config.headers.authorization) return;
     const token = getAccessToken(service);
     if (token) config.headers.authorization = `Bearer ${token}`;
   }

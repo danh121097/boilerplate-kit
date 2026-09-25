@@ -83,8 +83,8 @@ src/
 `src/services/core/` mirrors a production setup:
 
 - `Api` — class-based axios client with multi-service support (`MAIN` / `AUX`), lazy interceptor registration, in-flight request counter.
-- `ApiInterceptors` — request interceptor injects auth + optional HMAC headers; response interceptor unwraps `{ status, data, ... }` envelopes and reloads on 401.
-- `HMACSignatureGenerator` — produces `sig` / `ctime` / `x-version` headers only when `VITE_HMAC_SECRET` is set. Safe to delete if your backend doesn't sign.
+- `ApiInterceptors` — request interceptor injects auth + optional HMAC headers; response interceptor unwraps `{ status, data, ... }` envelopes and, on 401, refreshes once (single-flight, cross-tab locked) and replays; login/register/logout 401s are never refreshed, and a refused refresh routes to `/login` instead of reloading.
+- `HMACSignatureGenerator` — produces `sig` / `ctime` / `x-version` headers only when `VITE_HMAC_SECRET` is set. The secret ships in the bundle, so this is anti-casual-abuse only, not authentication. Safe to delete if your backend doesn't sign.
 - `Model` — base class for domain models; subclass and call `Model.setup({ path, service })`.
 - `defineQuery` / `defineMutation` — typed wrappers around TanStack Vue Query with consistent error type.
 

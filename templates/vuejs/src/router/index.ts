@@ -1,4 +1,4 @@
-import { useAuthStore } from "@/stores/auth";
+import { authGuard } from "@/router/auth-guard";
 import { createRouter, createWebHistory } from "vue-router";
 
 const router = createRouter({
@@ -14,7 +14,7 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     { path: "/form", name: "form", component: () => import("@/views/form-view.vue") },
-    // Guests only: an authenticated user hitting /login is sent home.
+    // Guests only: an authenticated user hitting /login goes to `?redirect=`.
     {
       path: "/login",
       name: "login",
@@ -24,17 +24,6 @@ const router = createRouter({
   ],
 });
 
-// Auth guard. `isAuthenticated` reads the persisted token synchronously, so the
-// decision is made without waiting on the profile fetch (`hydrate` runs in App).
-router.beforeEach((to) => {
-  const { isAuthenticated } = useAuthStore();
-
-  if (to.meta.requiresAuth && !isAuthenticated) {
-    return { name: "login", query: { redirect: to.fullPath } };
-  }
-  if (to.meta.guestOnly && isAuthenticated) {
-    return { name: "home" };
-  }
-});
+router.beforeEach(authGuard);
 
 export default router;

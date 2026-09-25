@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useLoginMutation } from "@/services/auth/auth";
+import { getApiErrorMessage } from "@/services/core";
 import { useAuthStore } from "@/stores/auth";
+import { safeRedirect } from "@/utils/safe-redirect";
 import { toTypedSchema } from "@vee-validate/zod";
 import { useForm } from "vee-validate";
 import { z } from "zod";
@@ -32,11 +34,13 @@ const onSubmit = handleSubmit(async (values) => {
   try {
     const result = await mutateAsync(values);
     authStore.setUser(result.user);
-    // Return to the page the guard bounced the user away from, else home.
-    const redirect = typeof route.query.redirect === "string" ? route.query.redirect : "/";
-    await router.replace(redirect);
+    // Return to the page the guard bounced the user away from (same-origin
+    // paths only), else home.
+    await router.replace(safeRedirect(route.query.redirect));
   } catch (err) {
-    error.value = err instanceof Error ? err.message : t("login.error");
+    // Rejections are `ApiResponseError` objects — show the server's message
+    // (e.g. "Invalid credentials" on a 401), falling back to the generic text.
+    error.value = getApiErrorMessage(err, t("login.error"));
   }
 });
 </script>

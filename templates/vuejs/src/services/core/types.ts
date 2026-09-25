@@ -19,17 +19,21 @@ declare module "axios" {
 }
 
 /**
- * Resolved refresh config for one service. The refresh token itself lives in an
- * httpOnly cookie owned by the backend — only the short-lived access token is
- * managed client-side.
+ * Resolved refresh config for one service. Both tokens are kept in that
+ * service's localStorage slots (see `auth-token-storage.ts`); the refresh token
+ * is sent in the refresh request body.
  */
 export interface RefreshOptions {
   /** Refresh endpoint, relative to the owning service's baseURL. */
   endpoint: string;
-  /** Which backend owns the refresh cookie. */
+  /** Which backend issued the tokens. */
   service: ApiService;
-  /** Reload the page when a refresh ultimately fails (session truly expired). */
-  reloadOnFailure: boolean;
+  /**
+   * Credential endpoints (login, register, logout, ...) whose 401 means "bad
+   * credentials", never "expired session" — they are never refreshed or retried.
+   * The refresh endpoint itself is always excluded.
+   */
+  excludePaths: string[];
 }
 
 /**
@@ -51,6 +55,9 @@ export interface ApiResponseError {
   message: string;
   error_code: number;
   error_message: string;
+  /** Set on transient failures (offline, timeout, 429, 5xx): the session is
+   * kept and the call may succeed if retried. */
+  retryable?: boolean;
   data?: Record<string, unknown>;
 }
 

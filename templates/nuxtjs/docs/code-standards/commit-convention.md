@@ -54,8 +54,8 @@ multiple changes:
 ```
 feat(auth): add session persistence
 
-- persist access token for the Bearer header
-- server sets/clears the refresh token as an httpOnly cookie
+- mark the readable session hint on login
+- server sets/clears the auth tokens as httpOnly cookies
 - read .data once since the interceptor unwraps the envelope
 ```
 

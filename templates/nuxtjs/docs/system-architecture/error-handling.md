@@ -54,27 +54,23 @@ Two doors lead to the same recovery logic:
 1. **HTTP 401** — caught in `onError` (`error.response?.status === 401`).
 2. **Envelope-level 401** — `body.error_code === 401` inside a 2xx body.
 
-Both call `refreshAndRetry`. If eligible (token present, not the refresh call, not
-already replayed) the request is refreshed and replayed; otherwise
-`handleUnauthorized` clears that service's token and reloads only when the service
-has no refresh configured. Full mechanics: [Security & Auth](./security-auth.md).
+Both call `refreshAndRetry`. If eligible (not a credential call such as
+login/refresh, not already replayed) the request is refreshed and replayed;
+otherwise `handleUnauthorized` rejects — and, when a refreshed replay is still
+401, announces session expiry so the app clears its cache and routes to
+`/login`. A login 401 (wrong password) is never refreshed. The page is never
+reloaded. Full mechanics: [Security & Auth](./security-auth.md).
 
 A key invariant: once a replay is launched, **its own** outcome propagates. A
 post-refresh 500 is a genuine 500 — not re-interpreted as an auth failure, and it
 does not clear the fresh token.
 
-### SSR-guarded reload
+### No reloads
 
-During SSR every request is anonymous (no token), so 401 handling never reaches a
-refresh. If a logout reload is requested, it no-ops on the server:
-
-```ts
-function reloadPage(): void {
-  if (typeof window !== "undefined") window.location.reload();
-}
-```
-
-So a 401 during Nitro render cannot crash rendering with an undefined `window`.
+The service layer has no `window.location.reload()` at all: browser-side
+session loss goes through `notifySessionExpired` → `04.session-expiry.client.ts`,
+and SSR fetches (`serverApi*`) reject with an `ApiResponseError` the query can
+render or retry in the browser.
 
 ## Network Errors
 
@@ -84,12 +80,13 @@ Transport-level failures (no response) are detected by axios error codes:
 if (error.code === "ERR_NETWORK" || error.code === "ERR_BLOCKED_BY_CLIENT") {
   console.error("Network error. Please check your internet connection.");
 }
-const errorData = error.response?.data ?? { message: error.message };
-return Promise.reject(errorData as ApiResponseError);
+return Promise.reject(toApiError(error));
 ```
 
 `ERR_BLOCKED_BY_CLIENT` covers ad-blockers / extensions cancelling the request.
-With no response body, the rejection falls back to `{ message: error.message }`.
+`toApiError` (`api-errors.ts`) normalizes every rejection to `ApiResponseError`
+with the HTTP status in `error_code` (`0` when there is no response), so callers
+can tell a rejected session (`isUnauthorizedError` → 401) from an outage.
 
 ## Blob Errors
 
@@ -119,7 +116,10 @@ every other error uses, instead of an unreadable error blob.
 | --- | --- | --- |
 | Envelope `status: "error"` | `onSuccess` | reject with the envelope as `ApiResponseError` |
 | Envelope/HTTP 401 (eligible) | `onSuccess`/`onError` | refresh + replay |
-| Envelope/HTTP 401 (ineligible, incl. all SSR) | `handleUnauthorized` | clear service token; reload if no refresh (SSR-guarded) |
-| Network / blocked | `onError` | log; reject `{ message }` |
+| Envelope/HTTP 401 (credential call / no refresh config) | `handleUnauthorized` | reject as-is |
+| Envelope/HTTP 401 after a refreshed replay | `handleUnauthorized` | reject; session-expired event → clear cache, `/login` |
+| Refresh refused (401/403) | `RefreshTokenManager` | session-expired event; reject `error_code: 401` |
+| SSR `serverApi*` failure | `server-api.ts` | reject `ApiResponseError` (`error_code` = status) |
+| Network / blocked | `onError` | log; reject `{ message, error_code: 0 }` |
 | Non-2xx blob | `onSuccess` | reject synthetic `ApiResponseError` |
 | Anything else | pass-through | raw response returned |

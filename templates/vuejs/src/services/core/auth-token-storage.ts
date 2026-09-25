@@ -31,6 +31,62 @@ const DEFAULT_KEYS: ServiceTokenKeys = {
 
 const serviceTokenKeys = new Map<string, ServiceTokenKeys>([["MAIN", DEFAULT_KEYS]]);
 
+/** localStorage is not reactive — writers notify here so UI state (the auth
+ * store's `isAuthenticated`) can mirror token presence. */
+type TokenChangeListener = (service: string) => void;
+const tokenListeners = new Set<TokenChangeListener>();
+
+/** Subscribe to token writes/clears for any service; returns an unsubscribe. */
+export function onTokensChanged(listener: TokenChangeListener): () => void {
+  tokenListeners.add(listener);
+  return () => tokenListeners.delete(listener);
+}
+
+function notifyTokensChanged(service: string): void {
+  tokenListeners.forEach((listener) => listener(service));
+}
+
+/**
+ * Per-service session epoch, bumped whenever a service's session is cleared
+ * (logout, refused refresh). A refresh captures it before its network call and
+ * drops its result if it changed meanwhile, so a refresh still in flight when
+ * the user logs out cannot write the tokens back.
+ */
+const sessionEpochs = new Map<string, number>();
+
+export function getSessionEpoch(service: string = "MAIN"): number {
+  return sessionEpochs.get(service) ?? 0;
+}
+
+/** Invalidate every refresh started before now: a refresh still in flight persists nothing. */
+export function bumpSessionEpoch(service: string = "MAIN"): void {
+  sessionEpochs.set(service, getSessionEpoch(service) + 1);
+}
+
+/** Per-service count of running logouts — no new refresh may start meanwhile. */
+const pendingLogouts = new Map<string, number>();
+
+/** A logout is running for `service`: every new refresh — and every 401 that
+ * would trigger one — rejects with `session_ended`. */
+export function isLogoutPending(service: string = "MAIN"): boolean {
+  return (pendingLogouts.get(service) ?? 0) > 0;
+}
+
+/**
+ * Mark a logout as running until the returned `done()` is called (idempotent).
+ * Call synchronously when logout starts, before any await; logout then bumps
+ * the epoch in the same tick it captures the tokens to revoke.
+ */
+export function beginLogout(service: string = "MAIN"): () => void {
+  pendingLogouts.set(service, (pendingLogouts.get(service) ?? 0) + 1);
+  let finished = false;
+  return () => {
+    if (finished) return;
+    finished = true;
+    pendingLogouts.set(service, (pendingLogouts.get(service) ?? 1) - 1);
+  };
+}
+
 /** Register (or override) the localStorage slots a service keeps its tokens in. */
 export function registerServiceToken(service: string, keys: ServiceTokenKeys): void {
   serviceTokenKeys.set(service, keys);
@@ -47,10 +103,12 @@ export function getAccessToken(service: string = "MAIN"): string | null {
 
 export function persistAccessToken(token: string, service: string = "MAIN"): void {
   localStorage.setItem(resolveKeys(service).access, token);
+  notifyTokensChanged(service);
 }
 
 export function clearAccessToken(service: string = "MAIN"): void {
   localStorage.removeItem(resolveKeys(service).access);
+  notifyTokensChanged(service);
 }
 
 export function getRefreshToken(service: string = "MAIN"): string | null {
@@ -59,10 +117,12 @@ export function getRefreshToken(service: string = "MAIN"): string | null {
 
 export function persistRefreshToken(token: string, service: string = "MAIN"): void {
   localStorage.setItem(resolveKeys(service).refresh, token);
+  notifyTokensChanged(service);
 }
 
 export function clearRefreshToken(service: string = "MAIN"): void {
   localStorage.removeItem(resolveKeys(service).refresh);
+  notifyTokensChanged(service);
 }
 
 /** Clear both tokens for a single service (e.g. when its refresh fails). */
@@ -70,12 +130,16 @@ export function clearServiceTokens(service: string = "MAIN"): void {
   const { access, refresh } = resolveKeys(service);
   localStorage.removeItem(access);
   localStorage.removeItem(refresh);
+  bumpSessionEpoch(service);
+  notifyTokensChanged(service);
 }
 
 /** Clear every registered service's access + refresh tokens (e.g. on logout). */
 export function clearAuthTokens(): void {
-  serviceTokenKeys.forEach(({ access, refresh }) => {
+  serviceTokenKeys.forEach(({ access, refresh }, service) => {
     localStorage.removeItem(access);
     localStorage.removeItem(refresh);
+    bumpSessionEpoch(service);
+    notifyTokensChanged(service);
   });
 }

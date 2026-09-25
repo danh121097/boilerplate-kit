@@ -1,17 +1,29 @@
 import { authContract } from "@/services/auth/contract";
-import { Api, ApiInterceptors, getApiBaseUrl } from "@/services/core";
+import {
+  Api,
+  ApiInterceptors,
+  getApiBaseUrl,
+  hasSessionHint,
+  markSessionActive,
+  setAppPrefix,
+} from "@/services/core";
 import type { ServiceRefreshConfig } from "@/services/core";
 
 /**
  * Bootstrap the shared `Api` client before any page-level data fetches run.
- * Runs client-only (.client suffix) — the axios interceptors are browser-side;
- * SSR data fetches the backend directly via `serverApiGet` (cookie forwarded).
+ * The axios client (and its refresh-and-retry interceptors) serves browser-side
+ * reads and mutations; SSR data fetches the backend directly via `serverApiGet`
+ * (cookie forwarded, no refresh — see `services/core/server-api.ts`).
  *
  * Declare every backend in `services` below — add a row + its runtimeConfig key
  * (a `NUXT_PUBLIC_*` env var) to wire another authenticated backend. Rows with
  * an empty baseURL are skipped, so optional services stay dormant until set.
  */
 export default defineNuxtPlugin(() => {
+  // Resolve the app-name prefix (session-hint cookie, refresh lock + timestamp)
+  // while a Nuxt context exists — same prefix as `useStorageKeys`.
+  setAppPrefix(useRuntimeConfig().public.appName);
+
   const services: Array<{
     name: string;
     baseURL: string;
@@ -20,9 +32,21 @@ export default defineNuxtPlugin(() => {
     {
       name: "MAIN",
       baseURL: getApiBaseUrl(),
-      // reloadOnFailure: true — most endpoints need auth, so a failed refresh means
-      // the session is truly dead → reload to a clean (logged-out) state.
-      refresh: { endpoint: authContract.paths.refresh, reloadOnFailure: true },
+      // A 401 is refreshed only while the session hint says a session exists
+      // (anonymous 401s are final), never for credential endpoints (a login 401
+      // is "wrong password"). A refresh the backend rejects fires
+      // `onSessionExpired` (handled in `04.session-expiry.client.ts`) — the page
+      // is never reloaded.
+      refresh: {
+        hasSession: hasSessionHint,
+        onRefreshed: markSessionActive,
+        endpoint: authContract.paths.refresh,
+        excludePaths: [
+          authContract.paths.login,
+          authContract.paths.register,
+          authContract.paths.logout,
+        ],
+      },
     },
   ];
 

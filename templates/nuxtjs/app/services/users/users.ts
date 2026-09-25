@@ -18,13 +18,21 @@ export class UsersModel extends Model {
     const res = await this.api.patch<User>({ url: usersContract.paths.byId(id), data: payload });
     return res.data;
   }
+
+  /** Browser-side list read — refreshes-and-retries on 401 via the interceptors. */
+  static list(): Promise<PaginatedResponse<User>> {
+    return this.api.paginate<User>({ url: usersContract.paths.list });
+  }
 }
 
 // Queries
 
-export const useUsersListQuery = defineQuery<PaginatedResponse<User> | null>({
+/** SSR reads directly (no refresh possible); the browser goes through the Model
+ * so an expired access cookie is refreshed. Errors reach the query either way. */
+export const useUsersListQuery = defineQuery<PaginatedResponse<User>>({
   key: queryKeys.users.list,
-  fetcher: () => serverApiPaginate<User>(usersContract.paths.list),
+  fetcher: () =>
+    import.meta.server ? serverApiPaginate<User>(usersContract.paths.list) : UsersModel.list(),
 });
 
 // Mutations

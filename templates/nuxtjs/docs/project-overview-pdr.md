@@ -1,7 +1,7 @@
 # Project Overview
 
 A Nuxt 4 + TypeScript **SSR** starter, wired for a real backend out of the box:
-an SSR-guarded axios service layer with JWT bearer auth, httpOnly refresh-token
+an SSR-guarded axios service layer with httpOnly-cookie JWT auth, refresh-token
 rotation, optional HMAC request signing, TanStack Vue Query for server state,
 Pinia for client state, Socket.IO, and `@nuxtjs/i18n`. The intent is a thin but
 complete foundation — copy it, point the `NUXT_PUBLIC_*` env vars at your API,
@@ -22,7 +22,7 @@ ordered `app/plugins/*` that run on **both server and client**.
 | Client state | Pinia 3 (`@pinia/nuxt`, `app/stores/`) |
 | Server state | TanStack Vue Query 5 (`app/services/core/tanstack.ts`) |
 | HTTP | axios 1 service layer, SSR-guarded (`app/services/`) |
-| Auth | JWT bearer + httpOnly refresh-cookie rotation + optional HMAC |
+| Auth | httpOnly access + refresh cookies (rotation) + session-hint cookie + optional HMAC |
 | Realtime | Socket.IO client 4 (`app/composables/useSocketIO.ts`) |
 | UI primitives | Reka UI 2 + `lucide-vue-next` icons |
 | Styling | Tailwind CSS v4 (`@tailwindcss/vite`) + SCSS (`sass-embedded`) |
@@ -77,10 +77,11 @@ runs unconfigured (see `app/plugins/01.init-services.ts`); the REST base is `app
   with a path-derived prefix (`app/components/ui/Button.vue` → `<UiButton>`).
 - **Stores are explicit** — `pinia.storesDirs: []` disables store auto-import;
   always `import { useXStore } from "@/stores/x"`.
-- **HMAC is a PUBLIC runtime config** — exposed to every browser client. For
-  production, sign in a Nitro server route / BFF and keep the secret private
-  (`runtimeConfig.hmacSecret`); the in-browser signer is a convenience (see
-  notes in `app/services/core/hmac-signature.ts` and `useSocketIO.ts`).
+- **HMAC is a PUBLIC runtime config** — exposed to every browser client, so it
+  is anti-casual-abuse only, not authentication. It must stay `public`: the
+  browser signs its own requests, and a private-only secret would break them.
+  For an unforgeable signature, proxy browser traffic through a server route
+  that signs (see `app/services/core/hmac-signature.ts`).
 - **Refresh token is server-owned** — it lives in an httpOnly cookie; only the
   short-lived access token is held client-side (in `localStorage`).
 - **File size** — aim for ≤ ~200 LOC per file; split early.

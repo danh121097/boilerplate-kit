@@ -1,15 +1,30 @@
 <script setup lang="ts">
 import { useLogoutMutation, useSessionQuery } from "@/services/auth";
+import { resetQueriesToSignedOut } from "@/services/core";
+import { queryKeys } from "@/services/query-keys";
 import { useQueryClient } from "@tanstack/vue-query";
 
 type Locale = "en" | "ja";
 
 const queryClient = useQueryClient();
-await queryClient.ensureQueryData(useSessionQuery.queryOptions());
+// prefetchQuery never throws: if the SSR probe fails (e.g. an expired access
+// cookie only the browser can refresh) the query is not dehydrated and the
+// browser resolves it on hydration.
+await queryClient.prefetchQuery(useSessionQuery.queryOptions());
 
 const { locale, t, setLocale } = useI18n();
-const { data: sessionUser } = useSessionQuery();
-const { mutate: doLogout, isPending: logoutPending } = useLogoutMutation();
+const { data: sessionUser, error: sessionError, refetch: refetchSession } = useSessionQuery();
+// A transient failure (offline, timeout, 5xx) keeps the session: offer a retry
+// instead of showing the visitor as logged out.
+const sessionUnavailable = computed(() => Boolean(sessionError.value?.retryable));
+// Settled, not success: even if the server call fails, this browser's session
+// state and cached data must not outlive the logout.
+const { mutate: doLogout, isPending: logoutPending } = useLogoutMutation({
+  onSettled: async () => {
+    resetQueriesToSignedOut(queryClient, queryKeys.auth.me);
+    await navigateTo("/login");
+  },
+});
 
 const isAuthenticated = computed(() => Boolean(sessionUser.value));
 
@@ -51,6 +66,16 @@ function toggleLocale() {
       </nav>
     </header>
     <main class="mx-auto max-w-3xl px-6 py-8">
+      <p
+        v-if="sessionUnavailable"
+        role="alert"
+        class="mb-4 flex items-center gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm"
+      >
+        {{ t("session.unavailable") }}
+        <UiButton variant="unstyled" class="ml-auto underline" @click="refetchSession()">
+          {{ t("session.retry") }}
+        </UiButton>
+      </p>
       <slot />
     </main>
   </div>

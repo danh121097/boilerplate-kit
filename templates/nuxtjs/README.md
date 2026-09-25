@@ -150,7 +150,7 @@ NUXT_PUBLIC_API_PREFIX=/api/v1
 NUXT_PUBLIC_LANGUAGE_CODE=en
 ```
 
-For private (server-only) secrets like HMAC signing, add unprefixed keys (`NUXT_HMAC_SECRET=...`) and access via `useRuntimeConfig().hmacSecret`.
+For private (server-only) secrets, add unprefixed keys (e.g. `NUXT_MY_SECRET=...`, declared under `runtimeConfig`) and access via `useRuntimeConfig().mySecret`. The HMAC secret is **not** one of them: the browser signs its own requests, so it must stay `NUXT_PUBLIC_HMAC_SECRET` — it is visible to every client and is an anti-casual-abuse measure, not authentication.
 
 ## Verified
 

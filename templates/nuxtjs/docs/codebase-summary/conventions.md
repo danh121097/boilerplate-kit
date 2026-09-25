@@ -61,8 +61,8 @@ Centralize string keys / event names so renames ripple cleanly:
 
 ## SSR safety
 
-- Guard `window`/`localStorage`/`document` (see `isClient()` in
-  `auth-token-storage.ts`; `reloadPage()` in `interceptors.ts`).
+- Guard `window`/`localStorage`/`navigator` (e.g. `typeof localStorage` /
+  `navigator.locks` checks in `refresh-token-manager.ts`).
 - Read env via `useRuntimeConfig()` in a request scope — never `import.meta.env`
   or module top-level reads.
 - Browser-only work (Socket.IO connect, ripple effects) goes in `onMounted`.

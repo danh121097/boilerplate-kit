@@ -2,6 +2,7 @@ import { getApiBaseUrl } from "@/services/core/api-config";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import type {
   ApiResponse,
+  ApiResponseError,
   CursorParams,
   CursorResponse,
   PaginatedResponse,
@@ -19,11 +20,33 @@ import type {
  * (`getApiBaseUrl()` = appEndpoint + "/api/v1") carries the prefix and the backend's
  * HMAC verify strips it, so the signed path matches. Mirrors `serverApiGet` in
  * next/tanstack.
+ *
+ * These helpers never refresh: the refresh cookie is scoped to the backend's
+ * auth routes and only the browser can rotate it. They are meant for SSR — the
+ * browser reads the same endpoints through the axios Models, whose interceptors
+ * refresh-and-retry on 401 (see `useSessionQuery` / `useUsersListQuery`).
+ * Failures REJECT with an `ApiResponseError` (`error_code` = HTTP status, 0 when
+ * the backend is unreachable; `retryable` on 0/408/429/5xx) so the query sees
+ * them instead of a silent null.
  */
-async function authedFetch<R>(
-  path: string,
-  query?: Record<string, string | number>,
-): Promise<R | null> {
+function toServerApiError(error: unknown): ApiResponseError {
+  const e = error as { data?: unknown; statusCode?: number; message?: string } | null;
+  const data =
+    e?.data && typeof e.data === "object" ? (e.data as Partial<ApiResponseError>) : undefined;
+  const message = data?.message ?? e?.message ?? "request_failed";
+  const status = e?.statusCode;
+  const transient = !status || status === 408 || status === 429 || status >= 500;
+  return {
+    ...data,
+    status: data?.status ?? "error",
+    message,
+    error_message: data?.error_message ?? message,
+    error_code: data?.error_code ?? status ?? 0,
+    ...(transient ? { retryable: true } : {}),
+  };
+}
+
+async function authedFetch<R>(path: string, query?: Record<string, string | number>): Promise<R> {
   const apiBase = getApiBaseUrl();
   const headers: Record<string, string> = {};
 
@@ -41,12 +64,13 @@ async function authedFetch<R>(
 
   try {
     return await $fetch<R>(`${apiBase}${path}`, { headers, credentials: "include", query });
-  } catch {
-    return null;
+  } catch (error) {
+    throw toServerApiError(error);
   }
 }
 
-/** Single resource — unwraps the envelope's `data`. Returns null on failure. */
+/** Single resource — unwraps the envelope's `data` (null when the body has none).
+ * Rejects with an `ApiResponseError` on failure. */
 export async function serverApiGet<T>(path: string): Promise<T | null> {
   const body = await authedFetch<ApiResponse<T>>(path);
   return body?.data ?? null;
@@ -54,13 +78,13 @@ export async function serverApiGet<T>(path: string): Promise<T | null> {
 
 /**
  * Paginated list — returns the FULL `{ status, data, meta }` envelope (keeps the
- * pagination metadata, unlike `serverApiGet` which unwraps `data`). Returns null on
- * failure. `params` become the `?page&limit` query string.
+ * pagination metadata, unlike `serverApiGet` which unwraps `data`). Rejects with an
+ * `ApiResponseError` on failure. `params` become the `?page&limit` query string.
  */
 export function serverApiPaginate<T>(
   path: string,
   params?: PaginationParams,
-): Promise<PaginatedResponse<T> | null> {
+): Promise<PaginatedResponse<T>> {
   return authedFetch<PaginatedResponse<T>>(
     path,
     params as Record<string, string | number> | undefined,
@@ -70,12 +94,12 @@ export function serverApiPaginate<T>(
 /**
  * Cursor (keyset) paginated list — like `serverApiPaginate` but for `?cursor&limit`
  * endpoints; returns the FULL `{ status, data, meta }` envelope with cursor `meta`
- * (`nextCursor`, `hasNext`). Returns null on failure.
+ * (`nextCursor`, `hasNext`). Rejects with an `ApiResponseError` on failure.
  */
 export function serverApiCursorPaginate<T>(
   path: string,
   params?: CursorParams,
-): Promise<CursorResponse<T> | null> {
+): Promise<CursorResponse<T>> {
   return authedFetch<CursorResponse<T>>(
     path,
     params as Record<string, string | number> | undefined,

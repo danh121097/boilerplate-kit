@@ -1,24 +1,32 @@
 <script setup lang="ts">
 import { useLoginMutation, useSessionQuery } from "@/services/auth";
+import { getApiErrorMessage } from "@/services/core";
+import { safeRedirect } from "@/utils/safe-redirect";
 import { useQueryClient } from "@tanstack/vue-query";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 
 const { t } = useI18n();
+const route = useRoute();
+
+const queryClient = useQueryClient();
+
+// Where to go once signed in: the page session expiry bounced the user away
+// from (`?redirect=`, same-origin paths only), else home.
+const redirectTo = computed(() => safeRedirect(route.query.redirect));
 
 // Resolve the session on the server; if already signed in, skip the form.
-const queryClient = useQueryClient();
-await queryClient.ensureQueryData(useSessionQuery.queryOptions());
+await queryClient.prefetchQuery(useSessionQuery.queryOptions());
 const { data: sessionUser } = useSessionQuery();
-if (sessionUser.value) await navigateTo("/");
+if (sessionUser.value) await navigateTo(redirectTo.value);
 
 // The login mutation invalidates `auth.me`; on success the session re-resolves and
-// we return home (the header flips to Logout). No token in JS — cookie-based auth.
+// we return to `redirectTo` (the header flips to Logout). No token in JS — cookie-based auth.
 const {
   mutate: doLogin,
   isPending,
   error,
 } = useLoginMutation({
-  onSuccess: () => navigateTo("/"),
+  onSuccess: () => navigateTo(redirectTo.value),
 });
 
 const email = ref("");
@@ -54,7 +62,9 @@ function onSubmit() {
           {{ isPending ? t("login.submitting") : t("login.submit") }}
         </UiButton>
 
-        <p v-if="error" class="text-sm text-red-600">{{ error.message }}</p>
+        <p v-if="error" class="text-sm text-red-600">
+          {{ getApiErrorMessage(error, t("login.error")) }}
+        </p>
       </form>
     </UiCard>
   </section>

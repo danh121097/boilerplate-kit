@@ -50,4 +50,115 @@ describe("RefreshTokenManager", () => {
     await expect(mgr.refresh()).rejects.toThrow("refresh failed");
     expect(onRefreshFailed).toHaveBeenCalledTimes(1);
   });
+
+  it("does not fire onRefreshFailed when the refresh fails transiently", async () => {
+    const onRefreshFailed = vi.fn();
+    const mgr = new RefreshTokenManager({
+      service: "MAIN",
+      refresh: async () => {
+        throw Object.assign(new Error("Network Error"), { isAxiosError: true });
+      },
+      onRefreshFailed,
+    });
+
+    await expect(mgr.refresh()).rejects.toThrow("Network Error");
+    expect(onRefreshFailed).not.toHaveBeenCalled();
+  });
+});
+
+describe("RefreshTokenManager — cross-tab lock", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  function memoryStorage() {
+    const store = new Map<string, string>();
+    return {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => void store.set(k, v),
+    };
+  }
+
+  it("runs the refresh under a per-service Web Lock", async () => {
+    const request = vi.fn((_name: string, task: () => Promise<unknown>) => task());
+    vi.stubGlobal("navigator", { locks: { request } });
+    const refresh = vi.fn(async () => {});
+    const mgr = new RefreshTokenManager({ service: "MAIN", refresh, onRefreshFailed: () => {} });
+
+    await mgr.refresh(Date.now());
+    expect(request).toHaveBeenCalledWith("PRISM_APP:auth-refresh:MAIN", expect.any(Function));
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips the refresh when another tab rotated the cookies after the request was sent", async () => {
+    const storage = memoryStorage();
+    vi.stubGlobal("localStorage", storage);
+    const sentAt = Date.now() - 1000;
+    // Another tab holds the lock, refreshes, records the rotation, then releases.
+    const request = vi.fn(async (_name: string, task: () => Promise<unknown>) => {
+      storage.setItem("PRISM_APP:auth-refresh:MAIN:at", String(Date.now()));
+      return task();
+    });
+    vi.stubGlobal("navigator", { locks: { request } });
+    const refresh = vi.fn(async () => {});
+    const mgr = new RefreshTokenManager({ service: "MAIN", refresh, onRefreshFailed: () => {} });
+
+    await mgr.refresh(sentAt);
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("records the rotation for other tabs after a successful refresh", async () => {
+    const storage = memoryStorage();
+    vi.stubGlobal("localStorage", storage);
+    vi.stubGlobal("navigator", {});
+    const mgr = new RefreshTokenManager({
+      service: "MAIN",
+      refresh: async () => {},
+      onRefreshFailed: () => {},
+    });
+
+    await mgr.refresh(Date.now());
+    expect(Number(storage.getItem("PRISM_APP:auth-refresh:MAIN:at"))).toBeGreaterThan(0);
+  });
+
+  it("ignores a shared timestamp in the future (clock moved back) and refreshes", async () => {
+    const storage = memoryStorage();
+    storage.setItem("PRISM_APP:auth-refresh:MAIN:at", String(Date.now() + 60 * 60 * 1000));
+    vi.stubGlobal("localStorage", storage);
+    vi.stubGlobal("navigator", {});
+    const refresh = vi.fn(async () => {});
+    const mgr = new RefreshTokenManager({ service: "MAIN", refresh, onRefreshFailed: () => {} });
+
+    await mgr.refresh(Date.now() - 1000);
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("fires onRefreshed only after a successful network refresh", async () => {
+    vi.stubGlobal("navigator", {});
+    const onRefreshed = vi.fn();
+    const ok = new RefreshTokenManager({
+      service: "MAIN",
+      refresh: async () => {},
+      onRefreshed,
+      onRefreshFailed: () => {},
+    });
+    await ok.refresh(Date.now());
+    expect(onRefreshed).toHaveBeenCalledTimes(1);
+
+    const failing = new RefreshTokenManager({
+      service: "MAIN",
+      refresh: () => Promise.reject(new Error("revoked")),
+      onRefreshed,
+      onRefreshFailed: () => {},
+    });
+    await expect(failing.refresh(Date.now())).rejects.toThrow("revoked");
+    expect(onRefreshed).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to an unlocked refresh when navigator.locks is unavailable", async () => {
+    vi.stubGlobal("navigator", {});
+    const refresh = vi.fn(async () => {});
+    const mgr = new RefreshTokenManager({ service: "MAIN", refresh, onRefreshFailed: () => {} });
+
+    await mgr.refresh(Date.now());
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
 });

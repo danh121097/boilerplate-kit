@@ -1,4 +1,5 @@
-const APP_PREFIX = import.meta.env.VITE_APP_NAME || "PRISM_APP";
+/** `VITE_APP_NAME` namespace for this app's browser storage (keys, Web Locks). */
+export const APP_PREFIX = import.meta.env.VITE_APP_NAME || "PRISM_APP";
 
 /**
  * Centralised localStorage key registry. Always go through this map so a single

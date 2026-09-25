@@ -7,6 +7,10 @@ export default {
     login: "ログイン",
     logout: "ログアウト",
   },
+  session: {
+    unavailable: "サーバーに接続できませんでした。ログイン状態は維持されています。",
+    retry: "再試行",
+  },
   login: {
     title: "ログイン",
     email: "メールアドレス",

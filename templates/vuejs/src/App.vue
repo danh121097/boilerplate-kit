@@ -6,7 +6,7 @@ const router = useRouter();
 const authStore = useAuthStore();
 const { locale, t } = useI18n();
 
-const { isAuthenticated } = storeToRefs(authStore);
+const { isAuthenticated, hydrateError } = storeToRefs(authStore);
 
 onMounted(() => authStore.hydrate());
 
@@ -47,6 +47,16 @@ async function onLogout() {
       </nav>
     </header>
     <main class="mx-auto max-w-3xl px-6 py-8">
+      <p
+        v-if="hydrateError"
+        role="alert"
+        class="mb-4 flex items-center gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm"
+      >
+        {{ t("session.unavailable") }}
+        <Button variant="unstyled" class="ml-auto underline" @click="authStore.retryHydrate()">
+          {{ t("session.retry") }}
+        </Button>
+      </p>
       <RouterView />
     </main>
   </div>

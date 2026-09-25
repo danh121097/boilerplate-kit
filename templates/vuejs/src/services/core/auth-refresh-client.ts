@@ -1,6 +1,7 @@
 import { Api } from "@/services/core/api";
-import { getRefreshToken, persistRefreshToken } from "@/services/core/auth-token-storage";
+import { getRefreshToken } from "@/services/core/auth-token-storage";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
+import type { RefreshedTokens } from "@/services/core/refresh-token-manager";
 import type { ApiService } from "@/services/core/types";
 import type { InternalAxiosRequestConfig } from "axios";
 import axios from "axios";
@@ -12,8 +13,9 @@ import axios from "axios";
  * refresh request itself can never recurse back into the refresh interceptor.
  *
  * The refresh token is read from localStorage and sent in the request body. The
- * backend rotates the pair and returns the new access (+ refresh) tokens; the new
- * refresh token is persisted here and the access token is handed to the caller.
+ * backend rotates the pair and returns the new access (+ refresh) tokens, which
+ * are handed to the single-flight manager — it persists them only if the session
+ * was not cleared (logout) while the call was in flight.
  * (`withCredentials` is kept so a backend that prefers an httpOnly refresh cookie
  * still works without code changes.)
  */
@@ -49,13 +51,17 @@ function extractRefreshToken(body: RefreshResponseBody): string | undefined {
   );
 }
 
+/** A refresh that takes longer is abandoned as a transient failure (the
+ * session is kept; a later 401 refreshes again). */
+export const REFRESH_TIMEOUT_MS = 15_000;
+
 /**
  * Build a refresher bound to a service + endpoint. Returns a thunk the
- * single-flight manager calls; it yields the freshly minted access token and
- * persists the rotated refresh token as a side effect.
+ * single-flight manager calls; it yields the rotated pair (persisting is the
+ * manager's job).
  */
 export function createTokenRefresher(endpoint: string, service: ApiService) {
-  return async (): Promise<string> => {
+  return async (): Promise<RefreshedTokens> => {
     const headers: Record<string, string | number> = {
       "Content-Type": "application/json",
       Accept: "application/json",
@@ -64,21 +70,23 @@ export function createTokenRefresher(endpoint: string, service: ApiService) {
     // so it must attach the same HMAC headers the backend requires of every
     // request — otherwise the refresh call itself is rejected. No-op when no
     // secret is configured.
+    // The signer sees the same body + headers the request sends, so the signed
+    // Content-Type ("application/json") matches the header the backend verifies.
+    const body = { refreshToken: getRefreshToken(service) ?? undefined };
     const signature = HMACSignatureGenerator.generateSignature({
       url: endpoint,
       method: "post",
       headers,
+      data: body,
     } as unknown as InternalAxiosRequestConfig);
     if (signature) Object.assign(headers, signature);
 
     const { data } = await axios.post<RefreshResponseBody>(
       `${Api.getBaseURL(service)}${endpoint}`,
-      { refreshToken: getRefreshToken(service) ?? undefined },
-      { withCredentials: true, headers },
+      body,
+      { withCredentials: true, headers, timeout: REFRESH_TIMEOUT_MS },
     );
 
-    const rotated = extractRefreshToken(data);
-    if (rotated) persistRefreshToken(rotated, service);
-    return extractAccessToken(data);
+    return { accessToken: extractAccessToken(data), refreshToken: extractRefreshToken(data) };
   };
 }

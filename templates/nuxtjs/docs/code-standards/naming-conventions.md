@@ -11,7 +11,7 @@ const hasValidationError = computed(() => Boolean(errorMessage.value));
 const showError = computed(() => hasValidationError.value || props.error);
 
 function buildAuth() {
-  return { token: `Bearer ${getAuthToken() ?? ""}`, role: "user" };
+  return { role: "user", ...signHeader() };
 }
 ```
 
@@ -75,7 +75,7 @@ import { SOCKET_EVENT, SOCKET_UNAUTHORIZED_MESSAGE } from "@/enums";
 socket.on(SOCKET_EVENT.AUTHENTICATED, handleAuthenticated);
 ```
 
-Storage keys go through the `useStorageKeys("AUTH_TOKEN")` accessor so the
+Storage keys go through the `useStorageKeys("LANGUAGE")` accessor so the
 `runtimeConfig`-derived prefix is applied consistently.
 
 ## API fields — camelCase
@@ -84,8 +84,8 @@ Request payloads and response models use camelCase keys, matching the typed
 contracts in `services/*/types/`.
 
 ```ts
-return { token: `Bearer ${getAuthToken() ?? ""}`, role: "user" };
-persistAuthToken(result.tokens.accessToken, this.service);
+const res = await this.api.post<AuthResult>({ url: authContract.paths.login, data: payload });
+return res.data; // { user, tokens } — the tokens themselves live in httpOnly cookies
 ```
 
 Query/mutation keys are dot-namespaced strings (`"auth.login"`, `"auth.me"`) so

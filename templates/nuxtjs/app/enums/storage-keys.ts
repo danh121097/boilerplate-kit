@@ -18,6 +18,8 @@ function buildKeys(prefix: string) {
   return {
     LANGUAGE: `${prefix}_LANGUAGE`,
     THEME: `${prefix}_THEME`,
+    /** Readable "a session exists" hint — see `services/core/session-hint.ts`. */
+    SESSION: `${prefix}_SESSION`,
   } as const;
 }
 

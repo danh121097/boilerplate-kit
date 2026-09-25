@@ -12,8 +12,10 @@ export interface SignRequestInput {
 
 /**
  * HMAC request signer — active only when the HMAC secret is configured. The
- * secret lives under `runtimeConfig.public.hmacSecret` (client-readable, a soft
- * integrity layer matching the backend's HMAC_SECRET).
+ * secret lives under `runtimeConfig.public.hmacSecret` because the browser must
+ * sign too — so it is readable by anyone: an anti-casual-abuse layer matching
+ * the backend's HMAC_SECRET, not authentication. Keep it `public`; a private-only
+ * secret would leave the browser unable to sign.
  *
  * `signRequest` is the pure core, reused by the axios interceptor AND `serverApiGet`
  * so a forwarded SSR fetch carries the same headers the backend
@@ -21,8 +23,11 @@ export interface SignRequestInput {
  * request config and delegates here.
  */
 export class HMACSignatureGenerator {
+  /** The path the server verifies: leading "/", no `?query` / `#hash` (the
+   * backends sign `req.url` / `originalUrl` with the query stripped). */
   private static normalizeUrl(url: string): string {
-    return url.startsWith("/") ? url : `/${url}`;
+    const path = url.split(/[?#]/)[0] ?? "";
+    return path.startsWith("/") ? path : `/${path}`;
   }
 
   private static sign(stringToSign: string, secret: string): string {
@@ -46,10 +51,9 @@ export class HMACSignatureGenerator {
     try {
       const cfg = useRuntimeConfig() as unknown as {
         public?: { hmacSecret?: string; buildVersion?: string };
-        hmacSecret?: string;
       };
-      // Prefer private runtimeConfig (server-only) then public (client-readable)
-      secret = cfg.hmacSecret ?? cfg.public?.hmacSecret ?? "";
+      // Same public secret on server (SSR fetches) and client (axios, refresh).
+      secret = cfg.public?.hmacSecret ?? "";
       xVersion = cfg.public?.buildVersion ?? "1.0.0";
     } catch {
       // Outside Nuxt request scope (e.g. pure unit test) — secret stays empty
@@ -74,14 +78,18 @@ export class HMACSignatureGenerator {
    *
    * The signed content-type MUST equal what the request actually sends:
    * axios omits Content-Type on body less requests (GET / DELETE with no data),
-   * so we sign "" for those and "application/json" only when a body is present.
-   * Multipart form-data requests keep their own pinned content-type.
+   * so we sign "" for those; a request with a body sends the type it pins
+   * (e.g. `text/plain`, `application/x-www-form-urlencoded`), defaulting to
+   * "application/json". A pinned value is signed exactly as sent — never pin a
+   * charset: browsers may rewrite it on the wire (Chrome sends `charset=UTF-8`),
+   * breaking the raw-header comparison. Multipart is NOT supported: the browser
+   * appends a boundary the signer cannot see.
    */
   static generateSignature(config: InternalAxiosRequestConfig): HMACSignatureData | null {
-    const pinned = config.headers?.["Content-Type"] as string | undefined;
-    const isMultipart = typeof pinned === "string" && pinned.startsWith("multipart");
+    const headers = config.headers as Record<string, unknown> | undefined;
+    const pinned = headers?.["Content-Type"] ?? headers?.["content-type"];
     const hasBody = config.data !== undefined && config.data !== null;
-    const contentType = isMultipart ? pinned : hasBody ? "application/json" : "";
+    const contentType = hasBody ? (typeof pinned === "string" && pinned) || "application/json" : "";
 
     return this.signRequest({
       method: config.method || "",

@@ -1,5 +1,6 @@
 import { registerDirectives } from "@/plugins/directives";
 import { installI18n } from "@/plugins/i18n";
+import { setupSessionExpiry } from "@/plugins/session-expiry";
 import { setupVueQuery } from "@/plugins/vue-query";
 import type { App } from "vue";
 import pinia from "@/plugins/pinia";
@@ -11,4 +12,5 @@ export function registerPlugins(app: App) {
   app.use(router);
   setupVueQuery(app);
   registerDirectives(app);
+  setupSessionExpiry(router, pinia);
 }

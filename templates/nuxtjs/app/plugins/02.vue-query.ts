@@ -10,8 +10,10 @@ import type { DehydratedState } from "@tanstack/vue-query";
 /**
  * Register TanStack Vue Query with SSR hydration. The server dehydrates the
  * QueryClient into the Nuxt payload after render; the client hydrates from it, so
- * a query prefetched during SSR (via `ensureQueryData`) renders with data on first
- * paint and is NOT refetched on hydration. This lets a server-side fetch flow through Vue Query and stay client-managed (invalidation).
+ * a query prefetched during SSR (via `prefetchQuery`) renders with data on first
+ * paint and is NOT refetched on hydration. A prefetch that failed is not
+ * dehydrated, so the browser runs it again. This lets a server-side fetch flow
+ * through Vue Query and stay client-managed (invalidation).
  */
 export default defineNuxtPlugin((nuxtApp) => {
   const queryClient = new QueryClient({
@@ -33,7 +35,13 @@ export default defineNuxtPlugin((nuxtApp) => {
       vueQueryState.value = dehydrate(queryClient);
     });
   }
-  if (import.meta.client) {
+  // Nothing to hydrate when the server produced no state (e.g. a client-only
+  // navigation or an SSR error page) — `hydrate` rejects null in newer versions.
+  if (import.meta.client && vueQueryState.value) {
     hydrate(queryClient, vueQueryState.value);
   }
+
+  // Exposed as `useNuxtApp().$queryClient` for plugins that run outside a
+  // component setup (e.g. clearing the cache on session expiry).
+  return { provide: { queryClient } };
 });

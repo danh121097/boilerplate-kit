@@ -1,6 +1,8 @@
+import { toApiError } from "@/services/core/api-errors";
 import { createTokenRefresher } from "@/services/core/auth-refresh-client";
 import { HeadersUtils } from "@/services/core/headers-utils";
 import { RefreshTokenManager } from "@/services/core/refresh-token-manager";
+import { notifySessionExpired } from "@/services/core/session-events";
 import type {
   ApiResponseError,
   ApiService,
@@ -12,13 +14,9 @@ import type { AxiosError, AxiosInstance, AxiosResponse, InternalAxiosRequestConf
 
 const REFRESH_DEFAULTS: Omit<RefreshOptions, "service"> = {
   endpoint: "/auth/refresh",
-  reloadOnFailure: true,
+  excludePaths: ["/auth/login", "/auth/register", "/auth/logout"],
+  hasSession: () => true,
 };
-
-/** Reload the current page — guarded so it no-ops during SSR. */
-function reloadPage(): void {
-  if (typeof window !== "undefined") window.location.reload();
-}
 
 /** Refresh runtime for one service: its single-flight manager + resolved options. */
 interface RefreshContext {
@@ -45,17 +43,24 @@ function isEnvelope(body: unknown): boolean {
   return b.status === "success" || b.status === "error" || typeof b.success === "boolean";
 }
 
+/** True for the refresh endpoint and every configured credential endpoint —
+ * a 401 there means wrong credentials / revoked token, not an expired session. */
+function isCredentialRequest(config: InternalAxiosRequestConfig, options: RefreshOptions): boolean {
+  const path = (config.url ?? "").split("?")[0] ?? "";
+  return [options.endpoint, ...options.excludePaths].some((p) => path.endsWith(p));
+}
+
 /**
  * A 401 is eligible for an automatic refresh only when the request has not
- * already been replayed and it is not the refresh call itself. Auth lives in
- * httpOnly cookies (invisible to JS), so eligibility cannot gate on a stored
- * token — a single replay-guarded attempt covers both expired-session and
- * genuinely-anonymous cases (the latter just fails the refresh and is handled).
+ * already been replayed, it is not a credential call (login, refresh, ...), and
+ * a session is believed to exist. Auth lives in httpOnly cookies (invisible to
+ * JS), so that last check reads the readable session-hint cookie: without it the
+ * 401 is anonymous and final — no refresh request.
  */
 function canAttemptRefresh(config: InternalAxiosRequestConfig, options: RefreshOptions): boolean {
   if (config._retry) return false;
-  if ((config.url ?? "").includes(options.endpoint)) return false;
-  return true;
+  if (isCredentialRequest(config, options)) return false;
+  return options.hasSession();
 }
 
 interface ResponseInterceptorOpts {
@@ -83,15 +88,24 @@ function createResponseInterceptor(opts: ResponseInterceptorOpts) {
     config._retry = true;
     // The refresh rotates the httpOnly auth cookies; replay the original request
     // as-is — the browser re-attaches the fresh cookie (no Bearer to set).
-    return ctx.manager.refresh().then(() => instance(config));
+    return ctx.manager.refresh(config._sentAt).then(
+      () => instance(config),
+      // Refresh failed: reject with the refresh call's status (401 when the
+      // session is gone / anonymous, 0/5xx when transient) — never reload.
+      (error) => Promise.reject(toApiError(error)),
+    );
   };
 
-  /** When a 401 cannot be recovered by a refresh, reload only if the service has
-   * no refresh configured (nothing can recover it). httpOnly cookies can't be
-   * cleared from JS — the backend clears them on logout / failed refresh. A
-   * refresh-capable service handles its own reload on actual refresh failure. */
+  /** A 401 no refresh can recover. httpOnly cookies can't be cleared from JS, so
+   * the caller just gets the rejection — never a page reload. When a refreshed
+   * replay is still 401 the session is gone: announce it so the app can clear
+   * its cache and route to /login. Credential calls (wrong password) are left
+   * alone. */
   const handleUnauthorized = (config?: InternalAxiosRequestConfig) => {
-    if (!resolveRefresh(serviceOf(config))) reloadPage();
+    const service = serviceOf(config);
+    const ctx = resolveRefresh(service);
+    if (!config?._retry || !ctx || isCredentialRequest(config, ctx.options)) return;
+    notifySessionExpired(service);
   };
 
   const onSuccess = (response: AxiosResponse) => {
@@ -129,8 +143,7 @@ function createResponseInterceptor(opts: ResponseInterceptorOpts) {
     if (error.code === "ERR_NETWORK" || error.code === "ERR_BLOCKED_BY_CLIENT") {
       console.error("Network error. Please check your internet connection.");
     }
-    const errorData = error.response?.data ?? { message: error.message };
-    return Promise.reject<ApiResponseError>(errorData as ApiResponseError);
+    return Promise.reject<ApiResponseError>(toApiError(error));
   };
 
   return [onSuccess, onError] as const;
@@ -159,9 +172,8 @@ export class ApiInterceptors implements HttpInterceptorSetup {
       const manager = new RefreshTokenManager({
         service,
         refresh: createTokenRefresher(options.endpoint, service),
-        onRefreshFailed: () => {
-          if (options.reloadOnFailure) reloadPage();
-        },
+        onRefreshed: options.onRefreshed,
+        onRefreshFailed: () => notifySessionExpired(service),
       });
       ctx = { manager, options };
       this.contexts.set(service, ctx);
@@ -173,6 +185,7 @@ export class ApiInterceptors implements HttpInterceptorSetup {
     instance.interceptors.request.use(
       (config) => {
         config.serviceType = service;
+        config._sentAt ??= Date.now();
         // HMAC headers only — the httpOnly auth cookie is sent automatically
         // (the axios instance is created with `withCredentials: true`).
         config.headers = HeadersUtils.setAuthHeaders(config);

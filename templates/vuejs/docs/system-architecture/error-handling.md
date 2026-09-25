@@ -52,10 +52,13 @@ Two doors lead to the same recovery logic:
 1. **HTTP 401** — caught in `onError` (`error.response?.status === 401`).
 2. **Envelope-level 401** — `body.error_code === 401` inside a 2xx body.
 
-Both call `refreshAndRetry`. If eligible (token present, not the refresh call, not
-already replayed) the request is refreshed and replayed; otherwise
-`handleUnauthorized` clears that service's token and reloads when the service has
-no refresh configured. Full mechanics: [Security & Auth](./security-auth.md).
+Both call `refreshAndRetry`. If eligible (token present, not a credential call
+such as login/refresh, not already replayed) the request is refreshed and
+replayed; otherwise `handleUnauthorized` leaves credential calls alone (a login
+401 is a wrong password) and otherwise clears that service's tokens, announcing
+session expiry when a refresh-capable service held a session. The page is never
+reloaded — the app routes to `/login`. Full mechanics:
+[Security & Auth](./security-auth.md).
 
 A key invariant: once a replay is launched, **its own** outcome propagates. A
 post-refresh 500 is a genuine 500 — it is not re-interpreted as an auth failure
@@ -69,12 +72,13 @@ Transport-level failures (no response) are detected by axios error codes:
 if (error.code === "ERR_NETWORK" || error.code === "ERR_BLOCKED_BY_CLIENT") {
   console.error("Network error. Please check your internet connection.");
 }
-const errorData = error.response?.data ?? { message: error.message };
-return Promise.reject(errorData as ApiResponseError);
+return Promise.reject(toApiError(error));
 ```
 
 `ERR_BLOCKED_BY_CLIENT` covers ad-blockers / extensions cancelling the request.
-When there is no response body, the rejection falls back to `{ message: error.message }`.
+`toApiError` (`api-errors.ts`) normalizes every rejection to `ApiResponseError`
+with the HTTP status in `error_code` (`0` when there is no response), so callers
+can tell a rejected session (`isUnauthorizedError` → 401) from an outage.
 
 ## Blob Errors
 
@@ -104,7 +108,9 @@ every other error uses, instead of handing back an unreadable error blob.
 | --- | --- | --- |
 | Envelope `status: "error"` | `onSuccess` | reject with the envelope as `ApiResponseError` |
 | Envelope/HTTP 401 (eligible) | `onSuccess`/`onError` | refresh + replay |
-| Envelope/HTTP 401 (ineligible) | `handleUnauthorized` | clear service token; reload if no refresh |
-| Network / blocked | `onError` | log; reject `{ message }` |
+| Envelope/HTTP 401 (credential call) | `handleUnauthorized` | reject as-is (no refresh, session kept) |
+| Envelope/HTTP 401 (other, ineligible) | `handleUnauthorized` | clear service tokens; session-expired event if one was held |
+| Refresh refused (401/403) | `RefreshTokenManager` | clear tokens; session-expired event → `/login`; reject 401 |
+| Network / blocked | `onError` | log; reject `{ message, error_code: 0 }` |
 | Non-2xx blob | `onSuccess` | reject synthetic `ApiResponseError` |
 | Anything else | pass-through | raw response returned |

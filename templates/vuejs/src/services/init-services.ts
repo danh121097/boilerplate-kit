@@ -26,7 +26,15 @@ const SERVICES: ServiceDefinition[] = [
     name: "MAIN",
     baseURL: getApiBaseUrl(),
     tokenKeys: { access: STORAGE_KEYS.ACCESS_TOKEN, refresh: STORAGE_KEYS.REFRESH_TOKEN },
-    refresh: { endpoint: authContract.paths.refresh },
+    refresh: {
+      endpoint: authContract.paths.refresh,
+      // A 401 from these means bad credentials, never an expired session.
+      excludePaths: [
+        authContract.paths.login,
+        authContract.paths.register,
+        authContract.paths.logout,
+      ],
+    },
   },
 ];
 
@@ -43,5 +51,7 @@ export function initServices(): void {
   // On a 401 the interceptor calls the failing service's own refresh endpoint
   // (sending the stored refresh token in the body), stores the new access +
   // refresh tokens, and replays the request. Each service refreshes independently.
+  // A refresh the backend rejects fires `onSessionExpired` (see
+  // `plugins/session-expiry.ts`) — the page is never reloaded.
   Api.registerInterceptors(new ApiInterceptors(refreshByService));
 }

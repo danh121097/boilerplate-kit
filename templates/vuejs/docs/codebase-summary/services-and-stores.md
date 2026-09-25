@@ -33,10 +33,12 @@ startup via `initServices()`.
 
 | File | Role |
 | --- | --- |
-| `interceptors.ts` | `ApiInterceptors`: request (attach HMAC + Bearer + `serviceType`) and response (unwrap envelopes, drive 401 refresh/retry) |
-| `refresh-token-manager.ts` | `RefreshTokenManager`: single-flight refresh per service — a burst of 401s triggers exactly one network refresh |
+| `interceptors.ts` | `ApiInterceptors`: request (attach HMAC + Bearer + `serviceType`) and response (unwrap envelopes, drive 401 refresh/retry; credential endpoints never refresh; never reloads) |
+| `refresh-token-manager.ts` | `RefreshTokenManager`: single-flight refresh per service under a cross-tab `navigator.locks` lock; skips the refresh when another tab already rotated the token |
+| `session-events.ts` | `onSessionExpired` / `notifySessionExpired`: service layer → app signal when a session is definitively gone |
+| `api-errors.ts` | `toApiError` (normalize rejections, HTTP status in `error_code`) + `isUnauthorizedError` |
 | `auth-refresh-client.ts` | `createTokenRefresher()`: bare, interceptor-free call to the refresh endpoint (avoids refresh recursion); extracts new access token from common envelope shapes |
-| `auth-token-storage.ts` | Per-service access-token registry in `localStorage`: `getAuthToken`, `persistAuthToken`, `clearAuthToken`, `clearAuthTokens`, `registerServiceToken` |
+| `auth-token-storage.ts` | Per-service access + refresh token slots in `localStorage` (`get/persist/clear{Access,Refresh}Token`, `clearServiceTokens`, `clearAuthTokens`, `registerServiceToken`) + `onTokensChanged` for reactive mirrors |
 | `headers-utils.ts` | `HeadersUtils`: attach HMAC signature headers + Bearer authorization header |
 | `hmac-signature.ts` | `HMACSignatureGenerator`: HMAC-SHA256 sign per request; **no-op unless `VITE_HMAC_SECRET` is set** |
 | `tanstack.ts` | `defineQuery()` / `defineMutation()` factories typed against `ApiResponseError` |
@@ -60,7 +62,9 @@ const SERVICES: ServiceDefinition[] = [
 ### Auth & Users services
 
 - `auth/auth.ts` — `AuthModel` (`/auth`): `login`, `register`, `logout`,
-  `getMe`; persists the access token via `persistAuthToken`, clears on logout.
+  `getMe`; persists both tokens on login/register; `logout` runs under the
+  refresh lock (`withSessionLock` — never overlaps a refresh), sends the latest
+  `{ refreshToken }` so the backend revokes it, then clears all tokens.
   Exposes `useLoginMutation`, `useRegisterMutation`, `useLogoutMutation`,
   `useMeQuery`. Types in `auth/types/auth.ts`.
 - `users/users.ts` — `UsersModel` (`/users`): `list`, `get`, `update`; exposes
@@ -74,6 +78,12 @@ interceptor strips a recognized envelope (`{ status: "success" }` or
 
 Setup-style stores. Imported explicitly — never auto-imported.
 
+- `auth.ts` — `useAuthStore`: `user`, `isAuthenticated` (profile or a token, via
+  a `hasToken` ref synced by `onTokensChanged` and by other tabs' `storage` events), `hydrate()` (logs out only on a
+  401 / refused refresh), `logout()` and `clearSession()` (user + tokens +
+  `resetQueriesToSignedOut` from `services/core/query-client.ts`, which resets
+  queries in place so mounted views stay attached). `plugins/session-expiry.ts` calls `clearSession()` and
+  routes to `/login` on session expiry.
 - `counter.ts` — `useCounterStore`: demo `count` + `increment/decrement/reset`.
 - `socket-io.ts` — `useSocketIOStore`: holds the live `Socket | null` and an
   `authenticated` flag; `setSocketIO(partial)` merges state.

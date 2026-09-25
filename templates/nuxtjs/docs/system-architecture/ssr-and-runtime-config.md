@@ -74,9 +74,10 @@ try {
 }
 ```
 
-This is why `01.init-services.ts` passes `tokenKey` as a **function**
-(`() => useStorageKeys("AUTH_TOKEN")`) instead of a string — the resolver fires
-later, inside a scope.
+This is why `01.init-services.ts` resolves the app prefix once, inside its
+plugin scope (`setAppPrefix(useRuntimeConfig().public.appName)`), before any
+request runs: the session-hint cookie (`<APP_PREFIX>_SESSION`), the refresh lock
+and its localStorage timestamp are all prefixed with it, on the server too.
 
 ## Server vs Client: what runs where
 
@@ -84,25 +85,21 @@ later, inside a scope.
 | --- | --- | --- |
 | Numbered plugins | yes (render) | yes (hydration) |
 | `useRuntimeConfig()` | yes | yes |
-| `getAuthToken()` / `localStorage` | **no-op / null** (guarded) | reads/writes real storage |
-| `window.location.reload()` | guarded no-op | reloads |
+| Auth tokens | httpOnly cookies, forwarded from the request (`serverApiGet`) | httpOnly cookies, sent by the browser (`withCredentials`) |
+| Session hint `<APP_PREFIX>_SESSION` | read from the request `cookie` header | read / written via `document.cookie` |
+| 401 refresh-and-retry | never (SSR fetches reject; the browser resolves them) | yes (axios interceptors) |
 | Socket.IO handshake | never (`onMounted` only) | yes |
 
-`auth-token-storage.ts` gates every read/write on `isClient()`:
+The server never refreshes: the refresh cookie is scoped to the backend's auth
+routes and only the browser can rotate it. `fetchServerSessionUser` (see
+[Security & Auth](./security-auth.md)) maps the SSR `/auth/me` read as:
 
-```ts
-function isClient(): boolean {
-  return typeof window !== "undefined" && typeof localStorage !== "undefined";
-}
-export function getAuthToken(service = "MAIN"): string | null {
-  if (!isClient()) return null;     // SSR: no token, request goes out anonymous
-  return localStorage.getItem(resolveTokenKey(service));
-}
-```
-
-So during SSR every request is **anonymous** — there is no bearer token and no
-refresh attempt (the refresh-eligibility check requires a token). Authenticated
-data fetches resolve on the client after hydration.
+| SSR result | Outcome |
+| --- | --- |
+| user | the user (dehydrated) |
+| 401 + no session hint | `null` — anonymous, safe to dehydrate |
+| 401 + session hint | rejects — the browser refreshes after hydration |
+| 5xx / unreachable | rejects (`retryable: true`) — the browser retries |
 
 ## `server/` directory (Nitro)
 

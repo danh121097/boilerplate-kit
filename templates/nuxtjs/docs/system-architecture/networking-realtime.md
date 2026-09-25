@@ -56,13 +56,13 @@ returning `res.data`).
 `ApiInterceptors` implements `HttpInterceptorSetup`:
 
 **Request** — stamps `config.serviceType`, attaches HMAC signature headers (when
-`runtimeConfig.public.hmacSecret` is set), then the bearer token for that
-service's slot (null during SSR):
+`runtimeConfig.public.hmacSecret` is set). No Authorization header: the
+browser sends the httpOnly auth cookies (`withCredentials`):
 
 ```ts
 config.serviceType = service;
+config._sentAt ??= Date.now();                              // cross-tab "already refreshed?" check
 config.headers = HeadersUtils.setAuthHeaders(config);      // + sig/ctime/x-version
-HeadersUtils.addAuthorizationHeader(config, service);      // Authorization: Bearer <token>
 ```
 
 **Response** — `onSuccess` unwraps a recognized envelope; non-envelope bodies
@@ -105,7 +105,7 @@ shares one connection.
 
 ```ts
 const socket = io(URL, {
-  auth: buildAuth(),         // { token: `Bearer <token>`, role: "user", ...signHeader() }
+  auth: buildAuth(),         // { role: "user", ...signHeader() } — the httpOnly cookie authenticates
   transports: ["websocket"],
   withCredentials: true,
   autoConnect: false,
@@ -117,14 +117,13 @@ SSR safety is built in:
 
 - The `io()` constructor is lazy/safe on the server (no socket opens until
   `.connect()`).
-- `getAuthToken()` returns `null` during SSR, so `buildAuth()` yields an empty
-  bearer server-side.
 - `connectSocket` runs in `onMounted`, so the handshake only happens on the
   client — never during Nitro render.
 
 Behavior:
 
-- `buildAuth()` attaches the bearer token plus, when `hmacSecret` is set, an HMAC
+- `buildAuth()` carries no token (the browser sends the httpOnly access cookie via
+  `withCredentials`) plus, when `hmacSecret` is set, an HMAC
   `{ sig, ctime }` over the canonical string for `GET /socket` (see
   [Security & Auth](./security-auth.md)).
 - Lifecycle: connects `onMounted`, tears down on `onScopeDispose`. Events come
