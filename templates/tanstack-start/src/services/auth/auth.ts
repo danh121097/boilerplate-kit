@@ -4,6 +4,9 @@ import {
   bumpSessionEpoch,
   defineMutation,
   endSession,
+  getSessionEpoch,
+  hasSessionHint,
+  isLogoutPending,
   isUnauthorizedError,
   Model,
   startSession,
@@ -16,6 +19,10 @@ import type {
   LoginPayload,
   RegisterPayload,
 } from "@/services/auth/types/auth";
+import type { SessionEndReason } from "@/services/core";
+
+/** The revoke in flight, shared by concurrent callers (one POST, one event). */
+let revoking: Promise<boolean> | null = null;
 
 export class AuthModel extends Model {
   static {
@@ -37,8 +44,41 @@ export class AuthModel extends Model {
     return res.data;
   }
 
-  /** Revoke the refresh token server-side (sent by cookie) and always end the
-   * client session — hint + cached queries — even if the request fails.
+  /** The user signs out in this tab: revoke the refresh token server-side (sent
+   * by cookie) and always end the client session — hint + cached queries — even
+   * if the request fails. Ends as "logout": no return path. A revoke already in
+   * flight has the same effect, so logout joins it instead of posting again. */
+  static async logout(): Promise<void> {
+    // A revoke that backs out (session already ended elsewhere) leaves this
+    // one to be logged out normally.
+    if (revoking && (await revoking)) return;
+    await this.endServerSession("logout");
+  }
+
+  /**
+   * The server rejected a live session outside a refused refresh (the session
+   * read still 401s): revoke it like `logout`, best effort, but end it as
+   * "expired" so the expiry redirect carries a return path. `sinceEpoch` is the
+   * epoch seen when the rejected request started (undefined: no epoch check).
+   * Resolves true when this call — or the in-flight one it joined — ended the
+   * session; false when it had already ended (no hint, a logout running, or the
+   * epoch moved): nothing is posted, whoever ended it already reset the client
+   * state.
+   */
+  static revokeSession(sinceEpoch?: number): Promise<boolean> {
+    revoking ??= this.endServerSession("expired", sinceEpoch)
+      .catch(() => true) // best effort: the client session ended either way
+      .finally(() => {
+        revoking = null;
+      });
+    return revoking;
+  }
+
+  /** Shared by `logout` and `revokeSession`: revoke server-side, then end the
+   * client session with `reason`. A revoke ("expired") stands down — resolving
+   * false, nothing posted — when the session already ended: no hint, a logout
+   * running, or (when `sinceEpoch` is given) the epoch moved. Resolves true once
+   * it ended the session; a failed POST rejects after ending it.
    *
    * Ordering, so the token revoked is the latest one: from the first line no
    * refresh may start (a 401 meanwhile rejects with `session_ended` without
@@ -46,7 +86,17 @@ export class AuthModel extends Model {
    * the lock in another — is waited out (15s cap), then the epoch is bumped in
    * the same tick as the POST starts, so anything still in flight persists
    * nothing. */
-  static async logout(): Promise<void> {
+  private static async endServerSession(
+    reason: SessionEndReason,
+    sinceEpoch?: number,
+  ): Promise<boolean> {
+    if (reason === "expired") {
+      const ended =
+        !hasSessionHint() ||
+        isLogoutPending(this.service) ||
+        (sinceEpoch !== undefined && getSessionEpoch(this.service) !== sinceEpoch);
+      if (ended) return false;
+    }
     const done = beginLogout(this.service);
     try {
       await withSessionLock(this.service, async () => {
@@ -54,12 +104,13 @@ export class AuthModel extends Model {
         try {
           await this.api.post({ url: authContract.paths.logout });
         } finally {
-          endSession("logout", this.service);
+          endSession(reason, this.service);
         }
       });
     } finally {
       done();
     }
+    return true;
   }
 
   static async getMe(): Promise<AuthUser> {
@@ -67,16 +118,19 @@ export class AuthModel extends Model {
     return res.data.user;
   }
 
-  /** Current user, or null when signed out. A 401 (anonymous, or a session whose
-   * refresh failed) resolves to null; other failures (network/5xx) still throw
-   * so they are not cached as "signed out". Browser-only (axios client); the
-   * session query uses the SSR-capable `fetchSession` in `./session`. */
+  /** Current user, or null when signed out. A 401 resolves to null; while the
+   * session is still live (hint set, not ended meanwhile) it is revoked first
+   * (`revokeSession`, ends as "expired"). Other failures (network/5xx) still
+   * throw so they are not cached as "signed out". Browser-only (axios client);
+   * the session query uses the SSR-capable `fetchSession` in `./session`. */
   static async getSession(): Promise<AuthUser | null> {
+    const epoch = getSessionEpoch(this.service);
     try {
       return await this.getMe();
     } catch (error) {
-      if (isUnauthorizedError(error)) return null;
-      throw error;
+      if (!isUnauthorizedError(error)) throw error;
+      await this.revokeSession(epoch);
+      return null;
     }
   }
 }

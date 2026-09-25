@@ -141,17 +141,32 @@ These helpers live in `services/core/api-errors.ts` (`toApiError`,
 `isTransientHttpError`, `isUnauthorizedError`, `isRefreshRefused`,
 `refreshUnavailable`, `getApiErrorMessage`, `SessionEndedError`).
 
-On boot, `hydrate()` signs out only when `/auth/me` ends in a 401. If a
-refused refresh already ended the session (tokens cleared, epoch moved) it just
-resets local state; otherwise it calls `AuthModel.logout()` to revoke the
-stored tokens. A network error, 5xx or retryable refresh failure keeps the tokens —
-the session may still be valid. `useMeQuery` reads the same endpoint through
-`AuthModel.getSession()`, which resolves `null` on a 401 and rejects on
-anything else.
+On boot, `hydrate()` signs out only when `/auth/me` ends in a 401, through
+`AuthModel.revokeSession(epoch)` (see below). A network error, 5xx or retryable
+refresh failure keeps the tokens — the session may still be valid.
+`useMeQuery` reads the same endpoint through `AuthModel.getSession()`, which
+revokes the same way and resolves `null` on a 401, and rejects on anything else.
+
+## Two ways a session ends
+
+- `AuthModel.logout()` — only when the user signs out in this tab. Ends the
+  session as `"logout"`: the login page gets no `redirect`.
+- `AuthModel.revokeSession(sinceEpoch?)` — the server rejected the session
+  outside a refused refresh (a 401 on the session read). When the session
+  already ended (the epoch moved since the request started, no tokens are
+  stored, or a logout is running) it posts nothing and resolves `false`; the
+  caller only resets local state. Otherwise it runs the same steps as logout
+  below (best effort, never rejects), ends the session as `"expired"` and
+  resolves `true`, so the expiry redirect carries `redirect=<current path>`.
+  Concurrent calls share one in-flight revoke: one POST, one event.
+  A `logout()` called meanwhile waits for that revoke and returns: no second
+  POST, no second event.
+
+Both share one private helper, `endServerSession(reason, sinceEpoch?)`.
 
 ## Logout
 
-`AuthModel.logout()`:
+`AuthModel.logout()` (and a revoke that goes ahead):
 
 1. In the first synchronous tick, before any await, marks a logout of the auth
    service as pending (`beginLogout(service)`) and notes the tokens it holds.
@@ -168,7 +183,7 @@ anything else.
    `{ refreshToken }` with `Authorization: Bearer <access token>`, so the
    backend revokes the latest token.
 4. In a `finally` block clears every stored token (`clearAuthTokens`) and calls
-   `endSession("logout", service)`, which clears the user and the query cache.
+   `endSession(reason, service)`, which clears the user and the query cache.
    The client is signed out even when the request fails. A voluntary logout
    fires no "expired" event and adds no `redirect`.
 
@@ -184,7 +199,10 @@ and compares `hasStoredSession()` for the main service against the last known
 state (kept current by this tab's own token writes via `onTokensChanged`):
 
 - another tab removed the tokens (logout) → `endSession("logout", "MAIN")`
-  here (user, query cache), then `onLogout` re-runs the guards;
+  here (epoch, user, query cache), then `onLogout`. This tab writes no storage
+  and posts nothing. On a protected page (route `staticData.requiresAuth`) the
+  root layout navigates to `/login` without `redirect`; elsewhere it re-runs
+  the guards;
 - another tab stored tokens (login) → `onLogin` resets `auth.me`, invalidates
   every query so the profile refetches, reloads the user and re-runs the guards.
 

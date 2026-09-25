@@ -4,7 +4,6 @@ import { authContract } from "@/services/auth/contract";
 import {
   getSessionEpoch,
   hasStoredSession,
-  isLogoutPending,
   isUnauthorizedError,
   onSessionEnded,
   resetQueriesOnSessionEnd,
@@ -48,15 +47,10 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ user, isAuthenticated: true, hydrated: true });
     } catch (error) {
       if (isUnauthorizedError(error)) {
-        // A refused refresh or a running logout already ends the session: only
-        // reset local state. Otherwise the session is rejected
-        // without a refresh having ended it — revoke + drop the tokens so the
-        // guard routes to /login.
-        const ended =
-          getSessionEpoch(authContract.service) !== epoch ||
-          !hasStoredSession(authContract.service) ||
-          isLogoutPending(authContract.service);
-        if (!ended) await AuthModel.logout().catch(() => {});
+        // The server rejected the session: revoke it (ends as "expired", so the
+        // login page returns here). A refused refresh or a running logout
+        // already ended it — then this only resets local state.
+        await AuthModel.revokeSession(epoch);
         set({ user: null, isAuthenticated: false, hydrated: true });
         return;
       }

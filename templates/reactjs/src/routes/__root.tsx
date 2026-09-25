@@ -39,9 +39,19 @@ function RootLayout() {
     [navigate, router],
   );
 
-  // Login/logout in another tab → recompute the session here and re-run the
-  // route guards (`beforeLoad`), e.g. bounce a protected page to /login.
-  useEffect(() => syncAuthWithOtherTabs(() => void router.invalidate()), [router]);
+  // Login/logout in another tab → recompute the session here. A remote logout
+  // on a protected page goes to /login without a return path (the user chose
+  // to sign out); otherwise the route guards (`beforeLoad`) re-run.
+  useEffect(
+    () =>
+      syncAuthWithOtherTabs(() => {
+        const signedOut = !useAuthStore.getState().isAuthenticated;
+        const onProtectedPage = router.state.matches.some((m) => m.staticData.requiresAuth);
+        if (signedOut && onProtectedPage) void navigate({ to: "/login" });
+        else void router.invalidate();
+      }),
+    [navigate, router],
+  );
 
   function toggleLocale() {
     const next = i18n.language === "en" ? "ja" : "en";

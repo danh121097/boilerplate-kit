@@ -1,16 +1,27 @@
 import { getMeServerFn } from "@/server/get-me";
-import { defineQuery, isUnauthorizedError, withSessionRefresh } from "@/services/core";
+import { AuthModel } from "@/services/auth/auth";
+import {
+  defineQuery,
+  getSessionEpoch,
+  isUnauthorizedError,
+  withSessionRefresh,
+} from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
 import type { AuthUser } from "@/services/auth/types/auth";
 
 /** Current user or null. Signed out (anonymous, or a refresh that failed) → null;
- * an expired-but-refreshable session is refreshed in the browser first. */
+ * an expired-but-refreshable session is refreshed in the browser first. In the
+ * browser, a session that still 401s while live (hint set, not ended meanwhile)
+ * is revoked (`AuthModel.revokeSession`, ends as "expired"); during SSR nothing
+ * is revoked. */
 export async function fetchSession(): Promise<AuthUser | null> {
+  const epoch = getSessionEpoch(AuthModel.service);
   try {
     return await withSessionRefresh(() => getMeServerFn());
   } catch (error) {
-    if (isUnauthorizedError(error)) return null;
-    throw error; // network/5xx or "deferred to the browser" — never cached as signed out
+    if (!isUnauthorizedError(error)) throw error; // network/5xx or "deferred to the browser" — never cached as signed out
+    if (typeof window !== "undefined") await AuthModel.revokeSession(epoch);
+    return null;
   }
 }
 

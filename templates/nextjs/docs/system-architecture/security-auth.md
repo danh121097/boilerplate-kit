@@ -35,7 +35,10 @@ and 5xx.
 
 ## Logout
 
-`AuthModel.logout()`:
+`AuthModel.logout()` — the user's own sign-out in this tab; it ends as
+"logout", and the header then navigates to plain `/login` (no `redirect`),
+whether or not the request succeeded. A logout called while a revoke is in
+flight joins it (one POST, one session end):
 
 1. In the first synchronous tick, before any await, marks a logout as pending
    (`beginLogout`). From then on a 401 — and any refresh already queued — rejects
@@ -62,6 +65,21 @@ clears the hint and broadcasts the logout to other tabs. The subscribers in
 `app/providers.tsx` — `resetQueriesOnSessionEnd` and `redirectOnSessionExpired`
 — filter on `authContract.service`, so a refused refresh of another backend
 leaves the user signed in.
+
+## Revoking A Rejected Session
+
+"logout" is only ever the user signing out in this tab. Any session the server
+rejects ends as "expired". Besides a refused refresh, that includes the session
+read itself: when `AuthModel.getSession()` (the `useMeQuery` fetcher) gets a 401
+while the hint is set, it calls `AuthModel.revokeSession(sinceEpoch)`, which
+reuses the logout internals (`endServerSession`): logout pending, lock, epoch
+bump, a best-effort `POST /auth/logout`, then `endSession("expired", service)`,
+so the expiry redirect carries the return path. It resolves `true` when it
+ended the session and `false` — posting nothing — when the session had already
+ended (no hint, a logout running, or the epoch moved since the read started).
+Concurrent calls share one revoke: one POST, one event. The server-side read
+(`readServerSession`) never revokes. An anonymous 401 (no hint) resolves to
+`null` without a POST or an event.
 
 ## Return Path
 
@@ -109,8 +127,13 @@ replay then carries the rotated cookies. A stamp more than 1 s in the future
 `STORAGE_KEYS.AUTH_SYNC` storage event that login and logout write, and
 re-checks the hint cookie whenever the tab regains focus or becomes visible:
 
-- another tab logged out → this tab calls `endSession("logout", "MAIN")` (hint,
-  user, query cache), then refreshes the Server Components;
+- another tab logged out → this tab ends its own state only: epoch bump and
+  session-end listeners with "logout" (user, query cache). It does not touch the
+  hint cookie (the other tab cleared it), does not re-broadcast and posts
+  nothing. No route requires auth, so it stays on the current page, which
+  re-renders signed-out (`router.refresh()` re-renders the Server Components); a template with protected routes would go to plain
+  `/login` (no `redirect`) from those only. A logout seen through both the
+  storage event and the focus re-check fires once;
 - another tab logged in → this tab resets `auth.me` and invalidates every query
   so the profile refetches.
 

@@ -69,9 +69,10 @@ function RootLayout() {
     [router],
   );
 
-  // Login/logout in another tab → re-read the session and re-run the route
-  // loaders here. A remote logout has already cleared this tab's cache via the
-  // session-end listener.
+  // Login/logout in another tab → re-run the route loaders here; a login also
+  // re-reads the session. On a logout the session-end listener above has
+  // already reset every query to signed-out; no route requires auth, so the
+  // page stays (no navigation).
   useEffect(
     () =>
       syncAuthAcrossTabs({
@@ -116,7 +117,13 @@ function RootLayout() {
               <Button
                 variant="unstyled"
                 className="ml-auto hover:text-indigo-600"
-                onClick={() => logout.mutate()}
+                // Signed out either way (the client session ends even when the
+                // request fails): go to plain /login, no return path.
+                onClick={() =>
+                  logout.mutate(undefined, {
+                    onSettled: () => void router.navigate({ to: "/login" }),
+                  })
+                }
                 disabled={logout.isPending}
               >
                 {t("nav.logout")}

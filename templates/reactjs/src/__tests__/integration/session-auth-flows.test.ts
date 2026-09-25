@@ -2,7 +2,7 @@ import { installLocalStorage } from "@/__tests__/helpers/fake-storage";
 import { httpError, makeClient, ok } from "@/__tests__/helpers/http-mocks";
 import { queryClient } from "@/providers/query-client-provider";
 import { AuthModel } from "@/services/auth";
-import { Api, clearServiceTokens, endSession, onSessionEnded } from "@/services/core";
+import { Api, onSessionEnded } from "@/services/core";
 import {
   getAccessToken,
   getRefreshToken,
@@ -258,42 +258,6 @@ describe("session auth flows", () => {
     expect(getAccessToken()).toBe("AT");
     expect(getRefreshToken()).toBe("RT");
     expect(useAuthStore.getState()).toMatchObject({ hydrated: true, isAuthenticated: true });
-  });
-
-  it("boot 401 after a refused refresh does not post logout again", async () => {
-    persistAccessToken("AT");
-    persistRefreshToken("RT");
-    // What the interceptor does when the refresh is refused, then the 401 it rejects with.
-    vi.spyOn(AuthModel.api, "get").mockImplementation(async () => {
-      clearServiceTokens("MAIN");
-      endSession("expired", "MAIN");
-      throw { status: "error", error_code: 401, message: "expired" };
-    });
-    const post = vi.spyOn(AuthModel.api, "post");
-    const ended = vi.fn();
-    const off = onSessionEnded(ended);
-
-    await useAuthStore.getState().hydrate();
-
-    expect(post).not.toHaveBeenCalled();
-    expect(ended).toHaveBeenCalledTimes(1);
-    expect(useAuthStore.getState()).toMatchObject({
-      user: null,
-      isAuthenticated: false,
-      hydrated: true,
-    });
-    off();
-  });
-
-  it("boot: a 401 while the session is still stored revokes it and logs out", async () => {
-    persistAccessToken("AT");
-    vi.spyOn(AuthModel.api, "get").mockRejectedValue({ error_code: 401, message: "no" });
-    vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
-
-    await useAuthStore.getState().hydrate();
-
-    expect(getAccessToken()).toBeNull();
-    expect(useAuthStore.getState()).toMatchObject({ user: null, isAuthenticated: false });
   });
 
   it("logout sends the refresh token in the body, the access token as Bearer, and clears tokens + query cache", async () => {

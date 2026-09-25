@@ -23,7 +23,7 @@ src/services/
 │   ├── types.ts            # Shared TS types + axios module augmentation
 │   └── index.ts
 ├── auth/
-│   ├── auth.ts             # AuthModel (login/register/logout/getMe/getSession) + mutations
+│   ├── auth.ts             # AuthModel (login/register/logout/revokeSession/getMe/getSession) + mutations
 │   ├── session.ts          # fetchSession (SSR server fn) + useMeQuery + useAuth
 │   ├── types/auth.ts       # AuthUser, AuthResult, LoginPayload, RegisterPayload
 │   └── index.ts

@@ -82,9 +82,10 @@ export function Providers({ children, initialLanguage }: ProvidersProps) {
     [router],
   );
 
-  // Login/logout in another tab → re-read the session here and re-render the
-  // Server Components (their server reads depend on the auth cookies). A remote
-  // logout has already cleared this tab's cache via the session-end listener.
+  // Login/logout in another tab → re-render the Server Components (their server
+  // reads depend on the auth cookies); a login also re-reads the session. On a
+  // logout the session-end listener above has already reset every query to
+  // signed-out; no route requires auth, so the page stays (no navigation).
   useEffect(
     () =>
       syncAuthAcrossTabs({

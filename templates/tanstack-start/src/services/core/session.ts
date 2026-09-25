@@ -114,30 +114,41 @@ export function onSessionEnded(listener: SessionEndListener): () => void {
   };
 }
 
-/** End `service`'s client session: bump its epoch; for the main session also
- * drop the hint and tell the other tabs; then notify listeners. */
-export function endSession(reason: SessionEndReason, service: ApiService = "MAIN"): void {
+/** Bump `service`'s epoch, then notify listeners. With `announce` (this tab
+ * ended the session) the main session also drops the hint and tells the other
+ * tabs; a tab reacting to another tab's logout passes false and writes nothing —
+ * that tab already cleared the hint and broadcast. */
+function finishSession(reason: SessionEndReason, service: ApiService, announce: boolean): void {
   bumpSessionEpoch(service);
-  if (service === "MAIN") {
+  if (announce && service === "MAIN") {
     clearSessionHint();
     broadcastAuthChange("logout");
   }
   for (const listener of listeners) listener(reason, service);
 }
 
+/** End `service`'s client session: bump its epoch; for the main session also
+ * drop the hint and tell the other tabs; then notify listeners. */
+export function endSession(reason: SessionEndReason, service: ApiService = "MAIN"): void {
+  finishSession(reason, service, true);
+}
+
 export interface AuthSyncHandlers {
   /** Another tab signed in — re-read the session. */
   onLogin?: () => void;
-  /** Another tab signed out (session-end listeners have already run). */
+  /** Another tab signed out (session-end listeners have already run with
+   * "logout") — e.g. leave a page that needs a session, without a return path. */
   onLogout?: () => void;
 }
 
 /**
  * Keep this tab in step with logins/logouts made in other tabs. A remote logout
- * ends the main session here (`endSession("logout")`), then calls `onLogout`; a
+ * ends the main session here with reason "logout" — epoch bump and listeners
+ * only: no hint write, no re-broadcast, no request — then calls `onLogout`; a
  * remote login calls `onLogin`. Triggers: the `AUTH_SYNC` storage event, and a
  * hint-cookie re-check on focus / when the tab becomes visible (cookie changes
- * fire no event). Browser-only; returns the unsubscribe.
+ * fire no event). A logout seen through both fires once. Browser-only; returns
+ * the unsubscribe.
  */
 export function syncAuthAcrossTabs(handlers: AuthSyncHandlers = {}): () => void {
   if (typeof window === "undefined") return () => {};
@@ -150,7 +161,7 @@ export function syncAuthAcrossTabs(handlers: AuthSyncHandlers = {}): () => void 
       handlers.onLogin?.();
       return;
     }
-    endSession("logout", "MAIN");
+    finishSession("logout", "MAIN", false);
     handlers.onLogout?.();
   };
   const onStorage = (event: StorageEvent) => {

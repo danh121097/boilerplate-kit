@@ -36,7 +36,7 @@ never touches `localStorage` or reads tokens directly.
 ### auth/
 
 - `contract.ts` — endpoint paths + React Query keys (single source of truth)
-- `AuthModel` — login, register, logout, getMe, getSession (401 → null)
+- `AuthModel` — login, register, logout, revokeSession, getMe, getSession (401 → null; a live session is revoked first)
 - `useLoginMutation`, `useRegisterMutation`, `useLogoutMutation`, `useMeQuery`
 - `session.ts` — `useAuth()` hook (derives from useMeQuery)
 

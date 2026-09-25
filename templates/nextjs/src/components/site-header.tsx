@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { setLocale } from "@/i18n/i18n";
 import { useLogoutMutation } from "@/services/auth";
 import { useAuth } from "@/services/auth/session";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import Link from "next/link";
 
@@ -18,6 +18,7 @@ const NAV = [
 /** App header + nav — client component (i18n labels + locale toggle + auth). */
 export function SiteHeader() {
   const pathname = usePathname();
+  const router = useRouter();
   const logout = useLogoutMutation();
 
   const { i18n, t } = useTranslation();
@@ -46,7 +47,9 @@ export function SiteHeader() {
           <Button
             variant="unstyled"
             className="ml-auto hover:text-indigo-600"
-            onClick={() => logout.mutate()}
+            // Signed out either way (the client session ends even when the
+            // request fails): go to plain /login, no return path.
+            onClick={() => logout.mutate(undefined, { onSettled: () => router.push("/login") })}
             disabled={logout.isPending}
           >
             {t("nav.logout")}

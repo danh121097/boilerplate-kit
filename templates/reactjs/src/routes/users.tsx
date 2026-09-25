@@ -3,6 +3,7 @@ import { useAuthStore } from "@/stores/auth";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/users")({
+  staticData: { requiresAuth: true },
   // Protected: token presence (sync) decides access before the profile loads.
   beforeLoad: ({ location }) => {
     if (!useAuthStore.getState().isAuthenticated) {
