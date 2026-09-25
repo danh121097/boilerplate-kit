@@ -64,8 +64,9 @@ origins, else `403 AUTHORIZATION_ERROR`. Disabled by default.
 | `auth` | 15 min | 30 | `/auth/register`, `/auth/refresh`, `/auth/logout` |
 | `login` | 15 min | 30 | `/auth/login` (brute-force protection) |
 
-Stricter auth/login limiters layer **on top of** the global one via the route
-decorator — controllers declare both so the global cap is not dropped:
+`@nestjs/throttler` v6 runs every named throttler on every route, so `auth` and
+`login` carry a `skipIf` (`skipUnlessOptedIn`) and only count on routes that name
+them in `@Throttle`. They layer **on top of** the global `default` cap:
 
 ```ts
 @Throttle({ default: { limit: 100, ttl: 60_000 }, login: { limit: 30, ttl: 900_000 } })
@@ -75,7 +76,8 @@ decorator — controllers declare both so the global cap is not dropped:
 
 - **`shouldSkip` → true when `NODE_ENV=test`** — disabled under test.
 - **`handleRequest` fail-open** — a storage (Redis) error is caught and the
-  request is allowed through, so a Redis outage never 500s an endpoint.
+  request is allowed through, so a Redis outage never 500s an endpoint. The 429
+  (an `HttpException`) is always rethrown.
 - **`throwThrottlingException`** throws `AppException({ errorType: 'RATE_LIMIT',
   statusCode: 429 })` so the standard error envelope is rendered.
 
@@ -126,5 +128,5 @@ cross-instance Socket.IO adapter.
 ## See Also
 
 - [auth-jwt-refresh.md](./auth-jwt-refresh.md) — authentication + revocation
-- [hmac-verification.md](./hmac-verification.md) — request integrity
+- [hmac-verification.md](./hmac-verification.md) — request signing
 - [request-flow.md](./request-flow.md) — where these sit in the pipeline

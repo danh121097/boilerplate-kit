@@ -27,7 +27,7 @@ automatically — treat it as source of truth and this page as the stable summar
   including `@Public` and `/health`. Each request MUST send `sig` and `ctime`
   headers. The signed canonical string is
   `[METHOD, contentType, ctime, path, ""].join("\n")`, HMAC-SHA256, Base64.
-  `ctime` must be within 5 minutes of server time (replay protection). `path` is
+  `ctime` must be within 5 minutes of server time (bounds the replay window; no nonce). `path` is
   the prefix-stripped request path (`derivePath`).
 - **Global rate limit (always)** — the `default` throttler (100 req / 60s)
   applies to every route. Skipped in test mode. Auth routes layer stricter

@@ -58,6 +58,7 @@ src/
 │   ├── password.ts           # validatePasswordStrength (length + complexity)
 │   ├── token-revocation.ts   # per-user revoked-at in Redis (no-op when off)
 │   ├── cache.ts              # cache-aside get/set/del helpers (no-op when off)
+│   ├── map-database-error.ts # Mongoose/Mongo errors → 400/409 AppError (error-handler)
 │   ├── route-registrar.ts    # registerGroup: build Express Router from a RouteGroup
 │   └── socket-emit.ts        # emitToUser / emitBroadcast service-facing helpers
 │

@@ -27,7 +27,7 @@ if (pub) {
   io.adapter(createAdapter(pub, subClient));   // cross-instance delivery when Redis on
 }
 
-io.use(socketHmac);   // 1. integrity / replay gate
+io.use(socketHmac);   // 1. HMAC signature + ctime window
 io.use(socketAuth);   // 2. identity gate
 io.on('connection', (socket) => {
   const userId = socket.data.user?.userId;

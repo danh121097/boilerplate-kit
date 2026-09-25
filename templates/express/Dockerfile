@@ -10,7 +10,7 @@ COPY package.json bun.lock* ./
 RUN bun install
 
 # Compile (tsc && tsc-alias) -> runnable CommonJS in dist/.
-COPY tsconfig.json .swcrc ./
+COPY tsconfig.json tsconfig.build.json .swcrc ./
 COPY src ./src
 RUN bun run build
 

@@ -16,6 +16,15 @@ describe("Zod Schemas", () => {
     }
   });
 
+  it("registerSchema rejects a whitespace-only name (trim before min)", () => {
+    const result = registerSchema.safeParse({
+      email: "a@b.com",
+      password: "12345678",
+      name: "   ",
+    });
+    expect(result.success).toBe(false);
+  });
+
   it("registerSchema rejects invalid email", () => {
     const result = registerSchema.safeParse({
       email: "bad",

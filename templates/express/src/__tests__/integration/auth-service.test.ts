@@ -106,6 +106,37 @@ describe("AuthService", () => {
       expect(active).toBe(0);
     });
 
+    it("concurrent refreshes with one token: exactly one wins, the rest are reuse", async () => {
+      const { user, tokens } = await register(validUser.email, validUser.password, validUser.name);
+      const results = await Promise.allSettled(
+        Array.from({ length: 5 }, () => refresh(tokens.refreshToken)),
+      );
+      const fulfilled = results.filter((r) => r.status === "fulfilled");
+      const rejected = results.filter((r) => r.status === "rejected");
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(4);
+      for (const r of rejected) {
+        expect((r as PromiseRejectedResult).reason).toBeInstanceOf(AppError);
+        expect((r as PromiseRejectedResult).reason.statusCode).toBe(401);
+      }
+      // The claimed token is revoked exactly once and stays revoked.
+      const stored = await RefreshToken.findOne({ token: hashToken(tokens.refreshToken) });
+      expect(stored?.isRevoked).toBe(true);
+      expect(await RefreshToken.countDocuments({ userId: (user as any)._id })).toBe(2);
+    });
+
+    it("rejects a duplicate refresh-token hash (unique index)", async () => {
+      await RefreshToken.init();
+      const { user, tokens } = await register(validUser.email, validUser.password, validUser.name);
+      await expect(
+        RefreshToken.create({
+          token: hashToken(tokens.refreshToken),
+          userId: (user as any)._id,
+          expiresAt: new Date(Date.now() + 60_000),
+        }),
+      ).rejects.toMatchObject({ code: 11000 });
+    });
+
     it("throws when user is inactive", async () => {
       const { user, tokens } = await register(validUser.email, validUser.password, validUser.name);
       await User.findByIdAndUpdate((user as any)._id, { isActive: false });

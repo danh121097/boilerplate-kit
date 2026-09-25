@@ -1,4 +1,5 @@
 import { AppException, ErrorType } from "@/common/exceptions/app.exception";
+import { mapDatabaseError } from "@/common/filters/map-database-error";
 import { AppLogger } from "@/common/logger/app-logger.service";
 import {
   ArgumentsHost,
@@ -18,6 +19,8 @@ import type { Request, Response } from "express";
  *   { success: false, status: "error", errorType, message,
  *     error_code, error_message, stack? (dev only) }
  *
+ * Known Mongoose/MongoDB errors (CastError, ValidationError, duplicate key) are
+ * mapped to 400/409 first; any other non-HTTP error is a generic 500.
  * 5xx → logger.error with stack; 4xx → logger.warn.
  * Unmatched routes produce Nest's default NotFoundException (404) which is
  * caught here and rendered with NOT_FOUND errorType — matching not-found-handler.ts.
@@ -27,7 +30,8 @@ import type { Request, Response } from "express";
 export class HttpExceptionFilter implements ExceptionFilter {
   constructor(private readonly logger: AppLogger) {}
 
-  catch(exception: unknown, host: ArgumentsHost): void {
+  catch(rawException: unknown, host: ArgumentsHost): void {
+    const exception = mapDatabaseError(rawException) ?? rawException;
     const ctx = host.switchToHttp();
     const res = ctx.getResponse<Response>();
     const req = ctx.getRequest<Request>();

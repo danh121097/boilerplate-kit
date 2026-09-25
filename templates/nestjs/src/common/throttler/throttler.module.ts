@@ -2,8 +2,8 @@ import { AppException } from "@/common/exceptions/app.exception";
 import { AppConfigService } from "@/config/app-config.service";
 import { RedisService } from "@/redis/redis.service";
 import { ThrottlerStorageRedisService } from "@nest-lab/throttler-storage-redis";
-import { ExecutionContext, Injectable, Module } from "@nestjs/common";
-import { APP_GUARD } from "@nestjs/core";
+import { ExecutionContext, HttpException, Injectable, Module } from "@nestjs/common";
+import { APP_GUARD, Reflector } from "@nestjs/core";
 import {
   ThrottlerGuard,
   ThrottlerModule,
@@ -14,7 +14,8 @@ import {
  * Custom throttler guard that:
  *   1. Skips entirely when config.isTest (mirrors express `skip: () => isTest`).
  *   2. Catches storage/Redis errors and allows the request (fail-open), matching
- *      express `passOnStoreError: true` on all three rate limiters.
+ *      express `passOnStoreError: true` on all three rate limiters. The 429 thrown
+ *      by throwThrottlingException is an HttpException and is always rethrown.
  *   3. Throws AppException(RATE_LIMIT) so the HttpExceptionFilter renders the
  *      exact express error envelope instead of NestJS's default ThrottlerException.
  *
@@ -45,11 +46,14 @@ export class AppThrottlerGuard extends ThrottlerGuard {
    * Fail-open: if the storage backend (Redis) throws during the rate-limit
    * increment, catch and return true (allow the request through).
    * Mirrors express `passOnStoreError: true` on all three limiters.
+   * super.handleRequest also *throws* the 429 when a limit is exceeded — that is
+   * an HttpException and must propagate, otherwise nothing is ever blocked.
    */
   protected override async handleRequest(requestProps: ThrottlerRequest): Promise<boolean> {
     try {
       return await super.handleRequest(requestProps);
-    } catch {
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
       // Storage error (e.g. Redis outage) — allow request, do not block.
       return true;
     }
@@ -71,13 +75,32 @@ export class AppThrottlerGuard extends ThrottlerGuard {
   }
 }
 
+// Metadata key @Throttle() writes per throttler name (THROTTLER_LIMIT + name in
+// @nestjs/throttler). Not re-exported by the package, so it is mirrored here.
+const THROTTLER_LIMIT_METADATA = "THROTTLER:LIMIT";
+const reflector = new Reflector();
+
+/**
+ * skipIf for opt-in named throttlers. @nestjs/throttler v6 runs EVERY named
+ * throttler on EVERY route, so without this the 30/15min auth/login caps would
+ * apply app-wide. A route opts in by naming the throttler in @Throttle({...}),
+ * matching express, which mounts authRateLimiter/loginRateLimiter on auth routes only.
+ */
+export function skipUnlessOptedIn(name: string): (context: ExecutionContext) => boolean {
+  return (context) =>
+    reflector.getAllAndOverride<number | undefined>(THROTTLER_LIMIT_METADATA + name, [
+      context.getHandler(),
+      context.getClass(),
+    ]) === undefined;
+}
+
 /**
  * ThrottlerConfigModule — configures @nestjs/throttler v6 with:
  *   - Redis-backed storage reusing the Phase-2 ioredis client (no new connection).
  *   - Named throttlers matching express rate-limit.ts exactly:
  *       default  → 100 req / 60 s   (global API cap)
- *       auth     → 30 req / 900 s   (auth endpoints)
- *       login    → 30 req / 900 s   (login endpoint, stricter brute-force guard)
+ *       auth     → 30 req / 900 s   (auth endpoints; opt-in via @Throttle)
+ *       login    → 30 req / 900 s   (login endpoint; opt-in via @Throttle)
  *   - Registers AppThrottlerGuard as APP_GUARD.
  *
  * When Redis is disabled (getClient() === null), storage falls back to the
@@ -101,10 +124,10 @@ export class AppThrottlerGuard extends ThrottlerGuard {
           throttlers: [
             // Global cap — mirrors globalRateLimiter (100 req/min).
             { name: "default", ttl: 60_000, limit: 100 },
-            // Auth cap — mirrors authRateLimiter (30 req/15 min).
-            { name: "auth", ttl: 900_000, limit: 30 },
-            // Login cap — mirrors loginRateLimiter (30 req/15 min).
-            { name: "login", ttl: 900_000, limit: 30 },
+            // Auth cap — mirrors authRateLimiter (30 req/15 min); opt-in routes only.
+            { name: "auth", ttl: 900_000, limit: 30, skipIf: skipUnlessOptedIn("auth") },
+            // Login cap — mirrors loginRateLimiter (30 req/15 min); opt-in routes only.
+            { name: "login", ttl: 900_000, limit: 30, skipIf: skipUnlessOptedIn("login") },
           ],
         };
       },

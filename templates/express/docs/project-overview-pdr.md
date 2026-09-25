@@ -38,7 +38,7 @@ limiting, and an optional Redis tier — all behind a declarative module pattern
 Every request under `API_PREFIX` (and every Socket.IO handshake) must carry `sig`
 + `ctime` headers. The server recomputes an HMAC-SHA256 over
 `[method, contentType, ctime, path, ""].join("\n")` and compares in constant time;
-timestamps older than 5 minutes are rejected (replay protection). See
+timestamps older than 5 minutes are rejected (bounds the replay window; no nonce). See
 `src/utils/hmac.ts` and `src/middleware/hmac.ts`.
 
 ## Optional Redis Tier

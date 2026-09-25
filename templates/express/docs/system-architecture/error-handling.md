@@ -53,6 +53,11 @@ res.status(statusCode).json({
 ```
 
 - `statusCode` defaults to `500`, `errorType` to `'INTERNAL_ERROR'` when not set.
+- Mongoose `CastError` / `ValidationError` → `400 VALIDATION_ERROR` and MongoDB
+  duplicate key (`code 11000`) → `409 CONFLICT`, naming the field(s) only
+  ([`utils/map-database-error.ts`](../../src/utils/map-database-error.ts)).
+- Any other non-`AppError` that ends as a 5xx answers `"Internal Server Error!"`;
+  its raw message is only logged.
 - `error_code` / `error_message` mirror the status + message under the field names
   the client error type expects (keeps the contract stable for the frontend).
 - The stack is included **only** in `development`.

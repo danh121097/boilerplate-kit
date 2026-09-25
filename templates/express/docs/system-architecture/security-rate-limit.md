@@ -108,5 +108,5 @@ Socket.IO adapter.
 ## See Also
 
 - [auth-jwt-refresh.md](./auth-jwt-refresh.md) — authentication + revocation
-- [hmac-verification.md](./hmac-verification.md) — request integrity
+- [hmac-verification.md](./hmac-verification.md) — request signing
 - [request-flow.md](./request-flow.md) — where these sit in the pipeline

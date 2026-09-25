@@ -17,8 +17,8 @@ const REFRESH_TOKEN_EXPIRY_DAYS = 7;
  * Key behaviors preserved:
  *  - register: strength check → uniqueness check → create user → issue tokens
  *  - login: no enumeration (inactive user == wrong password, same message)
- *  - refresh: DB hash lookup (NOT signature verify on hot path) → reuse detection
- *    → expiry check → rotation (revoke old, issue new pair)
+ *  - refresh: DB hash lookup (NOT signature verify on hot path) → atomic claim
+ *    (single winner under concurrency) → reuse detection / expiry → new pair
  *  - logout: revoke refresh by hash → revokeUserTokens (no-op when Redis off)
  *  - getMe: find by id, throw 404 if missing/inactive
  */
@@ -91,56 +91,28 @@ export class AuthService {
   }
 
   /**
-   * Rotate refresh token — DB hash lookup + reuse detection + expiry + rotation.
+   * Rotate refresh token — atomic claim + reuse detection + expiry + rotation.
    *
-   * Branch order (mirrors express service.ts exactly):
-   *  1. Hash raw token → DB lookup; throw 401 if no record found.
-   *  2. Check isRevoked: if true → mark ALL user refresh tokens revoked +
-   *     revokeUserTokens (access) → throw 401 (reuse/theft detection).
-   *  3. Check expiresAt: if expired → deleteOne → throw 401.
-   *  4. Rotation: mark old token revoked, find user, issue new pair.
+   *  1. Hash raw token → atomically claim it: findOneAndUpdate on
+   *     {token, isRevoked:false, expiresAt > now} → isRevoked:true. Exactly one
+   *     concurrent caller can win; the rest see null.
+   *  2. Claim failed → re-lookup to classify:
+   *       no record   → 401 invalid
+   *       isRevoked   → reuse/theft: revoke ALL user refresh tokens +
+   *                     revokeUserTokens (access) → 401
+   *       expired     → deleteOne → 401
+   *  3. Claim won → find user, issue new pair.
    */
   async refresh(rawRefreshToken: string): Promise<AuthTokens> {
     const hashedToken = this.tokenService.hashToken(rawRefreshToken);
-    const storedToken = await this.refreshTokenModel.findOne({ token: hashedToken });
+    const claimedToken = await this.refreshTokenModel.findOneAndUpdate(
+      { token: hashedToken, isRevoked: false, expiresAt: { $gt: new Date() } },
+      { isRevoked: true },
+    );
 
-    if (!storedToken) {
-      throw new AppException({
-        message: "Invalid refresh token!",
-        statusCode: 401,
-        errorType: "AUTHENTICATION_ERROR",
-      });
-    }
+    if (!claimedToken) return this.rejectUnclaimableToken(hashedToken);
 
-    // Reuse detection: revoked token re-presented means rotation already happened —
-    // possible theft/replay. Nuke all sessions so both attacker and user must re-login.
-    if (storedToken.isRevoked) {
-      await this.refreshTokenModel.updateMany(
-        { userId: storedToken.userId },
-        { isRevoked: true },
-      );
-      await this.tokenRevocationService.revokeUserTokens(String(storedToken.userId));
-      throw new AppException({
-        message: "Refresh token reuse detected — all sessions have been revoked!",
-        statusCode: 401,
-        errorType: "AUTHENTICATION_ERROR",
-      });
-    }
-
-    if (storedToken.expiresAt < new Date()) {
-      await storedToken.deleteOne();
-      throw new AppException({
-        message: "Invalid or expired refresh token!",
-        statusCode: 401,
-        errorType: "AUTHENTICATION_ERROR",
-      });
-    }
-
-    // Rotation: revoke old token, issue new pair.
-    storedToken.isRevoked = true;
-    await storedToken.save();
-
-    const user = await this.userModel.findById(storedToken.userId);
+    const user = await this.userModel.findById(claimedToken.userId);
     if (!user || !user.isActive) {
       throw new AppException({
         message: "User not found or inactive!",
@@ -185,6 +157,44 @@ export class AuthService {
       });
     }
     return user;
+  }
+
+  /**
+   * Classify a refresh token that could not be claimed and throw the matching
+   * 401. Reuse of an already-rotated token revokes the user's whole token family
+   * (theft/replay defense: attacker and user must both re-login).
+   */
+  private async rejectUnclaimableToken(hashedToken: string): Promise<never> {
+    const storedToken = await this.refreshTokenModel.findOne({ token: hashedToken });
+
+    if (!storedToken) {
+      throw new AppException({
+        message: "Invalid refresh token!",
+        statusCode: 401,
+        errorType: "AUTHENTICATION_ERROR",
+      });
+    }
+
+    if (storedToken.isRevoked) {
+      await this.refreshTokenModel.updateMany(
+        { userId: storedToken.userId },
+        { isRevoked: true },
+      );
+      await this.tokenRevocationService.revokeUserTokens(String(storedToken.userId));
+      throw new AppException({
+        message: "Refresh token reuse detected — all sessions have been revoked!",
+        statusCode: 401,
+        errorType: "AUTHENTICATION_ERROR",
+      });
+    }
+
+    // Not revoked but unclaimable → expired.
+    await storedToken.deleteOne();
+    throw new AppException({
+      message: "Invalid or expired refresh token!",
+      statusCode: 401,
+      errorType: "AUTHENTICATION_ERROR",
+    });
   }
 
   /** Build JWT payload from user document — userId as string, email, role. */

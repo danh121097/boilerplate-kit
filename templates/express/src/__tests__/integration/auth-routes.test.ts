@@ -120,6 +120,19 @@ describe("Auth Routes", () => {
     expect(res.status).toBe(401);
   });
 
+  it("POST /api/v1/auth/refresh — parallel refreshes with one token yield exactly one 200", async () => {
+    const regCookies = await registerUser();
+    const url = "/api/v1/auth/refresh";
+    const responses = await Promise.all(
+      Array.from({ length: 5 }, () =>
+        request(app).post(url).set(signHmac("POST", url)).set("Cookie", toCookieHeader(regCookies)),
+      ),
+    );
+    const statuses = responses.map((r) => r.status);
+    expect(statuses.filter((s) => s === 200)).toHaveLength(1);
+    expect(statuses.filter((s) => s === 401)).toHaveLength(4);
+  });
+
   it("POST /api/v1/auth/refresh — 401 without cookie", async () => {
     const url = "/api/v1/auth/refresh";
     const res = await request(app).post(url).set(signHmac("POST", url));

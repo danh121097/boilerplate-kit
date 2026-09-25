@@ -35,7 +35,7 @@ runs four steps in a fixed sequence. Using one composite guard guarantees the
 order regardless of `APP_GUARD` array position (which NestJS does not order):
 
 ```text
-1. HMAC integrity   — ALL routes, including @Public and /health
+1. HMAC signature   — ALL routes, including @Public and /health
 2. Origin / CSRF    — only when config.enableCsrf AND a mutating method (POST/PUT/PATCH/DELETE)
 3. JWT identity     — skipped for @Public routes; sets req.user
 4. Role check       — only when @Roles metadata is present (needs step 3)

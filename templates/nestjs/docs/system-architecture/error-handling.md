@@ -43,7 +43,9 @@ registered as `APP_FILTER` (in `CommonModule`) with `@Catch()` — it catches
 | --- | --- |
 | `AppException` | `statusCode` + `message` + its `errorType`, verbatim |
 | any other `HttpException` (e.g. Nest's `NotFoundException` for unmatched routes) | status + unwrapped message; `errorType` mapped from status via `mapHttpStatusToErrorType` |
-| any non-HTTP error | `500` `INTERNAL_ERROR`, generic message |
+| Mongoose `CastError` / `ValidationError` | `400` `VALIDATION_ERROR`, names the field(s) only (`map-database-error.ts`) |
+| MongoDB duplicate key (`code 11000`) | `409` `CONFLICT`, names the field(s) only |
+| any other non-HTTP error | `500` `INTERNAL_ERROR`, generic message |
 
 ```ts
 res.status(statusCode).json({

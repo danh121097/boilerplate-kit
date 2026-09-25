@@ -40,7 +40,8 @@ src/
 │   ├── exceptions/
 │   │   └── app.exception.ts   # AppException (extends HttpException) + ErrorType union
 │   ├── filters/
-│   │   └── http-exception.filter.ts # global filter → standard JSON error envelope
+│   │   ├── http-exception.filter.ts # global filter → standard JSON error envelope
+│   │   └── map-database-error.ts    # Mongoose/Mongo errors → 400/409 AppException
 │   ├── pipes/
 │   │   └── zod-validation.pipe.ts   # re-export of nestjs-zod ZodValidationPipe (global)
 │   ├── middleware/

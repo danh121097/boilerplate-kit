@@ -82,7 +82,7 @@ The `JwtPayload` carries `{ userId, email, role }` only — never `exp`/`iat`
 
 ```ts
 {
-  token:     { type: String, required: true, index: true },        // SHA-256 hash, NOT the raw JWT
+  token:     { type: String, required: true, unique: true },       // SHA-256 hash, NOT the raw JWT
   userId:    { type: ObjectId, ref: 'User', required: true, index: true },
   expiresAt: { type: Date, required: true, index: { expires: 0 } },// TTL index → Mongo auto-purges
   isRevoked: { type: Boolean, default: false },
@@ -92,6 +92,10 @@ The `JwtPayload` carries `{ userId, email, role }` only — never `exp`/`iat`
 Only the **hash** of the token is stored (`hashToken` = SHA-256 hex), so a DB leak
 cannot reconstruct usable tokens. The TTL index (`expires: 0`) auto-deletes
 expired documents.
+
+> **Upgrading an existing DB:** the `token` index is now unique. Drop the old
+> non-unique `token_1` index (or run `RefreshToken.syncIndexes()`) first —
+> Mongoose will not replace an existing index of the same name.
 
 ## Cookies
 
@@ -133,24 +137,29 @@ All flows live in [`modules/auth/service.ts`](../../src/modules/auth/service.ts)
 ### Refresh Rotation
 
 `AuthService.refresh` rotates on every use — a stolen-and-replayed token is
-detectable and the chain self-heals:
+detectable and the chain self-heals. The old token is **claimed atomically**, so
+concurrent refreshes with the same token produce exactly one `200`:
 
 ```ts
 const hashedToken = hashToken(rawRefreshToken);
-const stored = await RefreshToken.findOne({ token: hashedToken, isRevoked: false });
-if (!stored || stored.expiresAt < new Date()) {
-  if (stored) await stored.deleteOne();
-  throw new AppError({ statusCode: 401, errorType: 'AUTHENTICATION_ERROR', ... });
-}
-stored.isRevoked = true;          // revoke the OLD token
-await stored.save();
+const stored = await RefreshToken.findOneAndUpdate(      // 1. atomic claim = revoke OLD
+  { token: hashedToken, isRevoked: false, expiresAt: { $gt: new Date() } },
+  { isRevoked: true },
+);
+if (!stored) return rejectUnclaimableToken(hashedToken);  // 2. re-lookup + classify:
+//   unknown → 401 · already revoked → REUSE: revoke every refresh token of the user
+//   + revokeUserTokens → 401 · expired → deleteOne → 401
 // ...resolve user, then:
 const accessToken = signAccessToken(payload);
 const newRefreshToken = await createRefreshTokenInDb(user._id, payload); // issue NEW
 ```
 
 Each refresh **revokes the old token and issues a fresh pair**; new cookies are
-set by the controller.
+set by the controller. Clients must single-flight refreshes (the frontend
+templates lock across tabs). A parallel refresh with the same token is treated as
+reuse, but detection is best-effort under true concurrency: the winning
+request's new refresh token (and its access token) can be issued after the
+reuse branch revoked the family, and so survive it.
 
 ## Verifying Requests: `authenticate`
 

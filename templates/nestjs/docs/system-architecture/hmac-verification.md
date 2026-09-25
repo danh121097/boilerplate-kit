@@ -1,10 +1,15 @@
 # HMAC Request Verification
 
 Every route (and the Socket.IO handshake) is gated by an HMAC-SHA256 signature so
-the server can verify a request came from a client holding the shared secret and
-was not replayed. Source:
+the server can reject requests from clients that do not hold the shared secret
+and bound how long a captured signature stays usable. Source:
 [`common/services/hmac.service.ts`](../../src/common/services/hmac.service.ts),
 [`common/guards/security.guard.ts`](../../src/common/guards/security.guard.ts).
+
+> **Scope:** this is anti-casual-abuse only, not integrity or replay protection.
+> The body and query string are not signed, there is no nonce (a captured
+> signature replays freely inside the 5-minute window), and browser/mobile
+> clients necessarily ship the secret. Authorization rests on the JWT.
 
 ## The Canonical String
 

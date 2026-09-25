@@ -79,9 +79,13 @@ export async function login(
   return { user, tokens: { accessToken, refreshToken } };
 }
 
-/** Rotate refresh token: revoke old, issue new pair */
-export async function refresh(rawRefreshToken: string): Promise<AuthTokens> {
-  const hashedToken = hashToken(rawRefreshToken);
+/**
+ * Classify a refresh token that could not be claimed and throw the matching 401.
+ * Reuse of an already-rotated token is a sign of theft/replay: nuke the user's
+ * whole token family (all refresh tokens + access tokens) so attacker and user
+ * must re-login.
+ */
+async function rejectUnclaimableToken(hashedToken: string): Promise<never> {
   const storedToken = await RefreshToken.findOne({ token: hashedToken });
 
   if (!storedToken) {
@@ -92,9 +96,6 @@ export async function refresh(rawRefreshToken: string): Promise<AuthTokens> {
     });
   }
 
-  // Reuse detection: an already-revoked token presented again means it was
-  // rotated already — a sign of theft/replay. Nuke the user's whole token family
-  // (all refresh tokens + access tokens) so attacker and user must re-login.
   if (storedToken.isRevoked) {
     await RefreshToken.updateMany({ userId: storedToken.userId }, { isRevoked: true });
     await revokeUserTokens(String(storedToken.userId));
@@ -105,18 +106,28 @@ export async function refresh(rawRefreshToken: string): Promise<AuthTokens> {
     });
   }
 
-  if (storedToken.expiresAt < new Date()) {
-    await storedToken.deleteOne();
-    throw new AppError({
-      message: "Invalid or expired refresh token!",
-      statusCode: 401,
-      errorType: "AUTHENTICATION_ERROR",
-    });
-  }
+  // Not revoked but unclaimable → expired.
+  await storedToken.deleteOne();
+  throw new AppError({
+    message: "Invalid or expired refresh token!",
+    statusCode: 401,
+    errorType: "AUTHENTICATION_ERROR",
+  });
+}
 
-  // Rotate: revoke old token, issue new one
-  storedToken.isRevoked = true;
-  await storedToken.save();
+/**
+ * Rotate refresh token: atomically claim (revoke) the old one, issue a new pair.
+ * The claim is a single findOneAndUpdate on {token, not revoked, not expired},
+ * so concurrent refreshes with the same token yield exactly one winner.
+ */
+export async function refresh(rawRefreshToken: string): Promise<AuthTokens> {
+  const hashedToken = hashToken(rawRefreshToken);
+  const storedToken = await RefreshToken.findOneAndUpdate(
+    { token: hashedToken, isRevoked: false, expiresAt: { $gt: new Date() } },
+    { isRevoked: true },
+  );
+
+  if (!storedToken) return rejectUnclaimableToken(hashedToken);
 
   const user = await User.findById(storedToken.userId);
   if (!user || !user.isActive)

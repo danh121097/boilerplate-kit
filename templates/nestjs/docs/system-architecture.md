@@ -14,7 +14,7 @@ focused page under [`system-architecture/`](./system-architecture/).
 | Data store | MongoDB via `@nestjs/mongoose` |
 | Access tokens | JWT **RS256** (RSA keypair), 15 min default |
 | Refresh tokens | JWT **HS256** (symmetric secret), 7 day default, httpOnly cookie, DB-tracked + rotated, reuse-detected |
-| Request integrity | HMAC-SHA256 signature on every route (and socket handshake) |
+| Request signing | HMAC-SHA256 signature on every route (and socket handshake); anti-casual-abuse only |
 | Realtime | Socket.IO via `@nestjs/websockets` (HMAC + JWT gated handshake) |
 | API docs | `@nestjs/swagger` — live OpenAPI UI at `/docs` |
 | Optional cache / scale | Redis (throttler store, token revocation, cache, socket adapter) |

@@ -53,7 +53,7 @@ Every request (including `/health`, `@Public` routes, and the Socket.IO
 handshake) must carry `sig` + `ctime` headers. The HMAC step of `SecurityGuard`
 recomputes an HMAC-SHA256 over `[method, contentType, ctime, path, ""].join("\n")`
 and compares in constant time; timestamps older than 5 minutes are rejected
-(replay protection). The signed `path` is derived by stripping the global API
+(bounds the replay window; no nonce). The signed `path` is derived by stripping the global API
 prefix from `req.originalUrl` (`derivePath`). See `src/common/services/hmac.service.ts`
 and `src/common/guards/security.guard.ts`.
 

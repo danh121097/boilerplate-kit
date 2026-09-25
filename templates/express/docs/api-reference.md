@@ -14,7 +14,7 @@ list.
   The signed canonical string is
   `[METHOD, contentType, ctime, path, ""].join("\n")`, HMAC-SHA256, Base64
   (`src/middleware/hmac.ts`, `src/utils/hmac.ts`). `ctime` must be within 5
-  minutes of server time (replay protection).
+  minutes of server time (bounds the replay window; no nonce).
 - **Global rate limit (always)** — `globalRateLimiter` (100 req / 60s) is
   applied under the prefix on top of HMAC. Skipped in test mode. Auth routes
   layer stricter limiters on top.

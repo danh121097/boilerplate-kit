@@ -79,7 +79,7 @@ required at boot. The `JwtPayload` carries `{ userId, email, role }` only.
 ```ts
 @Schema({ timestamps: true })
 class RefreshToken {
-  @Prop({ required: true, index: true })  token: string;          // SHA-256 hash, NOT the raw JWT
+  @Prop({ required: true, unique: true }) token: string;          // SHA-256 hash, NOT the raw JWT
   @Prop({ type: Types.ObjectId, ref: "User", required: true, index: true }) userId: Types.ObjectId;
   @Prop({ required: true, index: { expires: 0 } }) expiresAt: Date; // TTL index → Mongo auto-purges
   @Prop({ default: false }) isRevoked: boolean;
@@ -89,6 +89,10 @@ class RefreshToken {
 Only the **hash** of the token is stored (`hashToken` = SHA-256 hex), so a DB
 leak cannot reconstruct usable tokens. The TTL index (`expires: 0`) auto-deletes
 expired documents.
+
+> **Upgrading an existing DB:** the `token` index is now unique. Drop the old
+> non-unique `token_1` index (or run `refreshTokenModel.syncIndexes()`) first —
+> Mongoose will not replace an existing index of the same name.
 
 ## Cookies
 
@@ -132,30 +136,32 @@ All flows live in
 ### Refresh Rotation + Reuse Detection
 
 `AuthService.refresh` looks the token up by **hash** (no signature verify on the
-hot path), then branches in a fixed order:
+hot path) and **claims it atomically**, so concurrent refreshes with the same
+token produce exactly one `200`:
 
 ```ts
 const hashedToken = this.tokenService.hashToken(rawRefreshToken);
-const stored = await this.refreshTokenModel.findOne({ token: hashedToken });
-if (!stored) throw 401;                       // 1. unknown token
-
-if (stored.isRevoked) {                        // 2. REUSE DETECTED
-  await this.refreshTokenModel.updateMany({ userId: stored.userId }, { isRevoked: true });
-  await this.tokenRevocationService.revokeUserTokens(String(stored.userId));
-  throw 401 "Refresh token reuse detected — all sessions have been revoked!";
-}
-
-if (stored.expiresAt < new Date()) { await stored.deleteOne(); throw 401; } // 3. expired
-
-stored.isRevoked = true; await stored.save();  // 4. rotate: revoke old
-// resolve active user, then issue a fresh access + refresh pair
+const claimed = await this.refreshTokenModel.findOneAndUpdate(   // 1. atomic claim = revoke old
+  { token: hashedToken, isRevoked: false, expiresAt: { $gt: new Date() } },
+  { isRevoked: true },
+);
+if (!claimed) return this.rejectUnclaimableToken(hashedToken);  // 2. re-lookup + classify:
+//   unknown → 401
+//   isRevoked → REUSE DETECTED: updateMany({ userId }, { isRevoked: true })
+//               + revokeUserTokens(userId) → 401 "Refresh token reuse detected — …"
+//   expired → deleteOne → 401
+// 3. resolve active user, then issue a fresh access + refresh pair
 ```
 
 Each refresh **revokes the old token and issues a fresh pair**. If an already
 -rotated (revoked) token is replayed — the classic stolen-token signal — every
 refresh token for that user is revoked and a user-level access cutoff is set,
 forcing both the attacker and the legitimate user to log in again. This is proven
-by `test/e2e/refresh-token-reuse-detection.e2e-spec.ts`.
+by `test/e2e/refresh-token-reuse-detection.e2e-spec.ts`. Clients must single-flight refreshes (the frontend
+templates lock across tabs). A parallel refresh with the same token is treated as
+reuse, but detection is best-effort under true concurrency: the winning
+request's new refresh token (and its access token) can be issued after the
+reuse branch revoked the family, and so survive it.
 
 ## Verifying Requests: the JWT step of `SecurityGuard`
 

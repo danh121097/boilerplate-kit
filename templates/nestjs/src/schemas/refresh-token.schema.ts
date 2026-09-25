@@ -10,11 +10,14 @@ export interface RefreshTokenDocument extends HydratedDocument<RefreshToken> {
  * RefreshToken schema — ported from express models/refresh-token.ts.
  * `token` stores the SHA-256 hash of the raw refresh token, never the raw token.
  * `expiresAt` carries a TTL index ({expires:0}) so MongoDB auto-deletes expired docs.
+ * `token` is unique as defense in depth: each raw token carries a random jti, so
+ * a duplicate hash means a bug. Rotation atomicity comes from the per-document
+ * findOneAndUpdate claim in AuthService.refresh, not from this index.
  * `userId` is indexed for fast per-user lookup during rotation / revocation.
  */
 @Schema({ timestamps: true })
 export class RefreshToken {
-  @Prop({ type: String, required: true, index: true })
+  @Prop({ type: String, required: true, unique: true })
   token!: string;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: "User", required: true, index: true })
