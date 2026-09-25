@@ -3,10 +3,13 @@ import type { ServiceRefreshConfig } from "@/services/core";
 import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import axios from "axios";
 
-/** Build an axios instance wired with the real request + response interceptors. */
+/** Build an axios instance wired with the real request + response interceptors.
+ * By default MAIN refreshes on any 401 (a session is assumed to exist). */
 export function makeClient(
   adapter: AxiosAdapter,
-  refresh: Record<string, ServiceRefreshConfig> = { MAIN: { endpoint: "/auth/refresh" } },
+  refresh: Record<string, ServiceRefreshConfig> = {
+    MAIN: { endpoint: "/auth/refresh", hasSession: () => true },
+  },
 ) {
   const interceptors = new ApiInterceptors(refresh);
   const instance = axios.create({ adapter });

@@ -8,8 +8,10 @@
 | Refresh token | `localStorage` via `STORAGE_KEYS.REFRESH_TOKEN` | Client — sent in the body of `/auth/refresh` and `/auth/logout` |
 
 Both keys carry the app prefix (`${APP_PREFIX}_ACCESS_TOKEN`,
-`${APP_PREFIX}_REFRESH_TOKEN`), as do the Web Lock names, so two apps on one
-origin never collide.
+`${APP_PREFIX}_REFRESH_TOKEN`), as do the Web Lock names
+(`${APP_PREFIX}:auth-refresh:<service>`), so two apps on one origin never
+collide. `getAppPrefix()` (`services/core/app-prefix.ts`) returns the prefix
+(`VITE_APP_NAME`, default `PRISM_APP`).
 
 The backend rotates the pair on every refresh and also sets an httpOnly refresh
 cookie (`withCredentials: true` keeps it working). Keeping the refresh token in
@@ -30,21 +32,32 @@ ctime (ms epoch)\n
 ```
 
 Signed with HMAC-SHA256, Base64-encoded → `sig` header. Also sends `ctime` and
-`x-version` headers. Implemented in `HMACSignatureGenerator.generateSignature()`.
+`x-version` headers. `HMACSignatureGenerator.signRequest({ method, path,
+contentType })` is the pure signer; `generateSignature(config)` adapts an axios
+request config to it.
 
 - `/path` is the request path relative to the baseURL with the query stripped.
   Query parameters — inline (`/users?page=2`) or via axios `params` — are never
   signed (the backend verifies `req.url.split("?")[0]`).
-- `Content-Type` is the exact header value sent: the pinned value (or
-  `application/json`) when there is a body, `""` when there is none (axios drops
-  the header). The client never adds or strips a charset; if you pin one, it is
-  signed exactly as sent.
+- `Content-Type` is the exact header value axios sends, as computed by
+  `resolveContentType(config)`:
+  - `data === undefined` → `""` (axios drops the header);
+  - otherwise the pinned Content-Type (instance default or per request, header
+    name matched case-insensitively) exactly as set;
+  - nothing pinned → axios's own default: `URLSearchParams` →
+    `application/x-www-form-urlencoded;charset=utf-8`, a string →
+    `application/x-www-form-urlencoded`, anything else (including `null`) →
+    `application/json`.
+
+  The client never adds or strips a charset; if you pin one, it is signed
+  exactly as sent. The `Api` client pins `application/json` on every instance.
 - `multipart/form-data` is **not supported** with HMAC on: the browser appends a
   generated `boundary` to the header after signing, so the signature cannot match.
 
-The bare refresh client (`auth-refresh-client.ts`) signs its own request manually
-(it bypasses the app interceptors to prevent refresh recursion), including its
-JSON body's `application/json` Content-Type.
+The bare refresh client (`auth-refresh-client.ts`) signs its own request with
+`signRequest` (it bypasses the app interceptors to prevent refresh recursion),
+including its JSON body's `application/json` Content-Type. Its timeout is
+`REFRESH_TIMEOUT_MS` (15 s).
 
 **HMAC here is anti-casual-abuse only, not authentication.** `VITE_*` variables
 are inlined into the bundle, so anyone can read the secret and sign requests.
@@ -68,9 +81,11 @@ Across tabs, `navigator.locks.request` makes only one tab refresh at a time; a t
 that waited re-reads the shared `localStorage` token and skips its own refresh
 when another tab already rotated it. That matters because the backend treats a
 replayed (already-rotated) refresh token as theft and revokes **all** sessions.
-`withSessionLock` runs refreshes and logout under this lock. Where the Web Locks
+Logout runs under the same lock through `withSessionLock`. Where the Web Locks
 API is missing the manager falls back to per-tab single-flight (two tabs may then
-refresh at once — a documented limit).
+refresh at once — a documented limit), and `withSessionLock` waits for this
+tab's in-flight refresh of that service instead. Either wait is capped at
+`SESSION_WAIT_TIMEOUT_MS` (15 s), after which the task runs anyway.
 
 ## Refresh eligibility
 
@@ -79,20 +94,34 @@ A 401 triggers an automatic refresh only when ALL are true:
 2. The URL is not the refresh endpoint or a credential endpoint in `skipPaths`
    (`/auth/login`, `/auth/register`, `/auth/logout`) — a wrong-password 401
    surfaces as a form error, never a refresh.
-3. The service holds an access or refresh token (anonymous traffic never refreshes).
+3. The service's `hasSession()` is true — by default, it holds an access or
+   refresh token (`hasStoredSession(service)`), so anonymous traffic never
+   refreshes. The same check runs again once the refresh lock is held: if
+   another tab logged out meanwhile, no refresh request is made.
+
+Per-service refresh options (`ServiceRefreshConfig` in `init-services.ts`):
+`endpoint` (default `/auth/refresh`), `skipPaths` (default `[]`),
+`hasSession`, and an optional `onRefreshed` hook.
 
 ## Session end (no reload)
 
 A 401 never reloads the page. Only a **refused** refresh (HTTP 401/403 from the
-refresh endpoint — `isRefreshRefused`) ends the session: the service's tokens are
-cleared and `endSession("expired")` fires (`session-events.ts`). The auth store
-listener drops the user and resets every cached query in place
-(`resetQueriesToSignedOut` — mounted components see signed-out data, `auth.me`
-is pinned to `null`, nothing refetches); the root layout navigates
-client-side to `/login?redirect=<current full path>`; the rejected request
-surfaces the original 401. A request that 401s again after a successful refresh
-(already replayed) returns that 401 to the caller and keeps the session — only a
-refused refresh ends it.
+refresh endpoint — `isRefreshRefused`) ends a session: that service's tokens are
+cleared and `endSession("expired", service)` fires (`services/core/session.ts`).
+The rejected request surfaces the original 401.
+
+Only the auth service (`authContract.service`, `MAIN`) is the user's session.
+When it ends, the auth store drops the user and resets every cached query in
+place (`resetQueriesOnSessionEnd` → `resetQueriesToSignedOut` — mounted
+components see signed-out data, `auth.me` is pinned to `null`, nothing
+refetches), and the root layout (`redirectOnSessionExpired`) navigates
+client-side to `loginPathWithReturn(<current full path>)`, i.e.
+`/login?redirect=…`. Another service's refused refresh clears only that
+service's tokens: the user stays signed in, the cache is kept and no redirect
+happens.
+
+A request that 401s again after a successful refresh (already replayed) returns
+that 401 to the caller and keeps the session — only a refused refresh ends it.
 
 After login — and when `/login` loads while already signed in — the app goes to
 `safeRedirect(redirect)`, which returns the value only when it is a string of at
@@ -100,49 +129,63 @@ most 512 characters, starts with exactly one `/`, contains no `\`, no control
 character and no `://`, and is not `/login` itself (with or without a query or
 trailing slash). Anything else falls back to `/`.
 
-A **transient** refresh failure (network error, the 15 s refresh timeout, 429,
-5xx) keeps the tokens and does not end the session; the request rejects with a
-non-401 `ApiResponseError` carrying `retryable: true`, and the next 401 retries
-the refresh. Every rejected request uses the shape `{ error_code: <status, or 0
+Any other refresh failure (network error, the 15 s refresh timeout, 408, 429,
+5xx, 400, or a 200 without an access token) keeps the tokens and does not end
+the session; the request rejects with `refreshUnavailable(error)` —
+`{ error_code: <refresh status, or 0>, message: "refresh_unavailable",
+retryable: true }` — and the next 401 retries the refresh. Every rejected request uses the shape `{ error_code: <status, or 0
 without a response>, message, retryable? }`; `retryable` is set for no response,
 408, 429 and 5xx.
 
-On boot, `hydrate()` logs out only when `/auth/me` ends in a 401 (refresh
-refused). A network error, 5xx or retryable refresh failure keeps the tokens —
-the session may still be valid.
+These helpers live in `services/core/api-errors.ts` (`toApiError`,
+`isTransientHttpError`, `isUnauthorizedError`, `isRefreshRefused`,
+`refreshUnavailable`, `getApiErrorMessage`, `SessionEndedError`).
+
+On boot, `hydrate()` signs out only when `/auth/me` ends in a 401. If a
+refused refresh already ended the session (tokens cleared, epoch moved) it just
+resets local state; otherwise it calls `AuthModel.logout()` to revoke the
+stored tokens. A network error, 5xx or retryable refresh failure keeps the tokens —
+the session may still be valid. `useMeQuery` reads the same endpoint through
+`AuthModel.getSession()`, which resolves `null` on a 401 and rejects on
+anything else.
 
 ## Logout
 
 `AuthModel.logout()`:
 
-1. In the first synchronous tick, before any await, captures the access and
-   refresh tokens and marks a logout as pending (`beginLogout`). From then on
-   `getFreshToken` and the 401 interceptor reject with `SessionEndedError`
-   (`{ error_code: 401, message: "session_ended" }`) and never call
-   `/auth/refresh`, even without the Web Locks API.
-2. Waits for this tab's in-flight refreshes (`settleInFlightRefreshes`), then
-   takes the refresh lock (`withSessionLock`) so a refresh running in another
-   tab stores its rotated pair first. Both waits share a 15 s cap
-   (`SESSION_WAIT_TIMEOUT_MS`); after it logout proceeds without the lock.
-3. Bumps the session epoch and posts `{ refreshToken }` with
-   `Authorization: Bearer <access token>` — the pair a settled refresh just
-   stored, else the captured one — so the backend revokes the latest token.
-4. In a `finally` block clears every stored token and calls
-   `endSession("logout")`, which clears the user and the query cache. The client
-   is signed out even when the request fails. A voluntary logout fires no
-   "expired" event and adds no `redirect`.
+1. In the first synchronous tick, before any await, marks a logout of the auth
+   service as pending (`beginLogout(service)`) and notes the tokens it holds.
+   From then on `getFreshToken` and the 401 interceptor reject with
+   `SessionEndedError` (`{ error_code: 401, message: "session_ended" }`) and
+   never call `/auth/refresh`, even without the Web Locks API.
+2. Runs the rest under `withSessionLock(service, …)`: it waits for a refresh
+   already running — in another tab through the Web Lock, or in this tab when
+   locks are unavailable — so the rotated pair is stored first. The wait is
+   capped at 15 s (`SESSION_WAIT_TIMEOUT_MS`); after it logout proceeds anyway.
+   With no refresh running and no Web Locks it starts at once.
+3. In one tick reads the pair to revoke (the stored one, else the pair noted in
+   step 1) and bumps the session epoch (`bumpSessionEpoch(service)`), then posts
+   `{ refreshToken }` with `Authorization: Bearer <access token>`, so the
+   backend revokes the latest token.
+4. In a `finally` block clears every stored token (`clearAuthTokens`) and calls
+   `endSession("logout", service)`, which clears the user and the query cache.
+   The client is signed out even when the request fails. A voluntary logout
+   fires no "expired" event and adds no `redirect`.
 
-A refresh that resolves after the epoch moved stores no token, fires no hook
-(not even the failure hook) and rejects with `session_ended`.
+Every token clear bumps that service's session epoch too. A refresh that
+resolves after the epoch moved stores no token, fires no hook (not even the
+failure hook) and rejects with `session_ended`.
 
 ## Cross-tab sync
 
-`syncAuthWithOtherTabs` (wired in the root layout) listens for `storage` events
-on the token keys:
+`syncAuthAcrossTabs({ onLogin, onLogout })` (wrapped by the store's
+`syncAuthWithOtherTabs`, wired in the root layout) listens for `storage` events
+and compares `hasStoredSession()` for the main service against the last known
+state (kept current by this tab's own token writes via `onTokensChanged`):
 
-- another tab removed the tokens (logout) → this tab ends its session (user,
-  query cache, guards);
-- another tab stored tokens (login) → this tab resets `auth.me`, invalidates
+- another tab removed the tokens (logout) → `endSession("logout", "MAIN")`
+  here (user, query cache), then `onLogout` re-runs the guards;
+- another tab stored tokens (login) → `onLogin` resets `auth.me`, invalidates
   every query so the profile refetches, reloads the user and re-runs the guards.
 
 A token rotation by another tab's refresh is ignored. Guarded for tests and

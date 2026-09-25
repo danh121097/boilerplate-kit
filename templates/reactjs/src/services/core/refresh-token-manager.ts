@@ -1,31 +1,27 @@
-import { APP_PREFIX } from "@/enums";
+import { isRefreshRefused, SessionEndedError } from "@/services/core/api-errors";
+import { getAppPrefix } from "@/services/core/app-prefix";
 import {
   clearServiceTokens,
   getAccessToken,
   persistAccessToken,
   persistRefreshToken,
 } from "@/services/core/auth-token-storage";
-import { getSessionEpoch, isLogoutPending } from "@/services/core/session-events";
-import type { ApiService } from "@/services/core/types";
-
-/** Tokens a refresh returned. The manager persists them — only when the
- * session is still the one that asked (see `getFreshToken`). */
-export interface RefreshedTokens {
-  accessToken: string;
-  /** The rotated refresh token, when the backend returns one in the body. */
-  refreshToken?: string;
-}
+import { getSessionEpoch, isLogoutPending } from "@/services/core/session";
+import type { ApiService, RefreshedTokens } from "@/services/core/types";
 
 /** Performs the network refresh and resolves to the new tokens. */
 export type TokenRefresher = () => Promise<RefreshedTokens>;
 
-interface RefreshTokenManagerOpts {
+export interface RefreshTokenManagerOptions {
   service: ApiService;
   refresh: TokenRefresher;
+  /** Called after a rotated pair was stored. */
+  onRefreshed?: () => void;
+  /** Fired once when the backend refuses the refresh (401/403): session gone. */
   onRefreshFailed: () => void;
   /** Re-checked once the lock is held: false (another tab logged out meanwhile)
    * aborts the refresh with `SessionEndedError`. */
-  isSessionAlive?: () => boolean;
+  isSessionAlive?: () => boolean | Promise<boolean>;
 }
 
 /** Upper bound on how long logout waits for a running refresh (lock or in-tab). */
@@ -36,90 +32,83 @@ export const SESSION_WAIT_TIMEOUT_MS = 15_000;
  * Carries the app prefix so two apps on one origin never share a lock.
  */
 export function refreshLockName(service: ApiService): string {
-  return `${APP_PREFIX}:auth-refresh:${service}`;
+  return `${getAppPrefix()}:auth-refresh:${service}`;
 }
 
-/** Every refresh running in this tab (all services), so logout can wait for them. */
-const inFlightRefreshes = new Set<Promise<unknown>>();
+/** In-flight refresh per service (this tab), for callers that must not overlap one. */
+const pendingRefreshes = new Map<ApiService, Promise<unknown>>();
 
-/** Resolves once every refresh running in this tab has settled, or after
- * `maxWaitMs` — logout waits on it so a rotation already under way is stored
- * before the token is revoked (the only ordering available where the Web Locks
- * API is missing). */
-export function settleInFlightRefreshes(maxWaitMs = SESSION_WAIT_TIMEOUT_MS): Promise<void> {
-  if (inFlightRefreshes.size === 0) return Promise.resolve();
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<void>((resolve) => {
-    timer = setTimeout(resolve, maxWaitMs);
-  });
-  const settled = Promise.allSettled([...inFlightRefreshes]).then(() => undefined);
-  return Promise.race([settled, timeout]).finally(() => clearTimeout(timer));
+/** Run `task` under the service's Web Lock when available (all tabs share one
+ * localStorage refresh token, and the backend revokes every session on refresh
+ * token reuse); falls back to running it directly. */
+async function withRefreshLock<T>(service: ApiService, task: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
+  // `await`: older DOM typings type `request` as resolving to the callback's promise.
+  return locks?.request ? await locks.request(refreshLockName(service), task) : task();
 }
 
 /**
- * The session ended (logout, here or in another tab) before or while a refresh
- * ran — no token was persisted and no refresh request is made. Shaped like an
- * API error (`{ error_code: 401, message: "session_ended" }`) so callers branch
- * on it like any other 401.
+ * Run `task` (logout) so it never overlaps a refresh of `service`: under the
+ * shared Web Lock when available (it waits for any tab's in-flight refresh, and
+ * a refresh queued behind it sees the ended session and persists nothing), else
+ * after this tab's in-flight refresh settles. The wait is capped at `maxWaitMs`;
+ * past it the task runs without the lock, so a hung refresh never blocks logout.
  */
-export class SessionEndedError extends Error {
-  readonly status = "error";
-  readonly error_code = 401;
-  readonly error_message = "session_ended";
-
-  constructor() {
-    super("session_ended");
-    this.name = "SessionEndedError";
-  }
-}
-
-/**
- * Whether a refresh failure means the backend REFUSED the session (HTTP 401/403
- * from the refresh endpoint). Only then is the session over. A network error,
- * timeout, 429 or 5xx is transient: the tokens may still be valid, so the
- * caller keeps them and surfaces a retryable error instead.
- */
-export function isRefreshRefused(error: unknown): boolean {
-  const status = (error as { response?: { status?: number } } | null)?.response?.status;
-  return status === 401 || status === 403;
-}
-
-interface SessionLockOptions {
-  /** Give up waiting for the lock after this long and run the task without it. */
-  maxWaitMs?: number;
-}
-
-/**
- * Run `task` under the service's browser-wide Web Lock so only ONE tab refreshes
- * (or logs out) at a time. Two tabs posting the same refresh token concurrently
- * would look like token reuse to the backend, which revokes every session. Runs
- * the task directly where the Web Locks API is unavailable (old browsers,
- * tests) — single-flight is then per tab only.
- */
-export function withSessionLock<T>(
+export async function withSessionLock<T>(
   service: ApiService,
   task: () => Promise<T>,
-  { maxWaitMs }: SessionLockOptions = {},
+  { maxWaitMs = SESSION_WAIT_TIMEOUT_MS }: { maxWaitMs?: number } = {},
 ): Promise<T> {
   const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
-  if (!locks?.request) return task();
-  const name = refreshLockName(service);
-  if (maxWaitMs === undefined) return locks.request(name, task) as Promise<T>;
+  if (locks?.request) return withCappedLock(locks, refreshLockName(service), task, maxWaitMs);
+
+  // No locks: wait out this tab's in-flight refresh(es); with none pending the
+  // task starts synchronously (no await before it).
+  let pending = pendingRefreshes.get(service);
+  if (!pending) return task();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let timedOut = false;
+  const deadline = new Promise<void>((resolve) => {
+    timer = setTimeout(() => {
+      timedOut = true;
+      resolve();
+    }, maxWaitMs);
+  });
+  try {
+    while (pending && !timedOut) {
+      await Promise.race([pending.catch(() => {}), deadline]);
+      pending = pendingRefreshes.get(service);
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+  return task();
+}
+
+/** `locks.request` whose wait for the lock is aborted after `maxWaitMs`; the
+ * task then runs unlocked. */
+async function withCappedLock<T>(
+  locks: LockManager,
+  name: string,
+  task: () => Promise<T>,
+  maxWaitMs: number,
+): Promise<T> {
+  let started = false;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), maxWaitMs);
-  return (
-    locks.request(name, { signal: controller.signal }, () => {
+  try {
+    return await locks.request(name, { signal: controller.signal }, () => {
+      started = true;
       clearTimeout(timer);
       return task();
-    }) as Promise<T>
-  ).catch((error: unknown) => {
-    // Waited too long for the lock: proceed without it.
-    if (controller.signal.aborted && (error as { name?: string } | null)?.name === "AbortError") {
-      return task();
-    }
+    });
+  } catch (error) {
+    if (!started && controller.signal.aborted) return task();
     throw error;
-  });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**
@@ -128,55 +117,60 @@ export function withSessionLock<T>(
  * every caller awaits the same in-flight promise, then retries with the new token.
  * Across tabs a Web Lock serializes refreshes; a tab that waited on the lock
  * re-reads the shared localStorage token and skips its own refresh when another
- * tab already rotated the pair meanwhile. Logout blocks new refreshes, waits for
- * this tab's in-flight one (`settleInFlightRefreshes`) and takes the same lock,
- * so it runs after the rotated pair is stored and revokes that one; a refresh
- * that finishes after the session ended (epoch moved) stores nothing, fires no
- * hook — not even the failure hook — and rejects with `SessionEndedError`.
+ * tab already rotated the pair meanwhile. Logout blocks new refreshes and waits
+ * for a running one (`withSessionLock`), so it revokes the rotated pair; a
+ * refresh that finishes after the session ended (epoch moved) stores nothing,
+ * fires no hook — not even the failure hook — and rejects with `SessionEndedError`.
  */
 export class RefreshTokenManager {
   private inFlight: Promise<string> | null = null;
   private readonly service: ApiService;
   private readonly refresh: TokenRefresher;
+  private readonly onRefreshed: () => void;
   private readonly onRefreshFailed: () => void;
-  private readonly isSessionAlive: () => boolean;
+  private readonly isSessionAlive: () => boolean | Promise<boolean>;
 
-  constructor(opts: RefreshTokenManagerOpts) {
+  constructor(opts: RefreshTokenManagerOptions) {
     this.service = opts.service;
     this.refresh = opts.refresh;
+    this.onRefreshed = opts.onRefreshed ?? (() => {});
     this.onRefreshFailed = opts.onRefreshFailed;
     this.isSessionAlive = opts.isSessionAlive ?? (() => true);
   }
 
   /**
    * Returns a fresh access token, deduplicating concurrent calls. `staleToken`
-   * is the access token the failed request carried (defaults to the stored one).
+   * is the access token the failed request carried: when the stored token
+   * already differs from it (another tab — or an earlier refresh in this one —
+   * rotated it), that token is returned without a network refresh. Without a
+   * `staleToken` (the request carried no Bearer) it always refreshes.
    * When the backend refuses the refresh (401/403) it clears this service's
-   * tokens and fires the failure hook; a transient failure (network, timeout,
-   * 5xx, 429) keeps the tokens. Either way the error is rethrown. The rotated
-   * pair is stored only while the session epoch is unchanged.
+   * tokens and fires the failure hook; any other failure keeps the tokens.
+   * Either way the error is rethrown. The rotated pair is stored only while the
+   * session epoch is unchanged.
    */
-  getFreshToken(staleToken: string | null = getAccessToken(this.service)): Promise<string> {
+  getFreshToken(staleToken?: string | null): Promise<string> {
     // A logout is running: never start a rotation it could miss.
-    if (isLogoutPending()) return Promise.reject(new SessionEndedError());
+    if (isLogoutPending(this.service)) return Promise.reject(new SessionEndedError());
     if (this.inFlight) return this.inFlight;
 
-    const epoch = getSessionEpoch();
-    const ended = () => getSessionEpoch() !== epoch;
+    const epoch = getSessionEpoch(this.service);
+    const ended = () => getSessionEpoch(this.service) !== epoch;
 
-    this.inFlight = withSessionLock(this.service, async () => {
+    const inFlight = withRefreshLock(this.service, async () => {
       // Logout ran or is running (here or in another tab) since we asked.
-      if (ended() || isLogoutPending() || !this.isSessionAlive()) {
+      if (ended() || isLogoutPending(this.service) || !(await this.isSessionAlive())) {
         throw new SessionEndedError();
       }
       // Another tab rotated the pair while we waited for the lock → reuse it.
       const current = getAccessToken(this.service);
-      if (current && current !== staleToken) return current;
+      if (staleToken && current && current !== staleToken) return current;
       const tokens = await this.refresh();
       // The session ended (epoch moved) while the refresh was in flight: store nothing.
       if (ended()) throw new SessionEndedError();
       if (tokens.refreshToken) persistRefreshToken(tokens.refreshToken, this.service);
       persistAccessToken(tokens.accessToken, this.service);
+      this.onRefreshed();
       return tokens.accessToken;
     })
       .catch((error: unknown) => {
@@ -189,12 +183,12 @@ export class RefreshTokenManager {
         throw error;
       })
       .finally(() => {
-        inFlightRefreshes.delete(pending);
         this.inFlight = null;
+        if (pendingRefreshes.get(this.service) === inFlight) pendingRefreshes.delete(this.service);
       });
 
-    const pending = this.inFlight;
-    inFlightRefreshes.add(pending);
-    return pending;
+    this.inFlight = inFlight;
+    pendingRefreshes.set(this.service, inFlight);
+    return inFlight;
   }
 }

@@ -2,11 +2,11 @@ import { installLocalStorage } from "@/__tests__/helpers/fake-storage";
 import { makeClient, ok } from "@/__tests__/helpers/http-mocks";
 import { Api } from "@/services/core/api";
 import { createTokenRefresher } from "@/services/core/auth-refresh-client";
-import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
+import { HMACSignatureGenerator, resolveContentType } from "@/services/core/hmac-signature";
+import axios, { AxiosHeaders } from "axios";
 import { createHmac } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { InternalAxiosRequestConfig } from "axios";
-import axios from "axios";
 
 /** Re-implements the SERVER's signing (Express `verifyHmac`) to prove the client
  * signs exactly what the backend verifies. */
@@ -140,5 +140,91 @@ describe("hmac-signature", () => {
         "/auth/refresh",
       ),
     );
+  });
+
+  it("signs the pinned request header of a bodyless request as ''", () => {
+    vi.stubEnv("VITE_HMAC_SECRET", "shared-secret");
+    const sig = HMACSignatureGenerator.generateSignature(configFor("/users", "delete"));
+    expect(sig!.sig).toBe(serverSign("shared-secret", "DELETE", "", sig!.ctime, "/users"));
+  });
+});
+
+/** A request config as the request interceptor sees it. */
+function requestWith(data: unknown, headers: Record<string, unknown> | AxiosHeaders = {}) {
+  return { url: "/x", method: "post", data, headers } as unknown as InternalAxiosRequestConfig;
+}
+
+describe("signed Content-Type matches what axios sends", () => {
+  const form = new URLSearchParams({ a: "1" });
+
+  it.each([
+    ["no body", requestWith(undefined, { "Content-Type": "application/json" }), ""],
+    [
+      "null body, JSON pinned",
+      requestWith(null, { "Content-Type": "application/json" }),
+      "application/json",
+    ],
+    ["null body, nothing pinned", requestWith(null), "application/json"],
+    ["object body, nothing pinned", requestWith({ a: 1 }), "application/json"],
+    [
+      "URLSearchParams, nothing pinned",
+      requestWith(form),
+      "application/x-www-form-urlencoded;charset=utf-8",
+    ],
+    ["string body, nothing pinned", requestWith("a=1"), "application/x-www-form-urlencoded"],
+    [
+      "URLSearchParams, JSON pinned",
+      requestWith(form, { "Content-Type": "application/json" }),
+      "application/json",
+    ],
+    [
+      "lowercase pinned header",
+      requestWith({ a: 1 }, { "content-type": "text/plain" }),
+      "text/plain",
+    ],
+    ["upper-case pinned header", requestWith("x", { "CONTENT-TYPE": "text/csv" }), "text/csv"],
+    [
+      "AxiosHeaders instance",
+      requestWith(
+        { a: 1 },
+        new AxiosHeaders({ "content-type": "application/json; charset=utf-8" }),
+      ),
+      "application/json; charset=utf-8",
+    ],
+    [
+      "AxiosHeaders without a pinned type",
+      requestWith("a=1", new AxiosHeaders()),
+      "application/x-www-form-urlencoded",
+    ],
+  ])("%s → %j", (_label, config, expected) => {
+    expect(resolveContentType(config)).toBe(expected);
+  });
+
+  it("the signature uses the resolved Content-Type", () => {
+    vi.stubEnv("VITE_HMAC_SECRET", "shared-secret");
+    const sig = HMACSignatureGenerator.generateSignature(requestWith(form));
+    expect(sig!.sig).toBe(
+      serverSign(
+        "shared-secret",
+        "POST",
+        "application/x-www-form-urlencoded;charset=utf-8",
+        sig!.ctime,
+        "/x",
+      ),
+    );
+    vi.unstubAllEnvs();
+  });
+
+  it("signRequest signs the given method, path and Content-Type", () => {
+    vi.stubEnv("VITE_HMAC_SECRET", "shared-secret");
+    const sig = HMACSignatureGenerator.signRequest({
+      method: "post",
+      path: "/auth/refresh#x",
+      contentType: "",
+      ctime: 1000,
+    });
+    expect(sig).toMatchObject({ ctime: 1000 });
+    expect(sig!.sig).toBe(serverSign("shared-secret", "POST", "", 1000, "/auth/refresh"));
+    vi.unstubAllEnvs();
   });
 });

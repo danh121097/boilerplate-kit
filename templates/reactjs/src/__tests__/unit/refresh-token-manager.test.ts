@@ -1,14 +1,15 @@
 import { installLocalStorage } from "@/__tests__/helpers/fake-storage";
 import { installFakeLocks } from "@/__tests__/helpers/fake-web-locks";
 import { APP_PREFIX } from "@/enums";
+import { SessionEndedError } from "@/services/core/api-errors";
 import {
   getAccessToken,
   getRefreshToken,
   persistAccessToken,
   persistRefreshToken,
 } from "@/services/core/auth-token-storage";
-import { RefreshTokenManager, SessionEndedError } from "@/services/core/refresh-token-manager";
-import { bumpSessionEpoch } from "@/services/core/session-events";
+import { RefreshTokenManager } from "@/services/core/refresh-token-manager";
+import { bumpSessionEpoch } from "@/services/core/session";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const tick = () => new Promise((r) => setTimeout(r, 5));
@@ -166,5 +167,74 @@ describe("RefreshTokenManager", () => {
 
     await expect(mgr.getFreshToken()).rejects.toBeInstanceOf(SessionEndedError);
     expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("does not refresh when the session check resolves false once the lock is held", async () => {
+    const refresh = vi.fn();
+    const mgr = new RefreshTokenManager({
+      service: "MAIN",
+      refresh,
+      onRefreshFailed: () => {},
+      isSessionAlive: async () => false,
+    });
+
+    await expect(mgr.getFreshToken()).rejects.toBeInstanceOf(SessionEndedError);
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("calls onRefreshed after storing the rotated pair", async () => {
+    const onRefreshed = vi.fn(() => expect(getAccessToken("MAIN")).toBe("AT2"));
+    const mgr = new RefreshTokenManager({
+      service: "MAIN",
+      refresh: async () => ({ accessToken: "AT2" }),
+      onRefreshed,
+      onRefreshFailed: () => {},
+    });
+
+    await mgr.getFreshToken();
+    expect(onRefreshed).toHaveBeenCalledTimes(1);
+  });
+
+  it("another service's session end does not abort this service's refresh", async () => {
+    const mgr = new RefreshTokenManager({
+      service: "MAIN",
+      refresh: async () => {
+        await tick();
+        return { accessToken: "AT2" };
+      },
+      onRefreshFailed: () => {},
+    });
+
+    const pending = mgr.getFreshToken();
+    bumpSessionEpoch("ADMIN");
+    await expect(pending).resolves.toBe("AT2");
+    expect(getAccessToken("MAIN")).toBe("AT2");
+  });
+
+  it("refreshes when the failed request carried no Bearer, even with a token stored", async () => {
+    persistAccessToken("AT1", "MAIN");
+    const refresh = vi.fn(async () => ({ accessToken: "AT2" }));
+    const mgr = new RefreshTokenManager({ service: "MAIN", refresh, onRefreshFailed: () => {} });
+
+    expect(await mgr.getFreshToken()).toBe("AT2");
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("reuses the stored token when it was rotated after the failed request was sent", async () => {
+    persistAccessToken("NEW", "MAIN");
+    const refresh = vi.fn(async () => ({ accessToken: "NEWER" }));
+    const mgr = new RefreshTokenManager({ service: "MAIN", refresh, onRefreshFailed: () => {} });
+
+    expect(await mgr.getFreshToken("OLD")).toBe("NEW");
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("refreshes when the stored token is the one the failed request carried", async () => {
+    persistAccessToken("OLD", "MAIN");
+    const refresh = vi.fn(async () => ({ accessToken: "NEW" }));
+    const mgr = new RefreshTokenManager({ service: "MAIN", refresh, onRefreshFailed: () => {} });
+
+    expect(await mgr.getFreshToken("OLD")).toBe("NEW");
+    expect(refresh).toHaveBeenCalledTimes(1);
   });
 });

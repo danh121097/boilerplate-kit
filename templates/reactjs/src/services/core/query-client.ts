@@ -1,4 +1,5 @@
-import { onSessionEnded } from "@/services/core/session-events";
+import { onSessionEnded } from "@/services/core/session";
+import type { ApiService } from "@/services/core/types";
 import type { QueryClient } from "@tanstack/react-query";
 
 /**
@@ -21,10 +22,17 @@ export function resetQueriesToSignedOut(queryClient: QueryClient, sessionKey: st
   queryClient.setQueryData([sessionKey], null);
 }
 
-/** Logout / failed refresh → `resetQueriesToSignedOut`. Returns the unsubscribe
- * (use as an effect cleanup). */
-export function resetQueriesOnSessionEnd(queryClient: QueryClient, sessionKey: string): () => void {
-  return onSessionEnded(() => resetQueriesToSignedOut(queryClient, sessionKey));
+/** Logout / refused refresh of `service` (the auth service) →
+ * `resetQueriesToSignedOut`. Another service's session end leaves the cache
+ * alone. Returns the unsubscribe (use as an effect cleanup). */
+export function resetQueriesOnSessionEnd(
+  queryClient: QueryClient,
+  sessionKey: string,
+  service: ApiService = "MAIN",
+): () => void {
+  return onSessionEnded((_reason, ended) => {
+    if (ended === service) resetQueriesToSignedOut(queryClient, sessionKey);
+  });
 }
 
 /**

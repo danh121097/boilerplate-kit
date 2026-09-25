@@ -122,7 +122,7 @@ describe("mounted observers across session end and login", () => {
     endSession("logout");
     const stop = syncAuthWithOtherTabs(vi.fn());
 
-    persistAccessToken("AT", "MAIN"); // the other tab's login
+    localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, "AT"); // the other tab's login
     onStorage({ key: STORAGE_KEYS.ACCESS_TOKEN });
 
     await vi.waitFor(() => expect(page.header.getCurrentResult().data).toEqual({ _id: "u2" }));

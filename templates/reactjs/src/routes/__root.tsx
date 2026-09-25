@@ -1,5 +1,6 @@
 import { setLocale } from "@/i18n/i18n";
-import { onSessionEnded } from "@/services/core";
+import { authContract } from "@/services/auth/contract";
+import { loginPathWithReturn, redirectOnSessionExpired } from "@/services/core";
 import { syncAuthWithOtherTabs, useAuthStore } from "@/stores/auth";
 import { createRootRouteWithContext } from "@tanstack/react-router";
 import type { QueryClient } from "@tanstack/react-query";
@@ -26,16 +27,15 @@ function RootLayout() {
     hydrate();
   }, [hydrate]);
 
-  // An expired session (refresh failed) routes to /login instead of reloading,
-  // carrying the current path so the login page can bring the user back.
+  // An expired auth session (refresh refused) routes to /login instead of
+  // reloading, carrying the current path so the login page can bring the user
+  // back. Another service's session end does not sign the user out.
   useEffect(
     () =>
-      onSessionEnded((reason) => {
+      redirectOnSessionExpired(() => {
         const { pathname, href } = router.state.location;
-        if (reason === "expired" && pathname !== "/login") {
-          void navigate({ to: "/login", search: { redirect: href } });
-        }
-      }),
+        if (pathname !== "/login") void navigate({ href: loginPathWithReturn(href) });
+      }, authContract.service),
     [navigate, router],
   );
 

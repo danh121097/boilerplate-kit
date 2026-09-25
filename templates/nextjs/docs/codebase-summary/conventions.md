@@ -6,7 +6,7 @@
 - **Hooks**: camelCase matching function name (`useAppVersion.ts`, `useAuth.ts`)
 - **Components**: PascalCase only in JSX imports; files are kebab-case when possible
 - **App Router pages**: `page.tsx` inside named segment folders
-- **Server helpers**: kebab-case in `src/server/` (`server-api.ts`, `get-me.ts`)
+- **Server helpers**: kebab-case in `src/server/` (`server-api.ts`, `session.ts`)
 
 ## Import Alias
 

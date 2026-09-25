@@ -15,17 +15,18 @@ Request → interceptor sends request
            └── POST /auth/refresh  (cookies auto-sent; bodyless HMAC signature)
            └── backend rotates cookies; session hint renewed
            └── interceptor: replay original request (fresh cookies now set)
-           └── refresh REFUSED (401/403) → endSession("expired"): hint + query cache
-               cleared, auth.me pinned to null,
-               router.replace("/login?redirect=<current path>"), request rejects
-               with the 401 (no reload)
+           └── refresh REFUSED (401/403) → endSession("expired", service); for the
+               auth service ("MAIN"): hint + query cache cleared, auth.me pinned
+               to null, router.replace("/login?redirect=<path?query#hash>");
+               request rejects with the 401 (no reload). Another service's
+               refused refresh ends only that service — the main session stays
            └── refresh TRANSIENT (network / 15 s timeout / 429 / 5xx) → hint kept,
                no session end, request rejects with a retryable non-401 error
 
-Logout →  logout pending (sync, first tick) → wait ≤ 15 s for in-flight refresh
-           + refresh lock → epoch bump → POST /auth/logout (server revokes the
-           refresh token, clears cookies)
-           └── finally: endSession("logout") — hint + query cache cleared
+Logout →  logout pending (sync, first tick) → refresh lock, or this tab's
+           in-flight refresh without Web Locks (≤ 15 s) → epoch bump →
+           POST /auth/logout (server revokes the refresh token, clears cookies)
+           └── finally: endSession("logout", service) — hint + query cache cleared
 ```
 
 Every rejected request uses the shape `{ error_code: <status, or 0 without a
@@ -40,22 +41,32 @@ and 5xx.
    (`beginLogout`). From then on a 401 — and any refresh already queued — rejects
    with `SessionEndedError` (`{ error_code: 401, message: "session_ended" }`)
    and never calls `/auth/refresh`, even without the Web Locks API.
-2. Waits for this tab's in-flight refreshes (`settleInFlightRefreshes`), then
-   takes the refresh lock (`withSessionLock`) so a refresh running in another
-   tab lands first. Both waits share a 15 s cap (`SESSION_WAIT_TIMEOUT_MS`);
-   after it logout proceeds without the lock.
-3. Bumps the session epoch and posts to `/auth/logout` (the refresh cookie
-   identifies the token to revoke).
-4. In a `finally` block calls `endSession("logout")`: hint, user and query cache
-   are cleared even when the request fails. A voluntary logout fires no
-   "expired" event and adds no `redirect`.
+2. Runs the rest under `withSessionLock(service, …)`: it takes the refresh Web
+   Lock, so a refresh running in any tab lands first; without the Web Locks API
+   it waits for this tab's in-flight refresh instead. The wait is capped at 15 s
+   (`SESSION_WAIT_TIMEOUT_MS`); past it logout proceeds without the lock.
+3. Bumps the service's session epoch and posts to `/auth/logout` (the refresh
+   cookie identifies the token to revoke).
+4. In a `finally` block calls `endSession("logout", service)`: hint, user and
+   query cache are cleared even when the request fails. A voluntary logout fires
+   no "expired" event and adds no `redirect`.
 
 A refresh that resolves after the epoch moved writes no hint, fires no hook (not
 even the failure hook) and rejects with `session_ended`.
 
+## Session End Per Service
+
+`endSession(reason, service)` bumps that service's epoch and notifies listeners
+with `(reason, service)`. Only the auth service (`authContract.service`, "MAIN")
+clears the hint and broadcasts the logout to other tabs. The subscribers in
+`app/providers.tsx` — `resetQueriesOnSessionEnd` and `redirectOnSessionExpired`
+— filter on `authContract.service`, so a refused refresh of another backend
+leaves the user signed in.
+
 ## Return Path
 
-A session expiry navigates client-side to `/login?redirect=<current full path>`.
+A session expiry navigates client-side to `/login?redirect=<path, query and
+hash>` (`loginPathWithReturn`).
 After login — and when `/login` loads while already signed in — the app goes to
 `safeRedirect(redirect)`, which returns the value only when it is a string of at
 most 512 characters, starts with exactly one `/`, contains no `\`, no control
@@ -72,7 +83,8 @@ surfaces a retryable error.
 
 The tokens are httpOnly, so JS cannot tell an anonymous visitor from a user
 whose 15-minute access cookie just expired. A readable cookie
-`STORAGE_KEYS.SESSION` (`${APP_PREFIX}_SESSION`) = `"1"` (no secret; `services/core/session.ts`) is set on
+`STORAGE_KEYS.SESSION` (`${APP_PREFIX}_SESSION`, prefix from
+`NEXT_PUBLIC_APP_NAME`, default `PRISM_APP`) = `"1"` (no secret; `services/core/session.ts`) is set on
 login/register/refresh and cleared on logout or refresh failure. Without it a
 401 is final: no refresh request, and `/auth/me` resolves to `null` (signed out).
 
@@ -80,22 +92,25 @@ login/register/refresh and cleared on logout or refresh failure. Without it a
 
 The backend treats a replayed (already-rotated) refresh token as theft and
 revokes **all** sessions, so two tabs must never refresh with the same cookie.
-`RefreshTokenManager` takes a Web Lock (`withSessionLock` →
-`navigator.locks.request`, `${APP_PREFIX}:auth-refresh:<service>`); a tab that
-waited compares the shared `localStorage` stamp
-`${APP_PREFIX}:auth-refresh:<service>:at` with the time it asked and skips its
-own refresh when another tab already rotated the (shared) cookies. Logout takes
-the same lock. Without the Web Locks API it falls back to per-tab single-flight
+`RefreshTokenManager.refresh(sentAt)` runs under a Web Lock
+(`navigator.locks.request`, `refreshLockName(service)` =
+`${APP_PREFIX}:auth-refresh:<service>`). The request interceptor stamps every
+request with `config._sentAt` (kept on the replay); once the lock is held the
+manager compares the shared `localStorage` stamp
+`${APP_PREFIX}:auth-refresh:<service>:at` with that time and skips its own
+refresh when a refresh (any tab) finished after the request was sent — the
+replay then carries the rotated cookies. A stamp more than 1 s in the future
+(clock moved back) is ignored. Logout takes the same lock (`withSessionLock`). Without the Web Locks API it falls back to per-tab single-flight
 (two tabs may then refresh at once — a documented limit).
 
 ## Cross-Tab Session Sync
 
 `syncAuthAcrossTabs` (wired in `app/providers.tsx`) listens for the
 `STORAGE_KEYS.AUTH_SYNC` storage event that login and logout write, and
-re-checks the hint cookie whenever the tab becomes visible:
+re-checks the hint cookie whenever the tab regains focus or becomes visible:
 
-- another tab logged out → this tab ends its session (hint, user, query cache,
-  guards);
+- another tab logged out → this tab calls `endSession("logout", "MAIN")` (hint,
+  user, query cache), then refreshes the Server Components;
 - another tab logged in → this tab resets `auth.me` and invalidates every query
   so the profile refetches.
 
@@ -124,12 +139,16 @@ ctime\n
 - `/path` is the request path relative to the baseURL with the query stripped.
   Query parameters — inline or via axios `params` — are never signed (the
   backend verifies `req.url.split("?")[0]`).
-- `Content-Type` is the exact header value sent: the pinned value (or
-  `application/json`) with a body, `""` without one. The client never adds or
-  strips a charset; a pinned one is signed exactly as sent.
+- `Content-Type` is the exact header value axios sends (`resolveContentType`):
+  `""` without a body; with one, the pinned value exactly as set, else axios's
+  default for the body — `URLSearchParams` →
+  `application/x-www-form-urlencoded;charset=utf-8`, a string →
+  `application/x-www-form-urlencoded`, anything else → `application/json`.
 - `multipart/form-data` is **not supported** with HMAC on: the browser appends a
   generated `boundary` after signing, so the signature cannot match.
-- The bare refresh client signs its own request (bodyless → empty Content-Type).
+- `HMACSignatureGenerator.signRequest({ method, path, contentType })` is the
+  shared core: the interceptor, the bare refresh client (bodyless → `""`) and
+  `server/server-api.ts` all sign through it.
 
 ## Per-Service Refresh Config
 
@@ -171,12 +190,17 @@ and signs the request with the same HMAC the backend requires. It never
 refreshes — an RSC cannot set cookies, and a rotation the browser never receives
 would trigger reuse detection (all sessions revoked). Instead:
 
-- missing/expired access cookie or backend 401 → throws `ServerAuthError`;
-- any other failure → throws (never `null` / an empty list).
+- missing/expired access cookie or backend 401 → rejects with an
+  `ApiResponseError` `{ error_code: 401 }`;
+- any other failure → rejects with an `ApiResponseError` (`error_code` = HTTP
+  status, 0 when unreachable; `retryable` on 0/408/429/5xx) — never `null` or
+  an empty list.
 
 The prefetch then fails, is not dehydrated, and the client query refetches
-through axios, which refreshes and replays. `getMeServerData()` returns `null`
-only for an anonymous visitor (no session hint).
+through axios, which refreshes and replays. `readServerSession()`
+(`src/server/session.ts`) resolves the current user, and resolves `null` for a
+401 only when the request carries no session hint (anonymous); with the hint it
+rejects so the browser refreshes.
 
 ## Security Notes
 

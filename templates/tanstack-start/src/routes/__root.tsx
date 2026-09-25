@@ -1,7 +1,15 @@
 /// <reference types="vite/client" />
 import { setLocale } from "@/i18n/i18n";
-import { useLogoutMutation } from "@/services/auth";
+import { authContract, useLogoutMutation } from "@/services/auth";
 import { useAuth } from "@/services/auth/session";
+import { resetQueriesOnSessionEnd, resyncQueriesAfterLogin } from "@/services/core/query-client";
+import {
+  loginPathWithReturn,
+  redirectOnSessionExpired,
+  syncAuthAcrossTabs,
+} from "@/services/core/session";
+import { queryKeys } from "@/services/query-keys";
+import { useQueryClient } from "@tanstack/react-query";
 import { createRootRouteWithContext, HeadContent, Scripts } from "@tanstack/react-router";
 import type { QueryClient } from "@tanstack/react-query";
 import appCss from "@/styles/tailwind.css?url";
@@ -34,9 +42,47 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 
 function RootLayout() {
   const logout = useLogoutMutation();
+  const queryClient = useQueryClient();
+  const router = useRouter();
 
   const { i18n, t } = useTranslation();
   const { isAuthenticated } = useAuth();
+
+  // Session subscriptions run in effects (browser only, cleaned up on unmount and
+  // HMR) rather than in `getRouter()`, which re-runs on HMR and would stack them.
+
+  // Logout / refused refresh of the auth service → reset the cache in place and
+  // pin `auth.me` to null. Another service's session ending leaves it alone.
+  useEffect(
+    () => resetQueriesOnSessionEnd(queryClient, queryKeys.auth.me, authContract.service),
+    [queryClient],
+  );
+
+  // Refused refresh (session expired) → /login, carrying the current location
+  // (path, query and hash) so the login page can bring the user back. No reload.
+  useEffect(
+    () =>
+      redirectOnSessionExpired(() => {
+        const { pathname, href } = router.state.location;
+        if (pathname !== "/login") void router.navigate({ href: loginPathWithReturn(href) });
+      }, authContract.service),
+    [router],
+  );
+
+  // Login/logout in another tab → re-read the session and re-run the route
+  // loaders here. A remote logout has already cleared this tab's cache via the
+  // session-end listener.
+  useEffect(
+    () =>
+      syncAuthAcrossTabs({
+        onLogin: () => {
+          resyncQueriesAfterLogin(queryClient, queryKeys.auth.me);
+          void router.invalidate();
+        },
+        onLogout: () => void router.invalidate(),
+      }),
+    [queryClient, router],
+  );
 
   function toggleLocale() {
     const next = i18n.language === "en" ? "ja" : "en";

@@ -1,5 +1,8 @@
-import { refreshUnavailable } from "@/services/core/interceptors";
-import { isRefreshRefused, SessionEndedError } from "@/services/core/refresh-token-manager";
+import {
+  isRefreshRefused,
+  refreshUnavailable,
+  SessionEndedError,
+} from "@/services/core/api-errors";
 import type { ApiResponseError, ApiService } from "@/services/core/types";
 
 /**
@@ -28,7 +31,8 @@ export function isServerUnauthorized(value: unknown): value is ServerUnauthorize
   );
 }
 
-type SessionRefresher = (service: ApiService) => Promise<void>;
+/** Refreshes `service`; skipped when a refresh finished after `sentAt`. */
+type SessionRefresher = (service: ApiService, sentAt?: number) => Promise<void>;
 
 let sessionRefresher: SessionRefresher | null = null;
 
@@ -60,6 +64,7 @@ export async function withSessionRefresh<T>(
   call: () => Promise<T | ServerUnauthorized>,
   service: ApiService = "MAIN",
 ): Promise<T> {
+  const sentAt = Date.now();
   const first = await call();
   if (!isServerUnauthorized(first)) return first;
   if (!first.hasSession) throw unauthorizedError();
@@ -70,7 +75,7 @@ export async function withSessionRefresh<T>(
   if (!sessionRefresher) throw unauthorizedError();
 
   try {
-    await sessionRefresher(service);
+    await sessionRefresher(service, sentAt);
   } catch (error) {
     // Refused, or the session ended (logout) meanwhile → signed out. Transient
     // (network/5xx/429) → keep the session and surface a retryable, non-401

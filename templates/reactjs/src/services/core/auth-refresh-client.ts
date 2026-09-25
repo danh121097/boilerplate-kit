@@ -1,9 +1,8 @@
 import { Api } from "@/services/core/api";
 import { getRefreshToken } from "@/services/core/auth-token-storage";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
-import type { RefreshedTokens } from "@/services/core/refresh-token-manager";
+import type { TokenRefresher } from "@/services/core/refresh-token-manager";
 import type { ApiService } from "@/services/core/types";
-import type { InternalAxiosRequestConfig } from "axios";
 import axios from "axios";
 
 /**
@@ -20,7 +19,7 @@ import axios from "axios";
  */
 
 /** A hung refresh must not stall every queued request forever. */
-const REFRESH_TIMEOUT_MS = 15_000;
+export const REFRESH_TIMEOUT_MS = 15_000;
 
 /** Tolerates the common envelope shapes a backend may wrap the new tokens in. */
 interface RefreshResponseBody {
@@ -40,7 +39,8 @@ function extractAccessToken(body: RefreshResponseBody): string {
     body.data?.accessToken ??
     body.tokens?.accessToken ??
     body.accessToken;
-  if (!token) throw new Error("Refresh response did not contain an access token");
+  // No response status → not a refusal: the session is kept (see `isRefreshRefused`).
+  if (!token) throw new Error("refresh_response_missing_access_token");
   return token;
 }
 
@@ -59,8 +59,8 @@ function extractRefreshToken(body: RefreshResponseBody): string | undefined {
  * the rotated refresh token — the manager persists them, and only while the
  * session that asked is still current (logout may have run meanwhile).
  */
-export function createTokenRefresher(endpoint: string, service: ApiService) {
-  return async (): Promise<RefreshedTokens> => {
+export function createTokenRefresher(endpoint: string, service: ApiService): TokenRefresher {
+  return async () => {
     const headers: Record<string, string | number> = {
       "Content-Type": "application/json",
       Accept: "application/json",
@@ -68,17 +68,16 @@ export function createTokenRefresher(endpoint: string, service: ApiService) {
     const body = { refreshToken: getRefreshToken(service) ?? undefined };
     // This bare client skips the app interceptors (to avoid refresh recursion),
     // so it must attach the same HMAC headers the backend requires of every
-    // request — otherwise the refresh call itself is rejected. Signed with the
-    // body so the signed Content-Type matches the JSON one actually sent. No-op
-    // when no secret is configured.
-    const signature = HMACSignatureGenerator.generateSignature({
-      url: endpoint,
-      method: "post",
-      headers,
-      data: body,
-    } as unknown as InternalAxiosRequestConfig);
+    // request — otherwise the refresh call itself is rejected. It always sends
+    // a JSON body, so it signs that Content-Type. No-op when no secret is set.
+    const signature = HMACSignatureGenerator.signRequest({
+      method: "POST",
+      path: endpoint,
+      contentType: "application/json",
+    });
     if (signature) Object.assign(headers, signature);
 
+    // Axios errors are rethrown as-is: the manager classifies them.
     const { data } = await axios.post<RefreshResponseBody>(
       `${Api.getBaseURL(service)}${endpoint}`,
       body,

@@ -1,4 +1,5 @@
-import { APP_PREFIX } from "@/enums";
+import { isRefreshRefused, SessionEndedError } from "@/services/core/api-errors";
+import { getAppPrefix } from "@/services/core/app-prefix";
 import { getSessionEpoch, isLogoutPending } from "@/services/core/session";
 import type { ApiService } from "@/services/core/types";
 
@@ -6,15 +7,16 @@ import type { ApiService } from "@/services/core/types";
  * as a side effect, so the refresher resolves with no value. */
 export type TokenRefresher = () => Promise<void>;
 
-interface RefreshTokenManagerOpts {
+export interface RefreshTokenManagerOptions {
   service: ApiService;
   refresh: TokenRefresher;
-  onRefreshFailed: () => void;
   /** Runs after a successful refresh (e.g. renew the session hint). */
   onRefreshed?: () => void;
+  /** Fired once when the backend refuses the refresh (401/403): session over. */
+  onRefreshFailed: () => void;
   /** Re-checked once the lock is held: false (another tab logged out meanwhile)
    * aborts the refresh with `SessionEndedError`. */
-  isSessionAlive?: () => boolean;
+  isSessionAlive?: () => boolean | Promise<boolean>;
 }
 
 /** Upper bound on how long logout waits for a running refresh (lock or in-tab). */
@@ -22,190 +24,200 @@ export const SESSION_WAIT_TIMEOUT_MS = 15_000;
 
 /**
  * Web Lock name serializing refreshes (and logout) for one service across tabs.
- * Carries the app prefix so two apps on one origin never share a lock.
+ * Carries the app prefix so two apps on one origin never share a lock;
+ * `${name}:at` is the cross-tab "last refresh" localStorage key.
  */
 export function refreshLockName(service: ApiService): string {
-  return `${APP_PREFIX}:auth-refresh:${service}`;
+  return `${getAppPrefix()}:auth-refresh:${service}`;
 }
 
-/** localStorage key of the shared "last successful refresh" stamp:
- * `${APP_PREFIX}:auth-refresh:${service}:at` (the lock name plus `:at`). */
-function lastRefreshKey(service: ApiService): string {
-  return `${refreshLockName(service)}:at`;
+function getLocks(): LockManager | undefined {
+  return typeof navigator !== "undefined" ? navigator.locks : undefined;
 }
 
-/** Every refresh running in this tab (all services), so logout can wait for them. */
-const inFlightRefreshes = new Set<Promise<unknown>>();
-
-/** Resolves once every refresh running in this tab has settled, or after
- * `maxWaitMs` — logout waits on it so a rotation already under way lands before
- * the token is revoked (the only ordering available without the Web Locks API). */
-export function settleInFlightRefreshes(maxWaitMs = SESSION_WAIT_TIMEOUT_MS): Promise<void> {
-  if (inFlightRefreshes.size === 0) return Promise.resolve();
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<void>((resolve) => {
-    timer = setTimeout(resolve, maxWaitMs);
-  });
-  const settled = Promise.allSettled([...inFlightRefreshes]).then(() => undefined);
-  return Promise.race([settled, timeout]).finally(() => clearTimeout(timer));
+/** Run `task` under the cross-tab Web Lock when available (every tab shares the
+ * refresh cookie, and the backend revokes all sessions on refresh-token reuse);
+ * falls back to running it directly (single-flight is then per tab only). */
+async function withRefreshLock<T>(name: string, task: () => Promise<T>): Promise<T> {
+  const locks = getLocks();
+  // `await`: older DOM typings type `request` as resolving to the callback's promise.
+  return locks?.request ? await locks.request(name, task) : task();
 }
+
+/** In-flight refresh per service (this tab), for callers that must not overlap one. */
+const pendingRefreshes = new Map<ApiService, Promise<unknown>>();
 
 /**
- * The session ended (logout, here or in another tab) before or while a refresh
- * ran — nothing was persisted and no refresh request is made. Shaped like an
- * API error (`{ error_code: 401, message: "session_ended" }`) so callers branch
- * on it like any other 401.
+ * Run `task` (logout) so it never overlaps a refresh of `service`: under the
+ * shared Web Lock when available (it waits for any tab's in-flight refresh, and
+ * a refresh queued behind it sees the ended session and persists nothing), else
+ * after this tab's in-flight refresh settles. The wait is capped at `maxWaitMs`;
+ * past it the task runs without the lock, so a hung refresh never blocks logout.
  */
-export class SessionEndedError extends Error {
-  readonly status = "error";
-  readonly error_code = 401;
-  readonly error_message = "session_ended";
-
-  constructor() {
-    super("session_ended");
-    this.name = "SessionEndedError";
-  }
-}
-
-/**
- * Whether a refresh failure means the backend REFUSED the session (HTTP 401/403
- * from the refresh endpoint). Only then is the session over. A network error,
- * timeout, 429 or 5xx is transient: the cookies may still be valid, so the
- * session hint is kept and the caller surfaces a retryable error instead.
- */
-export function isRefreshRefused(error: unknown): boolean {
-  const status = (error as { response?: { status?: number } } | null)?.response?.status;
-  return status === 401 || status === 403;
-}
-
-interface SessionLockOptions {
-  /** Give up waiting for the lock after this long and run the task without it. */
-  maxWaitMs?: number;
-}
-
-/**
- * Run `task` under the service's browser-wide Web Lock so only ONE tab refreshes
- * (or logs out) at a time. Two tabs posting the same refresh cookie concurrently
- * would look like token reuse to the backend, which revokes every session. Runs
- * the task directly where the Web Locks API is unavailable (old browsers, SSR,
- * tests) — single-flight is then per tab only.
- */
-export function withSessionLock<T>(
+export async function withSessionLock<T>(
   service: ApiService,
   task: () => Promise<T>,
-  { maxWaitMs }: SessionLockOptions = {},
+  { maxWaitMs = SESSION_WAIT_TIMEOUT_MS }: { maxWaitMs?: number } = {},
 ): Promise<T> {
-  const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
-  if (!locks?.request) return task();
-  const name = refreshLockName(service);
-  if (maxWaitMs === undefined) return locks.request(name, task) as Promise<T>;
+  const locks = getLocks();
+  if (locks?.request) return withCappedLock(locks, refreshLockName(service), task, maxWaitMs);
+
+  // No locks: wait out this tab's in-flight refresh(es); with none pending the
+  // task starts synchronously (no await before it).
+  let pending = pendingRefreshes.get(service);
+  if (!pending) return task();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let timedOut = false;
+  const deadline = new Promise<void>((resolve) => {
+    timer = setTimeout(() => {
+      timedOut = true;
+      resolve();
+    }, maxWaitMs);
+  });
+  try {
+    while (pending && !timedOut) {
+      await Promise.race([pending.catch(() => {}), deadline]);
+      pending = pendingRefreshes.get(service);
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+  return task();
+}
+
+/** `locks.request` whose wait for the lock is aborted after `maxWaitMs`; the
+ * task then runs unlocked. */
+async function withCappedLock<T>(
+  locks: LockManager,
+  name: string,
+  task: () => Promise<T>,
+  maxWaitMs: number,
+): Promise<T> {
+  let started = false;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), maxWaitMs);
-  return (
-    locks.request(name, { signal: controller.signal }, () => {
+  try {
+    return await locks.request(name, { signal: controller.signal }, () => {
+      started = true;
       clearTimeout(timer);
       return task();
-    }) as Promise<T>
-  ).catch((error: unknown) => {
-    // Waited too long for the lock: proceed without it.
-    if (controller.signal.aborted && (error as { name?: string } | null)?.name === "AbortError") {
-      return task();
-    }
+    });
+  } catch (error) {
+    if (!started && controller.signal.aborted) return task();
     throw error;
-  });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
-/** Epoch ms of the last successful refresh in ANY tab (shared via localStorage). */
-function readLastRefresh(service: ApiService): number {
+/** A stored timestamp further ahead than this is treated as bogus (the clock
+ * moved backwards since it was written) and ignored. */
+const CLOCK_SKEW_TOLERANCE_MS = 1_000;
+
+/** Cross-tab "last successful refresh" timestamp. The cookies themselves are
+ * httpOnly (unreadable), so tabs share when they last rotated them instead. */
+function readSharedTimestamp(key: string): number {
   try {
-    return Number(localStorage.getItem(lastRefreshKey(service))) || 0;
+    return typeof localStorage === "undefined" ? 0 : Number(localStorage.getItem(key)) || 0;
   } catch {
     return 0;
   }
 }
 
-function writeLastRefresh(service: ApiService, at: number): void {
+function writeSharedTimestamp(key: string, value: number): void {
   try {
-    localStorage.setItem(lastRefreshKey(service), String(at));
+    if (typeof localStorage !== "undefined") localStorage.setItem(key, String(value));
   } catch {
-    // Storage unavailable (private mode / SSR) — cross-tab skip degrades to a refresh.
+    // Storage blocked (private mode, quota) — the in-memory timestamp still applies.
   }
 }
 
 /**
  * Serializes token refreshes for ONE service. A burst of concurrent 401s (e.g. a
  * page firing several requests at once) triggers exactly ONE network refresh —
- * every caller awaits the same in-flight promise, then retries. Across tabs a
- * Web Lock serializes refreshes; a tab that waited on the lock re-checks the
- * shared "last refresh" stamp and skips its own refresh when another tab already
- * rotated the cookies meanwhile (the browser jar is shared, so it can just replay).
+ * every caller awaits the same in-flight promise, then retries. Across tabs the
+ * refresh runs under a Web Lock and is skipped when another tab rotated the
+ * cookies after the failed request was sent (the replay then carries them).
  * While a logout runs no refresh starts (`SessionEndedError`); a refresh that
  * finishes after the session ended (epoch moved) persists nothing, fires no
  * hook — not even the failure hook — and rejects with `SessionEndedError`.
  */
 export class RefreshTokenManager {
   private inFlight: Promise<void> | null = null;
+  private refreshedAt = 0;
   private readonly service: ApiService;
   private readonly doRefresh: TokenRefresher;
-  private readonly onRefreshFailed: () => void;
   private readonly onRefreshed?: () => void;
-  private readonly isSessionAlive: () => boolean;
+  private readonly onRefreshFailed: () => void;
+  private readonly isSessionAlive: () => boolean | Promise<boolean>;
 
-  constructor(opts: RefreshTokenManagerOpts) {
+  constructor(opts: RefreshTokenManagerOptions) {
     this.service = opts.service;
     this.doRefresh = opts.refresh;
-    this.onRefreshFailed = opts.onRefreshFailed;
     this.onRefreshed = opts.onRefreshed;
+    this.onRefreshFailed = opts.onRefreshFailed;
     this.isSessionAlive = opts.isSessionAlive ?? (() => true);
   }
 
   /**
-   * Runs the refresh, deduplicating concurrent calls. When the backend refuses
-   * the refresh (401/403) it fires the failure hook (session over); a transient
-   * failure only rethrows. On success the backend has rotated the
-   * auth cookies, so the caller can simply replay its request.
+   * Runs the refresh, deduplicating concurrent calls.
+   *
+   * @param sentAt When the failed request was sent. If a refresh (this tab or
+   * another) completed after that, the cookies are already fresh — skip it.
+   *
+   * A refused refresh (401/403) fires the failure hook (session over); any other
+   * failure only rethrows (session kept). On success the caller replays its
+   * request — the browser re-attaches the rotated cookies.
    */
-  refresh(): Promise<void> {
-    // A logout is running: never start a rotation it could miss.
-    if (isLogoutPending()) return Promise.reject(new SessionEndedError());
+  refresh(sentAt?: number): Promise<void> {
+    // A logout is running: never start (or join) a rotation it could miss.
+    if (isLogoutPending(this.service)) return Promise.reject(new SessionEndedError());
     if (this.inFlight) return this.inFlight;
 
-    const requestedAt = Date.now();
-    const epoch = getSessionEpoch();
-    const ended = () => getSessionEpoch() !== epoch;
+    const epoch = getSessionEpoch(this.service);
+    const lockName = refreshLockName(this.service);
+    const inFlight = withRefreshLock(lockName, () =>
+      this.refreshUnlessRotated(lockName, epoch, sentAt),
+    ).finally(() => {
+      this.inFlight = null;
+      if (pendingRefreshes.get(this.service) === inFlight) pendingRefreshes.delete(this.service);
+    });
+    this.inFlight = inFlight;
+    pendingRefreshes.set(this.service, inFlight);
 
-    this.inFlight = withSessionLock(this.service, async () => {
-      // Logout ran or is running (here or in another tab) since we asked.
-      if (ended() || isLogoutPending() || !this.isSessionAlive()) {
-        throw new SessionEndedError();
-      }
-      // Another tab rotated the cookies while we waited for the lock → reuse them.
-      if (readLastRefresh(this.service) > requestedAt) return;
+    return inFlight;
+  }
+
+  private async refreshUnlessRotated(lockName: string, epoch: number, sentAt?: number) {
+    // Logout ran or is running (here or in another tab) since we asked.
+    const alive = await this.isSessionAlive();
+    const ended = () => getSessionEpoch(this.service) !== epoch;
+    if (!alive || ended() || isLogoutPending(this.service)) throw new SessionEndedError();
+
+    // Timestamps in the future (clock moved back) prove nothing — ignore them
+    // and refresh, rather than skipping and letting the session end.
+    const limit = Date.now() + CLOCK_SKEW_TOLERANCE_MS;
+    const lastRefresh = Math.max(
+      0,
+      ...[this.refreshedAt, readSharedTimestamp(`${lockName}:at`)].filter((t) => t <= limit),
+    );
+    if (sentAt !== undefined && lastRefresh > sentAt) return;
+
+    try {
       await this.doRefresh();
-      // The session ended (epoch moved) while the refresh was in flight: persist nothing.
+    } catch (error) {
+      // Late result of a session that already ended: no hooks, just session_ended.
       if (ended()) throw new SessionEndedError();
-      writeLastRefresh(this.service, Date.now());
-    })
-      .then(
-        () => {
-          if (ended()) throw new SessionEndedError();
-          this.onRefreshed?.();
-        },
-        (error: unknown) => {
-          // Late result of a session that already ended: no hooks, just session_ended.
-          if (ended() || error instanceof SessionEndedError) throw new SessionEndedError();
-          if (isRefreshRefused(error)) this.onRefreshFailed();
-          throw error;
-        },
-      )
-      .finally(() => {
-        inFlightRefreshes.delete(pending);
-        this.inFlight = null;
-      });
+      if (isRefreshRefused(error)) this.onRefreshFailed();
+      throw error;
+    }
 
-    const pending = this.inFlight;
-    inFlightRefreshes.add(pending);
-    return pending;
+    // The session ended while the refresh was in flight: persist nothing.
+    if (ended()) throw new SessionEndedError();
+
+    this.refreshedAt = Date.now();
+    writeSharedTimestamp(`${lockName}:at`, this.refreshedAt);
+    this.onRefreshed?.();
   }
 }

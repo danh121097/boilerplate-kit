@@ -21,7 +21,8 @@ templates/tanstack-start/
     ├── router.tsx             # getRouter() factory: createRouter + fresh QueryClient +
     │                            # setupRouterSsrQueryIntegration (dehydrate/hydrate)
     ├── routes/
-    │   ├── __root.tsx         # Full HTML document: <html>/<head>/<body> + <HeadContent /> + <Scripts />
+    │   ├── __root.tsx         # Full HTML document: <html>/<head>/<body> + <HeadContent /> + <Scripts />;
+    │   │                        # session effects (cache reset, expiry redirect, cross-tab sync)
     │   ├── index.tsx          # / — home
     │   ├── counter.tsx        # /counter — Zustand
     │   ├── users.tsx          # /users — server function + React Query (SSR pattern)

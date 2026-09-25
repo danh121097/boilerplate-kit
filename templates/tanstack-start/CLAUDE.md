@@ -44,7 +44,7 @@ Full standards: [docs/code-standards.md](./docs/code-standards.md).
 ```bash
 pnpm dev          # Vite dev server with HMR (auto-generates routeTree.gen.ts)
 pnpm build        # tsc --noEmit, then SSR build via Vite (outputs dist/client + dist/server)
-pnpm start        # Serve the SSR build (dist/) via vite preview
+pnpm start        # Serve the SSR build (dist/) with srvx on Node (no Vite)
 pnpm typecheck    # tsc --noEmit
 pnpm test         # vitest run
 pnpm test:watch   # vitest

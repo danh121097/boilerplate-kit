@@ -6,8 +6,8 @@
 
 | File              | Purpose                                                              |
 | ----------------- | -------------------------------------------------------------------- |
-| `server-api.ts`   | `serverApiGet<T>(path)` — fetch with the access cookie + HMAC; throws `ServerAuthError` on 401 (no server refresh) |
-| `get-me.ts`       | `getMeServerData()` — resolve current user server-side               |
+| `server-api.ts`   | `serverApiGet` / `serverApiPaginate` / `serverApiCursorPaginate` — fetch with the access cookie + HMAC; reject with an `ApiResponseError` (401 when the access cookie is missing or rejected; no server refresh). `hasServerSessionHint()` |
+| `session.ts`      | `readServerSession()` — current user, or null when anonymous (no session hint) |
 | `get-users.ts`    | `getUsersServerData()` — fetch users list server-side                |
 
 ## Service Layer (`src/services/`)
@@ -20,21 +20,23 @@ never touches `localStorage` or reads tokens directly.
 | File                       | Purpose                                                            |
 | -------------------------- | ------------------------------------------------------------------ |
 | `api.ts`                   | `Api` class — axios wrapper, `withCredentials: true`               |
-| `auth-refresh-client.ts`   | Bare axios call to refresh endpoint (no interceptors)              |
-| `hmac-signature.ts`        | HMAC-SHA256 signing via `NEXT_PUBLIC_HMAC_SECRET`                  |
+| `api-errors.ts`            | `toApiError`, `isUnauthorizedError`, `isRefreshRefused`, `refreshUnavailable`, `SessionEndedError`, `getApiErrorMessage` |
+| `app-prefix.ts`            | `getAppPrefix()` — prefix for lock and storage keys                |
+| `auth-refresh-client.ts`   | `createTokenRefresher` — bare axios refresh call (no interceptors), `REFRESH_TIMEOUT_MS` |
+| `hmac-signature.ts`        | HMAC-SHA256 signing via `NEXT_PUBLIC_HMAC_SECRET`; `signRequest`, `resolveContentType` |
 | `headers-utils.ts`         | Attach HMAC headers to requests (no Bearer — cookies auto-sent)    |
 | `interceptors.ts`          | Request/response interceptors + 401 → refresh → replay             |
 | `model.ts`                 | Base `Model` class — subclass + call `Model.setup()`               |
-| `refresh-token-manager.ts` | Single-flight + cross-tab (Web Lock) token refresh                 |
-| `session.ts`               | Session hint cookie + `onSessionEnded` / `endSession`              |
-| `query-client.ts`          | `makeQueryClient` + `resetQueriesOnSessionEnd`                     |
+| `refresh-token-manager.ts` | Single-flight + cross-tab (Web Lock) refresh, `withSessionLock`    |
+| `session.ts`               | Per-service epoch + logout-pending, session hint, `onSessionEnded` / `endSession(reason, service)`, `syncAuthAcrossTabs`, `redirectOnSessionExpired`, `safeRedirect` |
+| `query-client.ts`          | `makeQueryClient`, `resetQueriesOnSessionEnd(client, key, service)`, `resyncQueriesAfterLogin` |
 | `tanstack.ts`              | `defineQuery` + `defineMutation` factory helpers                   |
 | `types.ts`                 | Shared TypeScript types + axios module augmentation                |
 
 ### auth/
 
 - `contract.ts` — endpoint paths + React Query keys (single source of truth)
-- `AuthModel` — login, register, logout, getMe
+- `AuthModel` — login, register, logout, getMe, getSession (401 → null)
 - `useLoginMutation`, `useRegisterMutation`, `useLogoutMutation`, `useMeQuery`
 - `session.ts` — `useAuth()` hook (derives from useMeQuery)
 

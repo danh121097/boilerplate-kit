@@ -10,23 +10,40 @@ export interface SignRequestInput {
   ctime?: number;
 }
 
-/** The Content-Type pinned on the request config (AxiosHeaders or a plain object). */
-function readContentType(config: InternalAxiosRequestConfig): string | undefined {
+/** The Content-Type pinned on the request (instance default or per-request),
+ * looked up case-insensitively: `AxiosHeaders.get` when available, else a key
+ * scan of a plain header object. */
+function headerContentType(config: InternalAxiosRequestConfig): string | undefined {
   const headers = config.headers as unknown as
     | (Record<string, unknown> & { get?: (name: string) => unknown })
     | undefined;
+  if (!headers) return undefined;
   const raw =
-    typeof headers?.get === "function"
+    typeof headers.get === "function"
       ? headers.get("Content-Type")
-      : (headers?.["Content-Type"] ?? headers?.["content-type"]);
+      : Object.entries(headers).find(([key]) => key.toLowerCase() === "content-type")?.[1];
   return typeof raw === "string" && raw ? raw : undefined;
 }
 
-/** The Content-Type pinned on the request, exactly as it will be sent. Pin no
- * charset: the backend signs the header it receives, so a pinned one must be
- * sent (and signed) unchanged. */
-export function pinnedContentType(config: InternalAxiosRequestConfig): string | undefined {
-  return readContentType(config);
+/**
+ * The Content-Type axios will actually send, which the backend signs:
+ * - no body (`data === undefined`) → `""` (axios drops the header);
+ * - a pinned Content-Type → that value, exactly as set (a pinned charset too);
+ * - else axios's default for the body: `URLSearchParams` →
+ *   `application/x-www-form-urlencoded;charset=utf-8`, a string →
+ *   `application/x-www-form-urlencoded`, anything else → `application/json`.
+ * `data: null` counts as a body (axios sends `null`). Multipart is not
+ * supported: the browser adds a boundary the client cannot know when signing.
+ */
+export function resolveContentType(config: InternalAxiosRequestConfig): string {
+  if (config.data === undefined) return "";
+  const pinned = headerContentType(config);
+  if (pinned) return pinned;
+  if (config.data instanceof URLSearchParams) {
+    return "application/x-www-form-urlencoded;charset=utf-8";
+  }
+  if (typeof config.data === "string") return "application/x-www-form-urlencoded";
+  return "application/json";
 }
 
 /**
@@ -71,26 +88,13 @@ export class HMACSignatureGenerator {
   }
 
   /** Adapter for the axios interceptor — signs `config.url` (already the path
-   * after baseURL, i.e. without the API prefix).
-   *
-   * The signed content-type MUST equal what the request actually sends, because
-   * the backend signs the `Content-Type` header it receives. axios omits
-   * Content-Type on bodyless requests (GET, or POST with no data), so those sign
-   * ""; a request with a body sends the pinned Content-Type (instance default or
-   * per-request header, signed exactly as sent) or axios's JSON default.
-   *
-   * Not covered: multipart uploads. The browser sends
-   * `multipart/form-data; boundary=…` with a boundary the client cannot know
-   * when signing, so upload routes need a backend-side exemption or
-   * normalization. */
+   * after baseURL, i.e. without the API prefix) with the Content-Type the
+   * request actually sends (`resolveContentType`). */
   static generateSignature(config: InternalAxiosRequestConfig): HMACSignatureData | null {
-    const hasBody = config.data !== undefined && config.data !== null;
-    const contentType = hasBody ? (pinnedContentType(config) ?? "application/json") : "";
-
     return this.signRequest({
       method: config.method || "",
       path: config.url || "",
-      contentType,
+      contentType: resolveContentType(config),
     });
   }
 }

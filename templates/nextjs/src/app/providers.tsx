@@ -1,6 +1,7 @@
 "use client";
 
 import { initI18n } from "@/i18n/i18n";
+import { authContract } from "@/services/auth/contract";
 import {
   makeQueryClient,
   resetQueriesOnSessionEnd,
@@ -62,17 +63,22 @@ export function Providers({ children, initialLanguage }: ProvidersProps) {
   // Lazy init: one stable i18n instance across renders, seeded with the SSR locale.
   const [i18nInstance] = useState(() => initI18n(initialLanguage));
 
-  // Logout / failed refresh → reset the cache in place and pin `auth.me` to null.
-  useEffect(() => resetQueriesOnSessionEnd(queryClient, queryKeys.auth.me), [queryClient]);
+  // Logout / refused refresh of the auth service → reset the cache in place and
+  // pin `auth.me` to null. Another service's session ending leaves it alone.
+  useEffect(
+    () => resetQueriesOnSessionEnd(queryClient, queryKeys.auth.me, authContract.service),
+    [queryClient],
+  );
 
   // Refused refresh (session expired) → send the user to /login, remembering
-  // where they were so the login page can bring them back. No reload.
+  // where they were (path, query and hash) so the login page can bring them
+  // back. No reload.
   useEffect(
     () =>
       redirectOnSessionExpired(() => {
-        const { pathname, search } = window.location;
-        if (pathname !== "/login") router.replace(loginPathWithReturn(pathname + search));
-      }),
+        const { pathname, search, hash } = window.location;
+        if (pathname !== "/login") router.replace(loginPathWithReturn(pathname + search + hash));
+      }, authContract.service),
     [router],
   );
 

@@ -4,13 +4,7 @@ import { httpError, makeClient, ok } from "@/__tests__/helpers/http-mocks";
 import { APP_PREFIX, STORAGE_KEYS } from "@/enums";
 import { queryClient } from "@/providers/query-client-provider";
 import { AuthModel } from "@/services/auth";
-import {
-  Api,
-  endSession,
-  onSessionEnded,
-  safeRedirect,
-  SESSION_WAIT_TIMEOUT_MS,
-} from "@/services/core";
+import { Api, endSession, onSessionEnded, SESSION_WAIT_TIMEOUT_MS } from "@/services/core";
 import {
   getAccessToken,
   getRefreshToken,
@@ -23,8 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import axios from "axios";
 
 /**
- * Logout vs an in-flight refresh, cross-tab login/logout sync, and the
- * same-origin return path used after a session expires.
+ * Logout vs an in-flight refresh, and cross-tab login/logout sync.
  */
 
 // The auth store reads localStorage at import time.
@@ -289,7 +282,7 @@ describe("cross-tab auth sync", () => {
     queryClient.setQueryData(["users.list"], { data: [] });
     const stop = syncAuthWithOtherTabs(vi.fn());
 
-    persistAccessToken("AT", "MAIN"); // the other tab's login
+    localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, "AT"); // the other tab's login
     onStorage({ key: STORAGE_KEYS.ACCESS_TOKEN });
 
     expect(queryClient.getQueryData([queryKeys.auth.me])).toBeUndefined();
@@ -303,45 +296,34 @@ describe("cross-tab auth sync", () => {
     const onChange = vi.fn();
     const stop = syncAuthWithOtherTabs(onChange);
 
-    persistAccessToken("AT", "MAIN"); // the other tab's login
+    localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, "AT"); // the other tab's login
     onStorage({ key: STORAGE_KEYS.ACCESS_TOKEN });
     expect(useAuthStore.getState().isAuthenticated).toBe(true);
     expect(getMe).toHaveBeenCalledTimes(1);
     expect(onChange).toHaveBeenCalledTimes(1);
 
-    persistAccessToken("AT-rotated", "MAIN"); // another tab refreshed
+    localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, "AT-rotated"); // another tab refreshed
     onStorage({ key: STORAGE_KEYS.ACCESS_TOKEN });
     onStorage({ key: STORAGE_KEYS.LANGUAGE });
     expect(onChange).toHaveBeenCalledTimes(1);
     stop();
   });
-});
 
-describe("return path after session expiry", () => {
-  it.each([
-    ["/users?page=2", "/users?page=2"],
-    ["/", "/"],
-    ["//evil.example", "/"],
-    ["/\\evil.example", "/"],
-    ["/users\\x", "/"],
-    ["https://evil.example", "/"],
-    ["/r?next=https://evil.example", "/"],
-    ["users", "/"],
-    ["/\t/evil.example", "/"],
-    ["/\n/evil.example", "/"],
-    ["/ok\u007F", "/"],
-    ["/login", "/"],
-    ["/login/", "/"],
-    ["/login?redirect=%2Fusers", "/"],
-    ["/login-help", "/login-help"],
-    [undefined, "/"],
-  ])("safeRedirect(%j) → %j", (value, expected) => {
-    expect(safeRedirect(value)).toBe(expected);
-  });
+  it("after this tab logs out, a login in another tab signs this tab in again", async () => {
+    vi.stubGlobal("navigator", {});
+    persistAccessToken("AT", "MAIN");
+    useAuthStore.setState({ isAuthenticated: true, user: { _id: "u1" } as never });
+    vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
+    vi.spyOn(AuthModel, "getMe").mockResolvedValue({ _id: "u2" } as never);
+    const onChange = vi.fn();
+    const stop = syncAuthWithOtherTabs(onChange);
 
-  it("safeRedirect accepts up to 512 characters and rejects longer values", () => {
-    const max = `/${"a".repeat(511)}`;
-    expect(safeRedirect(max)).toBe(max);
-    expect(safeRedirect(`${max}a`)).toBe("/");
+    await AuthModel.logout(); // this tab's own logout: no storage event here
+    localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, "AT2"); // the other tab's login
+    onStorage({ key: STORAGE_KEYS.ACCESS_TOKEN });
+
+    expect(useAuthStore.getState().isAuthenticated).toBe(true);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    stop();
   });
 });

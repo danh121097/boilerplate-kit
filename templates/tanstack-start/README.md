@@ -70,7 +70,7 @@ VITE_BUILD_VERSION=     # injected by CI for x-version header
 ```bash
 pnpm dev          # Vite dev server (HMR + SSR)
 pnpm build        # Type-check + production SSR build
-pnpm start        # Serve the production build in dist/ (vite preview)
+pnpm start        # Node production server (srvx) for dist/: SSR handler + dist/client assets
 pnpm typecheck    # tsc --noEmit
 pnpm test         # vitest run
 pnpm lint         # eslint

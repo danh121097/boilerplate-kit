@@ -9,19 +9,22 @@ src/services/
 ├── core/
 │   ├── api.ts              # Api class — multi-service axios wrapper
 │   ├── interceptors.ts     # ApiInterceptors — request (HMAC) + response (401 → refresh)
-│   ├── refresh-token-manager.ts  # Single-flight + cross-tab (Web Lock) refresh
-│   ├── auth-refresh-client.ts    # Bare axios refresh call (no interceptors)
-│   ├── session.ts          # Session hint cookie + onSessionEnded / endSession
-│   ├── server-auth.ts      # ServerUnauthorized + withSessionRefresh (server-fn reads)
-│   ├── query-client.ts     # makeQueryClient + resetQueriesOnSessionEnd
+│   ├── api-errors.ts       # toApiError, isUnauthorizedError, isRefreshRefused, refreshUnavailable, SessionEndedError, getApiErrorMessage
+│   ├── app-prefix.ts       # getAppPrefix() — prefix for lock and storage keys
+│   ├── refresh-token-manager.ts  # Single-flight + cross-tab (Web Lock) refresh, withSessionLock
+│   ├── auth-refresh-client.ts    # createTokenRefresher — bare axios refresh call, REFRESH_TIMEOUT_MS
+│   ├── session.ts          # Per-service epoch + logout-pending, session hint, onSessionEnded / endSession(reason, service), syncAuthAcrossTabs, redirectOnSessionExpired, safeRedirect
+│   ├── server-session.ts   # ServerUnauthorized + withSessionRefresh (server-fn reads)
+│   ├── query-client.ts     # makeQueryClient, resetQueriesOnSessionEnd(client, key, service), resyncQueriesAfterLogin
 │   ├── headers-utils.ts    # HeadersUtils.setAuthHeaders (HMAC; cookies auto-sent)
-│   ├── hmac-signature.ts   # HMACSignatureGenerator (crypto-js, VITE_HMAC_SECRET)
+│   ├── hmac-signature.ts   # HMACSignatureGenerator (crypto-js, VITE_HMAC_SECRET), signRequest, resolveContentType
 │   ├── model.ts            # Model base class — subclass + Model.setup()
 │   ├── tanstack.ts         # defineQuery / defineMutation (React Query)
 │   ├── types.ts            # Shared TS types + axios module augmentation
 │   └── index.ts
 ├── auth/
-│   ├── auth.ts             # AuthModel + useLoginMutation, useRegisterMutation, etc.
+│   ├── auth.ts             # AuthModel (login/register/logout/getMe/getSession) + mutations
+│   ├── session.ts          # fetchSession (SSR server fn) + useMeQuery + useAuth
 │   ├── types/auth.ts       # AuthUser, AuthResult, LoginPayload, RegisterPayload
 │   └── index.ts
 └── users/

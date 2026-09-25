@@ -73,7 +73,7 @@ export function defineQuery<TData, TParams = void>(config: DefineQueryConfig<TDa
  * `router.tsx`) dehydrates them, so the matching `useXxx()` hook hydrates with no
  * refetch. Declare loaders without the boilerplate arrow:
  *
- *   loader: prefetchQueries(useSessionQuery, useUsersListQuery),
+ *   loader: prefetchQueries(useMeQuery, useUsersListQuery),
  *
  * Uses `prefetchQuery` (never throws): a failed prefetch — e.g. an expired
  * session deferred to the browser — must not fail the route. The query is left

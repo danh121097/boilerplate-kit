@@ -1,11 +1,13 @@
-import { createTokenRefresher } from "@/services/core/auth-refresh-client";
-import { HeadersUtils } from "@/services/core/headers-utils";
 import {
   isRefreshRefused,
-  RefreshTokenManager,
+  refreshUnavailable,
   SessionEndedError,
-} from "@/services/core/refresh-token-manager";
-import { endSession, markSessionActive } from "@/services/core/session";
+  toApiError,
+} from "@/services/core/api-errors";
+import { createTokenRefresher } from "@/services/core/auth-refresh-client";
+import { HeadersUtils } from "@/services/core/headers-utils";
+import { RefreshTokenManager } from "@/services/core/refresh-token-manager";
+import { endSession, hasSessionHint } from "@/services/core/session";
 import type {
   ApiResponseError,
   ApiService,
@@ -18,7 +20,7 @@ import type { AxiosError, AxiosInstance, AxiosResponse, InternalAxiosRequestConf
 const REFRESH_DEFAULTS: Omit<RefreshOptions, "service"> = {
   endpoint: "/auth/refresh",
   skipPaths: [],
-  hasSession: () => true,
+  hasSession: hasSessionHint,
 };
 
 /** Refresh runtime for one service: its single-flight manager + resolved options. */
@@ -71,41 +73,6 @@ function canAttemptRefresh(config: InternalAxiosRequestConfig, options: RefreshO
   return options.hasSession();
 }
 
-/** A request that could not be replayed because the refresh itself failed
- * transiently. Deliberately NOT a 401, so callers keep the session. */
-export function refreshUnavailable(error: unknown): ApiResponseError {
-  const status = (error as { response?: { status?: number } } | null)?.response?.status ?? 0;
-  const message = "Session refresh temporarily unavailable";
-  return { status: "error", error_code: status, message, error_message: message, retryable: true };
-}
-
-/** No response at all (network / timeout), 408, 429 or 5xx — worth retrying later. */
-function isTransientStatus(status: number | undefined): boolean {
-  return status === undefined || status === 408 || status === 429 || status >= 500;
-}
-
-/** Normalize a rejected response into the `ApiResponseError` shape, filling
- * `error_code` from the HTTP status (0 when there was no response) when the
- * body does not carry one, and flagging transient failures `retryable`. */
-function toApiError(error: AxiosError<ApiResponseError>): ApiResponseError {
-  const status = error.response?.status;
-  const body = error.response?.data;
-  const retryable = isTransientStatus(status) ? { retryable: true } : {};
-  if (body && typeof body === "object") {
-    return {
-      ...body,
-      error_code: body.error_code || status || 0,
-      ...retryable,
-    } as ApiResponseError;
-  }
-  return {
-    status: "error",
-    message: error.message,
-    error_code: status ?? 0,
-    ...retryable,
-  } as ApiResponseError;
-}
-
 interface ResponseInterceptorOpts {
   strictBlobError: boolean;
   instance: AxiosInstance;
@@ -135,7 +102,7 @@ function createResponseInterceptor(opts: ResponseInterceptorOpts) {
     config._retry = true;
     // The refresh rotates the httpOnly auth cookies; replay the original request
     // as-is — the browser re-attaches the fresh cookie (no Bearer to set).
-    return ctx.manager.refresh().then(
+    return ctx.manager.refresh(config._sentAt).then(
       () => instance(config),
       (refreshError: unknown) =>
         Promise.reject<AxiosResponse>(
@@ -209,10 +176,11 @@ export class ApiInterceptors implements HttpInterceptorSetup {
       const manager = new RefreshTokenManager({
         service,
         refresh: createTokenRefresher(options.endpoint, service),
-        onRefreshed: markSessionActive,
+        onRefreshed: options.onRefreshed,
         // Another tab logged out while this one waited for the lock → no refresh.
         isSessionAlive: options.hasSession,
-        // Session is dead: clear the hint + cached queries; the caller gets the 401.
+        // Session is dead: end it (the main session also drops the hint and the
+        // cached queries); the caller gets the original 401.
         onRefreshFailed: () => endSession("expired", service),
       });
       ctx = { manager, options };
@@ -224,19 +192,24 @@ export class ApiInterceptors implements HttpInterceptorSetup {
   /**
    * Refresh one service's session outside the response interceptor (e.g. after a
    * server function reports an expired session). Same single-flight + cross-tab
-   * lock as an interceptor-driven refresh; rejects when the service has no
-   * refresh configured or the refresh fails (the session is then ended).
+   * lock as an interceptor-driven refresh — pass `sentAt` (when the failed call
+   * started) so a refresh another tab finished after it is reused. Rejects when
+   * the service has no refresh configured or the refresh fails (a refused one
+   * ends the session).
    */
-  refreshSession(service: ApiService = "MAIN"): Promise<void> {
+  refreshSession(service: ApiService = "MAIN", sentAt?: number): Promise<void> {
     const ctx = this.getRefreshContext(service);
     if (!ctx) return Promise.reject(new Error(`No refresh configured for service ${service}`));
-    return ctx.manager.refresh();
+    return ctx.manager.refresh(sentAt);
   }
 
   setupRequestInterceptor(instance: AxiosInstance, service: ApiService): void {
     instance.interceptors.request.use(
       (config) => {
         config.serviceType = service;
+        // Kept on the replay: a refresh finished after this moment already
+        // rotated the cookies, so the manager skips a second refresh.
+        config._sentAt ??= Date.now();
         // HMAC headers only — the httpOnly auth cookie is sent automatically
         // (the axios instance is created with `withCredentials: true`).
         config.headers = HeadersUtils.setAuthHeaders(config);

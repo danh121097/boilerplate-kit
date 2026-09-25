@@ -1,11 +1,12 @@
 import { STORAGE_KEYS } from "@/enums";
 import { getApiBaseUrl } from "@/services/core/api-config";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
-import { isServerUnauthorized } from "@/services/core/server-auth";
+import { isServerUnauthorized } from "@/services/core/server-session";
 import { getCookie } from "@tanstack/react-start/server";
-import type { ServerUnauthorized } from "@/services/core/server-auth";
+import type { ServerUnauthorized } from "@/services/core/server-session";
 import type {
   ApiResponse,
+  ApiResponseError,
   CursorParams,
   CursorResponse,
   PaginatedResponse,
@@ -27,9 +28,32 @@ import type {
  * across concurrent reads — weakening the backend's reuse detection. The read
  * returns `ServerUnauthorized` instead and the browser refreshes + replays via
  * `withSessionRefresh`. Never resolves an auth failure to a cacheable empty
- * value; other failures throw.
+ * value; other failures reject with an `ApiResponseError` (`error_code` = HTTP
+ * status, 0 when the backend is unreachable; `retryable` on 0/408/429/5xx).
  */
 const API_BASE = getApiBaseUrl();
+
+/** Build the `ApiResponseError` a server read rejects with, from the HTTP
+ * status (0 = no response) and the response body when it is an envelope. */
+function toServerApiError(status: number, body?: unknown, fallback = "request_failed") {
+  const data = body && typeof body === "object" ? (body as Partial<ApiResponseError>) : undefined;
+  const message = data?.message ?? fallback;
+  const transient = !status || status === 408 || status === 429 || status >= 500;
+  const error: ApiResponseError = {
+    ...data,
+    status: data?.status ?? "error",
+    message,
+    error_message: data?.error_message ?? message,
+    error_code: data?.error_code ?? status,
+    ...(transient ? { retryable: true } : {}),
+  };
+  return error;
+}
+
+/** Whether the request carries the readable session hint (see `services/core/session`). */
+export function hasServerSessionHint(): boolean {
+  return getCookie(STORAGE_KEYS.SESSION) === "1";
+}
 
 function hmacHeaders(method: string, path: string, contentType: string): Record<string, string> {
   const sig = HMACSignatureGenerator.signRequest({ method, path, contentType });
@@ -41,7 +65,8 @@ function hmacHeaders(method: string, path: string, contentType: string): Record<
 
 /**
  * Authenticated SSR GET core — returns the parsed body (full envelope), or
- * `ServerUnauthorized` when the access cookie is missing or rejected. The HMAC signs the path only; `query` is appended as `?key=value`.
+ * `ServerUnauthorized` when the access cookie is missing or rejected. The HMAC
+ * signs the path only; `query` is appended as `?key=value`.
  */
 async function authedFetch<R>(
   path: string,
@@ -50,18 +75,26 @@ async function authedFetch<R>(
   const access = getCookie("accessToken");
   const unauthorized: ServerUnauthorized = {
     unauthorized: true,
-    hasSession: getCookie(STORAGE_KEYS.SESSION) === "1",
+    hasSession: hasServerSessionHint(),
   };
   const qs = query
     ? `?${new URLSearchParams(Object.entries(query).map(([k, v]) => [k, String(v)])).toString()}`
     : "";
   if (!access) return unauthorized;
 
-  const res = await fetch(`${API_BASE}${path}${qs}`, {
-    headers: { cookie: `accessToken=${access}`, ...hmacHeaders("GET", path, "") },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}${qs}`, {
+      headers: { cookie: `accessToken=${access}`, ...hmacHeaders("GET", path, "") },
+    });
+  } catch (error) {
+    throw toServerApiError(0, undefined, error instanceof Error ? error.message : undefined);
+  }
   if (res.status === 401) return unauthorized;
-  if (!res.ok) throw new Error(`GET ${path} failed with status ${res.status}`);
+  if (!res.ok) {
+    const body: unknown = await res.json().catch(() => undefined);
+    throw toServerApiError(res.status, body, `GET ${path} failed with status ${res.status}`);
+  }
   return (await res.json()) as R;
 }
 

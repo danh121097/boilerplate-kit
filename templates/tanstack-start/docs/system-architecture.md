@@ -49,7 +49,9 @@ Per call:
   • Create router with context: { queryClient }
   • Call setupRouterSsrQueryIntegration({ router, queryClient })
     → dehydrates on server, hydrates on client, wraps in QueryClientProvider
-  • Return router
+  • Return router (no session subscriptions here: the factory re-runs on HMR,
+    so the cache reset, expiry redirect and cross-tab sync are useEffects with
+    cleanup in routes/__root.tsx)
 
 On server: router renders → HTML includes dehydrated QueryClient state
 On client: hydrated state is restored → route components read cache without

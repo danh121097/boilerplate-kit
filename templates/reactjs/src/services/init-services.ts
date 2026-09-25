@@ -12,7 +12,7 @@ import type { ServiceRefreshConfig, ServiceTokenKeys } from "@/services/core";
  * Add a backend = add a row + its `VITE_*_API_URL` in `.env`. Rows with an empty
  * baseURL are skipped, so optional services stay dormant until their env var is
  * set. Give a row a `refresh` to enable per-service auto-refresh; omit it to opt
- * the service out (its 401s just clear that service's tokens).
+ * the service out (its 401s go straight back to the caller).
  */
 interface ServiceDefinition {
   name: string;
@@ -47,6 +47,7 @@ export function initServices(): void {
   // On a 401 the interceptor calls the failing service's own refresh endpoint
   // (sending the stored refresh token in the body), stores the new access +
   // refresh tokens, and replays the request. Each service refreshes independently.
-  // A failed refresh ends the session (the auth store routes to /login) — no reload.
+  // A refused refresh (401/403) ends that service's session; only the auth
+  // service's routes to /login (auth store + root layout) — never a reload.
   Api.registerInterceptors(new ApiInterceptors(refreshByService));
 }

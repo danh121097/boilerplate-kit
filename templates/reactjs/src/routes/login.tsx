@@ -1,5 +1,5 @@
 import { useLoginMutation } from "@/services/auth/auth";
-import { safeRedirect } from "@/services/core";
+import { getApiErrorMessage, safeRedirect } from "@/services/core";
 import { useAuthStore } from "@/stores/auth";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createFileRoute } from "@tanstack/react-router";
@@ -54,7 +54,8 @@ function LoginPage() {
       // Same-origin paths only — never an open redirect to another site.
       await navigate({ href: safeRedirect(redirectTo) });
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("login.error"));
+      // Rejections are `ApiResponseError` objects: show the server's message.
+      setError(getApiErrorMessage(err, t("login.error")));
     }
   });
 

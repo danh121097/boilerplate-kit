@@ -4,6 +4,7 @@ import {
   ApiInterceptors,
   getApiBaseUrl,
   hasSessionHint,
+  markSessionActive,
   registerSessionRefresher,
 } from "@/services/core";
 import type { ServiceRefreshConfig } from "@/services/core";
@@ -28,11 +29,13 @@ const SERVICES: ServiceDefinition[] = [
     baseURL: getApiBaseUrl(),
     // A 401 is refreshed only while the session hint says a session exists
     // (anonymous 401s are final), never for credential endpoints (a login 401 is
-    // "wrong password"), and a failed refresh ends the session — no page reload.
+    // "wrong password"), a successful refresh renews the hint, and a refused
+    // refresh ends the session — no page reload.
     refresh: {
       endpoint: authContract.paths.refresh,
       skipPaths: [authContract.paths.login, authContract.paths.register, authContract.paths.logout],
       hasSession: hasSessionHint,
+      onRefreshed: markSessionActive,
     },
   },
 ];
@@ -53,5 +56,5 @@ export function initServices(): void {
   Api.registerInterceptors(interceptors);
   // Server-function reads report an expired session instead of refreshing (the
   // server never sees the path-scoped refresh cookie); they refresh through here.
-  registerSessionRefresher((service) => interceptors.refreshSession(service));
+  registerSessionRefresher((service, sentAt) => interceptors.refreshSession(service, sentAt));
 }

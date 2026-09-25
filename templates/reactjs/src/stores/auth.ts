@@ -1,9 +1,10 @@
-import { STORAGE_KEYS } from "@/enums";
 import { queryClient } from "@/providers/query-client-provider";
 import { AuthModel } from "@/services/auth/auth";
+import { authContract } from "@/services/auth/contract";
 import {
-  getAccessToken,
-  getRefreshToken,
+  getSessionEpoch,
+  hasStoredSession,
+  isLogoutPending,
   isUnauthorizedError,
   onSessionEnded,
   resetQueriesOnSessionEnd,
@@ -30,29 +31,37 @@ interface AuthState {
  */
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
-  isAuthenticated: hasStoredSession(),
+  isAuthenticated: hasStoredSession(authContract.service),
   hydrated: false,
 
-  setUser: (user) => set({ user, isAuthenticated: Boolean(user) || hasStoredSession() }),
+  setUser: (user) =>
+    set({ user, isAuthenticated: Boolean(user) || hasStoredSession(authContract.service) }),
 
   hydrate: async () => {
-    if (!hasStoredSession()) {
+    if (!hasStoredSession(authContract.service)) {
       set({ hydrated: true });
       return;
     }
+    const epoch = getSessionEpoch(authContract.service);
     try {
       const user = await AuthModel.getMe();
       set({ user, isAuthenticated: true, hydrated: true });
     } catch (error) {
       if (isUnauthorizedError(error)) {
-        // Session is gone (refresh already failed) — revoke + drop the tokens so
-        // the guard routes to /login.
-        await AuthModel.logout().catch(() => {});
+        // A refused refresh or a running logout already ends the session: only
+        // reset local state. Otherwise the session is rejected
+        // without a refresh having ended it — revoke + drop the tokens so the
+        // guard routes to /login.
+        const ended =
+          getSessionEpoch(authContract.service) !== epoch ||
+          !hasStoredSession(authContract.service) ||
+          isLogoutPending(authContract.service);
+        if (!ended) await AuthModel.logout().catch(() => {});
         set({ user: null, isAuthenticated: false, hydrated: true });
         return;
       }
       // Network error / 5xx: the session may still be valid — keep the tokens.
-      set({ isAuthenticated: hasStoredSession(), hydrated: true });
+      set({ isAuthenticated: hasStoredSession(authContract.service), hydrated: true });
     }
   },
 
@@ -62,17 +71,13 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 }));
 
-/** A session exists while either token is stored (the access token may have
- * expired and been cleared while the refresh token can still renew it). */
-function hasStoredSession(): boolean {
-  return Boolean(getAccessToken() || getRefreshToken());
-}
-
-// Logout or a failed refresh: drop the user and reset every cached query in
-// place (pinning `auth.me` to null) so no signed-in data outlives the session.
+// Logout or a refused refresh of the auth service: drop the user and reset
+// every cached query in place (pinning `auth.me` to null) so no signed-in data
+// outlives the session. Another service's session end keeps the user signed in.
 // Routing to /login happens in the root layout.
-resetQueriesOnSessionEnd(queryClient, queryKeys.auth.me);
-onSessionEnded(() => {
+resetQueriesOnSessionEnd(queryClient, queryKeys.auth.me, authContract.service);
+onSessionEnded((_reason, service) => {
+  if (service !== authContract.service) return;
   useAuthStore.setState({ user: null, isAuthenticated: false });
 });
 
@@ -86,9 +91,6 @@ onSessionEnded(() => {
  */
 export function syncAuthWithOtherTabs(onChange: () => void): () => void {
   return syncAuthAcrossTabs({
-    keys: [STORAGE_KEYS.ACCESS_TOKEN, STORAGE_KEYS.REFRESH_TOKEN],
-    isSignedIn: () => useAuthStore.getState().isAuthenticated,
-    hasStoredSession,
     onLogin: () => {
       useAuthStore.setState({ user: null, isAuthenticated: true });
       resyncQueriesAfterLogin(queryClient, queryKeys.auth.me);

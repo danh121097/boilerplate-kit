@@ -88,4 +88,4 @@ derives from the client's `useMeQuery()`:
 const { user, isAuthenticated, isLoading } = useAuth();
 ```
 
-For server components, call `getMeServerData()` directly from `@/server/get-me`.
+For server components, call `readServerSession()` directly from `@/server/session`.

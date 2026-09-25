@@ -2,7 +2,7 @@ import { serverApiPaginate } from "@/server/server-api";
 import { usersContract } from "@/services/users/contract";
 import { createServerFn } from "@tanstack/react-start";
 import type { PaginatedResponse } from "@/services/core";
-import type { ServerUnauthorized } from "@/services/core/server-auth";
+import type { ServerUnauthorized } from "@/services/core/server-session";
 import type { User } from "@/services/users/types/user";
 
 /** Users list. `ServerUnauthorized` when the session cannot be proven

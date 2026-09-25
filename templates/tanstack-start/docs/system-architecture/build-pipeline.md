@@ -10,6 +10,7 @@
 | `@tailwindcss/vite` | 4 | Tailwind CSS v4 via Vite plugin |
 | TypeScript | 5 | Type checking (separate from Vite) |
 | Vitest | 3 | Unit + integration tests |
+| srvx | 0.11 | Node production server for the built fetch handler (`pnpm start`). A runtime `dependency`, not a devDependency: the `start` CLI and `dist/server/server.js` both import it, so `pnpm install --prod && pnpm start` needs it |
 | ESLint | 9 flat config | Lint |
 | Prettier | 3 | Format |
 
@@ -18,7 +19,9 @@
 ```
 pnpm dev       → vite (HMR, auto-generates routeTree.gen.ts)
 pnpm build     → tsc --noEmit && vite build (type check then SSR bundle)
-pnpm start     → vite preview (serves dist/: client assets + dist/server/server.js SSR handler)
+pnpm start     → srvx --prod --static ../client dist/server/server.js (Node server of the built
+                 fetch handler; static assets from dist/client — the path is relative to the entry.
+                 PORT, default 3000; srvx also loads .env from the working directory)
 pnpm typecheck → tsc --noEmit
 pnpm test      → vitest run
 pnpm test:watch→ vitest

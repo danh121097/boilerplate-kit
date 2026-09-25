@@ -7,7 +7,12 @@
 1. **401 with eligible request** — triggers refresh flow via `RefreshTokenManager`,
    then retries the original request once (`config._retry = true`).
 2. **401 after retry / non-refresh 401** — rejects with the original error.
-3. **Other errors** — pass through `Promise.reject(error)` unchanged.
+3. **Other errors** — reject with `toApiError(error)`: `{ error_code: <status,
+   or 0 without a response>, message, retryable? }`.
+
+The helpers live in `services/core/api-errors.ts`. Show a failed call's message
+with `getApiErrorMessage(error, fallback)` — rejections are plain
+`ApiResponseError` objects, not `Error`s.
 
 ## Model / service layer
 

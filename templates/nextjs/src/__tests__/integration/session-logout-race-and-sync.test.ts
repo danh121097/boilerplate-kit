@@ -271,15 +271,22 @@ describe("cross-tab auth sync", () => {
     off();
   });
 
-  it("notices a hint-cookie change when the tab becomes visible", () => {
+  it("notices a hint-cookie change when the tab becomes visible or regains focus", () => {
     const handlers = installBrowser();
     installLocalStorage();
     const onLogin = vi.fn();
-    const stop = syncAuthAcrossTabs({ onLogin });
+    const onLogout = vi.fn();
+    const stop = syncAuthAcrossTabs({ onLogin, onLogout });
 
     document.cookie = `${STORAGE_KEYS.SESSION}=1`; // another tab signed in
     handlers.visibilitychange!({});
     expect(onLogin).toHaveBeenCalledTimes(1);
+
+    const epoch = getSessionEpoch();
+    document.cookie = `${STORAGE_KEYS.SESSION}=`; // …then signed out; this tab regains focus
+    handlers.focus!({});
+    expect(onLogout).toHaveBeenCalledTimes(1);
+    expect(getSessionEpoch()).toBe(epoch + 1);
     stop();
   });
 });

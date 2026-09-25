@@ -8,11 +8,10 @@ import {
   endSession,
   getAccessToken,
   getRefreshToken,
+  isUnauthorizedError,
   Model,
   persistAccessToken,
   persistRefreshToken,
-  SESSION_WAIT_TIMEOUT_MS,
-  settleInFlightRefreshes,
   withSessionLock,
 } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
@@ -45,43 +44,34 @@ export class AuthModel extends Model {
    * token as Bearer), then always drop local tokens and end the session so
    * listeners clear cached queries, even when the request fails.
    *
-   * Ordering, so the token revoked is the latest one: in the first tick no
+   * Ordering, so the token revoked is the latest one: from the first tick no
    * refresh may start (a 401 meanwhile rejects with `session_ended` without
-   * calling /auth/refresh) and both tokens are captured; a refresh already
-   * running in this tab settles and stores its rotated pair first, and the
-   * refresh lock waits out one running in another tab. Both waits share a 15s
-   * cap, after which logout proceeds anyway. The epoch bump then makes anything
-   * still in flight store nothing. */
+   * calling /auth/refresh). `withSessionLock` then waits for a refresh already
+   * running — in this tab or, through the Web Lock, in another — to store its
+   * rotated pair (capped at 15s, after which logout proceeds anyway). Inside it,
+   * in one tick, the pair to revoke is read and the epoch bumped, so anything
+   * still in flight stores nothing. The pair held when logout started is the
+   * fallback, in case another tab cleared storage while this one waited. */
   static async logout(): Promise<void> {
-    const deadline = Date.now() + SESSION_WAIT_TIMEOUT_MS;
-    const captured = {
-      access: getAccessToken(this.service),
-      refresh: getRefreshToken(this.service),
-    };
-    const done = beginLogout();
+    const service = this.service;
+    const held = { access: getAccessToken(service), refresh: getRefreshToken(service) };
+    const done = beginLogout(service);
     try {
-      await settleInFlightRefreshes(SESSION_WAIT_TIMEOUT_MS);
-      const maxWaitMs = Math.max(0, deadline - Date.now());
-      await withSessionLock(
-        this.service,
-        async () => {
-          bumpSessionEpoch();
-          // Prefer a pair a settled refresh just rotated in; else what was captured.
-          const access = getAccessToken(this.service) ?? captured.access;
-          const refreshToken = getRefreshToken(this.service) ?? captured.refresh;
-          try {
-            await this.api.post({
-              url: authContract.paths.logout,
-              data: { refreshToken: refreshToken ?? undefined },
-              customHeaders: access ? { authorization: `Bearer ${access}` } : undefined,
-            });
-          } finally {
-            clearAuthTokens();
-            endSession("logout", this.service);
-          }
-        },
-        { maxWaitMs },
-      );
+      await withSessionLock(service, async () => {
+        const access = getAccessToken(service) ?? held.access;
+        const refreshToken = getRefreshToken(service) ?? held.refresh;
+        bumpSessionEpoch(service);
+        try {
+          await this.api.post({
+            url: authContract.paths.logout,
+            data: { refreshToken: refreshToken ?? undefined },
+            customHeaders: access ? { authorization: `Bearer ${access}` } : undefined,
+          });
+        } finally {
+          clearAuthTokens();
+          endSession("logout", service);
+        }
+      });
     } finally {
       done();
     }
@@ -90,6 +80,18 @@ export class AuthModel extends Model {
   static async getMe(): Promise<AuthUser> {
     const res = await this.api.get<{ user: AuthUser }>({ url: authContract.paths.me });
     return res.data.user;
+  }
+
+  /** The signed-in user, or `null` when the session is gone (401). Any other
+   * failure (network, 5xx, refresh unavailable) rejects — the session may
+   * still be valid. */
+  static async getSession(): Promise<AuthUser | null> {
+    try {
+      return await this.getMe();
+    } catch (error) {
+      if (isUnauthorizedError(error)) return null;
+      throw error;
+    }
   }
 
   /** Persist both tokens: access for the Bearer header, refresh for the refresh call. */
@@ -101,9 +103,9 @@ export class AuthModel extends Model {
 }
 
 // Queries
-export const useMeQuery = defineQuery<AuthUser>({
+export const useMeQuery = defineQuery<AuthUser | null>({
   key: queryKeys.auth.me,
-  fetcher: () => AuthModel.getMe(),
+  fetcher: () => AuthModel.getSession(),
 });
 
 // Mutations

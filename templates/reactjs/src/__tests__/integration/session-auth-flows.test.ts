@@ -2,7 +2,7 @@ import { installLocalStorage } from "@/__tests__/helpers/fake-storage";
 import { httpError, makeClient, ok } from "@/__tests__/helpers/http-mocks";
 import { queryClient } from "@/providers/query-client-provider";
 import { AuthModel } from "@/services/auth";
-import { Api, onSessionEnded } from "@/services/core";
+import { Api, clearServiceTokens, endSession, onSessionEnded } from "@/services/core";
 import {
   getAccessToken,
   getRefreshToken,
@@ -124,6 +124,7 @@ describe("session auth flows", () => {
     ["timeout", { code: "ECONNABORTED" }],
     ["503", { status: 503 }],
     ["429", { status: 429 }],
+    ["400", { status: 400 }],
   ])(
     "transient refresh failure (%s) keeps tokens, no session end, rejects retryable",
     async (_label, failure) => {
@@ -137,7 +138,7 @@ describe("session auth flows", () => {
       const http = client(async (config) => httpError(config, 401));
 
       const error = await http.get("/users").catch((e: unknown) => e);
-      expect(error).toMatchObject({ retryable: true });
+      expect(error).toMatchObject({ retryable: true, message: "refresh_unavailable" });
       expect((error as { error_code: number }).error_code).not.toBe(401);
       expect(ended).not.toHaveBeenCalled();
       expect(reload).not.toHaveBeenCalled();
@@ -146,6 +147,22 @@ describe("session auth flows", () => {
       off();
     },
   );
+
+  it("a refresh answering 200 without an access token keeps the session and rejects retryable", async () => {
+    persistAccessToken("OLD");
+    persistRefreshToken("RT");
+    const { post, client } = setup();
+    post.mockResolvedValue({ data: { data: {} } });
+    const ended = vi.fn();
+    const off = onSessionEnded(ended);
+
+    const http = client(async (config) => httpError(config, 401));
+
+    await expect(http.get("/users")).rejects.toMatchObject({ error_code: 0, retryable: true });
+    expect(ended).not.toHaveBeenCalled();
+    expect(getRefreshToken()).toBe("RT");
+    off();
+  });
 
   it("the refresh request gives up after 15s so a hung refresh cannot stall requests", async () => {
     persistAccessToken("OLD");
@@ -202,8 +219,8 @@ describe("session auth flows", () => {
     vi.spyOn(AuthModel.api, "get").mockRejectedValue({
       status: "error",
       error_code: 0,
-      message: "Session refresh temporarily unavailable",
-      error_message: "",
+      message: "refresh_unavailable",
+      error_message: "refresh_unavailable",
       retryable: true,
     });
     const logout = vi.spyOn(AuthModel, "logout");
@@ -243,7 +260,32 @@ describe("session auth flows", () => {
     expect(useAuthStore.getState()).toMatchObject({ hydrated: true, isAuthenticated: true });
   });
 
-  it("boot: a 401 (refresh already failed) logs out", async () => {
+  it("boot 401 after a refused refresh does not post logout again", async () => {
+    persistAccessToken("AT");
+    persistRefreshToken("RT");
+    // What the interceptor does when the refresh is refused, then the 401 it rejects with.
+    vi.spyOn(AuthModel.api, "get").mockImplementation(async () => {
+      clearServiceTokens("MAIN");
+      endSession("expired", "MAIN");
+      throw { status: "error", error_code: 401, message: "expired" };
+    });
+    const post = vi.spyOn(AuthModel.api, "post");
+    const ended = vi.fn();
+    const off = onSessionEnded(ended);
+
+    await useAuthStore.getState().hydrate();
+
+    expect(post).not.toHaveBeenCalled();
+    expect(ended).toHaveBeenCalledTimes(1);
+    expect(useAuthStore.getState()).toMatchObject({
+      user: null,
+      isAuthenticated: false,
+      hydrated: true,
+    });
+    off();
+  });
+
+  it("boot: a 401 while the session is still stored revokes it and logs out", async () => {
     persistAccessToken("AT");
     vi.spyOn(AuthModel.api, "get").mockRejectedValue({ error_code: 401, message: "no" });
     vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);

@@ -1,9 +1,9 @@
 import { STORAGE_KEYS } from "@/enums";
 import { getMeServerFn } from "@/server/get-me";
-import { readSessionUser } from "@/server/read-session-user";
 import { serverApiGet, serverApiPaginate } from "@/server/server-api";
+import { readServerSession } from "@/server/session";
 import { fetchSession } from "@/services/auth/session";
-import { registerSessionRefresher, withSessionRefresh } from "@/services/core/server-auth";
+import { registerSessionRefresher, withSessionRefresh } from "@/services/core/server-session";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -44,6 +44,22 @@ describe("withSessionRefresh (browser)", () => {
     await expect(withSessionRefresh(call)).resolves.toEqual({ data: ["u1"] });
     expect(refresher).toHaveBeenCalledTimes(1);
     expect(call).toHaveBeenCalledTimes(2);
+  });
+
+  it("passes when the failed call started, so a refresh another tab finished since is reused", async () => {
+    const refresher = vi.fn().mockResolvedValue(undefined);
+    registerSessionRefresher(refresher);
+    const before = Date.now();
+    const call = vi
+      .fn()
+      .mockResolvedValueOnce(UNAUTHORIZED_HINTED)
+      .mockResolvedValueOnce({ data: [] });
+
+    await withSessionRefresh(call, "MAIN");
+    const [service, sentAt] = refresher.mock.calls[0] as [string, number];
+    expect(service).toBe("MAIN");
+    expect(sentAt).toBeGreaterThanOrEqual(before);
+    expect(sentAt).toBeLessThanOrEqual(Date.now());
   });
 
   it("anonymous: rejects with 401 without any refresh", async () => {
@@ -89,18 +105,20 @@ describe("withSessionRefresh (browser)", () => {
 
 describe("withSessionRefresh (SSR)", () => {
   it("defers a hinted session to the browser instead of resolving signed-out", async () => {
-    const error = await withSessionRefresh(async () => UNAUTHORIZED_HINTED).catch((e) => e);
+    const error = await withSessionRefresh(async () => UNAUTHORIZED_HINTED).catch(
+      (e: unknown) => e,
+    );
     expect(error).toBeInstanceOf(Error);
     expect((error as { error_code?: number }).error_code).toBeUndefined();
   });
 });
 
-describe("server-side session read (SSR, fetchSession → readSessionUser)", () => {
+describe("server-side session read (SSR, fetchSession → readServerSession)", () => {
   beforeEach(() => {
     requestCookies.clear();
     requestCookies.set("accessToken", "AT");
     vi.mocked(getMeServerFn as unknown as () => Promise<unknown>).mockImplementation(
-      readSessionUser,
+      readServerSession,
     );
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 401 })));
   });
@@ -146,10 +164,24 @@ describe("server-api authedFetch", () => {
     expect(String(fetchSpy.mock.calls[0]![0])).not.toContain("/auth/refresh");
   });
 
-  it("throws on a non-auth failure instead of returning an empty value", async () => {
+  it("rejects a non-auth failure with a retryable ApiResponseError instead of an empty value", async () => {
     requestCookies.set("accessToken", "AT");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 503 })));
 
-    await expect(serverApiPaginate("/users")).rejects.toThrow("503");
+    await expect(serverApiPaginate("/users")).rejects.toMatchObject({
+      status: "error",
+      error_code: 503,
+      retryable: true,
+    });
+  });
+
+  it("rejects with error_code 0 when the backend is unreachable", async () => {
+    requestCookies.set("accessToken", "AT");
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("fetch failed")));
+
+    await expect(serverApiGet("/auth/me")).rejects.toMatchObject({
+      error_code: 0,
+      retryable: true,
+    });
   });
 });

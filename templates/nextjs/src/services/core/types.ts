@@ -15,7 +15,18 @@ declare module "axios" {
     /** Set once a request has already been replayed after a token refresh, so a
      * second 401 cannot trigger an endless refresh/retry loop. */
     _retry?: boolean;
+    /** When the request was first sent (stamped once, kept on the replay). A
+     * refresh finished after this moment already rotated the cookies, so a 401
+     * sent before it replays without refreshing again. */
+    _sentAt?: number;
   }
+}
+
+/** A rotated token pair. Cookie-based auth never sees one (the backend rotates
+ * the httpOnly cookies); kept so the core types match the token templates. */
+export interface RefreshedTokens {
+  accessToken: string;
+  refreshToken?: string;
 }
 
 /**
@@ -36,9 +47,11 @@ export interface RefreshOptions {
   skipPaths: string[];
   /**
    * Whether a session is believed to exist. Anonymous 401s (false) are final:
-   * no refresh request is made. Defaults to always true.
+   * no refresh request is made. Defaults to `hasSessionHint`.
    */
   hasSession: () => boolean;
+  /** Runs after a successful refresh (e.g. renew the session hint). */
+  onRefreshed?: () => void;
 }
 
 /**

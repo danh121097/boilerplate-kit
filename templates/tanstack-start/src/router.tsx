@@ -1,13 +1,7 @@
 import { initI18n } from "@/i18n/i18n";
 import { routeTree } from "@/routeTree.gen";
 import { initServices } from "@/services";
-import {
-  makeQueryClient,
-  resetQueriesOnSessionEnd,
-  resyncQueriesAfterLogin,
-} from "@/services/core/query-client";
-import { redirectOnSessionExpired, syncAuthAcrossTabs } from "@/services/core/session";
-import { queryKeys } from "@/services/query-keys";
+import { makeQueryClient } from "@/services/core/query-client";
 import { createRouter } from "@tanstack/react-router";
 import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
 import { I18nextProvider } from "react-i18next";
@@ -32,9 +26,6 @@ export function getRouter() {
   // Shared defaults (non-zero staleTime so hydrated SSR data isn't refetched on mount).
   const client = makeQueryClient();
 
-  // Browser: logout / failed refresh resets the cache in place and pins `auth.me` to null.
-  if (typeof window !== "undefined") resetQueriesOnSessionEnd(client, queryKeys.auth.me);
-
   const i18n = initI18n();
 
   const router = createRouter({
@@ -50,25 +41,9 @@ export function getRouter() {
     ),
   });
 
-  if (typeof window !== "undefined") {
-    // A refused refresh (session expired) routes to /login, carrying the current
-    // path so the login page can bring the user back. No reload.
-    redirectOnSessionExpired(() => {
-      const { pathname, href } = router.state.location;
-      if (pathname !== "/login") void router.navigate({ to: "/login", search: { redirect: href } });
-    });
-
-    // Login/logout in another tab → re-read the session and re-run the route
-    // loaders here. A remote logout has already cleared this tab's cache via the
-    // session-end listener.
-    syncAuthAcrossTabs({
-      onLogin: () => {
-        resyncQueriesAfterLogin(client, queryKeys.auth.me);
-        void router.invalidate();
-      },
-      onLogout: () => void router.invalidate(),
-    });
-  }
+  // Session subscriptions (expiry redirect, cache reset, cross-tab sync) live in
+  // `routes/__root.tsx` effects: this factory re-runs on HMR, so subscribing here
+  // would stack listeners.
 
   // Dehydrate/hydrate the QueryClient across the SSR boundary + supply QueryClientProvider.
   setupRouterSsrQueryIntegration({ router, queryClient: client });

@@ -3,6 +3,8 @@ import { STORAGE_KEYS } from "@/enums";
 import { AuthModel } from "@/services/auth";
 import {
   Api,
+  ApiInterceptors,
+  getSessionEpoch,
   hasSessionHint,
   markSessionActive,
   onSessionEnded,
@@ -251,5 +253,41 @@ describe("session auth flows", () => {
 
     expect(queryClient.getQueryData(["auth.me"])).toBeUndefined();
     expect(queryClient.getQueryState(["users.list"])?.isInvalidated).toBe(true);
+  });
+
+  it("a refused refresh of another service keeps the main session", async () => {
+    markSessionActive();
+    const post = vi.spyOn(axios, "post").mockRejectedValue(refreshError({ status: 401 }));
+    Api.setBaseURL("http://billing.test", "BILLING");
+    const interceptors = new ApiInterceptors({
+      BILLING: { endpoint: "/auth/refresh", hasSession: () => true },
+    });
+    const billing = axios.create({ adapter: async (config) => httpError(config, 401) });
+    interceptors.setupRequestInterceptor(billing, "BILLING");
+    interceptors.setupResponseInterceptor(billing);
+
+    const queryClient = makeQueryClient();
+    queryClient.setQueryData(["auth.me"], { _id: "1" });
+    const offReset = resetQueriesOnSessionEnd(queryClient, "auth.me");
+    const redirect = vi.fn();
+    const offRedirect = redirectOnSessionExpired(redirect);
+    const ended = vi.fn();
+    const off = onSessionEnded(ended);
+    const mainEpoch = getSessionEpoch("MAIN");
+    const billingEpoch = getSessionEpoch("BILLING");
+
+    await expect(billing.get("/invoices")).rejects.toMatchObject({ error_code: 401 });
+
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(ended).toHaveBeenCalledWith("expired", "BILLING");
+    expect(getSessionEpoch("BILLING")).toBe(billingEpoch + 1);
+    // The main session is untouched: hint, epoch, cache and route all stay.
+    expect(hasSessionHint()).toBe(true);
+    expect(getSessionEpoch("MAIN")).toBe(mainEpoch);
+    expect(queryClient.getQueryData(["auth.me"])).toEqual({ _id: "1" });
+    expect(redirect).not.toHaveBeenCalled();
+    off();
+    offRedirect();
+    offReset();
   });
 });

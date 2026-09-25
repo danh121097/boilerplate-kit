@@ -19,7 +19,7 @@ export async function fetchSession(): Promise<AuthUser | null> {
  * during SSR, via RPC on the client). Auth mutations invalidate `auth.me` so it
  * re-resolves against the cookies after login/logout.
  */
-export const useSessionQuery = defineQuery<AuthUser | null>({
+export const useMeQuery = defineQuery<AuthUser | null>({
   key: queryKeys.auth.me,
   fetcher: fetchSession,
 });
@@ -29,7 +29,7 @@ export const useSessionQuery = defineQuery<AuthUser | null>({
  * session query (not stored), so it can never drift from the real cookie session.
  */
 export function useAuth() {
-  const session = useSessionQuery();
+  const session = useMeQuery();
   return {
     user: session.data ?? null,
     isAuthenticated: Boolean(session.data),

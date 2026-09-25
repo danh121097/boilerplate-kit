@@ -77,4 +77,19 @@ describe("AuthModel", () => {
     const user = await AuthModel.getMe();
     expect(user).toEqual(RESULT.user);
   });
+
+  it("getSession returns the user, or null when the session is gone (401)", async () => {
+    const get = vi.spyOn(AuthModel.api, "get");
+    get.mockResolvedValueOnce({ success: true, data: { user: RESULT.user } } as never);
+    expect(await AuthModel.getSession()).toEqual(RESULT.user);
+
+    get.mockRejectedValueOnce({ status: "error", error_code: 401, message: "expired" });
+    expect(await AuthModel.getSession()).toBeNull();
+  });
+
+  it("getSession rejects on a failure that says nothing about the session", async () => {
+    const unavailable = { error_code: 503, message: "down", retryable: true };
+    vi.spyOn(AuthModel.api, "get").mockRejectedValue(unavailable);
+    await expect(AuthModel.getSession()).rejects.toBe(unavailable);
+  });
 });

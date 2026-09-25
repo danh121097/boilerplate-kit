@@ -4,14 +4,18 @@ import {
   bumpSessionEpoch,
   defineMutation,
   endSession,
+  isUnauthorizedError,
   Model,
-  SESSION_WAIT_TIMEOUT_MS,
-  settleInFlightRefreshes,
   startSession,
   withSessionLock,
 } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
-import type { AuthResult, LoginPayload, RegisterPayload } from "@/services/auth/types/auth";
+import type {
+  AuthResult,
+  AuthUser,
+  LoginPayload,
+  RegisterPayload,
+} from "@/services/auth/types/auth";
 
 export class AuthModel extends Model {
   static {
@@ -39,29 +43,40 @@ export class AuthModel extends Model {
    * Ordering, so the token revoked is the latest one: from the first line no
    * refresh may start (a 401 meanwhile rejects with `session_ended` without
    * calling /auth/refresh). A refresh already running — in this tab, or holding
-   * the lock in another — is waited out (15s cap in total), then the epoch is
-   * bumped in the same tick as the POST starts, so anything still in flight
-   * persists nothing. */
+   * the lock in another — is waited out (15s cap), then the epoch is bumped in
+   * the same tick as the POST starts, so anything still in flight persists
+   * nothing. */
   static async logout(): Promise<void> {
-    const deadline = Date.now() + SESSION_WAIT_TIMEOUT_MS;
-    const done = beginLogout();
+    const done = beginLogout(this.service);
     try {
-      await settleInFlightRefreshes(SESSION_WAIT_TIMEOUT_MS);
-      const maxWaitMs = Math.max(0, deadline - Date.now());
-      await withSessionLock(
-        this.service,
-        async () => {
-          bumpSessionEpoch();
-          try {
-            await this.api.post({ url: authContract.paths.logout });
-          } finally {
-            endSession("logout", this.service);
-          }
-        },
-        { maxWaitMs },
-      );
+      await withSessionLock(this.service, async () => {
+        bumpSessionEpoch(this.service);
+        try {
+          await this.api.post({ url: authContract.paths.logout });
+        } finally {
+          endSession("logout", this.service);
+        }
+      });
     } finally {
       done();
+    }
+  }
+
+  static async getMe(): Promise<AuthUser> {
+    const res = await this.api.get<{ user: AuthUser }>({ url: authContract.paths.me });
+    return res.data.user;
+  }
+
+  /** Current user, or null when signed out. A 401 (anonymous, or a session whose
+   * refresh failed) resolves to null; other failures (network/5xx) still throw
+   * so they are not cached as "signed out". Browser-only (axios client); the
+   * session query uses the SSR-capable `fetchSession` in `./session`. */
+  static async getSession(): Promise<AuthUser | null> {
+    try {
+      return await this.getMe();
+    } catch (error) {
+      if (isUnauthorizedError(error)) return null;
+      throw error;
     }
   }
 }
@@ -80,7 +95,7 @@ export const useRegisterMutation = defineMutation<AuthResult, RegisterPayload>({
 });
 
 // No `invalidates`: logout ends the session, and the session-end listener in
-// `router.tsx` resets the cache in place and pins `auth.me` to null.
+// `routes/__root.tsx` resets the cache in place and pins `auth.me` to null.
 export const useLogoutMutation = defineMutation({
   key: queryKeys.auth.logout,
   mutator: () => AuthModel.logout(),

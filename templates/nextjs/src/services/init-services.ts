@@ -1,5 +1,11 @@
 import { authContract } from "@/services/auth/contract";
-import { Api, ApiInterceptors, getApiBaseUrl, hasSessionHint } from "@/services/core";
+import {
+  Api,
+  ApiInterceptors,
+  getApiBaseUrl,
+  hasSessionHint,
+  markSessionActive,
+} from "@/services/core";
 import type { ServiceRefreshConfig } from "@/services/core";
 
 /**
@@ -22,11 +28,13 @@ const SERVICES: ServiceDefinition[] = [
     baseURL: getApiBaseUrl(),
     // A 401 is refreshed only while the session hint says a session exists
     // (anonymous 401s are final), never for credential endpoints (a login 401 is
-    // "wrong password"), and a failed refresh ends the session — no page reload.
+    // "wrong password"), a successful refresh renews the hint, and a refused
+    // refresh ends the session — no page reload.
     refresh: {
       endpoint: authContract.paths.refresh,
       skipPaths: [authContract.paths.login, authContract.paths.register, authContract.paths.logout],
       hasSession: hasSessionHint,
+      onRefreshed: markSessionActive,
     },
   },
 ];

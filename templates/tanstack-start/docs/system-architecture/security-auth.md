@@ -6,7 +6,7 @@
 |-------|-------------|-------------|
 | Access token (JWT, 15 min) | httpOnly cookie `accessToken` | Server (set on login, rotated on refresh) |
 | Refresh token (7 d) | httpOnly cookie `refreshToken`, path `${apiPrefix}/auth` | Server (rotated on refresh, revoked on logout) |
-| Session hint | readable cookie `STORAGE_KEYS.SESSION` (`${APP_PREFIX}_SESSION`) = `"1"` | Client (`services/core/session.ts`) |
+| Session hint | readable cookie `STORAGE_KEYS.SESSION` (`${APP_PREFIX}_SESSION`, prefix from `VITE_APP_NAME`, default `PRISM_APP`) = `"1"` | Client (`services/core/session.ts`) |
 
 The client never reads either token. `withCredentials: true` on every axios
 instance lets the browser attach the cookies automatically.
@@ -36,16 +36,19 @@ Signed with HMAC-SHA256, Base64-encoded → `sig` header. Also sends `ctime` and
 - `/path` is the request path relative to the baseURL with the query stripped.
   Query parameters — inline (`/users?page=2`) or via axios `params` — are never
   signed (the backend verifies `req.url.split("?")[0]`).
-- `Content-Type` is the exact header value sent: the pinned value (or
-  `application/json`) when there is a body, `""` when there is none (axios drops
-  the header). The client never adds or strips a charset; if you pin one, it is
-  signed exactly as sent.
+- `Content-Type` is the exact header value axios sends (`resolveContentType`):
+  `""` without a body (axios drops the header); with one, the pinned value
+  exactly as set, else axios's default for the body — `URLSearchParams` →
+  `application/x-www-form-urlencoded;charset=utf-8`, a string →
+  `application/x-www-form-urlencoded`, anything else → `application/json`.
 - `multipart/form-data` is **not supported** with HMAC on: the browser appends a
   generated `boundary` to the header after signing, so the signature cannot match.
 
-The bare refresh client (`auth-refresh-client.ts`) signs its own request manually
-(it bypasses the app interceptors to prevent refresh recursion). It posts no body,
-so it signs an empty Content-Type.
+`HMACSignatureGenerator.signRequest({ method, path, contentType })` is the shared
+core. The bare refresh client (`auth-refresh-client.ts`) signs through it itself
+(it bypasses the app interceptors to prevent refresh recursion); it posts no body,
+so it signs an empty Content-Type. `src/server/server-api.ts` signs its SSR
+fetches through it too.
 
 **HMAC here is anti-casual-abuse only, not authentication.** `VITE_*` variables
 are inlined into the client bundle, so anyone can read the secret and sign
@@ -58,16 +61,19 @@ server function with a server-only secret.
 `RefreshTokenManager` serializes 401 refreshes for ONE service:
 
 ```
-concurrent 401s → refresh() → inFlight exists → join it
+concurrent 401s → refresh(config._sentAt) → inFlight exists → join it
                 → no inFlight → Web Lock "${APP_PREFIX}:auth-refresh:<service>"
-                     → another tab refreshed after we asked? → skip, just replay
+                     → a refresh finished after the request was sent? → skip, just replay
                      → else POST /auth/refresh → stamp "${APP_PREFIX}:auth-refresh:<service>:at"
 ```
 
 A burst of N concurrent 401s in one tab triggers exactly ONE `POST /auth/refresh`.
-Across tabs, `navigator.locks.request` makes only one tab refresh at a time; a tab
-that waited compares the shared `localStorage` stamp with the time it asked and
-skips its own refresh when another tab already rotated the (shared) cookies.
+Across tabs, `navigator.locks.request` makes only one tab refresh at a time. The
+request interceptor stamps each request with `config._sentAt` (kept on the
+replay); once the lock is held the manager compares the shared `localStorage`
+stamp with that time and skips its own refresh when a refresh (any tab) finished
+after the request was sent. A stamp more than 1 s in the future (clock moved
+back) is ignored.
 That matters because the backend treats a replayed refresh token as theft and
 revokes **all** sessions. `withSessionLock` runs refreshes and logout under this
 lock. Without the Web Locks API it falls back to per-tab single-flight (two tabs
@@ -87,13 +93,17 @@ A 401 triggers an automatic refresh only when ALL are true:
 ## Session end (no reload)
 
 A 401 never reloads the page. Only a **refused** refresh (HTTP 401/403 from the
-refresh endpoint — `isRefreshRefused`) ends the session: `endSession("expired")`
-clears the hint and the QueryClient cache, pins `auth.me` to `null`, and routes
-to `/login` (`redirectOnSessionExpired`, wired in `router.tsx`); the rejected
-request surfaces the original 401. Anonymous visitors are never redirected — no
+refresh endpoint — `isRefreshRefused`) ends that service's session:
+`endSession("expired", service)`. For the auth service ("MAIN") it clears the
+hint, and the subscribers in `routes/__root.tsx` — which filter on
+`authContract.service` — reset the QueryClient cache, pin `auth.me` to `null`
+and route to `/login` (`redirectOnSessionExpired`); the rejected request
+surfaces the original 401. A refused refresh of another service ends only that
+service's session — the user stays signed in. Anonymous visitors are never redirected — no
 hint means no refresh attempt, so no "expired" event.
 
-The redirect is client-side: `/login?redirect=<current full path>`. After login —
+The redirect is client-side: `/login?redirect=<path, query and hash>`
+(`loginPathWithReturn`). After login —
 and when `/login` loads while already signed in — the app navigates to
 `safeRedirect(redirect)`, which returns the value only when it is a string of at
 most 512 characters, starts with exactly one `/`, contains no `\`, no control
@@ -121,15 +131,17 @@ refreshes on the server**. The backend scopes the refresh cookie to
 server-side rotation shared across concurrent reads would weaken the backend's
 reuse detection.
 
-Server-side session read (`readSessionUser()` in
-`src/server/read-session-user.ts`, reached only through the `getMeServerFn`
-handler, plus the `withSessionRefresh` fetcher): hint set + 401 → reject so the
-browser refreshes; no hint + 401 → `null` (anonymous); 5xx → reject.
+Server-side session read (`readServerSession()` in `src/server/session.ts`,
+reached only through the `getMeServerFn` handler, plus the `withSessionRefresh`
+fetcher): hint set + 401 → reject so the browser refreshes; no hint + 401 →
+`null` (anonymous); other failures reject with an `ApiResponseError`
+(`error_code` = HTTP status, 0 when unreachable; `retryable` on 0/408/429/5xx).
 
 When the access cookie is missing or rejected it returns
 `ServerUnauthorized { hasSession }` instead of `null`. The query fetcher
-(`withSessionRefresh`) maps "no hint" to signed-out, and in the browser refreshes
-through axios and replays the server function once (a refused refresh → 401
+(`withSessionRefresh`, `core/server-session.ts`) maps "no hint" to signed-out,
+and in the browser refreshes through axios — passing when the call started, so a
+refresh another tab finished since is reused — and replays the server function once (a refused refresh → 401
 signed-out; a transient one → retryable error, session kept). During SSR a
 hinted session throws (not cached as signed-out), so the browser refetches and
 refreshes on mount.
@@ -142,13 +154,13 @@ refreshes on mount.
    (`beginLogout`). From then on a 401 — and any refresh already queued — rejects
    with `SessionEndedError` (`{ error_code: 401, message: "session_ended" }`)
    and never calls `/auth/refresh`, even without the Web Locks API.
-2. Waits for this tab's in-flight refreshes (`settleInFlightRefreshes`), then
-   takes the refresh lock (`withSessionLock`) so a refresh running in another
-   tab lands first. Both waits share a 15 s cap (`SESSION_WAIT_TIMEOUT_MS`);
-   after it logout proceeds without the lock.
-3. Bumps the session epoch and posts to `/auth/logout` (the backend revokes the
-   refresh token from its cookie and clears both cookies).
-4. In a `finally` block calls `endSession("logout")`, which clears the hint and
+2. Runs the rest under `withSessionLock(service, …)`: it takes the refresh Web
+   Lock, so a refresh running in any tab lands first; without the Web Locks API
+   it waits for this tab's in-flight refresh instead. The wait is capped at 15 s
+   (`SESSION_WAIT_TIMEOUT_MS`); past it logout proceeds without the lock.
+3. Bumps the service's session epoch and posts to `/auth/logout` (the backend
+   revokes the refresh token from its cookie and clears both cookies).
+4. In a `finally` block calls `endSession("logout", service)`, which clears the hint and
    the query cache. The client is signed out even when the request fails. A
    voluntary logout fires no "expired" event and adds no `redirect`.
 
@@ -157,16 +169,18 @@ A refresh that resolves after the epoch moved writes no hint, fires no hook
 
 ## Cross-tab sync
 
-`syncAuthAcrossTabs` (wired in `router.tsx`) listens for the
+`syncAuthAcrossTabs` (a `useEffect` in `routes/__root.tsx`) listens for the
 `STORAGE_KEYS.AUTH_SYNC` storage event that login and logout write, and re-checks
-the hint cookie whenever the tab becomes visible:
+the hint cookie whenever the tab regains focus or becomes visible:
 
-- another tab logged out → this tab ends its session (hint, user, query cache,
-  guards);
+- another tab logged out → this tab calls `endSession("logout", "MAIN")` (hint,
+  user, query cache) and re-runs the route loaders;
 - another tab logged in → this tab resets `auth.me`, invalidates every query so
   the profile refetches, and re-runs the route guards.
 
-Both are guarded for SSR and tests (no `window`/`document` → no-op).
+Both are guarded for SSR and tests (no `window`/`document` → no-op). The session
+subscriptions live in `__root.tsx` effects with cleanup, not in `getRouter()`:
+the router factory re-runs on HMR, so subscriptions there would stack.
 
 ## Query cache on session end
 

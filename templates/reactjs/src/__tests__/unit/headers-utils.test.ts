@@ -1,10 +1,11 @@
 import { installLocalStorage } from "@/__tests__/helpers/fake-storage";
 import { persistAccessToken } from "@/services/core/auth-token-storage";
 import { HeadersUtils } from "@/services/core/headers-utils";
+import { AxiosHeaders } from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { InternalAxiosRequestConfig } from "axios";
 
-function configWith(headers: Record<string, unknown> = {}) {
+function configWith(headers: Record<string, unknown> | AxiosHeaders = {}) {
   return { url: "/x", method: "get", headers } as unknown as InternalAxiosRequestConfig;
 }
 
@@ -40,5 +41,15 @@ describe("headers-utils", () => {
     const config = configWith();
     HeadersUtils.addAuthorizationHeader(config, "MAIN");
     expect(config.headers.authorization).toBeUndefined();
+  });
+
+  it.each([
+    ["a plain object, any casing", { AUTHORIZATION: "Bearer captured" }],
+    ["AxiosHeaders", new AxiosHeaders({ Authorization: "Bearer captured" })],
+  ])("addAuthorizationHeader keeps a caller-set Authorization header (%s)", (_label, headers) => {
+    persistAccessToken("stored", "MAIN");
+    const config = configWith(headers);
+    HeadersUtils.addAuthorizationHeader(config, "MAIN");
+    expect(JSON.stringify(config.headers)).not.toContain("stored");
   });
 });

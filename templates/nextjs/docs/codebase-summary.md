@@ -24,7 +24,7 @@ src/
 ├── stores/               # Zustand stores (counter)
 ├── server/               # SSR helpers (RSC/async component only)
 │   ├── server-api.ts     # serverApiGet<T>() — SSR fetch with auth cookies + HMAC
-│   ├── get-me.ts         # getMeServerData() — fetch current user server-side
+│   ├── session.ts        # readServerSession() — current user server-side
 │   └── get-users.ts      # getUsersServerData() — fetch users list server-side
 ├── services/             # Axios service layer (client-side only)
 │   ├── core/             # Api, interceptors, HMAC, tanstack helpers

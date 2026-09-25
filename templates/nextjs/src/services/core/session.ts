@@ -9,62 +9,62 @@ import type { ApiService } from "@/services/core/types";
  * Session hint — the auth tokens are httpOnly cookies, so JS cannot tell an
  * anonymous visitor from a signed-in user whose 15-minute access cookie just
  * expired. A readable `SESSION` cookie (no secret, just "1") is set on
- * login/register/refresh and cleared on logout/refresh failure. Its only job is
- * to decide whether a 401 is worth a refresh attempt: no hint → anonymous → the
- * 401 is final (no refresh request, no reload). The server reads the same
+ * login/register/refresh and cleared when the main session ends. Its only job
+ * is to decide whether a 401 is worth a refresh attempt: no hint → anonymous →
+ * the 401 is final (no refresh request, no reload). The server reads the same
  * cookie to tell "anonymous" from "session needs a refresh". Its lifetime
  * matches the backend's 7-day refresh cookie.
  *
- * Session end — logout and a failed refresh both end the session; listeners
- * (the QueryClient provider) drop every cached query so no signed-in data
- * outlives it.
+ * Session end — logout and a refused refresh both end a service's session;
+ * listeners receive the reason and the service, so app code reacts only to the
+ * auth service's session (the QueryClient provider drops every cached query).
  *
- * Session epoch — a per-tab counter that logout and session end bump. A refresh
- * records the epoch when it starts and persists nothing (hint, "last refresh"
- * stamp) when the epoch moved meanwhile, so a refresh that resolves after
- * logout cannot resurrect the session. While a logout runs (`beginLogout`), no
- * refresh may start at all.
+ * Session epoch — a per-service, per-tab counter that session end bumps. A
+ * refresh records the epoch when it starts and persists nothing (hint, "last
+ * refresh" stamp) when the epoch moved meanwhile, so a refresh that resolves
+ * after logout cannot resurrect the session. While a logout runs
+ * (`beginLogout`), no refresh of that service may start at all.
  *
  * Cross-tab sync — login/logout write `STORAGE_KEYS.AUTH_SYNC`; other tabs see
- * the `storage` event (and re-check the hint cookie when they become visible)
- * and recompute their auth state — see `syncAuthAcrossTabs`.
+ * the `storage` event (and re-check the hint cookie on focus/visibility) and
+ * recompute their auth state — see `syncAuthAcrossTabs`.
  */
 
 const SESSION_HINT_MAX_AGE = 7 * 24 * 60 * 60; // mirrors the backend refresh cookie
 
-let sessionEpoch = 0;
+const sessionEpochs = new Map<ApiService, number>();
 
-/** Hint state this tab last set or observed — dedupes cross-tab notifications. */
-let knownHint: boolean | null = null;
-
-export function getSessionEpoch(): number {
-  return sessionEpoch;
+export function getSessionEpoch(service: ApiService = "MAIN"): number {
+  return sessionEpochs.get(service) ?? 0;
 }
 
-/** Invalidate every refresh started before now (see "Session epoch" above). */
-export function bumpSessionEpoch(): void {
-  sessionEpoch += 1;
+/** Invalidate every refresh of `service` started before now (see "Session epoch"). */
+export function bumpSessionEpoch(service: ApiService = "MAIN"): void {
+  sessionEpochs.set(service, getSessionEpoch(service) + 1);
 }
 
-let pendingLogouts = 0;
+const pendingLogouts = new Map<ApiService, number>();
 
-/** A logout is running: no refresh may start (it would rotate the token the
- * logout is about to revoke) — refreshes reject with `SessionEndedError`. */
-export function isLogoutPending(): boolean {
-  return pendingLogouts > 0;
+/** A logout of `service` is running: no refresh may start (it would rotate the
+ * token the logout is about to revoke) — refreshes reject with `SessionEndedError`. */
+export function isLogoutPending(service: ApiService = "MAIN"): boolean {
+  return (pendingLogouts.get(service) ?? 0) > 0;
 }
 
-/** Mark a logout as running until the returned `done()` is called. Call it
- * synchronously at logout start, before any await. */
-export function beginLogout(): () => void {
-  pendingLogouts += 1;
+/** Mark a logout as running until the returned `done()` is called (idempotent).
+ * Call it synchronously at logout start, before any await. */
+export function beginLogout(service: ApiService = "MAIN"): () => void {
+  pendingLogouts.set(service, (pendingLogouts.get(service) ?? 0) + 1);
   let finished = false;
   return () => {
     if (finished) return;
     finished = true;
-    pendingLogouts -= 1;
+    pendingLogouts.set(service, (pendingLogouts.get(service) ?? 1) - 1);
   };
 }
+
+/** Hint state this tab last set or observed — dedupes cross-tab notifications. */
+let knownHint: boolean | null = null;
 
 export function hasSessionHint(): boolean {
   return readCookie(STORAGE_KEYS.SESSION) === "1";
@@ -77,6 +77,7 @@ export function markSessionActive(): void {
   knownHint = true;
 }
 
+/** Drop the hint. Does not bump the epoch — `endSession` owns that. */
 export function clearSessionHint(): void {
   if (typeof document === "undefined") return;
   document.cookie = `${STORAGE_KEYS.SESSION}=; path=/; max-age=0; SameSite=Lax`;
@@ -105,7 +106,7 @@ type SessionEndListener = (reason: SessionEndReason, service: ApiService) => voi
 
 const listeners = new Set<SessionEndListener>();
 
-/** Subscribe to session end (logout / refresh failure). Returns the unsubscribe. */
+/** Subscribe to session end (logout / refused refresh). Returns the unsubscribe. */
 export function onSessionEnded(listener: SessionEndListener): () => void {
   listeners.add(listener);
   return () => {
@@ -113,17 +114,15 @@ export function onSessionEnded(listener: SessionEndListener): () => void {
   };
 }
 
-function notifySessionEnded(reason: SessionEndReason, service: ApiService): void {
-  for (const listener of listeners) listener(reason, service);
-}
-
-/** End the client session: bump the epoch, drop the hint, tell the other tabs
- * and notify listeners. */
+/** End `service`'s client session: bump its epoch; for the main session also
+ * drop the hint and tell the other tabs; then notify listeners. */
 export function endSession(reason: SessionEndReason, service: ApiService = "MAIN"): void {
-  bumpSessionEpoch();
-  clearSessionHint();
-  broadcastAuthChange("logout");
-  notifySessionEnded(reason, service);
+  bumpSessionEpoch(service);
+  if (service === "MAIN") {
+    clearSessionHint();
+    broadcastAuthChange("logout");
+  }
+  for (const listener of listeners) listener(reason, service);
 }
 
 export interface AuthSyncHandlers {
@@ -135,10 +134,10 @@ export interface AuthSyncHandlers {
 
 /**
  * Keep this tab in step with logins/logouts made in other tabs. A remote logout
- * runs the local session end (epoch bump + `onSessionEnded` listeners with
- * "logout", no re-broadcast); a remote login calls `onLogin`. Triggers: the
- * `AUTH_SYNC` storage event, and a hint-cookie re-check whenever the tab becomes
- * visible (cookie changes fire no event). Browser-only; returns the unsubscribe.
+ * ends the main session here (`endSession("logout")`), then calls `onLogout`; a
+ * remote login calls `onLogin`. Triggers: the `AUTH_SYNC` storage event, and a
+ * hint-cookie re-check on focus / when the tab becomes visible (cookie changes
+ * fire no event). Browser-only; returns the unsubscribe.
  */
 export function syncAuthAcrossTabs(handlers: AuthSyncHandlers = {}): () => void {
   if (typeof window === "undefined") return () => {};
@@ -151,8 +150,7 @@ export function syncAuthAcrossTabs(handlers: AuthSyncHandlers = {}): () => void 
       handlers.onLogin?.();
       return;
     }
-    bumpSessionEpoch();
-    notifySessionEnded("logout", "MAIN");
+    endSession("logout", "MAIN");
     handlers.onLogout?.();
   };
   const onStorage = (event: StorageEvent) => {
@@ -164,24 +162,29 @@ export function syncAuthAcrossTabs(handlers: AuthSyncHandlers = {}): () => void 
   };
 
   window.addEventListener("storage", onStorage);
+  window.addEventListener("focus", onVisible);
   document.addEventListener("visibilitychange", onVisible);
   return () => {
     window.removeEventListener("storage", onStorage);
+    window.removeEventListener("focus", onVisible);
     document.removeEventListener("visibilitychange", onVisible);
   };
 }
 
 /**
- * Route to the login page when a live session expires (the backend refused the
- * refresh). Anonymous visitors never trigger it: "expired" is only emitted after
- * a refresh attempt, and a refresh is only attempted while the session hint is
- * present. Logout is not a redirect trigger — the caller navigates itself.
- * Returns the unsubscribe. Pair with `loginPathWithReturn` so the user lands
- * back on the page they were on.
+ * Route to the login page when `service`'s live session expires (the backend
+ * refused the refresh). Anonymous visitors never trigger it: "expired" is only
+ * emitted after a refresh attempt, and a refresh is only attempted while the
+ * session hint is present. Logout is not a redirect trigger — the caller
+ * navigates itself. Returns the unsubscribe. Pair with `loginPathWithReturn` so
+ * the user lands back on the page they were on.
  */
-export function redirectOnSessionExpired(redirect: () => void): () => void {
-  return onSessionEnded((reason) => {
-    if (reason === "expired") redirect();
+export function redirectOnSessionExpired(
+  redirect: () => void,
+  service: ApiService = "MAIN",
+): () => void {
+  return onSessionEnded((reason, ended) => {
+    if (reason === "expired" && ended === service) redirect();
   });
 }
 
@@ -209,13 +212,4 @@ export function safeRedirect(value: unknown, fallback = "/"): string {
   if (value.includes("://")) return fallback;
   if (/^\/login\/?(?:[?#]|$)/.test(value)) return fallback;
   return value;
-}
-
-/** A rejected API call whose HTTP status (or envelope `error_code`) is 401. */
-export function isUnauthorizedError(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    (error as { error_code?: unknown }).error_code === 401
-  );
 }

@@ -18,6 +18,14 @@ declare module "axios" {
   }
 }
 
+/** Tokens a refresh returned. The refresh manager persists them — only while
+ * the session that asked is still current (logout may have run meanwhile). */
+export interface RefreshedTokens {
+  accessToken: string;
+  /** The rotated refresh token, when the backend returns one in the body. */
+  refreshToken?: string;
+}
+
 /**
  * Resolved refresh config for one service. Both tokens live in localStorage
  * (see `auth-token-storage`); the refresh token is sent in the refresh body.
@@ -30,6 +38,12 @@ export interface RefreshOptions {
   /** Credential endpoints (login/register/logout) whose 401 is final — a wrong
    * password must surface as an error, never trigger a refresh. */
   skipPaths: string[];
+  /** Whether a session exists worth refreshing (default: the service holds an
+   * access or refresh token). Anonymous 401s pass through untouched; also
+   * re-checked once the refresh lock is held (another tab may have logged out). */
+  hasSession: () => boolean;
+  /** Called after a refresh stored a rotated pair. */
+  onRefreshed?: () => void;
 }
 
 /**

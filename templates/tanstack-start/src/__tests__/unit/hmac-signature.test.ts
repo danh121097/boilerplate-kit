@@ -1,11 +1,11 @@
 import { makeClient, ok } from "@/__tests__/helpers/http-mocks";
 import { Api } from "@/services/core/api";
 import { createTokenRefresher } from "@/services/core/auth-refresh-client";
-import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
+import { HMACSignatureGenerator, resolveContentType } from "@/services/core/hmac-signature";
+import axios, { AxiosHeaders } from "axios";
 import { createHmac } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { InternalAxiosRequestConfig } from "axios";
-import axios from "axios";
 
 /** Re-implements the SERVER's signing (Express `verifyHmac`) to prove the client
  * signs exactly what the backend verifies. */
@@ -146,5 +146,42 @@ describe("hmac-signature", () => {
     expect(sent.sig).toBe(
       serverSign("shared-secret", "POST", pinned, Number(sent.ctime), "/notes"),
     );
+  });
+});
+
+describe("resolveContentType — signs what axios sends", () => {
+  const JSON_TYPE = "application/json";
+  const FORM = "application/x-www-form-urlencoded";
+  const config = (data: unknown, headers: unknown = {}) =>
+    ({ url: "/x", method: "post", data, headers }) as unknown as InternalAxiosRequestConfig;
+
+  it.each([
+    ["no body", config(undefined, { "Content-Type": JSON_TYPE }), ""],
+    [
+      "null body, pinned JSON (axios sends `null`)",
+      config(null, { "Content-Type": JSON_TYPE }),
+      JSON_TYPE,
+    ],
+    ["null body, nothing pinned", config(null), JSON_TYPE],
+    [
+      "URLSearchParams, nothing pinned",
+      config(new URLSearchParams("a=1")),
+      `${FORM};charset=utf-8`,
+    ],
+    [
+      "URLSearchParams, pinned JSON",
+      config(new URLSearchParams("a=1"), { "Content-Type": JSON_TYPE }),
+      JSON_TYPE,
+    ],
+    ["string, nothing pinned", config("a=1"), FORM],
+    ["object, nothing pinned", config({ a: 1 }), JSON_TYPE],
+    ["lowercase pinned header", config({ a: 1 }, { "content-type": "text/plain" }), "text/plain"],
+    [
+      "AxiosHeaders instance",
+      config({ a: 1 }, new AxiosHeaders({ "Content-Type": "application/json; charset=utf-8" })),
+      "application/json; charset=utf-8",
+    ],
+  ])("%s", (_label, input, expected) => {
+    expect(resolveContentType(input)).toBe(expected);
   });
 });

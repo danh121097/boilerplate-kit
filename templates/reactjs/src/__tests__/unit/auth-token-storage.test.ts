@@ -4,10 +4,12 @@ import {
   clearServiceTokens,
   getAccessToken,
   getRefreshToken,
+  onTokensChanged,
   persistAccessToken,
   persistRefreshToken,
   registerServiceToken,
 } from "@/services/core/auth-token-storage";
+import { getSessionEpoch } from "@/services/core/session";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("auth-token-storage", () => {
@@ -66,5 +68,31 @@ describe("auth-token-storage", () => {
   it("falls back to the MAIN slots for an unregistered service", () => {
     persistAccessToken("main-a", "MAIN");
     expect(getAccessToken("UNKNOWN")).toBe("main-a"); // resolves to MAIN slot
+  });
+
+  it("every clear bumps the session epoch of that service only", () => {
+    const main = getSessionEpoch("MAIN");
+    const admin = getSessionEpoch("ADMIN");
+
+    clearServiceTokens("ADMIN");
+    expect(getSessionEpoch("ADMIN")).toBe(admin + 1);
+    expect(getSessionEpoch("MAIN")).toBe(main);
+
+    clearAuthTokens();
+    expect(getSessionEpoch("MAIN")).toBe(main + 1);
+    expect(getSessionEpoch("ADMIN")).toBe(admin + 2);
+  });
+
+  it("onTokensChanged reports this tab's writes and clears per service until unsubscribed", () => {
+    const changed = vi.fn();
+    const off = onTokensChanged(changed);
+
+    persistAccessToken("a", "MAIN");
+    persistRefreshToken("r", "ADMIN");
+    clearServiceTokens("MAIN");
+    off();
+    persistAccessToken("b", "MAIN");
+
+    expect(changed.mock.calls).toEqual([["MAIN"], ["ADMIN"], ["MAIN"]]);
   });
 });

@@ -38,7 +38,7 @@ templates/nextjs/
     ├── lib/utils.ts          # cn()
     ├── server/               # SSR helpers (RSC only)
     │   ├── server-api.ts     # serverApiGet<T>()
-    │   ├── get-me.ts         # getMeServerData()
+    │   ├── session.ts        # readServerSession()
     │   └── get-users.ts      # getUsersServerData()
     ├── services/
     │   ├── core/             # Api, interceptors, HMAC, tanstack (see services-and-stores.md)

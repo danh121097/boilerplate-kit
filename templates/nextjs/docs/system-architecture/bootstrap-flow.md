@@ -22,14 +22,16 @@ Next.js build
 
 - `layout.tsx` is a React Server Component with `suppressHydrationWarning` on `<html>` and `<body>`.
 - `Providers` is the `"use client"` boundary — everything below it is hydrated.
-- `initServices()` is called inside `useEffect` so it only runs in the browser,
-  never during SSR. Auth cookies are managed by the backend; the client never reads them.
+- `initServices()` runs once at module load in the browser (before any query),
+  never during SSR. The session subscriptions (cache reset, expiry redirect,
+  cross-tab sync) are `useEffect`s with cleanup in `Providers`. Auth cookies are managed by the backend; the client never reads them.
 - `initI18n()` is SSR-guarded: `getSavedLanguage()` returns the env-var default
   when `window` is undefined.
 - The `QueryClient` is created once per browser session via `getQueryClient()`;
   on the server a fresh client is created per request to avoid state leakage.
 - Auth state (`useAuth()`) is derived from the client's session query; server components
-  call `getMeServerData()` to resolve session server-side with forwarded cookies.
+  call `readServerSession()` (`src/server/session.ts`) to resolve the session
+  server-side with forwarded cookies.
 
 ## Route Rendering
 

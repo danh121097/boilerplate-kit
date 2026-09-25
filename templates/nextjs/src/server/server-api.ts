@@ -4,6 +4,7 @@ import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import { cookies } from "next/headers";
 import type {
   ApiResponse,
+  ApiResponseError,
   CursorParams,
   CursorResponse,
   PaginatedResponse,
@@ -25,21 +26,31 @@ import type {
  * handing the new cookies to the browser would leave it holding a revoked token,
  * whose next use trips reuse detection and revokes ALL sessions. (The refresh
  * cookie is also path-scoped to `${apiPrefix}/auth`, so page requests never
- * carry it.) Instead every auth failure THROWS: a throwing prefetch is not
- * dehydrated, so the client query refetches through axios, which refreshes.
+ * carry it.) Instead every failure REJECTS with an `ApiResponseError`
+ * (`error_code` = HTTP status — 401 for a missing/expired access cookie — or 0
+ * when the backend is unreachable; `retryable` on 0/408/429/5xx): a rejecting
+ * prefetch is not dehydrated, so the client query refetches through axios,
+ * which refreshes.
  *
  * Next 15+: cookies() is async — must be awaited before reading values.
  */
 const API_BASE = getApiBaseUrl();
 
-/** The server could not prove a session (missing/expired access cookie). */
-export class ServerAuthError extends Error {
-  readonly status = 401;
-
-  constructor(path: string) {
-    super(`Unauthorized: GET ${path}`);
-    this.name = "ServerAuthError";
-  }
+/** Build the `ApiResponseError` a server read rejects with, from the HTTP
+ * status (0 = no response) and the response body when it is an envelope. */
+function toServerApiError(status: number, body?: unknown, fallback = "request_failed") {
+  const data = body && typeof body === "object" ? (body as Partial<ApiResponseError>) : undefined;
+  const message = data?.message ?? fallback;
+  const transient = !status || status === 408 || status === 429 || status >= 500;
+  const error: ApiResponseError = {
+    ...data,
+    status: data?.status ?? "error",
+    message,
+    error_message: data?.error_message ?? message,
+    error_code: data?.error_code ?? status,
+    ...(transient ? { retryable: true } : {}),
+  };
+  return error;
 }
 
 /** Whether the request carries the readable session hint (see `services/core/session`). */
@@ -58,27 +69,35 @@ function hmacHeaders(method: string, path: string, contentType: string): Record<
 /**
  * Authenticated SSR GET core — forwards the access cookie + HMAC and returns the
  * parsed body (full envelope). The HMAC signs the path only; `query` is appended
- * as the `?key=value` string. Throws `ServerAuthError` on a missing access
- * cookie or a 401, and a plain Error on any other failure — never resolves a
- * failure to a value React Query would cache as success.
+ * as the `?key=value` string. Rejects with an `ApiResponseError` — 401 on a
+ * missing access cookie — never resolving a failure to a value React Query
+ * would cache as success.
  */
 async function authedFetch<R>(path: string, query?: Record<string, string | number>): Promise<R> {
   const access = (await cookies()).get("accessToken")?.value;
-  if (!access) throw new ServerAuthError(path); // expired (15 min) or anonymous
+  // Expired (15 min) or anonymous: nothing to prove a session with.
+  if (!access) throw toServerApiError(401, undefined, "Unauthorized");
 
   const qs = query
     ? `?${new URLSearchParams(Object.entries(query).map(([k, v]) => [k, String(v)])).toString()}`
     : "";
-  const res = await fetch(`${API_BASE}${path}${qs}`, {
-    headers: { cookie: `accessToken=${access}`, ...hmacHeaders("GET", path, "") },
-    cache: "no-store",
-  });
-  if (res.status === 401) throw new ServerAuthError(path);
-  if (!res.ok) throw new Error(`GET ${path} failed with status ${res.status}`);
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}${qs}`, {
+      headers: { cookie: `accessToken=${access}`, ...hmacHeaders("GET", path, "") },
+      cache: "no-store",
+    });
+  } catch (error) {
+    throw toServerApiError(0, undefined, error instanceof Error ? error.message : undefined);
+  }
+  if (!res.ok) {
+    const body: unknown = await res.json().catch(() => undefined);
+    throw toServerApiError(res.status, body, `GET ${path} failed with status ${res.status}`);
+  }
   return (await res.json()) as R;
 }
 
-/** Single resource — unwraps the envelope's `data`. Throws on failure. */
+/** Single resource — unwraps the envelope's `data`. Rejects on failure. */
 export async function serverApiGet<T>(path: string): Promise<T> {
   const body = await authedFetch<ApiResponse<T>>(path);
   return body.data;
