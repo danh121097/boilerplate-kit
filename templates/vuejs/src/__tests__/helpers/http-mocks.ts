@@ -3,10 +3,16 @@ import type { ServiceRefreshConfig } from "@/services/core";
 import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import axios from "axios";
 
+/** The app's MAIN refresh config: credential endpoints never trigger a refresh. */
+export const MAIN_REFRESH: ServiceRefreshConfig = {
+  endpoint: "/auth/refresh",
+  skipPaths: ["/auth/login", "/auth/register", "/auth/logout"],
+};
+
 /** Build an axios instance wired with the real request + response interceptors. */
 export function makeClient(
   adapter: AxiosAdapter,
-  refresh: Record<string, ServiceRefreshConfig> = { MAIN: { endpoint: "/auth/refresh" } },
+  refresh: Record<string, ServiceRefreshConfig> = { MAIN: MAIN_REFRESH },
 ) {
   const instance = axios.create({ adapter });
   const interceptors = new ApiInterceptors(refresh);

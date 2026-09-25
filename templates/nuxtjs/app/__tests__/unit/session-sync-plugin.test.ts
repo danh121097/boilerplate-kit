@@ -1,10 +1,12 @@
-import { markSessionActive } from "@/services/core";
+import { markSessionActive, onSessionEnded, resetQueriesOnSessionEnd } from "@/services/core";
 import { QueryClient, QueryObserver } from "@tanstack/vue-query";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * The client plugin that follows logins / logouts made in other tabs by
- * re-reading the session-hint cookie on focus and visibility. `window`,
+ * The client plugin that follows logins / logouts made in other tabs: the
+ * `AUTH_SYNC` storage event, plus a session hint re-read on focus and
+ * visibility. A remote logout ends the local session, whose cache reset is
+ * registered here the way `04.session-expiry.client.ts` does. `window`,
  * `document` and `defineNuxtPlugin` are stubbed.
  */
 
@@ -17,12 +19,20 @@ describe("05.session-sync.client plugin", () => {
   const HINT = "PRISM_APP_SESSION=1";
 
   const focus = () => win.dispatchEvent(new Event("focus"));
+  const authSync = (type: string) =>
+    win.dispatchEvent(
+      Object.assign(new Event("storage"), {
+        key: "PRISM_APP_AUTH_SYNC",
+        newValue: JSON.stringify({ type, at: Date.now() }),
+      }),
+    );
 
   beforeAll(async () => {
     vi.stubGlobal("defineNuxtPlugin", (fn: PluginFn) => fn);
     vi.stubGlobal("window", win);
     vi.stubGlobal("document", doc);
     doc.cookie = HINT; // this tab boots signed in
+    resetQueriesOnSessionEnd(queryClient, "auth.me");
     const plugin = (await import("@/plugins/05.session-sync.client"))
       .default as unknown as PluginFn;
     plugin({ $queryClient: queryClient });
@@ -103,5 +113,40 @@ describe("05.session-sync.client plugin", () => {
     expect(fetchMe).toHaveBeenCalledTimes(2);
     expect(header.getCurrentResult().data).toEqual({ _id: "u2" });
     unsubscribe();
+  });
+
+  it("another tab's logout broadcast ends this tab's session as a logout", () => {
+    const ended = vi.fn();
+    const unsubscribe = onSessionEnded(ended);
+    queryClient.setQueryData(["auth.me"], { _id: "u1" });
+
+    doc.cookie = ""; // the other tab dropped the hint and announced it
+    authSync("logout");
+    unsubscribe();
+
+    expect(ended).toHaveBeenCalledExactlyOnceWith("logout", "MAIN");
+    expect(queryClient.getQueryData(["auth.me"])).toBeNull();
+  });
+
+  it("another tab's login broadcast re-reads the session", () => {
+    doc.cookie = "";
+    focus();
+    queryClient.setQueryData(["auth.me"], null);
+
+    doc.cookie = HINT;
+    authSync("login");
+
+    expect(queryClient.getQueryData(["auth.me"])).toBeUndefined();
+  });
+
+  it("ignores unrelated storage keys and malformed broadcasts", () => {
+    const ended = vi.fn();
+    const unsubscribe = onSessionEnded(ended);
+    win.dispatchEvent(Object.assign(new Event("storage"), { key: "other", newValue: "x" }));
+    win.dispatchEvent(
+      Object.assign(new Event("storage"), { key: "PRISM_APP_AUTH_SYNC", newValue: "{" }),
+    );
+    unsubscribe();
+    expect(ended).not.toHaveBeenCalled();
   });
 });

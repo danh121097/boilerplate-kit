@@ -1,3 +1,5 @@
+import { onSessionEnded } from "@/services/core/session";
+import type { ApiService } from "@/services/core/types";
 import type { QueryClient } from "@tanstack/vue-query";
 
 /**
@@ -18,6 +20,20 @@ export function resetQueriesToSignedOut(queryClient: QueryClient, sessionKey: st
     if (query.getObserversCount() === 0) cache.remove(query);
   }
   queryClient.setQueryData([sessionKey], null);
+}
+
+/**
+ * Reset every query to signed-out whenever `service`'s session ends (logout or
+ * a refused refresh), so no signed-in data outlives it. Returns the unsubscribe.
+ */
+export function resetQueriesOnSessionEnd(
+  queryClient: QueryClient,
+  sessionKey: string,
+  service: ApiService = "MAIN",
+): () => void {
+  return onSessionEnded((_reason, ended) => {
+    if (ended === service) resetQueriesToSignedOut(queryClient, sessionKey);
+  });
 }
 
 /**

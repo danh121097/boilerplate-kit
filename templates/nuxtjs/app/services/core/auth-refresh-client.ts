@@ -1,5 +1,6 @@
 import { Api } from "@/services/core/api";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
+import type { TokenRefresher } from "@/services/core/refresh-token-manager";
 import type { ApiService } from "@/services/core/types";
 import axios from "axios";
 
@@ -14,8 +15,8 @@ export const REFRESH_TIMEOUT_MS = 15_000;
  * the httpOnly refresh cookie, the backend rotates both cookies, the caller replays
  * its request — no token touches JS. Client-only (called from the interceptor).
  */
-export function createTokenRefresher(endpoint: string, service: ApiService) {
-  return async (): Promise<void> => {
+export function createTokenRefresher(endpoint: string, service: ApiService): TokenRefresher {
+  return async () => {
     const headers: Record<string, string | number> = { Accept: "application/json" };
     // The bare client skips app interceptors, so it must attach HMAC itself or the
     // refresh is rejected. Body less request → no Content-Type → sign "" to match

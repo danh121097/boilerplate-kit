@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { useLoginMutation } from "@/services/auth/auth";
-import { getApiErrorMessage } from "@/services/core";
+import { getApiErrorMessage, safeRedirect } from "@/services/core";
 import { useAuthStore } from "@/stores/auth";
-import { safeRedirect } from "@/utils/safe-redirect";
 import { toTypedSchema } from "@vee-validate/zod";
 import { useForm } from "vee-validate";
 import { z } from "zod";

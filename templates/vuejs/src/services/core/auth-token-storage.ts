@@ -1,4 +1,5 @@
 import { STORAGE_KEYS } from "@/enums";
+import { bumpSessionEpoch } from "@/services/core/session";
 
 /**
  * Per-service token registry. Each API service maps to its own pair of
@@ -13,6 +14,9 @@ import { STORAGE_KEYS } from "@/enums";
  *   Api.setBaseURL(adminURL, "ADMIN");
  *   registerServiceToken("ADMIN", { access: `${APP_PREFIX}_admin_ACCESS_TOKEN`,
  *                                   refresh: `${APP_PREFIX}_admin_REFRESH_TOKEN` });
+ *
+ * Every clear bumps that service's session epoch (`session.ts`), so a refresh
+ * still in flight when the tokens go cannot write them back.
  *
  * Security note: storing the refresh token in localStorage makes it readable by
  * JS (and thus by any XSS). The backend also sets an httpOnly refresh cookie; if
@@ -46,47 +50,6 @@ function notifyTokensChanged(service: string): void {
   tokenListeners.forEach((listener) => listener(service));
 }
 
-/**
- * Per-service session epoch, bumped whenever a service's session is cleared
- * (logout, refused refresh). A refresh captures it before its network call and
- * drops its result if it changed meanwhile, so a refresh still in flight when
- * the user logs out cannot write the tokens back.
- */
-const sessionEpochs = new Map<string, number>();
-
-export function getSessionEpoch(service: string = "MAIN"): number {
-  return sessionEpochs.get(service) ?? 0;
-}
-
-/** Invalidate every refresh started before now: a refresh still in flight persists nothing. */
-export function bumpSessionEpoch(service: string = "MAIN"): void {
-  sessionEpochs.set(service, getSessionEpoch(service) + 1);
-}
-
-/** Per-service count of running logouts — no new refresh may start meanwhile. */
-const pendingLogouts = new Map<string, number>();
-
-/** A logout is running for `service`: every new refresh — and every 401 that
- * would trigger one — rejects with `session_ended`. */
-export function isLogoutPending(service: string = "MAIN"): boolean {
-  return (pendingLogouts.get(service) ?? 0) > 0;
-}
-
-/**
- * Mark a logout as running until the returned `done()` is called (idempotent).
- * Call synchronously when logout starts, before any await; logout then bumps
- * the epoch in the same tick it captures the tokens to revoke.
- */
-export function beginLogout(service: string = "MAIN"): () => void {
-  pendingLogouts.set(service, (pendingLogouts.get(service) ?? 0) + 1);
-  let finished = false;
-  return () => {
-    if (finished) return;
-    finished = true;
-    pendingLogouts.set(service, (pendingLogouts.get(service) ?? 1) - 1);
-  };
-}
-
 /** Register (or override) the localStorage slots a service keeps its tokens in. */
 export function registerServiceToken(service: string, keys: ServiceTokenKeys): void {
   serviceTokenKeys.set(service, keys);
@@ -108,6 +71,7 @@ export function persistAccessToken(token: string, service: string = "MAIN"): voi
 
 export function clearAccessToken(service: string = "MAIN"): void {
   localStorage.removeItem(resolveKeys(service).access);
+  bumpSessionEpoch(service);
   notifyTokensChanged(service);
 }
 
@@ -122,6 +86,7 @@ export function persistRefreshToken(token: string, service: string = "MAIN"): vo
 
 export function clearRefreshToken(service: string = "MAIN"): void {
   localStorage.removeItem(resolveKeys(service).refresh);
+  bumpSessionEpoch(service);
   notifyTokensChanged(service);
 }
 

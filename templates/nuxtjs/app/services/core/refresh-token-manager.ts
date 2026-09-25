@@ -1,38 +1,22 @@
-import { isTransientHttpError } from "@/services/core/api-errors";
+import { isRefreshRefused, SessionEndedError } from "@/services/core/api-errors";
 import { getAppPrefix } from "@/services/core/app-prefix";
-import { getSessionEpoch, isLogoutPending } from "@/services/core/session-hint";
+import { getSessionEpoch, isLogoutPending } from "@/services/core/session";
 import type { ApiService } from "@/services/core/types";
 
 /** Performs the network refresh. The backend rotates the httpOnly token cookies
  * as a side effect, so the refresher resolves with no value. */
 export type TokenRefresher = () => Promise<void>;
 
-interface RefreshTokenManagerOpts {
+export interface RefreshTokenManagerOptions {
   service: ApiService;
   refresh: TokenRefresher;
   /** Fired after a successful network refresh. */
   onRefreshed?: () => void;
-  /** Fired once when the backend definitively rejects the refresh (session gone). */
+  /** Fired once when the backend refuses the refresh (401/403 — session gone). */
   onRefreshFailed: () => void;
-}
-
-/**
- * A refresh failure that says nothing about the session — offline, timeout,
- * rate limit or a 5xx. Anything else (401/403 from the refresh endpoint) means
- * the refresh cookie is no longer usable.
- */
-export const isTransientRefreshError = isTransientHttpError;
-
-/** Rejection for a refresh whose session ended (logout) while it ran — its
- * result is discarded, and it is not a refresh failure (no expiry event). */
-export class SessionEndedError extends Error {
-  readonly error_code = 401;
-  readonly status = "error";
-  readonly error_message = "session_ended";
-  constructor() {
-    super("session_ended");
-    this.name = "SessionEndedError";
-  }
+  /** Checked once the lock is held: false means the session is gone (e.g.
+   * another tab logged out while this one waited) — no network refresh. */
+  isSessionAlive?: () => boolean | Promise<boolean>;
 }
 
 /** App-prefixed Web Lock name shared by the refresh and logout of one service;
@@ -57,21 +41,22 @@ async function withRefreshLock<T>(name: string, task: () => Promise<T>): Promise
 /** In-flight refresh per service (this tab), for callers that must not overlap one. */
 const pendingRefreshes = new Map<ApiService, Promise<unknown>>();
 
-/** Longest a logout waits for an in-flight refresh before proceeding anyway. */
-export const SESSION_LOCK_WAIT_MS = 15_000;
+/** Longest a logout waits for an in-flight refresh (lock or in-tab) before
+ * proceeding anyway. */
+export const SESSION_WAIT_TIMEOUT_MS = 15_000;
 
 /**
  * Run `task` (logout) so it never overlaps a refresh of `service`: under the
  * shared Web Lock when available (it waits for any tab's in-flight refresh, and a
  * refresh queued behind it sees the ended session and does not re-mark it active), else
  * after this tab's in-flight refresh settles. The wait is capped at
- * `SESSION_LOCK_WAIT_MS`; past it the task runs without the lock, so a hung
+ * `SESSION_WAIT_TIMEOUT_MS`; past it the task runs without the lock, so a hung
  * refresh can never block logout.
  */
 export async function withSessionLock<T>(
   service: ApiService,
   task: () => Promise<T>,
-  { maxWaitMs = SESSION_LOCK_WAIT_MS }: { maxWaitMs?: number } = {},
+  { maxWaitMs = SESSION_WAIT_TIMEOUT_MS }: { maxWaitMs?: number } = {},
 ): Promise<T> {
   const locks = getLocks();
   if (locks?.request) return withCappedLock(locks, refreshLockName(service), task, maxWaitMs);
@@ -161,12 +146,14 @@ export class RefreshTokenManager {
   private readonly doRefresh: TokenRefresher;
   private readonly onRefreshed?: () => void;
   private readonly onRefreshFailed: () => void;
+  private readonly isSessionAlive?: () => boolean | Promise<boolean>;
 
-  constructor(opts: RefreshTokenManagerOpts) {
+  constructor(opts: RefreshTokenManagerOptions) {
     this.service = opts.service;
     this.doRefresh = opts.refresh;
     this.onRefreshed = opts.onRefreshed;
     this.onRefreshFailed = opts.onRefreshFailed;
+    this.isSessionAlive = opts.isSessionAlive;
   }
 
   /**
@@ -175,17 +162,17 @@ export class RefreshTokenManager {
    * @param sentAt When the failed request was sent. If a refresh (this tab or
    * another) completed after that, the cookies are already fresh — skip it.
    *
-   * A definitive failure fires the failure hook; a transient one (network/5xx)
-   * just rethrows. If the session ends while it runs, it rejects with
+   * A refused refresh (401/403) fires the failure hook; any other failure
+   * (network, timeout, 4xx/5xx, ...) just rethrows and keeps the session. If the session ends while it runs, it rejects with
    * `SessionEndedError`. On success the caller can simply replay its request.
    */
   refresh(sentAt?: number): Promise<void> {
     // Logout in progress: never start (or join) a refresh — it would rotate the
     // cookie logout is revoking. No /auth/refresh call is made.
-    if (isLogoutPending()) return Promise.reject(new SessionEndedError());
+    if (isLogoutPending(this.service)) return Promise.reject(new SessionEndedError());
     if (this.inFlight) return this.inFlight;
 
-    const epoch = getSessionEpoch();
+    const epoch = getSessionEpoch(this.service);
     const lockName = refreshLockName(this.service);
     const inFlight = withRefreshLock(lockName, () =>
       this.refreshUnlessRotated(lockName, epoch, sentAt),
@@ -199,9 +186,18 @@ export class RefreshTokenManager {
     return inFlight;
   }
 
+  /** Logged out (or logging out) since `epoch` was captured. */
+  private sessionEnded(epoch: number): boolean {
+    return isLogoutPending(this.service) || getSessionEpoch(this.service) !== epoch;
+  }
+
   private async refreshUnlessRotated(lockName: string, epoch: number, sentAt?: number) {
     // Logged out (or logging out) while waiting for the lock: nothing to refresh.
-    if (isLogoutPending() || getSessionEpoch() !== epoch) throw new SessionEndedError();
+    if (this.sessionEnded(epoch)) throw new SessionEndedError();
+    // Another tab ended the session (hint gone) while this one waited.
+    const alive = this.isSessionAlive?.() ?? true;
+    if (!(alive instanceof Promise ? await alive : alive)) throw new SessionEndedError();
+    if (this.sessionEnded(epoch)) throw new SessionEndedError();
 
     // Timestamps in the future (clock moved back) prove nothing — ignore them
     // and refresh, rather than skipping and letting the session end.
@@ -215,13 +211,13 @@ export class RefreshTokenManager {
     try {
       await this.doRefresh();
     } catch (error) {
-      if (getSessionEpoch() !== epoch) throw new SessionEndedError();
-      if (!isTransientRefreshError(error)) this.onRefreshFailed();
+      if (getSessionEpoch(this.service) !== epoch) throw new SessionEndedError();
+      if (isRefreshRefused(error)) this.onRefreshFailed();
       throw error;
     }
 
     // Logged out while the call was in flight: do not re-mark the session.
-    if (getSessionEpoch() !== epoch) throw new SessionEndedError();
+    if (getSessionEpoch(this.service) !== epoch) throw new SessionEndedError();
 
     this.refreshedAt = Date.now();
     writeSharedTimestamp(`${lockName}:at`, this.refreshedAt);

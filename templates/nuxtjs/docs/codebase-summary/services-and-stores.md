@@ -26,21 +26,34 @@ merge supported).
 Base class for domain services. Subclasses call `Model.setup({ path, service })`
 in a static block to bind an `Api` instance + path. See `AuthModel`, `UsersModel`.
 
-### Session hint (`session-hint.ts`) + app prefix (`app-prefix.ts`)
+### Session (`session.ts`) + app prefix (`app-prefix.ts`)
 
 Auth tokens are httpOnly cookies — nothing auth-related is stored by JS. The
 readable `<APP_NAME>_SESSION=1` cookie only says "a session is believed to exist"
-(set on login / register / refresh, cleared on logout / expiry; never used for
-authorization). `hasSessionHint()` reads `document.cookie` in the browser and the
-request cookie header during SSR. `clearSessionHint()` also bumps a session
-epoch: a refresh that lands after logout sees it changed and does not re-mark the
-session. `setAppPrefix()` (called by `01.init-services.ts` with
-`NUXT_PUBLIC_APP_NAME`) prefixes the hint cookie, the refresh Web Lock and its
+(set on login / register / refresh, cleared when the session ends; never used
+for authorization). `session.ts` holds:
+
+- the hint: `hasSessionHint()` (browser `document.cookie`; SSR delegates to
+  `hasServerSessionHint()` in `server-api.ts`), `markSessionActive()`,
+  `clearSessionHint()` (no epoch bump), `startSession()` (mark + broadcast
+  `login` to other tabs);
+- a per-service session epoch and logout-pending counter (`getSessionEpoch`,
+  `bumpSessionEpoch`, `isLogoutPending`, `beginLogout`): a refresh that lands
+  after logout sees the epoch moved and does not re-mark the session;
+- session end: `onSessionEnded(listener)`, `endSession(reason, service)` —
+  bumps the epoch, and for MAIN clears the hint and broadcasts `logout`
+  (`<APP_NAME>_AUTH_SYNC`), then notifies listeners;
+- `syncAuthAcrossTabs`, `redirectOnSessionExpired`, `loginPathWithReturn`,
+  `safeRedirect`.
+
+`setAppPrefix()` (called by `01.init-services.ts` with `NUXT_PUBLIC_APP_NAME`)
+prefixes the hint cookie, the auth-sync key, the refresh Web Lock and its
 localStorage timestamp.
 
 ### HMAC signing (`hmac-signature.ts`) — via runtimeConfig
 
-`HMACSignatureGenerator.generateSignature(config)` reads
+`HMACSignatureGenerator.generateSignature(config)` — `signRequest` with the
+Content-Type `resolveContentType(config)` says axios will send — reads
 `useRuntimeConfig().public.hmacSecret` (wrapped in try/catch — returns `null`
 outside a request scope or when no secret). It signs
 `[method, contentType, ctime, path, ""].join("\n")` with HMAC-SHA256 (base64),
@@ -62,21 +75,28 @@ is no Authorization header: auth rides on the httpOnly cookies
 - **Response interceptor** unwraps recognized envelopes (`{ status }` or
   `{ success }`), unwraps `Blob` responses, and on **401** (HTTP status or
   `error_code: 401`) attempts a refresh-and-replay when eligible
-  (`canAttemptRefresh`: not already retried, not a credential endpoint —
-  login/register/logout/refresh 401s are never refreshed — and the readable
-  session-hint cookie is set, so anonymous 401s never call refresh; see
-  `session-hint.ts`). It never reloads the
-  page; rejections are normalized by `toApiError` (`api-errors.ts`).
+  (`canAttemptRefresh`: not already retried, not the refresh endpoint or a
+  `skipPaths` entry — login/register/logout 401s are never refreshed — and
+  `hasSession()` (default `hasSessionHint`) is true, so anonymous 401s never
+  call refresh). It never reloads the page; rejections are normalized by
+  `toApiError` (`api-errors.ts`). A refused refresh rejects with the original
+  401; any other refresh failure with `refreshUnavailable` (retryable, session
+  kept); a replay that is 401 again just rejects.
+  `ApiInterceptors.refreshSession(service, sentAt?)` runs the same refresh on
+  demand.
 - **`RefreshTokenManager`** serializes refreshes per service: a burst of
   concurrent 401s yields exactly **one** network refresh (single-flight
   `inFlight` promise), run under a cross-tab `navigator.locks` lock and skipped
   when another tab rotated the cookies after the request was sent. A refused
-  refresh fires `notifySessionExpired` (`session-events.ts`) →
-  `04.session-expiry.client.ts` clears the query cache and routes to `/login`.
+  refresh (401/403, `isRefreshRefused`) calls `endSession("expired", service)`
+  → `04.session-expiry.client.ts` resets the query cache and routes to
+  `/login?redirect=…`. `withSessionLock` (capped at `SESSION_WAIT_TIMEOUT_MS`)
+  keeps logout from overlapping a refresh.
 - **`createTokenRefresher`** hits `/auth/refresh` on a **bare** axios instance
   (NOT the app client, to avoid refresh recursion) with `withCredentials` so the
-  httpOnly refresh cookie is sent; it re-attaches HMAC headers manually, and
-  extracts the new access token from any of several envelope shapes.
+  httpOnly refresh cookie is sent; it re-attaches HMAC headers manually
+  (`signRequest`, empty Content-Type for the bodyless call). The backend rotates
+  the cookies, so the refresher resolves with no value.
 
 ### TanStack helpers (`tanstack.ts`)
 
@@ -89,22 +109,26 @@ typed as `ApiResponseError`.
 
 `ApiService`, `ApiResponse`/`ApiResponseError`, `RefreshOptions`,
 `ServiceRefreshConfig`, `ServiceConfig`, `HMACSignatureData`, plus an axios
-module augmentation adding `serviceType` and `_retry` to the request config.
+module augmentation adding `serviceType`, `_retry` and `_sentAt` to the request
+config. `RefreshOptions` = `{ endpoint, service, skipPaths, hasSession,
+onRefreshed? }`.
 
 ## Domain services
 
 ### Auth (`app/services/auth/auth.ts`)
 
 `AuthModel extends Model` (path `/auth`). Methods: `login`, `register` (both
-mark the session hint), `logout` (runs under the refresh lock via
-`withSessionLock`, so it never overlaps a refresh, and always clears the hint),
-`getMe`.
+call `startSession()`), `logout` (runs under the refresh lock via
+`withSessionLock`, so it never overlaps a refresh, and always ends the session
+with `endSession("logout")`), `getMe` (`Promise<AuthUser>`), `getSession`
+(`Promise<AuthUser | null>`; a 401 → `null`).
 Cookie-first: the backend sets httpOnly access/refresh cookies, so there is no
 client-side token persistence. The response interceptor already unwraps the
 envelope, so each method reads `res.data` once. Exposes `useLoginMutation`,
 `useRegisterMutation`, `useLogoutMutation`. The canonical session read is
-`useSessionQuery` (in `session.ts`, via `serverApiGet` so it prefetches on SSR
-with the forwarded cookie) — there is no duplicate axios `getMe`. Types in
+`useMeQuery` (`defineQuery<AuthUser | null>` in `services/auth/session.ts`): its
+fetcher runs `readServerSession()` on SSR (`serverApiGet` with the forwarded
+cookie; never refreshes) and `AuthModel.getSession()` in the browser. Types in
 `types/auth.ts` (`AuthUser`, `AuthTokens`, `LoginPayload`, `RegisterPayload`,
 `AuthResult`) — note `refreshToken` is optional client-side (it lives in the cookie).
 

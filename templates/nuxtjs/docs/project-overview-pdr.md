@@ -22,7 +22,7 @@ ordered `app/plugins/*` that run on **both server and client**.
 | Client state | Pinia 3 (`@pinia/nuxt`, `app/stores/`) |
 | Server state | TanStack Vue Query 5 (`app/services/core/tanstack.ts`) |
 | HTTP | axios 1 service layer, SSR-guarded (`app/services/`) |
-| Auth | httpOnly access + refresh cookies (rotation) + session-hint cookie + optional HMAC |
+| Auth | httpOnly access + refresh cookies (rotation) + session hint cookie + optional HMAC |
 | Realtime | Socket.IO client 4 (`app/composables/useSocketIO.ts`) |
 | UI primitives | Reka UI 2 + `lucide-vue-next` icons |
 | Styling | Tailwind CSS v4 (`@tailwindcss/vite`) + SCSS (`sass-embedded`) |

@@ -1,4 +1,5 @@
 import { getApiBaseUrl } from "@/services/core/api-config";
+import { getAppPrefix } from "@/services/core/app-prefix";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import type {
   ApiResponse,
@@ -24,7 +25,7 @@ import type {
  * These helpers never refresh: the refresh cookie is scoped to the backend's
  * auth routes and only the browser can rotate it. They are meant for SSR — the
  * browser reads the same endpoints through the axios Models, whose interceptors
- * refresh-and-retry on 401 (see `useSessionQuery` / `useUsersListQuery`).
+ * refresh-and-retry on 401 (see `useMeQuery` / `useUsersListQuery`).
  * Failures REJECT with an `ApiResponseError` (`error_code` = HTTP status, 0 when
  * the backend is unreachable; `retryable` on 0/408/429/5xx) so the query sees
  * them instead of a silent null.
@@ -44,6 +45,30 @@ function toServerApiError(error: unknown): ApiResponseError {
     error_code: data?.error_code ?? status ?? 0,
     ...(transient ? { retryable: true } : {}),
   };
+}
+
+/** The value of cookie `name` in a `Cookie` header (undefined when absent). */
+function readCookie(header: string | undefined, name: string): string | undefined {
+  if (!header) return undefined;
+  for (const part of header.split(";")) {
+    const [key, ...rest] = part.trim().split("=");
+    if (key === name) return decodeURIComponent(rest.join("="));
+  }
+  return undefined;
+}
+
+/**
+ * SSR: the incoming request carries the `${APP_PREFIX}_SESSION` hint cookie.
+ * Only valid inside a Nuxt request context (call it before any `await`); false
+ * outside one.
+ */
+export function hasServerSessionHint(): boolean {
+  try {
+    const cookie = useRequestHeaders(["cookie"]).cookie;
+    return readCookie(cookie, `${getAppPrefix()}_SESSION`) === "1";
+  } catch {
+    return false;
+  }
 }
 
 async function authedFetch<R>(path: string, query?: Record<string, string | number>): Promise<R> {

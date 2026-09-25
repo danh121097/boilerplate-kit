@@ -18,6 +18,13 @@ declare module "axios" {
   }
 }
 
+/** A rotated token pair (the refresh token is optional — some backends keep it
+ * in an httpOnly cookie). */
+export interface RefreshedTokens {
+  accessToken: string;
+  refreshToken?: string;
+}
+
 /**
  * Resolved refresh config for one service. Both tokens are kept in that
  * service's localStorage slots (see `auth-token-storage.ts`); the refresh token
@@ -31,9 +38,17 @@ export interface RefreshOptions {
   /**
    * Credential endpoints (login, register, logout, ...) whose 401 means "bad
    * credentials", never "expired session" — they are never refreshed or retried.
-   * The refresh endpoint itself is always excluded.
+   * The refresh endpoint itself is always skipped.
    */
-  excludePaths: string[];
+  skipPaths: string[];
+  /**
+   * Whether a session is believed to exist. When false a 401 is anonymous and
+   * final: no refresh attempt. Defaults to `hasStoredSession(service)` (an access
+   * or refresh token is stored).
+   */
+  hasSession: () => boolean;
+  /** Fired after every successful refresh. */
+  onRefreshed?: () => void;
 }
 
 /**

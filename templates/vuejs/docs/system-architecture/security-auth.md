@@ -4,8 +4,9 @@ The flagship subsystem. A **JWT access token** (bearer header) and a **refresh
 token** (sent in the refresh/logout body) live in per-service localStorage slots;
 every request carries an optional **HMAC signature**. A 401 drives a
 **single-flight, cross-tab-locked** refresh-and-replay per service. The service
-layer never reloads the page: an unrecoverable session fires a "session expired"
-event the app turns into a redirect to `/login`.
+layer never reloads the page: a refused refresh ends the session as `"expired"`
+(`endSession` in `services/core/session.ts`), which the app turns into a
+client-side redirect to `/login?redirect=<current path>`.
 
 ## Token Model
 
@@ -24,24 +25,30 @@ its own slots, so multiple authenticated backends never collide:
 ```ts
 getAccessToken(service) / persistAccessToken(t, service) / clearAccessToken(service)
 getRefreshToken(service) / persistRefreshToken(t, service) / clearRefreshToken(service)
-clearServiceTokens(service)   // drop ONE service's pair (failed refresh, unrecoverable 401)
+clearServiceTokens(service)   // drop ONE service's pair (refused refresh)
 clearAuthTokens()             // drop EVERY registered service's pair (logout)
 onTokensChanged(listener)     // localStorage is not reactive — writers notify here
 ```
 
 The auth store mirrors token presence into a `hasToken` ref through
 `onTokensChanged`, so `isAuthenticated` updates on login, refresh, logout and
-interceptor-driven clears. It also listens to the `window` `storage` event. When
-another tab logs out, this tab drops its profile and every query's data
-(`resetQueriesToSignedOut`, see below), and the guard state (`hasToken`)
-follows. When another tab logs in, this tab resets its profile, marks every
-query stale (`resyncQueriesAfterLogin`, so mounted views refetch) and re-reads
-the profile.
-A token rotation elsewhere, where presence is unchanged, is ignored.
+interceptor-driven clears. Cross-tab sync goes through
+`syncAuthAcrossTabs({ onLogin })` (`services/core/session.ts`): on every
+`window` `storage` event it re-reads whether a MAIN token is stored
+(`hasStoredSession`) and compares it with the last known value; this tab's own
+logins and logouts (`onTokensChanged`) update that value too. When another
+tab logs out, this tab ends its own session as `"logout"` (`endSession`), so the
+store drops its profile and every query's data (`resetQueriesToSignedOut`, see
+below), and the guard state (`hasToken`) follows. When another tab logs in, this
+tab resets its profile, marks every query stale (`resyncQueriesAfterLogin`, so
+mounted views refetch) and re-reads the profile. A token rotation elsewhere,
+where presence is unchanged, is ignored.
 
-`clearServiceTokens` / `clearAuthTokens` bump a per-service **session epoch**
-(`getSessionEpoch`). A refresh captures it before its network call and persists
-nothing if it changed meanwhile — see [Logout vs an in-flight refresh](#logout-vs-an-in-flight-refresh).
+Every clear (`clearAccessToken`, `clearRefreshToken`, `clearServiceTokens`,
+`clearAuthTokens`) bumps that service's **session epoch** (`bumpSessionEpoch` /
+`getSessionEpoch` in `session.ts`). A refresh captures it before its network
+call and persists nothing if it changed meanwhile — see
+[Logout vs an in-flight refresh](#logout-vs-an-in-flight-refresh).
 
 ## HMAC Request Signing (`hmac-signature.ts`)
 
@@ -49,16 +56,22 @@ Active only when `VITE_HMAC_SECRET` is set; otherwise `generateSignature` return
 `null` and signing is skipped entirely.
 
 ```ts
-const path = normalizeUrl(config.url || "");                 // ensure leading "/"
-const method = config.method?.toUpperCase() || "";
-const hasBody = config.data !== undefined && config.data !== null;
-// The backend signs the raw Content-Type header it receives. axios drops it on
-// bodyless requests → ""; a request with a body sends its pinned type.
-const contentType = hasBody ? pinnedContentType || "application/json" : "";
-const stringToSign = [method, contentType, ctime, path, ""].join("\n");  // canonical
+// generateSignature(config) — the axios adapter
+signRequest({ method: config.method, path: config.url, contentType: resolveContentType(config) });
+
+// signRequest({ method, path, contentType = "application/json", ctime = Date.now() })
+const stringToSign = [method.toUpperCase(), contentType, ctime, normalizeUrl(path), ""].join("\n");
 const sig = Base64.stringify(HmacSHA256(stringToSign, secret));          // base64 HMAC-SHA256
 return { sig, ctime, "x-version": xVersion };                            // headers
 ```
+
+`resolveContentType(config)` returns the Content-Type axios will actually send:
+`""` when `data === undefined` (axios drops the header); otherwise the pinned
+value (instance default or per-request, looked up case-insensitively, or via
+`AxiosHeaders.get`) exactly as set; otherwise axios's default for the body —
+`URLSearchParams` → `application/x-www-form-urlencoded;charset=utf-8`, a string
+→ `application/x-www-form-urlencoded`, anything else (including `null`) →
+`application/json`.
 
 - **Canonical string:** `[method, contentType, ctime, path, ""].join("\n")` — the
   trailing `""` yields a final newline. `contentType` MUST equal the header the
@@ -70,11 +83,10 @@ return { sig, ctime, "x-version": xVersion };                            // head
 **Signing rules and limits** (the backends verify the raw `Content-Type` header
 and the path with the query stripped):
 
-- The signed path is `config.url` (relative to the baseURL) with the query
-  stripped (`url.split("?")[0]`). Query params — inline or via `params` — are
-  never signed.
-- The signed `contentType` is the exact header sent: the pinned value (or
-  `application/json`) for a request with a body, `""` without one.
+- The signed path is `config.url` (relative to the baseURL) with the query and
+  hash stripped (`url.split(/[?#]/)[0]`). Query params — inline or via `params` —
+  are never signed.
+- The signed `contentType` is the exact header sent (`resolveContentType`).
 - **Never pin a charset.** A pinned value is signed exactly as sent, but browsers
   may rewrite a charset on the wire (Chrome sends `charset=UTF-8`), which breaks
   the raw-header comparison.
@@ -100,17 +112,18 @@ recover before ending the session.
 ### Eligibility — `canAttemptRefresh`
 
 ```ts
-if (config._retry) return false;                        // already replayed once
-if (isCredentialRequest(config, options)) return false; // refresh / login / register / logout
-return Boolean(getAccessToken(options.service));        // skip anonymous traffic
+if (config._retry) return false;                     // already replayed once
+if (isRefreshExempt(config, options)) return false;  // refresh endpoint + skipPaths
+return options.hasSession();                         // default hasStoredSession(service)
 ```
 
 So: never loop (`_retry` guard), never refresh a **credential endpoint** (a 401
 from login means a wrong password, not an expired session — the error reaches
 the form untouched), never trigger a refresh storm for anonymous requests.
-Credential paths come from `excludePaths` (defaults `/auth/login`,
-`/auth/register`, `/auth/logout`; `init-services.ts` passes the auth contract's
-paths) plus the refresh `endpoint` itself.
+Exempt paths are the refresh `endpoint` plus `skipPaths` (default `[]`;
+`init-services.ts` passes the auth contract's login, register and logout paths),
+matched against the request path without query or hash (`path === p ||
+path.endsWith(p)`).
 
 ### Single-Flight + Cross-Tab Lock — `RefreshTokenManager`
 
@@ -135,16 +148,20 @@ getFreshToken(staleToken) {
 }
 ```
 
-`staleToken` is the bearer the failed request was sent with. When
-`navigator.locks` is unavailable it falls back to the unlocked single-flight
-behavior.
+`staleToken` is the bearer the failed request was sent with. Once the lock is
+held the manager also rejects with `SessionEndedError` (no network call) when
+the session ended meanwhile: a moved epoch, a running logout, or
+`isSessionAlive()` (wired to the service's `hasSession`) returning false — e.g.
+another tab logged out while this one waited. When `navigator.locks` is
+unavailable it falls back to the unlocked single-flight behavior.
 
-Failure handling distinguishes **definitive** from **transient** failures:
+Only 401/403 from the refresh call ends the session (`isRefreshRefused`);
+every other failure is transient:
 
 | Refresh outcome | Tokens | Effect |
 | --- | --- | --- |
-| 401/403 (revoked, reuse detected, expired) or malformed response | cleared | `onRefreshFailed` → `notifySessionExpired(service)` |
-| Network error, timeout (15s), 408/429, 5xx | kept | rejects with `retryable: true`; a later request can refresh again |
+| 401/403 (revoked, reuse detected, expired) | cleared | `onRefreshFailed` → `endSession("expired", service)`; the request rejects with its original 401 |
+| Network error, timeout (15s), 400, 408, 429, 5xx, 200 without an access token | kept | rejects with `refreshUnavailable(error)` (`message: "refresh_unavailable"`, `retryable: true`, `error_code` = status or 0) |
 
 Every rejection reaching a caller has the shape
 `{ error_code: <HTTP status or 0>, message, retryable? }` (`toApiError`).
@@ -157,10 +174,11 @@ HMAC headers itself, signing the same body and `Content-Type` it sends:
 
 ```ts
 const body = { refreshToken: getRefreshToken(service) ?? undefined };
-const signature = HMACSignatureGenerator.generateSignature({ url: endpoint, method: "post", headers, data: body });
-const { data } = await axios.post(url, body, { withCredentials: true, headers });
-// rotated pair (tolerates several envelope shapes) — the manager persists it,
-// unless the session ended while the call was in flight
+const signature = HMACSignatureGenerator.signRequest({ method: "POST", path: endpoint, contentType: "application/json" });
+const { data } = await axios.post(url, body, { withCredentials: true, headers, timeout: REFRESH_TIMEOUT_MS });
+// rotated pair (tolerates several envelope shapes; a missing access token throws
+// "refresh_response_missing_access_token", which is transient) — the manager
+// persists it, unless the session ended while the call was in flight
 return { accessToken: extractAccessToken(data), refreshToken: extractRefreshToken(data) };
 ```
 
@@ -170,38 +188,53 @@ return { accessToken: extractAccessToken(data), refreshToken: extractRefreshToke
 config._retry = true;                                  // mark before replaying
 return ctx.manager.getFreshToken(sentAccessToken(config)).then(
   (token) => { config.headers.authorization = `Bearer ${token}`; return instance(config); },
-  (error) => Promise.reject(toApiError(error)),        // refresh failed → reject, never reload
+  (error) => Promise.reject(
+    error instanceof SessionEndedError ? error         // logout ran meanwhile
+    : isRefreshRefused(error) ? unauthorized           // the original 401 (session ended)
+    : refreshUnavailable(error),                       // transient, session kept
+  ),
 );
 ```
 
-The replay's own outcome propagates: a later non-auth failure (e.g. 500) does
-**not** wrongly clear the freshly minted token.
+The replay's own outcome propagates as-is: a later 500 — or a 401 again —
+neither clears the freshly minted token nor ends the session. The refresh
+endpoint is the only authority on session validity; a resource-level 401 after
+a successful rotation just rejects to the caller, and `_retry` bounds the cost
+to one refresh per request.
 
-### When Refresh Is Not Possible — `handleUnauthorized`
+### When Refresh Is Not Attempted
 
-```ts
-if (ctx && isCredentialRequest(config, ctx.options)) return; // wrong password: leave session alone
-const hadSession = Boolean(getAccessToken(service));
-clearServiceTokens(service);                                 // drop only this service's pair
-if (ctx && hadSession) notifySessionExpired(service);        // e.g. refreshed replay still 401
-```
+A 401 that is not eligible (credential endpoint, anonymous, already replayed, or
+a service **without** refresh config) rejects with `toApiError(error)` and
+touches nothing. Nothing in the service layer reloads the page.
 
-A service **without** refresh config just clears its tokens and rejects. Nothing
-in the service layer reloads the page.
+## Session End → `/login`
 
-## Session Expiry → `/login`
+`services/core/session.ts` carries the session-end pub/sub:
+`endSession(reason, service)` bumps that service's epoch, then notifies
+`onSessionEnded((reason, service) => …)` listeners. Reasons are `"logout"`
+(voluntary, or another tab's) and `"expired"` (a refused refresh).
 
-`services/core/session-events.ts` is a tiny pub/sub. `plugins/session-expiry.ts`
-subscribes once (after Pinia + router are installed): for the MAIN service it
-calls `authStore.clearSession()` (user, tokens, and
-`resetQueriesToSignedOut` (`services/core/query-client.ts`): every query reset in place — no refetch, in-flight fetches cancelled — unobserved ones removed, `auth.me` pinned to `null`. Never `queryClient.clear()`, which would leave mounted views attached to dead queries showing the old user's data) and
-`router.replace({ name: "login", query: { redirect } })`.
+- The auth store subscribes and, for the MAIN service, drops the user and the
+  hydrate error, re-syncs `hasToken` and calls `resetQueriesToSignedOut`
+  (`services/core/query-client.ts`): every query reset in place — no refetch,
+  in-flight fetches cancelled — unobserved ones removed, `auth.me` pinned to
+  `null`. Never `queryClient.clear()`, which would leave mounted views attached
+  to dead queries showing the old user's data.
+- `plugins/session-expiry.ts` (after Pinia + router are installed) registers
+  `redirectOnSessionExpired(redirect, authContract.service)`: only an
+  `"expired"` end of the auth service navigates, client-side, to
+  `loginPathWithReturn(currentRoute.fullPath)` (`/login?redirect=<encoded
+  path>`), unless already on the login page.
 
 ## Boot Hydration and Logout (`stores/auth.ts`)
 
-- `hydrate()` resolves the profile when a token exists. It clears the session
-  **only** on a 401 (after the refresh attempt) or when a refused refresh already
-  cleared the tokens. A network error, timeout or 5xx keeps the tokens and sets
+- `hydrate()` resolves the profile when a token is stored. On a 401 (after the
+  refresh attempt) it calls `AuthModel.logout()` (revoke, clear, end the session
+  as `"logout"`) — unless the session already ended while the request ran (a
+  refused refresh or another logout cleared the tokens or moved the session
+  epoch), in which case it only resets local state, with no second logout
+  request. A network error, timeout or 5xx keeps the tokens and sets
   `hydrateError` (`retryable: true`); `App.vue` shows it with a Retry button
   (`retryHydrate()`).
 - `logout()` posts `{ refreshToken }` to `/auth/logout` (so the backend revokes
@@ -209,7 +242,7 @@ calls `authStore.clearSession()` (user, tokens, and
   fails.
 - The login view follows `?redirect=` after signing in, and the router guard
   (`router/auth-guard.ts`) does the same when a signed-in user opens `/login`.
-  Both go through `safeRedirect(value)` (`utils/safe-redirect.ts`), which keeps
+  Both go through `safeRedirect(value)` (`services/core/session.ts`), which keeps
   the value only when it is a string of at most 512 chars, starts with exactly
   one `/`, contains no `\`, no control character (`[\u0000-\u001F\u007F]`, which
   URL parsers strip) and no `://`, and is not the login page itself (`/login`,
@@ -223,7 +256,7 @@ a counter, so overlapping logouts never clear each other's flag) in its first
 tick, then runs through `withSessionLock(service, …)`: under the same
 `<APP_PREFIX>:auth-refresh:<service>` Web Lock as the refresh (or, without `navigator.locks`,
 after this tab's in-flight refresh settles). The wait is capped at 15s
-(`SESSION_LOCK_WAIT_MS`); past it logout proceeds unlocked. A running refresh therefore finishes
+(`SESSION_WAIT_TIMEOUT_MS`); past it logout proceeds unlocked. A running refresh therefore finishes
 first and logout sends — and revokes — the freshly rotated refresh token. In
 this tab, a refresh queued behind logout finds the session ended
 (`isLogoutPending` or a moved epoch). In another tab, one queued behind the lock
@@ -237,12 +270,15 @@ A logout also closes the window while it waits and while its own request is in
 flight. From its first tick every new refresh — including a 401 arriving
 mid-logout — rejects at once with `SessionEndedError`
 (`{ error_code: 401, message: "session_ended" }`) and never calls
-`/auth/refresh`. Once the lock is held, in one synchronous tick it captures the
-refresh token and the access token and bumps the session epoch (`bumpSessionEpoch`). It then posts
+`/auth/refresh`. Both tokens are captured when logout starts, before any await.
+Once the lock is held, in one synchronous tick it picks the tokens to revoke —
+the ones stored now, else the copy captured at the start if storage was emptied
+meanwhile — and bumps the session epoch (`bumpSessionEpoch`). It then posts
 `{ refreshToken }` with `Authorization: Bearer <captured access token>`. So the
-server cannot rotate the token logout is revoking. Tokens, user and query cache
-are cleared even when the request fails; a voluntary logout never fires session
-expiry and navigates to `/login` without a `redirect`. The `done()` returned by
+server cannot rotate the token logout is revoking. In a `finally` it clears the
+tokens and calls `endSession("logout", service)`, so tokens, user and query
+cache are cleared even when the request fails; a voluntary logout never ends
+the session as `"expired"` and navigates to `/login` without a `redirect`. The `done()` returned by
 `beginLogout` lifts the block afterwards (idempotent).
 
 **Known limit:** two tabs **without** `navigator.locks`. The session epoch and the
@@ -254,8 +290,9 @@ close this gap.
 
 `ApiInterceptors` is built from a `Record<service, ServiceRefreshConfig>`. A
 service is auto-refreshed **iff it appears in that map**; omit it to opt out (its
-401s just clear that service's tokens). Defaults: `endpoint: "/auth/refresh"`,
-`excludePaths: ["/auth/login", "/auth/register", "/auth/logout"]`. Managers are
+401s just reject). `ServiceRefreshConfig` = `Partial<{ endpoint, skipPaths,
+hasSession, onRefreshed }>`. Defaults: `endpoint: "/auth/refresh"`,
+`skipPaths: []`, `hasSession: () => hasStoredSession(service)`. Managers are
 built lazily and cached per service.
 
 ## End-to-End 401 Sequence
@@ -263,15 +300,16 @@ built lazily and cached per service.
 ```
 request → 401
    │
-   ├─ canAttemptRefresh?  (not _retry, not a credential path, token present)
-   │        │ no → credential path: reject as-is
-   │        │      otherwise: clear service tokens; expire session if one was held
+   ├─ canAttemptRefresh?  (not _retry, not exempt, hasSession())
+   │        │ no → reject toApiError(error); nothing cleared
    │        │ yes
+   ├─ config._retry = true
    ├─ RefreshTokenManager.getFreshToken(sentToken)  ← concurrent 401s share ONE call
    │        ├─ navigator.locks "<APP_PREFIX>:auth-refresh:<service>" (cross-tab)
+   │        ├─ session ended meanwhile? → SessionEndedError, no network call
    │        ├─ token already rotated by another tab? → use it
    │        ├─ bare-axios POST /auth/refresh ({ refreshToken } + HMAC) → new pair
-   │        └─ definitive failure → clear tokens, notifySessionExpired → /login
-   ├─ config._retry = true
+   │        ├─ 401/403 → clear tokens, endSession("expired") → /login; reject original 401
+   │        └─ anything else → reject refreshUnavailable (retryable), session kept
    └─ replay request with `Bearer <newToken>` → original outcome propagates
 ```

@@ -76,8 +76,9 @@ try {
 
 This is why `01.init-services.ts` resolves the app prefix once, inside its
 plugin scope (`setAppPrefix(useRuntimeConfig().public.appName)`), before any
-request runs: the session-hint cookie (`<APP_PREFIX>_SESSION`), the refresh lock
-and its localStorage timestamp are all prefixed with it, on the server too.
+request runs: the session hint cookie (`<APP_PREFIX>_SESSION`), the auth-sync
+key (`<APP_PREFIX>_AUTH_SYNC`), the refresh lock and its localStorage timestamp
+are all prefixed with it, on the server too.
 
 ## Server vs Client: what runs where
 
@@ -86,12 +87,12 @@ and its localStorage timestamp are all prefixed with it, on the server too.
 | Numbered plugins | yes (render) | yes (hydration) |
 | `useRuntimeConfig()` | yes | yes |
 | Auth tokens | httpOnly cookies, forwarded from the request (`serverApiGet`) | httpOnly cookies, sent by the browser (`withCredentials`) |
-| Session hint `<APP_PREFIX>_SESSION` | read from the request `cookie` header | read / written via `document.cookie` |
+| Session hint `<APP_PREFIX>_SESSION` | read from the request `cookie` header (`hasServerSessionHint`) | read / written via `document.cookie` |
 | 401 refresh-and-retry | never (SSR fetches reject; the browser resolves them) | yes (axios interceptors) |
 | Socket.IO handshake | never (`onMounted` only) | yes |
 
 The server never refreshes: the refresh cookie is scoped to the backend's auth
-routes and only the browser can rotate it. `fetchServerSessionUser` (see
+routes and only the browser can rotate it. `readServerSession` (see
 [Security & Auth](./security-auth.md)) maps the SSR `/auth/me` read as:
 
 | SSR result | Outcome |

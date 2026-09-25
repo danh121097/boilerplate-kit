@@ -1,5 +1,5 @@
 /**
- * Centralised cookie key registry for UI preferences. Always go through this map
+ * Centralised key registry for UI preferences and the auth-sync broadcast. Always go through this map
  * so a single rename ripples cleanly and stale keys are easy to spot.
  *
  * Preferences live in cookies (not localStorage) so SSR can read them on the
@@ -18,8 +18,10 @@ function buildKeys(prefix: string) {
   return {
     LANGUAGE: `${prefix}_LANGUAGE`,
     THEME: `${prefix}_THEME`,
-    /** Readable "a session exists" hint — see `services/core/session-hint.ts`. */
+    /** Readable "a session exists" hint — see `services/core/session.ts`. */
     SESSION: `${prefix}_SESSION`,
+    /** localStorage key another tab's login / logout is announced on — see `services/core/session.ts`. */
+    AUTH_SYNC: `${prefix}_AUTH_SYNC`,
   } as const;
 }
 

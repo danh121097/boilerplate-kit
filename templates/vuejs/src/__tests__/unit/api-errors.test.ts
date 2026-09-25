@@ -1,4 +1,12 @@
-import { getApiErrorMessage, toApiError } from "@/services/core";
+import {
+  getApiErrorMessage,
+  isRefreshRefused,
+  isTransientHttpError,
+  isUnauthorizedError,
+  refreshUnavailable,
+  SessionEndedError,
+  toApiError,
+} from "@/services/core";
 import { describe, expect, it } from "vitest";
 
 /** Login-form error text: the server's message, not the generic fallback. */
@@ -26,5 +34,47 @@ describe("getApiErrorMessage", () => {
 
   it("uses an Error's message", () => {
     expect(getApiErrorMessage(new Error("Network Error"), "x")).toBe("Network Error");
+  });
+});
+
+const httpFailure = (status?: number) => ({
+  isAxiosError: true,
+  response: status === undefined ? undefined : { status, data: { success: false } },
+});
+
+describe("refresh failure classification", () => {
+  it("only a 401 or 403 from the refresh call refuses the session", () => {
+    expect(isRefreshRefused(httpFailure(401))).toBe(true);
+    expect(isRefreshRefused(httpFailure(403))).toBe(true);
+    for (const status of [undefined, 400, 408, 429, 500, 503]) {
+      expect(isRefreshRefused(httpFailure(status))).toBe(false);
+    }
+    expect(isRefreshRefused(new Error("refresh_response_missing_access_token"))).toBe(false);
+  });
+
+  it("a transient refresh failure maps to a retryable non-401 rejection", () => {
+    expect(refreshUnavailable(httpFailure(503))).toEqual({
+      status: "error",
+      error_code: 503,
+      message: "refresh_unavailable",
+      error_message: "refresh_unavailable",
+      retryable: true,
+    });
+    expect(refreshUnavailable(httpFailure())).toMatchObject({ error_code: 0, retryable: true });
+    expect(refreshUnavailable(new Error("malformed"))).toMatchObject({ error_code: 0 });
+  });
+
+  it("an ended session reads as a 401 session_ended", () => {
+    const error = new SessionEndedError();
+    expect(error).toMatchObject({ error_code: 401, message: "session_ended" });
+    expect(isUnauthorizedError(error)).toBe(true);
+  });
+
+  it("offline, 408, 429 and 5xx are transient; 4xx are not", () => {
+    for (const status of [undefined, 408, 429, 500]) {
+      expect(isTransientHttpError(httpFailure(status))).toBe(true);
+    }
+    expect(isTransientHttpError(httpFailure(400))).toBe(false);
+    expect(isTransientHttpError(httpFailure(401))).toBe(false);
   });
 });

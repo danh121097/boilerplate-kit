@@ -79,7 +79,7 @@ describe("interceptors — token refresh", () => {
     expect(getAccessToken("MAIN")).toBe("NEW");
   });
 
-  it("gives up after one retry (no infinite loop) and clears the token", async () => {
+  it("gives up after one retry (no infinite loop) and keeps the refreshed token", async () => {
     localStorage.setItem(TOKEN_KEY, "OLD");
     vi.spyOn(axios, "post").mockResolvedValue(NEW_TOKEN);
 
@@ -89,9 +89,9 @@ describe("interceptors — token refresh", () => {
       return httpError(config);
     });
 
-    await expect(client.get("/users")).rejects.toBeTruthy();
+    await expect(client.get("/users")).rejects.toMatchObject({ error_code: 401 });
     expect(calls).toBe(2);
-    expect(getAccessToken("MAIN")).toBeNull();
+    expect(getAccessToken("MAIN")).toBe("NEW");
   });
 
   it("does not attempt refresh for anonymous traffic (no token)", async () => {

@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { useLoginMutation, useSessionQuery } from "@/services/auth";
-import { getApiErrorMessage } from "@/services/core";
-import { safeRedirect } from "@/utils/safe-redirect";
+import { useLoginMutation, useMeQuery } from "@/services/auth";
+import { getApiErrorMessage, safeRedirect } from "@/services/core";
 import { useQueryClient } from "@tanstack/vue-query";
 import { computed, ref } from "vue";
 
@@ -15,8 +14,8 @@ const queryClient = useQueryClient();
 const redirectTo = computed(() => safeRedirect(route.query.redirect));
 
 // Resolve the session on the server; if already signed in, skip the form.
-await queryClient.prefetchQuery(useSessionQuery.queryOptions());
-const { data: sessionUser } = useSessionQuery();
+await queryClient.prefetchQuery(useMeQuery.queryOptions());
+const { data: sessionUser } = useMeQuery();
 if (sessionUser.value) await navigateTo(redirectTo.value);
 
 // The login mutation invalidates `auth.me`; on success the session re-resolves and

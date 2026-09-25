@@ -34,7 +34,7 @@ access + refresh-cookie rotation + HMAC-signed requests, **SSR-guarded**),
 - `window`, `document.cookie` and `localStorage` access are **client-guarded**;
   signing reads the secret via `useRuntimeConfig()` (never `import.meta.env`).
 - In the browser a 401 triggers a **single-flight**, cross-tab-locked refresh per
-  service (only while the session-hint cookie is set); the page never reloads. Server state lives in
+  service (only while the session hint cookie is set); the page never reloads. Server state lives in
   TanStack Vue Query; UI/session state lives in Pinia.
 
 ## Read Order

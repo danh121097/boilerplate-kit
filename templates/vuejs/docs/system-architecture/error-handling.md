@@ -39,7 +39,7 @@ So `{ id: 1, status: "done" }` is treated as a raw payload, not an error envelop
 if (isEnvelope(response.data)) {
   const body = response.data;
   if (body.status === "success" || body.success === true) return response.data; // unwrap
-  if (body.error_code === 401) { /* refresh-and-retry, else handleUnauthorized */ }
+  if (body.error_code === 401) { /* refresh-and-retry when eligible */ }
   return Promise.reject(response.data as ApiResponseError);   // envelope-level error
 }
 return response;   // non-envelope → pass through untouched
@@ -52,17 +52,18 @@ Two doors lead to the same recovery logic:
 1. **HTTP 401** — caught in `onError` (`error.response?.status === 401`).
 2. **Envelope-level 401** — `body.error_code === 401` inside a 2xx body.
 
-Both call `refreshAndRetry`. If eligible (token present, not a credential call
-such as login/refresh, not already replayed) the request is refreshed and
-replayed; otherwise `handleUnauthorized` leaves credential calls alone (a login
-401 is a wrong password) and otherwise clears that service's tokens, announcing
-session expiry when a refresh-capable service held a session. The page is never
-reloaded — the app routes to `/login`. Full mechanics:
-[Security & Auth](./security-auth.md).
+Both call `refreshAndRetry`. If eligible (a session is stored, not the refresh
+endpoint or a `skipPaths` entry such as login, not already replayed) the request
+is refreshed and replayed; otherwise the 401 rejects as-is and nothing is
+cleared (a login 401 is a wrong password). Only the refresh call decides that a
+session is gone: a refused refresh (401/403) ends it as `"expired"` and the app
+routes to `/login`; any other refresh failure rejects with a retryable
+`refresh_unavailable` error and keeps it. The page is never reloaded. Full
+mechanics: [Security & Auth](./security-auth.md).
 
 A key invariant: once a replay is launched, **its own** outcome propagates. A
-post-refresh 500 is a genuine 500 — it is not re-interpreted as an auth failure
-and does not clear the fresh token.
+post-refresh 500 is a genuine 500, and a post-refresh 401 just rejects to the
+caller — neither clears the fresh token nor ends the session.
 
 ## Network Errors
 
@@ -108,9 +109,9 @@ every other error uses, instead of handing back an unreadable error blob.
 | --- | --- | --- |
 | Envelope `status: "error"` | `onSuccess` | reject with the envelope as `ApiResponseError` |
 | Envelope/HTTP 401 (eligible) | `onSuccess`/`onError` | refresh + replay |
-| Envelope/HTTP 401 (credential call) | `handleUnauthorized` | reject as-is (no refresh, session kept) |
-| Envelope/HTTP 401 (other, ineligible) | `handleUnauthorized` | clear service tokens; session-expired event if one was held |
-| Refresh refused (401/403) | `RefreshTokenManager` | clear tokens; session-expired event → `/login`; reject 401 |
+| Envelope/HTTP 401 (ineligible: credential call, anonymous, replayed, no refresh config) | `onSuccess`/`onError` | reject as-is (no refresh, session kept) |
+| Refresh refused (401/403) | `RefreshTokenManager` | clear tokens; `endSession("expired")` → `/login`; reject the original 401 |
+| Refresh failed otherwise (network, timeout, 400, 408, 429, 5xx, malformed body) | `refreshAndRetry` | reject `refreshUnavailable` (`retryable: true`); session kept |
 | Network / blocked | `onError` | log; reject `{ message, error_code: 0 }` |
 | Non-2xx blob | `onSuccess` | reject synthetic `ApiResponseError` |
 | Anything else | pass-through | raw response returned |

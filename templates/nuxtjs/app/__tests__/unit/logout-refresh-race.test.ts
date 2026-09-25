@@ -1,10 +1,10 @@
 import { httpError, makeClient } from "@/__tests__/helpers/http-mocks";
 import { AuthModel } from "@/services/auth";
 import {
-  clearSessionHint,
+  endSession,
   hasSessionHint,
   markSessionActive,
-  onSessionExpired,
+  onSessionEnded,
   RefreshTokenManager,
 } from "@/services/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -80,7 +80,7 @@ describe("logout vs in-flight refresh", () => {
 
     const fresh = mgr.refresh(Date.now());
     // The session ends (logout / expiry) before the refresh response lands.
-    clearSessionHint();
+    endSession("logout", "MAIN");
     pending.resolve();
 
     await expect(fresh).rejects.toMatchObject({ error_code: 401, message: "session_ended" });
@@ -200,13 +200,13 @@ describe("logout vs in-flight refresh", () => {
   it("voluntary logout never announces session expiry, even when the request fails", async () => {
     vi.stubGlobal("navigator", {});
     vi.spyOn(AuthModel.api, "post").mockRejectedValue({ error_code: 0, message: "Network Error" });
-    const expired = vi.fn();
-    const unsubscribe = onSessionExpired(expired);
+    const ended = vi.fn();
+    const unsubscribe = onSessionEnded(ended);
 
     await expect(AuthModel.logout()).rejects.toMatchObject({ error_code: 0 });
     unsubscribe();
 
-    expect(expired).not.toHaveBeenCalled();
+    expect(ended).toHaveBeenCalledExactlyOnceWith("logout", "MAIN");
     expect(hasSessionHint()).toBe(false);
   });
 

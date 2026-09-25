@@ -7,6 +7,7 @@ import {
   getRefreshToken,
   persistAccessToken,
   persistRefreshToken,
+  refreshLockName,
   RefreshTokenManager,
   SessionEndedError,
 } from "@/services/core";
@@ -180,6 +181,29 @@ describe("logout vs in-flight refresh", () => {
     expect(seen).toEqual(["AT"]);
     expect(getAccessToken("MAIN")).toBeNull();
     expect(getRefreshToken("MAIN")).toBeNull();
+  });
+
+  it("logout revokes the tokens held at its start when storage is emptied while it waits", async () => {
+    const locks = fakeLocks();
+    vi.stubGlobal("navigator", { locks });
+    const post = vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
+    const holder = deferred<void>();
+    // Another holder of the session lock (e.g. a refresh in another tab).
+    void locks.request(refreshLockName("MAIN"), () => holder.promise);
+
+    const logout = AuthModel.logout();
+    // Storage emptied while logout waits for the lock.
+    localStorage.clear();
+    holder.resolve();
+    await logout;
+
+    expect(post).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "/auth/logout",
+        data: { refreshToken: "RT" },
+        customHeaders: { authorization: "Bearer AT" },
+      }),
+    );
   });
 
   it("a refresh queued behind logout finds the session ended (with navigator.locks)", async () => {

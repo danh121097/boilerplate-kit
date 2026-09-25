@@ -5,8 +5,10 @@ import {
   clearAuthTokens,
   defineMutation,
   defineQuery,
+  endSession,
   getAccessToken,
   getRefreshToken,
+  isUnauthorizedError,
   Model,
   persistAccessToken,
   persistRefreshToken,
@@ -42,22 +44,29 @@ export class AuthModel extends Model {
    * it in localStorage, not the cookie), then drop every stored token.
    *
    * Never overlaps a token refresh: an in-flight refresh finishes first (so the
-   * token revoked is the latest rotated one; the wait is capped at 15s). Then —
-   * synchronously, before the request — both tokens are captured and the session
+   * token revoked is the latest rotated one; the wait is capped at 15s). Both
+   * tokens are captured when logout starts; the ones stored when the lock is
+   * taken win, the captured copy is the fallback if storage was emptied
+   * meanwhile. Then — synchronously, before the request — the session is
    * marked as ending, so a 401 arriving while the logout request is in flight
    * rejects with `session_ended` instead of rotating the token being revoked; a
-   * refresh landing afterwards writes nothing back. The tokens are cleared even
-   * when the request fails. */
+   * refresh landing afterwards writes nothing back. The tokens are cleared and
+   * the session ended ("logout" — no session-expired redirect) even when the
+   * request fails. */
   static async logout(): Promise<void> {
     const service = this.service;
+    // Captured before any await: if storage is emptied while logout waits
+    // (another tab, a refused refresh), these are still revoked.
+    const held = { access: getAccessToken(service), refresh: getRefreshToken(service) };
     // Logout-pending from the first tick: no refresh starts while logout waits
     // for an in-flight one or while its request is in flight.
     const done = beginLogout(service);
     try {
       await withSessionLock(service, async () => {
-        // One synchronous tick: capture what to revoke, then end the epoch.
-        const refreshToken = getRefreshToken(service) ?? undefined;
-        const accessToken = getAccessToken(service);
+        // One synchronous tick: pick what to revoke (the latest stored tokens,
+        // else the copy captured at the start), then end the epoch.
+        const refreshToken = getRefreshToken(service) ?? held.refresh ?? undefined;
+        const accessToken = getAccessToken(service) ?? held.access;
         bumpSessionEpoch(service);
         try {
           await this.api.post({
@@ -67,6 +76,7 @@ export class AuthModel extends Model {
           });
         } finally {
           clearAuthTokens();
+          endSession("logout", service);
         }
       });
     } finally {
@@ -79,6 +89,17 @@ export class AuthModel extends Model {
     return res.data.user;
   }
 
+  /** The signed-in user, or null when the session is rejected (401 — after the
+   * interceptor's refresh attempt). Other failures (offline, 5xx) reject. */
+  static async getSession(): Promise<AuthUser | null> {
+    try {
+      return await this.getMe();
+    } catch (error) {
+      if (isUnauthorizedError(error)) return null;
+      throw error;
+    }
+  }
+
   /** Persist both tokens: access for the Bearer header, refresh for the refresh call. */
   private static storeSession(result: AuthResult): AuthResult {
     persistAccessToken(result.tokens.accessToken, this.service);
@@ -88,9 +109,9 @@ export class AuthModel extends Model {
 }
 
 // Queries
-export const useMeQuery = defineQuery<AuthUser>({
+export const useMeQuery = defineQuery<AuthUser | null>({
   key: queryKeys.auth.me,
-  fetcher: () => AuthModel.getMe(),
+  fetcher: () => AuthModel.getSession(),
 });
 
 // Mutations

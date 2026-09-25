@@ -79,18 +79,18 @@ export function useSocketIO() {
       storeSocketIO.setSocketIO({ authenticated: false });
     reConnect();
   }, 1000);
-  const handleUnauthorized = () => destroySocket();
+  const onSocketUnauthorized = () => destroySocket();
 
   socket.on(SOCKET_EVENT.AUTHENTICATED, handleAuthenticated);
   socket.on(SOCKET_EVENT.CONNECT_ERROR, handleConnectError);
-  socket.on(SOCKET_EVENT.UNAUTHORIZED, handleUnauthorized);
+  socket.on(SOCKET_EVENT.UNAUTHORIZED, onSocketUnauthorized);
 
   onMounted(connectSocket);
 
   onScopeDispose(() => {
     socket.off(SOCKET_EVENT.AUTHENTICATED, handleAuthenticated);
     socket.off(SOCKET_EVENT.CONNECT_ERROR, handleConnectError);
-    socket.off(SOCKET_EVENT.UNAUTHORIZED, handleUnauthorized);
+    socket.off(SOCKET_EVENT.UNAUTHORIZED, onSocketUnauthorized);
     destroySocket();
   });
 

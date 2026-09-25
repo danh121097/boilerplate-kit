@@ -1,9 +1,16 @@
 import { AuthModel } from "@/services/auth";
-import { clearSessionHint, hasSessionHint, markSessionActive } from "@/services/core";
+import {
+  clearSessionHint,
+  endSession,
+  getSessionEpoch,
+  hasSessionHint,
+  markSessionActive,
+  startSession,
+} from "@/services/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * The readable session-hint cookie: set on login/register, cleared on logout
+ * The readable session hint cookie and the session lifecycle: set on login/register, cleared on logout
  * (even a failed one). `document.cookie` is stubbed as a plain string property.
  */
 
@@ -15,10 +22,21 @@ const RESULT = {
 describe("session hint", () => {
   let doc: { cookie: string };
 
+  let storage: Map<string, string>;
+
   beforeEach(() => {
     doc = { cookie: "" };
     vi.stubGlobal("document", doc);
+    storage = new Map();
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => storage.get(k) ?? null,
+      setItem: (k: string, v: string) => storage.set(k, v),
+      removeItem: (k: string) => storage.delete(k),
+    });
   });
+
+  const lastBroadcast = () =>
+    JSON.parse(storage.get("PRISM_APP_AUTH_SYNC") ?? "null") as { type: string } | null;
 
   afterEach(() => {
     vi.restoreAllMocks();
@@ -61,5 +79,40 @@ describe("session hint", () => {
     vi.spyOn(AuthModel.api, "post").mockRejectedValue(new Error("network"));
     await expect(AuthModel.logout()).rejects.toThrow("network");
     expect(hasSessionHint()).toBe(false);
+  });
+
+  it("clearing the hint alone does not end the session epoch", () => {
+    const epoch = getSessionEpoch("MAIN");
+    markSessionActive();
+    clearSessionHint();
+    expect(getSessionEpoch("MAIN")).toBe(epoch);
+  });
+
+  it("starting a session marks the hint and tells the other tabs", () => {
+    startSession();
+    expect(hasSessionHint()).toBe(true);
+    expect(lastBroadcast()).toMatchObject({ type: "login" });
+  });
+
+  it("ending the main session bumps its epoch, drops the hint and tells the other tabs", () => {
+    const epoch = getSessionEpoch("MAIN");
+    markSessionActive();
+
+    endSession("expired", "MAIN");
+
+    expect(getSessionEpoch("MAIN")).toBe(epoch + 1);
+    expect(hasSessionHint()).toBe(false);
+    expect(lastBroadcast()).toMatchObject({ type: "logout" });
+  });
+
+  it("ending another service's session keeps the hint and broadcasts nothing", () => {
+    const main = getSessionEpoch("MAIN");
+    markSessionActive();
+
+    endSession("expired", "ADMIN");
+
+    expect(getSessionEpoch("MAIN")).toBe(main);
+    expect(hasSessionHint()).toBe(true);
+    expect(lastBroadcast()).toBeNull();
   });
 });

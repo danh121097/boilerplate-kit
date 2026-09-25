@@ -21,6 +21,14 @@ declare module "axios" {
   }
 }
 
+/** A rotated token pair — token templates only; here the backend rotates the
+ * httpOnly cookies and the refresher resolves with no value. Kept so the core
+ * type surface matches across templates. */
+export interface RefreshedTokens {
+  accessToken: string;
+  refreshToken?: string;
+}
+
 /**
  * Resolved refresh config for one service. Both tokens live in httpOnly cookies
  * owned by the backend — nothing is managed client-side.
@@ -33,13 +41,13 @@ export interface RefreshOptions {
   /**
    * Credential endpoints (login, register, logout, ...) whose 401 means "bad
    * credentials", never "expired session" — they are never refreshed or retried.
-   * The refresh endpoint itself is always excluded.
+   * The refresh endpoint itself is always skipped.
    */
-  excludePaths: string[];
+  skipPaths: string[];
   /**
-   * Whether a session is believed to exist (the readable session-hint cookie).
+   * Whether a session is believed to exist (the readable session hint cookie).
    * When false a 401 is treated as anonymous: no refresh attempt. UX only —
-   * never an authorization decision. Defaults to always true.
+   * never an authorization decision. Defaults to `hasSessionHint`.
    */
   hasSession: () => boolean;
   /** Fired after every successful refresh (renews the session hint). */

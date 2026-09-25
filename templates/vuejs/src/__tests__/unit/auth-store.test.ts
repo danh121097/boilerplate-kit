@@ -2,9 +2,10 @@ import { installLocalStorage } from "@/__tests__/helpers/fake-storage";
 import { STORAGE_KEYS } from "@/enums";
 import { AuthModel } from "@/services/auth/auth";
 import {
+  clearServiceTokens,
+  endSession,
   getAccessToken,
-  notifySessionExpired,
-  onSessionExpired,
+  onSessionEnded,
   persistAccessToken,
   persistRefreshToken,
 } from "@/services/core";
@@ -80,14 +81,39 @@ describe("auth store", () => {
     expect(getMe).toHaveBeenCalledTimes(2);
   });
 
-  it("hydrate clears the session on a 401", async () => {
+  it("hydrate revokes a rejected session through logout on a 401", async () => {
     vi.spyOn(AuthModel, "getMe").mockRejectedValue({ error_code: 401, message: "expired" });
+    const logout = vi.spyOn(AuthModel, "logout").mockImplementation(async () => {
+      clearServiceTokens("MAIN");
+      endSession("logout", "MAIN");
+    });
+    const store = useAuthStore();
+    store.setUser({ _id: "u1", email: "a@b.com", name: "A", role: "user" } as never);
+
+    await store.hydrate();
+
+    expect(logout).toHaveBeenCalledTimes(1);
+    expect(getAccessToken("MAIN")).toBeNull();
+    expect(store.user).toBeNull();
+    expect(store.isAuthenticated).toBe(false);
+  });
+
+  it("hydrate only resets local state on a 401 when the session already ended", async () => {
+    vi.spyOn(AuthModel, "getMe").mockImplementation(async () => {
+      // A refused refresh ended the session while the profile request ran.
+      clearServiceTokens("MAIN");
+      endSession("expired", "MAIN");
+      throw { error_code: 401, message: "expired" };
+    });
+    const logout = vi.spyOn(AuthModel, "logout");
     const store = useAuthStore();
 
     await store.hydrate();
 
-    expect(getAccessToken("MAIN")).toBeNull();
+    expect(logout).not.toHaveBeenCalled();
+    expect(store.user).toBeNull();
     expect(store.isAuthenticated).toBe(false);
+    expect(store.hydrateError).toBeNull();
   });
 
   it("isAuthenticated reacts to token writes and clears (localStorage is not reactive)", () => {
@@ -118,8 +144,8 @@ describe("auth store", () => {
 
   it("voluntary logout never announces session expiry, even when the request fails", async () => {
     vi.spyOn(AuthModel.api, "post").mockRejectedValue({ error_code: 0, message: "Network Error" });
-    const expired = vi.fn();
-    const unsubscribe = onSessionExpired(expired);
+    const ended = vi.fn();
+    const unsubscribe = onSessionEnded(ended);
     queryClient.setQueryData(["users.list"], ["someone"]);
     const store = useAuthStore();
     store.setUser({ _id: "u1", email: "a@b.com", name: "A", role: "user" } as never);
@@ -127,7 +153,7 @@ describe("auth store", () => {
     await store.logout();
     unsubscribe();
 
-    expect(expired).not.toHaveBeenCalled();
+    expect(ended).toHaveBeenCalledExactlyOnceWith("logout", "MAIN");
     expect(store.user).toBeNull();
     expect(getAccessToken("MAIN")).toBeNull();
     expect(queryClient.getQueryData(["users.list"])).toBeUndefined();
@@ -178,6 +204,55 @@ describe("auth store", () => {
     }
   });
 
+  it("remote logout after a same-tab login is applied", () => {
+    localStorage.clear(); // signed out when the store starts
+    const target = new EventTarget();
+    Object.assign(globalThis, { window: target });
+    try {
+      const store = useAuthStore();
+      const ended = vi.fn();
+      const stop = onSessionEnded(ended);
+
+      // This tab signs in.
+      persistAccessToken("AT2", "MAIN");
+      persistRefreshToken("RT2", "MAIN");
+      expect(store.isAuthenticated).toBe(true);
+
+      // Another tab signs out.
+      localStorage.clear();
+      target.dispatchEvent(new Event("storage"));
+      stop();
+
+      expect(ended).toHaveBeenCalledWith("logout", "MAIN");
+      expect(store.isAuthenticated).toBe(false);
+    } finally {
+      delete (globalThis as { window?: unknown }).window;
+    }
+  });
+
+  it("remote login after a same-tab logout is applied", async () => {
+    const target = new EventTarget();
+    Object.assign(globalThis, { window: target });
+    try {
+      const store = useAuthStore();
+      // This tab signs out.
+      store.clearSession();
+      expect(store.isAuthenticated).toBe(false);
+      const me = { _id: "u3", email: "c@b.com", name: "C", role: "user" };
+      const getMe = vi.spyOn(AuthModel, "getMe").mockResolvedValue(me as never);
+
+      // Another tab signs in.
+      localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, "AT4");
+      target.dispatchEvent(new Event("storage"));
+
+      expect(store.isAuthenticated).toBe(true);
+      await vi.waitFor(() => expect(store.user).toEqual(me));
+      expect(getMe).toHaveBeenCalledTimes(1);
+    } finally {
+      delete (globalThis as { window?: unknown }).window;
+    }
+  });
+
   it("a token rotation in another tab keeps this tab's state", () => {
     const target = new EventTarget();
     Object.assign(globalThis, { window: target });
@@ -207,11 +282,12 @@ describe("auth store", () => {
     setupSessionExpiry(router, activePinia);
     queryClient.setQueryData(["users.list"], ["someone"]);
 
-    notifySessionExpired("MAIN");
+    // The refresh manager clears the refused service's tokens, then ends the session.
+    clearServiceTokens("MAIN");
+    endSession("expired", "MAIN");
 
-    expect(getAccessToken("MAIN")).toBeNull();
     expect(useAuthStore(activePinia).isAuthenticated).toBe(false);
     expect(queryClient.getQueryData(["users.list"])).toBeUndefined();
-    expect(replace).toHaveBeenCalledWith({ name: "login", query: { redirect: "/users?page=2" } });
+    expect(replace).toHaveBeenCalledWith("/login?redirect=%2Fusers%3Fpage%3D2");
   });
 });

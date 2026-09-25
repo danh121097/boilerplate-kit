@@ -1,7 +1,14 @@
+import { SessionEndedError } from "@/services/core/api-errors";
 import { RefreshTokenManager } from "@/services/core/refresh-token-manager";
+import { bumpSessionEpoch } from "@/services/core/session";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const tick = () => new Promise((r) => setTimeout(r, 5));
+const httpFailure = (status: number) =>
+  Object.assign(new Error(`Request failed with status code ${status}`), {
+    isAxiosError: true,
+    response: { status, data: {} },
+  });
 
 describe("RefreshTokenManager", () => {
   afterEach(() => vi.restoreAllMocks());
@@ -37,18 +44,67 @@ describe("RefreshTokenManager", () => {
     expect(runs).toBe(2);
   });
 
-  it("fires onRefreshFailed and rethrows when refresh rejects", async () => {
+  for (const status of [401, 403]) {
+    it(`fires onRefreshFailed and rethrows when the refresh is refused with ${status}`, async () => {
+      const onRefreshFailed = vi.fn();
+      const mgr = new RefreshTokenManager({
+        service: "MAIN",
+        refresh: async () => {
+          throw httpFailure(status);
+        },
+        onRefreshFailed,
+      });
+
+      await expect(mgr.refresh()).rejects.toMatchObject({ response: { status } });
+      expect(onRefreshFailed).toHaveBeenCalledTimes(1);
+    });
+  }
+
+  for (const [label, failure] of [
+    ["a 400", httpFailure(400)],
+    ["a plain error", new Error("refresh failed")],
+  ] as const) {
+    it(`does not fire onRefreshFailed when the refresh fails with ${label}`, async () => {
+      const onRefreshFailed = vi.fn();
+      const mgr = new RefreshTokenManager({
+        service: "MAIN",
+        refresh: async () => {
+          throw failure;
+        },
+        onRefreshFailed,
+      });
+
+      await expect(mgr.refresh()).rejects.toBe(failure);
+      expect(onRefreshFailed).not.toHaveBeenCalled();
+    });
+  }
+
+  it("rejects session_ended without a network call when no session hint is left", async () => {
+    const refresh = vi.fn(async () => {});
     const onRefreshFailed = vi.fn();
     const mgr = new RefreshTokenManager({
       service: "MAIN",
-      refresh: async () => {
-        throw new Error("refresh failed");
-      },
+      refresh,
       onRefreshFailed,
+      isSessionAlive: () => false,
     });
 
-    await expect(mgr.refresh()).rejects.toThrow("refresh failed");
-    expect(onRefreshFailed).toHaveBeenCalledTimes(1);
+    await expect(mgr.refresh()).rejects.toBeInstanceOf(SessionEndedError);
+    expect(refresh).not.toHaveBeenCalled();
+    expect(onRefreshFailed).not.toHaveBeenCalled();
+  });
+
+  it("a refresh that resolves after the session ended fires no hooks and rejects session_ended", async () => {
+    const onRefreshed = vi.fn();
+    const mgr = new RefreshTokenManager({
+      service: "MAIN",
+      refresh: async () => bumpSessionEpoch("MAIN"),
+      onRefreshed,
+      onRefreshFailed: () => {},
+    });
+
+    await expect(mgr.refresh()).rejects.toBeInstanceOf(SessionEndedError);
+    expect(onRefreshed).not.toHaveBeenCalled();
   });
 
   it("does not fire onRefreshFailed when the refresh fails transiently", async () => {

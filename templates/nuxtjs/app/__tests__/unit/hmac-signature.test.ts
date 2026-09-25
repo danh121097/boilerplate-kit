@@ -1,6 +1,7 @@
 import { makeClient, ok } from "@/__tests__/helpers/http-mocks";
 import { HeadersUtils } from "@/services/core/headers-utils";
-import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
+import { HMACSignatureGenerator, resolveContentType } from "@/services/core/hmac-signature";
+import { AxiosHeaders } from "axios";
 import { createHmac } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { InternalAxiosRequestConfig } from "axios";
@@ -163,5 +164,45 @@ describe("hmac-signature", () => {
     });
     expect(sig).not.toBeNull();
     expect(sig!.sig).toBe(serverSign("shared-secret", "GET", "", ctime, "/auth/me"));
+  });
+});
+
+const requestWith = (data: unknown, headers: Record<string, string> | AxiosHeaders = {}) =>
+  ({ data, headers }) as unknown as InternalAxiosRequestConfig;
+
+/** The signed Content-Type must be exactly the header axios will send. */
+describe("resolveContentType", () => {
+  it.each([
+    ["no body", requestWith(undefined), ""],
+    [
+      "no body with a pinned type",
+      requestWith(undefined, { "Content-Type": "application/json" }),
+      "",
+    ],
+    ["a null body", requestWith(null), "application/json"],
+    ["a plain object", requestWith({ a: 1 }), "application/json"],
+    ["a string body", requestWith("a=1"), "application/x-www-form-urlencoded"],
+    [
+      "URLSearchParams",
+      requestWith(new URLSearchParams("a=1")),
+      "application/x-www-form-urlencoded;charset=utf-8",
+    ],
+    [
+      "a lowercase pinned header",
+      requestWith({ a: 1 }, { "content-type": "text/plain" }),
+      "text/plain",
+    ],
+    [
+      "a pinned header with a charset, signed as sent",
+      requestWith({ a: 1 }, { "Content-Type": "application/json; charset=utf-8" }),
+      "application/json; charset=utf-8",
+    ],
+    [
+      "an AxiosHeaders instance",
+      requestWith({ a: 1 }, new AxiosHeaders({ "Content-Type": "application/vnd.api+json" })),
+      "application/vnd.api+json",
+    ],
+  ])("%s", (_label, input, expected) => {
+    expect(resolveContentType(input)).toBe(expected);
   });
 });

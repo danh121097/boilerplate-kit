@@ -1,13 +1,13 @@
-import { httpError, makeClient, ok } from "@/__tests__/helpers/http-mocks";
-import { Api, onSessionExpired } from "@/services/core";
+import { httpError, MAIN_REFRESH, makeClient, ok } from "@/__tests__/helpers/http-mocks";
+import { Api, ApiInterceptors, onSessionEnded } from "@/services/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import axios from "axios";
 
 /**
  * 401 handling that must never reload the page: credential endpoints skip the
- * refresh, a refused refresh announces session expiry and rejects, a transient
- * refresh failure does not end the session, and a service without refresh
- * config just rejects.
+ * refresh, a refused refresh (401/403) ends the session as expired, every
+ * other refresh failure keeps it, and a 401 that is not refreshed (no refresh
+ * config, anonymous, or a replay that is 401 again) just rejects to the caller.
  */
 
 const refreshRefused = () =>
@@ -20,14 +20,14 @@ const refreshRefused = () =>
 
 describe("interceptors — 401 without reload", () => {
   const reload = vi.fn();
-  let expired: ReturnType<typeof vi.fn<(service: string) => void>>;
+  let ended: ReturnType<typeof vi.fn<(reason: string, service: string) => void>>;
   let unsubscribe: () => void;
 
   beforeEach(() => {
     vi.stubGlobal("window", { location: { reload } });
     Api.setBaseURL("http://api.test", "MAIN");
-    expired = vi.fn<(service: string) => void>();
-    unsubscribe = onSessionExpired(expired);
+    ended = vi.fn<(reason: string, service: string) => void>();
+    unsubscribe = onSessionEnded(ended);
   });
 
   afterEach(() => {
@@ -48,10 +48,10 @@ describe("interceptors — 401 without reload", () => {
     ).rejects.toMatchObject({ error_code: 401, message: "Invalid credentials" });
     expect(post).not.toHaveBeenCalled();
     expect(reload).not.toHaveBeenCalled();
-    expect(expired).not.toHaveBeenCalled();
+    expect(ended).not.toHaveBeenCalled();
   });
 
-  it("refresh refused → announces expiry and rejects 401, no reload", async () => {
+  it("refresh refused → ends the session as expired and rejects 401, no reload", async () => {
     vi.spyOn(axios, "post").mockImplementation(refreshRefused);
     let calls = 0;
     const client = makeClient(async (config) => {
@@ -62,10 +62,10 @@ describe("interceptors — 401 without reload", () => {
     await expect(client.get("/users")).rejects.toMatchObject({ error_code: 401 });
     expect(calls).toBe(1); // not replayed after a refused refresh
     expect(reload).not.toHaveBeenCalled();
-    expect(expired).toHaveBeenCalledWith("MAIN");
+    expect(ended).toHaveBeenCalledExactlyOnceWith("expired", "MAIN");
   });
 
-  it("refresh answered 403 ends the session like a 401", async () => {
+  it("refresh answered 403 ends the session and rejects with the original 401", async () => {
     vi.spyOn(axios, "post").mockRejectedValue(
       Object.assign(new Error("Request failed with status code 403"), {
         isAxiosError: true,
@@ -74,11 +74,13 @@ describe("interceptors — 401 without reload", () => {
     );
     const client = makeClient(async (config) => httpError(config));
 
-    await expect(client.get("/users")).rejects.toMatchObject({ error_code: 403 });
-    expect(expired).toHaveBeenCalledWith("MAIN");
+    await expect(client.get("/users")).rejects.toMatchObject({ error_code: 401 });
+    expect(ended).toHaveBeenCalledWith("expired", "MAIN");
   });
 
   for (const [label, status, code] of [
+    ["400", 400, undefined],
+    ["408", 408, undefined],
     ["429", 429, undefined],
     ["503", 503, undefined],
     ["a timeout", undefined, "ECONNABORTED"],
@@ -97,7 +99,7 @@ describe("interceptors — 401 without reload", () => {
         error_code: status ?? 0,
         retryable: true,
       });
-      expect(expired).not.toHaveBeenCalled();
+      expect(ended).not.toHaveBeenCalled();
     });
   }
 
@@ -119,17 +121,48 @@ describe("interceptors — 401 without reload", () => {
     const client = makeClient(async (config) => httpError(config));
 
     await expect(client.get("/users")).rejects.toMatchObject({ error_code: 0 });
-    expect(expired).not.toHaveBeenCalled();
+    expect(ended).not.toHaveBeenCalled();
     expect(reload).not.toHaveBeenCalled();
   });
 
-  it("refreshed replay still 401 → announces expiry, no reload", async () => {
+  it("a replayed request that is 401 again rejects to the caller and keeps the session", async () => {
+    vi.spyOn(axios, "post").mockResolvedValue({ data: { success: true } } as never);
+    let calls = 0;
+    const client = makeClient(async (config) => {
+      calls += 1;
+      return httpError(config);
+    });
+
+    await expect(client.get("/users")).rejects.toMatchObject({ error_code: 401 });
+    expect(calls).toBe(2);
+    expect(ended).not.toHaveBeenCalled();
+    expect(reload).not.toHaveBeenCalled();
+  });
+
+  it("concurrent replays that are 401 again never fan out session-ended events", async () => {
     vi.spyOn(axios, "post").mockResolvedValue({ data: { success: true } } as never);
     const client = makeClient(async (config) => httpError(config));
 
-    await expect(client.get("/users")).rejects.toMatchObject({ error_code: 401 });
-    expect(expired).toHaveBeenCalledTimes(1);
-    expect(reload).not.toHaveBeenCalled();
+    const results = await Promise.allSettled([
+      client.get("/a"),
+      client.get("/b"),
+      client.get("/c"),
+    ]);
+
+    expect(results.every((r) => r.status === "rejected")).toBe(true);
+    expect(ended).not.toHaveBeenCalled();
+  });
+
+  it("refresh refused for another service keeps the main session", async () => {
+    Api.setBaseURL("http://admin.test", "ADMIN");
+    vi.spyOn(axios, "post").mockImplementation(refreshRefused);
+    const instance = axios.create({ adapter: async (config) => httpError(config) });
+    const interceptors = new ApiInterceptors({ ADMIN: MAIN_REFRESH, MAIN: MAIN_REFRESH });
+    interceptors.setupRequestInterceptor(instance, "ADMIN");
+    interceptors.setupResponseInterceptor(instance);
+
+    await expect(instance.get("/reports")).rejects.toMatchObject({ error_code: 401 });
+    expect(ended).toHaveBeenCalledExactlyOnceWith("expired", "ADMIN");
   });
 
   it("service without refresh config: 401 just rejects, no refresh, no reload", async () => {
@@ -149,13 +182,13 @@ describe("interceptors — 401 without reload", () => {
         calls += 1;
         return httpError(config);
       },
-      { MAIN: { endpoint: "/auth/refresh", hasSession: () => false } },
+      { MAIN: { ...MAIN_REFRESH, hasSession: () => false } },
     );
 
     await expect(client.get("/auth/me")).rejects.toMatchObject({ error_code: 401 });
     expect(post).not.toHaveBeenCalled();
     expect(calls).toBe(1);
-    expect(expired).not.toHaveBeenCalled();
+    expect(ended).not.toHaveBeenCalled();
   });
 
   it("session hint present: refreshes, and renews the hint on success", async () => {
@@ -164,7 +197,7 @@ describe("interceptors — 401 without reload", () => {
     let calls = 0;
     const client = makeClient(
       async (config) => (++calls === 1 ? httpError(config) : ok(config, { success: true })),
-      { MAIN: { endpoint: "/auth/refresh", hasSession: () => true, onRefreshed } },
+      { MAIN: { ...MAIN_REFRESH, onRefreshed } },
     );
 
     await client.get("/users");
@@ -172,7 +205,7 @@ describe("interceptors — 401 without reload", () => {
     expect(onRefreshed).toHaveBeenCalledTimes(1);
   });
 
-  it("successful refresh + replay does not announce expiry", async () => {
+  it("successful refresh + replay does not end the session", async () => {
     vi.spyOn(axios, "post").mockResolvedValue({ data: { success: true } } as never);
     let calls = 0;
     const client = makeClient(async (config) =>
@@ -180,6 +213,6 @@ describe("interceptors — 401 without reload", () => {
     );
 
     await client.get("/users");
-    expect(expired).not.toHaveBeenCalled();
+    expect(ended).not.toHaveBeenCalled();
   });
 });

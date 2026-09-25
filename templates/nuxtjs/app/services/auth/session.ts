@@ -17,19 +17,13 @@ import type { AuthUser } from "@/services/auth/types/auth";
  *   that survives the refresh means anonymous → null; any other error (network,
  *   5xx) surfaces to the query rather than looking like a logout.
  */
-export async function fetchSessionUser(): Promise<AuthUser | null> {
-  if (import.meta.server) return fetchServerSessionUser();
-  try {
-    return await AuthModel.getMe();
-  } catch (error) {
-    if (isUnauthorizedError(error)) return null;
-    throw error;
-  }
+export function fetchSessionUser(): Promise<AuthUser | null> {
+  return import.meta.server ? readServerSession() : AuthModel.getSession();
 }
 
-/** The SSR branch of `fetchSessionUser` (exported for tests). Call it inside
+/** The SSR branch of `fetchSessionUser`. It never refreshes. Call it inside
  * the request's Nuxt context: the hint is read before the first await. */
-export async function fetchServerSessionUser(): Promise<AuthUser | null> {
+export async function readServerSession(): Promise<AuthUser | null> {
   const hinted = hasSessionHint();
   try {
     const body = await serverApiGet<{ user?: AuthUser }>(authContract.paths.me);
@@ -42,13 +36,13 @@ export async function fetchServerSessionUser(): Promise<AuthUser | null> {
   }
 }
 
-export const useSessionQuery = defineQuery<AuthUser | null>({
+export const useMeQuery = defineQuery<AuthUser | null>({
   key: queryKeys.auth.me,
   fetcher: fetchSessionUser,
 });
 
 export function useAuth() {
-  const session = useSessionQuery();
+  const session = useMeQuery();
   return {
     user: session.data.value ?? null,
     isAuthenticated: Boolean(session.data.value),

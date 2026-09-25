@@ -1,10 +1,12 @@
+import { onSessionEnded } from "@/services/core/session";
+import type { ApiService } from "@/services/core/types";
 import type { QueryClient } from "@tanstack/vue-query";
 
 /**
  * Drop every signed-in query without detaching mounted components. Each query
  * is reset in place (in-flight fetch cancelled, data gone, observers notified,
  * nothing refetched); queries nobody observes are then removed. The session
- * query is pinned to "signed out" (`null`), so a mounted header shows
+ * query is pinned to "signed out" (`null`), so a mounted reader shows
  * signed-out and a later login's invalidation reaches the same observer.
  *
  * Not `queryClient.clear()`: that removes the Query objects mounted observers
@@ -18,6 +20,20 @@ export function resetQueriesToSignedOut(queryClient: QueryClient, sessionKey: st
     if (query.getObserversCount() === 0) cache.remove(query);
   }
   queryClient.setQueryData([sessionKey], null);
+}
+
+/**
+ * Reset every query to signed-out whenever `service`'s session ends (logout or
+ * a refused refresh), so no signed-in data outlives it. Returns the unsubscribe.
+ */
+export function resetQueriesOnSessionEnd(
+  queryClient: QueryClient,
+  sessionKey: string,
+  service: ApiService = "MAIN",
+): () => void {
+  return onSessionEnded((_reason, ended) => {
+    if (ended === service) resetQueriesToSignedOut(queryClient, sessionKey);
+  });
 }
 
 /**

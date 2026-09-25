@@ -1,12 +1,12 @@
-import { notifySessionExpired } from "@/services/core";
+import { endSession } from "@/services/core";
 import { QueryClient, QueryObserver } from "@tanstack/vue-query";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * The client plugin that replaced the page reload: on session expiry it clears
- * the query cache and routes to /login — but only when a session existed (a
- * cached user or the session-hint cookie). Nuxt globals (`defineNuxtPlugin`,
- * `navigateTo`) and `document.cookie` are stubbed.
+ * The client plugin that replaced the page reload: when the main session ends
+ * it resets the query cache; when it expired it also routes to /login with a
+ * return path. Nuxt globals (`defineNuxtPlugin`, `navigateTo`) and
+ * `document.cookie` are stubbed.
  */
 
 type PluginFn = (nuxtApp: unknown) => void;
@@ -50,23 +50,32 @@ describe("04.session-expiry.client plugin", () => {
     queryClient.setQueryData(["auth.me"], { _id: "u1" });
     queryClient.setQueryData(["users.list"], { data: [] });
 
-    notifySessionExpired("MAIN");
+    endSession("expired", "MAIN");
 
     expect(queryClient.getQueryData(["users.list"])).toBeUndefined();
     expect(queryClient.getQueryData(["auth.me"])).toBeNull();
-    expect(navigateTo).toHaveBeenCalledWith({
-      path: "/login",
-      query: { redirect: "/users?page=2" },
-    });
+    expect(navigateTo).toHaveBeenCalledWith("/login?redirect=%2Fusers%3Fpage%3D2");
   });
 
-  it("does nothing for an anonymous visitor", () => {
-    queryClient.setQueryData(["auth.me"], null);
+  it("a voluntary logout resets the cache without navigating", () => {
+    queryClient.setQueryData(["auth.me"], { _id: "u1" });
     queryClient.setQueryData(["users.list"], { data: [] });
 
-    notifySessionExpired("MAIN");
+    endSession("logout", "MAIN");
 
-    expect(queryClient.getQueryData(["users.list"])).toEqual({ data: [] });
+    expect(queryClient.getQueryData(["users.list"])).toBeUndefined();
+    expect(queryClient.getQueryData(["auth.me"])).toBeNull();
+    expect(navigateTo).not.toHaveBeenCalled();
+  });
+
+  it("another service's expiry leaves the main session alone", () => {
+    doc.cookie = "PRISM_APP_SESSION=1";
+    queryClient.setQueryData(["auth.me"], { _id: "u1" });
+
+    endSession("expired", "ADMIN");
+
+    expect(doc.cookie).toBe("PRISM_APP_SESSION=1");
+    expect(queryClient.getQueryData(["auth.me"])).toEqual({ _id: "u1" });
     expect(navigateTo).not.toHaveBeenCalled();
   });
 
@@ -74,21 +83,18 @@ describe("04.session-expiry.client plugin", () => {
     doc.cookie = "PRISM_APP_SESSION=1";
     queryClient.setQueryData(["users.list"], { data: [] });
 
-    notifySessionExpired("MAIN");
+    endSession("expired", "MAIN");
 
     expect(doc.cookie).toContain("max-age=0");
     expect(queryClient.getQueryData(["users.list"])).toBeUndefined();
-    expect(navigateTo).toHaveBeenCalledWith({
-      path: "/login",
-      query: { redirect: "/users?page=2" },
-    });
+    expect(navigateTo).toHaveBeenCalledWith("/login?redirect=%2Fusers%3Fpage%3D2");
   });
 
   it("clears the cache but does not navigate when already on /login", () => {
     path = "/login";
     queryClient.setQueryData(["auth.me"], { _id: "u1" });
 
-    notifySessionExpired("MAIN");
+    endSession("expired", "MAIN");
 
     expect(queryClient.getQueryData(["auth.me"])).toBeNull();
     expect(navigateTo).not.toHaveBeenCalled();
@@ -105,7 +111,7 @@ describe("04.session-expiry.client plugin", () => {
     const unsubscribe = header.subscribe(() => {});
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    notifySessionExpired("MAIN");
+    endSession("expired", "MAIN");
     expect(header.getCurrentResult().data).toBeNull();
 
     user = { _id: "u1", again: true }; // login succeeds → the mutation invalidates auth.me

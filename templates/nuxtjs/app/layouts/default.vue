@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useLogoutMutation, useSessionQuery } from "@/services/auth";
+import { useLogoutMutation, useMeQuery } from "@/services/auth";
 import { resetQueriesToSignedOut } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
 import { useQueryClient } from "@tanstack/vue-query";
@@ -10,10 +10,10 @@ const queryClient = useQueryClient();
 // prefetchQuery never throws: if the SSR probe fails (e.g. an expired access
 // cookie only the browser can refresh) the query is not dehydrated and the
 // browser resolves it on hydration.
-await queryClient.prefetchQuery(useSessionQuery.queryOptions());
+await queryClient.prefetchQuery(useMeQuery.queryOptions());
 
 const { locale, t, setLocale } = useI18n();
-const { data: sessionUser, error: sessionError, refetch: refetchSession } = useSessionQuery();
+const { data: sessionUser, error: sessionError, refetch: refetchSession } = useMeQuery();
 // A transient failure (offline, timeout, 5xx) keeps the session: offer a retry
 // instead of showing the visitor as logged out.
 const sessionUnavailable = computed(() => Boolean(sessionError.value?.retryable));

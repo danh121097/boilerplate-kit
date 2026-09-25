@@ -1,4 +1,4 @@
-import { safeRedirect } from "@/utils/safe-redirect";
+import { safeRedirect } from "@/services/core";
 import { describe, expect, it } from "vitest";
 
 describe("safeRedirect", () => {

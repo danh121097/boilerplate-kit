@@ -1,4 +1,4 @@
-import { AuthModel, fetchServerSessionUser, fetchSessionUser } from "@/services/auth";
+import { AuthModel, readServerSession, fetchSessionUser } from "@/services/auth";
 import { resetQueriesToSignedOut, serverApiGet } from "@/services/core";
 import { QueryClient } from "@tanstack/vue-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -32,7 +32,7 @@ describe("fetchSessionUser (browser)", () => {
   });
 });
 
-describe("fetchServerSessionUser (SSR)", () => {
+describe("readServerSession (SSR)", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   function stubServer(cookie: string | undefined, fetchImpl: () => Promise<unknown>) {
@@ -53,24 +53,24 @@ describe("fetchServerSessionUser (SSR)", () => {
 
   it("no session hint + 401 → null (anonymous, safe to dehydrate)", async () => {
     stubServer("PRISM_APP_LANGUAGE=en", unauthorized);
-    await expect(fetchServerSessionUser()).resolves.toBeNull();
+    await expect(readServerSession()).resolves.toBeNull();
   });
 
   it("session hint + 401 → rejects (expired access cookie; the browser refreshes)", async () => {
     stubServer("PRISM_APP_SESSION=1; accessToken=x", unauthorized);
-    await expect(fetchServerSessionUser()).rejects.toMatchObject({ error_code: 401 });
+    await expect(readServerSession()).rejects.toMatchObject({ error_code: 401 });
   });
 
   it("returns the signed-in user", async () => {
     stubServer("PRISM_APP_SESSION=1", async () => ({ success: true, data: { user: USER } }));
-    await expect(fetchServerSessionUser()).resolves.toEqual(USER);
+    await expect(readServerSession()).resolves.toEqual(USER);
   });
 
   it("non-401 failures reject even without the hint", async () => {
     stubServer(undefined, () =>
       Promise.reject(Object.assign(new Error("fetch failed"), { statusCode: 503 })),
     );
-    await expect(fetchServerSessionUser()).rejects.toMatchObject({
+    await expect(readServerSession()).rejects.toMatchObject({
       error_code: 503,
       retryable: true,
     });
@@ -78,7 +78,7 @@ describe("fetchServerSessionUser (SSR)", () => {
 
   it("never calls the refresh endpoint, even with the hint set and a 401", async () => {
     stubServer("PRISM_APP_SESSION=1", unauthorized);
-    await expect(fetchServerSessionUser()).rejects.toMatchObject({ error_code: 401 });
+    await expect(readServerSession()).rejects.toMatchObject({ error_code: 401 });
     const fetchMock = $fetch as unknown as ReturnType<typeof vi.fn>;
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0]?.[0])).toMatch(/\/auth\/me$/);

@@ -2,10 +2,11 @@ import { authContract } from "@/services/auth/contract";
 import {
   beginLogout,
   bumpSessionEpoch,
-  clearSessionHint,
   defineMutation,
-  markSessionActive,
+  endSession,
+  isUnauthorizedError,
   Model,
+  startSession,
   withSessionLock,
 } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
@@ -23,7 +24,7 @@ export class AuthModel extends Model {
 
   static async login(payload: LoginPayload): Promise<AuthResult> {
     const res = await this.api.post<AuthResult>({ url: authContract.paths.login, data: payload });
-    markSessionActive();
+    startSession();
     return res.data;
   }
 
@@ -32,7 +33,7 @@ export class AuthModel extends Model {
       url: authContract.paths.register,
       data: payload,
     });
-    markSessionActive();
+    startSession();
     return res.data;
   }
 
@@ -44,17 +45,19 @@ export class AuthModel extends Model {
    * session is marked as ending from the first tick and its epoch ends right
    * before the request, so a 401 arriving meanwhile rejects with
    * `session_ended` instead of rotating the cookie being revoked, and a refresh
-   * landing afterwards does not re-mark the session. The hint is dropped even
-   * when the call fails: this browser's session is over either way. */
+   * landing afterwards does not re-mark the session. The session ends (hint
+   * dropped, other tabs told, query cache reset) even when the call fails: this
+   * browser's session is over either way. */
   static async logout(): Promise<void> {
-    const done = beginLogout();
+    const service = this.service;
+    const done = beginLogout(service);
     try {
-      await withSessionLock(this.service, async () => {
-        bumpSessionEpoch();
+      await withSessionLock(service, async () => {
+        bumpSessionEpoch(service);
         try {
           await this.api.post({ url: authContract.paths.logout });
         } finally {
-          clearSessionHint();
+          endSession("logout", service);
         }
       });
     } finally {
@@ -64,9 +67,20 @@ export class AuthModel extends Model {
 
   /** Browser-side profile read — goes through the interceptors, so an expired
    * access cookie is refreshed and the request replayed. */
-  static async getMe(): Promise<AuthUser | null> {
-    const res = await this.api.get<{ user?: AuthUser }>({ url: authContract.paths.me });
-    return res.data.user ?? null;
+  static async getMe(): Promise<AuthUser> {
+    const res = await this.api.get<{ user: AuthUser }>({ url: authContract.paths.me });
+    return res.data.user;
+  }
+
+  /** The signed-in user, or null when the session is rejected (401 — after the
+   * interceptor's refresh attempt). Other failures (offline, 5xx) reject. */
+  static async getSession(): Promise<AuthUser | null> {
+    try {
+      return await this.getMe();
+    } catch (error) {
+      if (isUnauthorizedError(error)) return null;
+      throw error;
+    }
   }
 }
 
@@ -84,8 +98,8 @@ export const useRegisterMutation = defineMutation<AuthResult, RegisterPayload>({
   invalidates: [queryKeys.auth.me, queryKeys.users.list],
 });
 
-/** Callers clear the query cache on settle (`resetQueriesToSignedOut`) — nothing to
- * invalidate once every cached query is dropped. */
+/** Logout ends the session, which resets every query to signed-out
+ * (`04.session-expiry.client.ts`) — nothing to invalidate. */
 export const useLogoutMutation = defineMutation({
   key: queryKeys.auth.logout,
   mutator: () => AuthModel.logout(),

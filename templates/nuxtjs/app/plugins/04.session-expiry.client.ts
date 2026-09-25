@@ -1,22 +1,18 @@
-import { authContract, useSessionQuery } from "@/services/auth";
+import { authContract } from "@/services/auth";
 import {
-  clearSessionHint,
-  hasSessionHint,
-  onSessionExpired,
-  resetQueriesToSignedOut,
+  loginPathWithReturn,
+  redirectOnSessionExpired,
+  resetQueriesOnSessionEnd,
 } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
 import type { QueryClient } from "@tanstack/vue-query";
 
 /**
- * React to a definitively expired session (the backend refused the refresh
- * cookie, or a refreshed request is still 401): clear the query cache and send
- * the user to /login. Replaces the old full-page reload.
- *
- * Only acts when a session existed: a user is cached, or the readable session
- * hint is set (a cold page load with an expired access cookie and a dead
- * refresh cookie has nothing cached yet). An anonymous visitor has neither — and
- * without the hint its 401s never even attempt a refresh.
+ * React to the end of the main session. Logout and a refused refresh both reset
+ * every query to signed-out in place (the hint is already cleared by
+ * `endSession`). An expired session (the backend refused the refresh cookie)
+ * also sends the user to /login with a `redirect` back to where they were;
+ * a voluntary logout navigates on its own. Never a full page reload.
  */
 export default defineNuxtPlugin((nuxtApp) => {
   const router = useRouter();
@@ -25,19 +21,12 @@ export default defineNuxtPlugin((nuxtApp) => {
   // type, so reading `$queryClient` through it would be circular (`unknown`).
   const queryClient = nuxtApp.$queryClient as QueryClient;
 
-  onSessionExpired((service) => {
-    if (service !== authContract.service) return;
-    const hadSession =
-      hasSessionHint() || Boolean(queryClient.getQueryData(useSessionQuery.queryKey()));
-    if (!hadSession) return;
+  resetQueriesOnSessionEnd(queryClient, queryKeys.auth.me, authContract.service);
 
-    clearSessionHint();
-    resetQueriesToSignedOut(queryClient, queryKeys.auth.me);
+  redirectOnSessionExpired(() => {
     const current = router.currentRoute.value;
     if (current.path === "/login") return;
     // Come back here after signing in again (`pages/login.vue` follows it).
-    void nuxtApp.runWithContext(() =>
-      navigateTo({ path: "/login", query: { redirect: current.fullPath } }),
-    );
-  });
+    void nuxtApp.runWithContext(() => navigateTo(loginPathWithReturn(current.fullPath)));
+  }, authContract.service);
 });

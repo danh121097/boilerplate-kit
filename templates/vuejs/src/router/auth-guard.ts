@@ -1,5 +1,5 @@
+import { safeRedirect } from "@/services/core";
 import { useAuthStore } from "@/stores/auth";
-import { safeRedirect } from "@/utils/safe-redirect";
 import type { RouteLocationNormalized, RouteLocationRaw } from "vue-router";
 
 /**

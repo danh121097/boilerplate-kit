@@ -113,7 +113,6 @@
     "refThrottled": true,
     "refWithControl": true,
     "resolveComponent": true,
-    "safeRedirect": true,
     "setActivePinia": true,
     "setMapStoreSuffix": true,
     "shallowReactive": true,

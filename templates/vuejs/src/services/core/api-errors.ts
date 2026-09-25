@@ -52,3 +52,37 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
     ? message
     : fallback;
 }
+
+/** True when the refresh endpoint refused the session — HTTP 401 or 403. Every
+ * other refresh failure (offline, timeout, 408, 429, 5xx, 400, a malformed
+ * body) is transient: the session is kept and a later 401 refreshes again. */
+export function isRefreshRefused(error: unknown): boolean {
+  const status = (error as { response?: { status?: number } } | null)?.response?.status;
+  return status === 401 || status === 403;
+}
+
+/** The rejection for a request that could not be replayed because the refresh
+ * failed transiently. Deliberately not a 401, so callers keep the session. */
+export function refreshUnavailable(error: unknown): ApiResponseError {
+  const status = (error as { response?: { status?: number } } | null)?.response?.status;
+  return {
+    status: "error",
+    error_code: status ?? 0,
+    message: "refresh_unavailable",
+    error_message: "refresh_unavailable",
+    retryable: true,
+  };
+}
+
+/** Rejection for a refresh (or a 401 that would start one) whose session ended —
+ * logout ran, or the session was cleared while it waited. Its result is
+ * discarded, and it is not a refresh failure (no session-expired event). */
+export class SessionEndedError extends Error {
+  readonly error_code = 401;
+  readonly status = "error";
+  readonly error_message = "session_ended";
+  constructor() {
+    super("session_ended");
+    this.name = "SessionEndedError";
+  }
+}

@@ -41,7 +41,7 @@ envelope. `onSuccess` then:
 if (isEnvelope(response.data)) {
   const body = response.data;
   if (body.status === "success" || body.success === true) return response.data; // unwrap
-  if (body.error_code === 401) { /* refresh-and-retry, else handleUnauthorized */ }
+  if (body.error_code === 401) { /* refresh-and-retry when eligible */ }
   return Promise.reject(response.data as ApiResponseError);   // envelope-level error
 }
 return response;   // non-envelope → pass through untouched
@@ -54,21 +54,23 @@ Two doors lead to the same recovery logic:
 1. **HTTP 401** — caught in `onError` (`error.response?.status === 401`).
 2. **Envelope-level 401** — `body.error_code === 401` inside a 2xx body.
 
-Both call `refreshAndRetry`. If eligible (not a credential call such as
-login/refresh, not already replayed) the request is refreshed and replayed;
-otherwise `handleUnauthorized` rejects — and, when a refreshed replay is still
-401, announces session expiry so the app clears its cache and routes to
-`/login`. A login 401 (wrong password) is never refreshed. The page is never
+Both call `refreshAndRetry`. If eligible (the session hint is set, not the
+refresh endpoint or a `skipPaths` entry such as login, not already replayed) the
+request is refreshed and replayed; otherwise the 401 rejects as-is. A login 401
+(wrong password) is never refreshed. Only the refresh call decides that a
+session is gone: a refused refresh (401/403) ends it as `"expired"` and the app
+resets its cache and routes to `/login`; any other refresh failure rejects with
+a retryable `refresh_unavailable` error and keeps it. The page is never
 reloaded. Full mechanics: [Security & Auth](./security-auth.md).
 
 A key invariant: once a replay is launched, **its own** outcome propagates. A
-post-refresh 500 is a genuine 500 — not re-interpreted as an auth failure, and it
-does not clear the fresh token.
+post-refresh 500 is a genuine 500, and a post-refresh 401 just rejects to the
+caller — neither ends the session.
 
 ### No reloads
 
 The service layer has no `window.location.reload()` at all: browser-side
-session loss goes through `notifySessionExpired` → `04.session-expiry.client.ts`,
+session loss goes through `endSession("expired")` → `04.session-expiry.client.ts`,
 and SSR fetches (`serverApi*`) reject with an `ApiResponseError` the query can
 render or retry in the browser.
 
@@ -116,9 +118,9 @@ every other error uses, instead of an unreadable error blob.
 | --- | --- | --- |
 | Envelope `status: "error"` | `onSuccess` | reject with the envelope as `ApiResponseError` |
 | Envelope/HTTP 401 (eligible) | `onSuccess`/`onError` | refresh + replay |
-| Envelope/HTTP 401 (credential call / no refresh config) | `handleUnauthorized` | reject as-is |
-| Envelope/HTTP 401 after a refreshed replay | `handleUnauthorized` | reject; session-expired event → clear cache, `/login` |
-| Refresh refused (401/403) | `RefreshTokenManager` | session-expired event; reject `error_code: 401` |
+| Envelope/HTTP 401 (ineligible: credential call, no hint, replayed, no refresh config) | `onSuccess`/`onError` | reject as-is |
+| Refresh refused (401/403) | `RefreshTokenManager` | `endSession("expired")` → reset cache, `/login`; reject the original 401 |
+| Refresh failed otherwise (network, timeout, 400, 408, 429, 5xx) | `refreshAndRetry` | reject `refreshUnavailable` (`retryable: true`); session kept |
 | SSR `serverApi*` failure | `server-api.ts` | reject `ApiResponseError` (`error_code` = status) |
 | Network / blocked | `onError` | log; reject `{ message, error_code: 0 }` |
 | Non-2xx blob | `onSuccess` | reject synthetic `ApiResponseError` |

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 /**
  * `resetQueriesToSignedOut` against a live observer — the same `QueryObserver` the
- * layout header's `useSessionQuery()` holds for the app's lifetime. Ending a
+ * layout header's `useMeQuery()` holds for the app's lifetime. Ending a
  * session must drop the user without detaching that observer, so the next
  * login (which invalidates `auth.me`) reaches the header again.
  */

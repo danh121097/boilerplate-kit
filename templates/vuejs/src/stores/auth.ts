@@ -4,10 +4,15 @@ import { authContract } from "@/services/auth/contract";
 import {
   clearAuthTokens,
   getAccessToken,
+  getSessionEpoch,
+  hasStoredSession,
+  isLogoutPending,
   isUnauthorizedError,
+  onSessionEnded,
   onTokensChanged,
   resetQueriesToSignedOut,
   resyncQueriesAfterLogin,
+  syncAuthAcrossTabs,
   toApiError,
 } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
@@ -23,7 +28,8 @@ import type { ApiResponseError } from "@/services/core";
  * mirrored into `hasToken`, kept in sync by the token-storage change hook (login,
  * refresh, logout and interceptor-driven clears all go through it). `user` is
  * the decoded profile — loaded lazily by `hydrate()` on boot and set directly on
- * a successful login.
+ * a successful login. When the main session ends (logout, a refused refresh, or
+ * another tab's logout) the profile and every cached query are dropped.
  */
 /** Interceptor rejections already are `ApiResponseError`s; normalize the rest. */
 function asApiError(error: unknown): ApiResponseError {
@@ -54,21 +60,41 @@ export const useAuthStore = defineStore("auth", () => {
     resetQueriesToSignedOut(queryClient, queryKeys.auth.me);
   }
 
+  /** Drop the profile and cached data only — the stored tokens are not touched. */
+  function resetSignedOut() {
+    user.value = null;
+    resetQueriesToSignedOut(queryClient, queryKeys.auth.me);
+  }
+
   /**
-   * Read the persisted token once at boot; if present, resolve the profile.
-   * Only a rejected session (401 after the refresh attempt, or a refresh the
-   * backend refused — which already cleared the tokens) logs out. A network
-   * error, timeout or 5xx keeps the tokens so the session survives an outage.
+   * Read the persisted session once at boot; if present, resolve the profile.
+   * A rejected session (401 after the refresh attempt) is revoked and cleared
+   * through `AuthModel.logout()` — unless it already ended while the request
+   * ran (a refused refresh or another logout cleared the tokens / moved the
+   * epoch), in which case only local state is reset. A network error, timeout
+   * or 5xx keeps the tokens so the session survives an outage.
    */
   async function hydrate() {
     if (hydrated.value) return;
     hydrateError.value = null;
-    if (getAccessToken(authContract.service)) {
+    const service = authContract.service;
+    if (hasStoredSession(service)) {
+      const epoch = getSessionEpoch(service);
       try {
         user.value = await AuthModel.getMe();
       } catch (error) {
-        if (isUnauthorizedError(error) || !getAccessToken(authContract.service)) clearSession();
-        else hydrateError.value = { ...asApiError(error), retryable: true };
+        const ended =
+          getSessionEpoch(service) !== epoch ||
+          !hasStoredSession(service) ||
+          isLogoutPending(service);
+        if (isUnauthorizedError(error) && !ended) {
+          await AuthModel.logout().catch(() => {});
+          resetSignedOut();
+        } else if (isUnauthorizedError(error) || ended) {
+          resetSignedOut();
+        } else {
+          hydrateError.value = { ...asApiError(error), retryable: true };
+        }
       }
     }
     hydrated.value = true;
@@ -94,32 +120,28 @@ export const useAuthStore = defineStore("auth", () => {
     if (service === authContract.service) syncHasToken();
   });
 
-  /**
-   * Another tab logged in or out: localStorage changed underneath this tab (the
-   * `storage` event only fires in the OTHER tabs). A logout there drops this
-   * tab's profile and every cached query's data (mounted views stay attached);
-   * the guard state (`hasToken`) follows. A login there resets the profile,
-   * marks every query stale (mounted ones refetch) and re-reads the profile. A plain token
-   * rotation (refresh) elsewhere leaves presence unchanged and is ignored.
-   */
-  function onOtherTabStorage() {
-    const hadToken = hasToken.value;
-    syncHasToken();
-    if (hadToken === hasToken.value) return;
+  // The main session ended here or in another tab: drop the profile and every
+  // cached query's data (mounted views stay attached); the guard state follows.
+  onSessionEnded((_reason, service) => {
+    if (service !== authContract.service) return;
     user.value = null;
     hydrateError.value = null;
-    if (!hasToken.value) {
-      resetQueriesToSignedOut(queryClient, queryKeys.auth.me);
-      return;
-    }
-    resyncQueriesAfterLogin(queryClient, queryKeys.auth.me);
-    void retryHydrate();
-  }
+    syncHasToken();
+    resetQueriesToSignedOut(queryClient, queryKeys.auth.me);
+  });
 
-  // Browser-only (skipped under SSR / node tests without a window).
-  if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
-    window.addEventListener("storage", onOtherTabStorage);
-  }
+  // Another tab logged in: reset the profile, mark every query stale (mounted
+  // ones refetch) and re-read the profile. A logout there reaches the listener
+  // above; a plain token rotation (refresh) elsewhere is ignored. Browser-only.
+  syncAuthAcrossTabs({
+    onLogin: () => {
+      syncHasToken();
+      user.value = null;
+      hydrateError.value = null;
+      resyncQueriesAfterLogin(queryClient, queryKeys.auth.me);
+      void retryHydrate();
+    },
+  });
 
   return {
     user,

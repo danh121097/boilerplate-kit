@@ -12,7 +12,7 @@ import type { ServiceRefreshConfig, ServiceTokenKeys } from "@/services/core";
  * Add a backend = add a row + its `VITE_*_API_URL` in `.env`. Rows with an empty
  * baseURL are skipped, so optional services stay dormant until their env var is
  * set. Give a row a `refresh` to enable per-service auto-refresh; omit it to opt
- * the service out (its 401s just clear that service's tokens).
+ * the service out (its 401s just reject to the caller).
  */
 interface ServiceDefinition {
   name: string;
@@ -29,11 +29,7 @@ const SERVICES: ServiceDefinition[] = [
     refresh: {
       endpoint: authContract.paths.refresh,
       // A 401 from these means bad credentials, never an expired session.
-      excludePaths: [
-        authContract.paths.login,
-        authContract.paths.register,
-        authContract.paths.logout,
-      ],
+      skipPaths: [authContract.paths.login, authContract.paths.register, authContract.paths.logout],
     },
   },
 ];
@@ -51,7 +47,7 @@ export function initServices(): void {
   // On a 401 the interceptor calls the failing service's own refresh endpoint
   // (sending the stored refresh token in the body), stores the new access +
   // refresh tokens, and replays the request. Each service refreshes independently.
-  // A refresh the backend rejects fires `onSessionExpired` (see
-  // `plugins/session-expiry.ts`) — the page is never reloaded.
+  // A refresh the backend refuses ends the session (`endSession("expired")`,
+  // handled in `plugins/session-expiry.ts`) — the page is never reloaded.
   Api.registerInterceptors(new ApiInterceptors(refreshByService));
 }

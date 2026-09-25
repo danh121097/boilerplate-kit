@@ -1,14 +1,21 @@
 import { installLocalStorage } from "@/__tests__/helpers/fake-storage";
 import { APP_PREFIX } from "@/enums";
+import { SessionEndedError } from "@/services/core/api-errors";
 import {
   getAccessToken,
   persistAccessToken,
   persistRefreshToken,
 } from "@/services/core/auth-token-storage";
-import { RefreshTokenManager, SessionEndedError } from "@/services/core/refresh-token-manager";
+import { RefreshTokenManager } from "@/services/core/refresh-token-manager";
+import { bumpSessionEpoch } from "@/services/core/session";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const tick = () => new Promise((r) => setTimeout(r, 5));
+const httpFailure = (status: number) =>
+  Object.assign(new Error(`Request failed with status code ${status}`), {
+    isAxiosError: true,
+    response: { status, data: {} },
+  });
 
 describe("RefreshTokenManager", () => {
   beforeEach(() => installLocalStorage());
@@ -22,7 +29,7 @@ describe("RefreshTokenManager", () => {
       refresh: async () => {
         runs += 1;
         await tick();
-        return `T${runs}`;
+        return { accessToken: `T${runs}` };
       },
       onRefreshFailed: () => {},
     });
@@ -43,7 +50,7 @@ describe("RefreshTokenManager", () => {
     let runs = 0;
     const mgr = new RefreshTokenManager({
       service: "MAIN",
-      refresh: async () => `T${++runs}`,
+      refresh: async () => ({ accessToken: `T${++runs}` }),
       onRefreshFailed: () => {},
     });
 
@@ -53,29 +60,89 @@ describe("RefreshTokenManager", () => {
   });
 
   it("rejects session_ended without a network call when no token is stored (e.g. another tab logged out)", async () => {
-    const refresh = vi.fn(async () => "T1");
+    const refresh = vi.fn(async () => ({ accessToken: "T1" }));
     const onRefreshFailed = vi.fn();
-    const mgr = new RefreshTokenManager({ service: "MAIN", refresh, onRefreshFailed });
+    const mgr = new RefreshTokenManager({
+      service: "MAIN",
+      refresh,
+      onRefreshFailed,
+      isSessionAlive: () => false,
+    });
 
     await expect(mgr.getFreshToken()).rejects.toBeInstanceOf(SessionEndedError);
     expect(refresh).not.toHaveBeenCalled();
     expect(onRefreshFailed).not.toHaveBeenCalled();
   });
 
-  it("clears the service token and fires onRefreshFailed when refresh rejects", async () => {
+  for (const status of [401, 403]) {
+    it(`clears the service token and fires onRefreshFailed when refresh is refused with ${status}`, async () => {
+      persistAccessToken("OLD", "MAIN");
+      const onRefreshFailed = vi.fn();
+      const mgr = new RefreshTokenManager({
+        service: "MAIN",
+        refresh: async () => {
+          throw httpFailure(status);
+        },
+        onRefreshFailed,
+      });
+
+      await expect(mgr.getFreshToken()).rejects.toMatchObject({ response: { status } });
+      expect(onRefreshFailed).toHaveBeenCalledTimes(1);
+      expect(getAccessToken("MAIN")).toBeNull(); // cleared
+    });
+  }
+
+  for (const [label, failure] of [
+    ["a 400", httpFailure(400)],
+    ["a malformed body", new Error("refresh_response_missing_access_token")],
+  ] as const) {
+    it(`keeps the tokens (no failure hook) when the refresh fails with ${label}`, async () => {
+      persistAccessToken("OLD", "MAIN");
+      const onRefreshFailed = vi.fn();
+      const mgr = new RefreshTokenManager({
+        service: "MAIN",
+        refresh: async () => {
+          throw failure;
+        },
+        onRefreshFailed,
+      });
+
+      await expect(mgr.getFreshToken("OLD")).rejects.toBe(failure);
+      expect(onRefreshFailed).not.toHaveBeenCalled();
+      expect(getAccessToken("MAIN")).toBe("OLD");
+    });
+  }
+
+  it("a refresh that resolves after the session ended persists nothing and rejects session_ended", async () => {
     persistAccessToken("OLD", "MAIN");
-    const onRefreshFailed = vi.fn();
+    const onRefreshed = vi.fn();
     const mgr = new RefreshTokenManager({
       service: "MAIN",
       refresh: async () => {
-        throw new Error("refresh failed");
+        bumpSessionEpoch("MAIN");
+        return { accessToken: "LATE" };
       },
-      onRefreshFailed,
+      onRefreshed,
+      onRefreshFailed: () => {},
     });
 
-    await expect(mgr.getFreshToken()).rejects.toThrow("refresh failed");
-    expect(onRefreshFailed).toHaveBeenCalledTimes(1);
-    expect(getAccessToken("MAIN")).toBeNull(); // cleared
+    await expect(mgr.getFreshToken("OLD")).rejects.toBeInstanceOf(SessionEndedError);
+    expect(getAccessToken("MAIN")).toBe("OLD");
+    expect(onRefreshed).not.toHaveBeenCalled();
+  });
+
+  it("fires onRefreshed after persisting a rotated pair", async () => {
+    persistAccessToken("OLD", "MAIN");
+    const onRefreshed = vi.fn(() => expect(getAccessToken("MAIN")).toBe("NEW"));
+    const mgr = new RefreshTokenManager({
+      service: "MAIN",
+      refresh: async () => ({ accessToken: "NEW", refreshToken: "NEW_R" }),
+      onRefreshed,
+      onRefreshFailed: () => {},
+    });
+
+    expect(await mgr.getFreshToken("OLD")).toBe("NEW");
+    expect(onRefreshed).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the tokens (no failure hook) when the refresh fails transiently", async () => {
@@ -105,7 +172,7 @@ describe("RefreshTokenManager — cross-tab lock", () => {
     persistAccessToken("OLD", "MAIN");
     const mgr = new RefreshTokenManager({
       service: "MAIN",
-      refresh: async () => "NEW",
+      refresh: async () => ({ accessToken: "NEW" }),
       onRefreshFailed: () => {},
     });
 
@@ -121,7 +188,7 @@ describe("RefreshTokenManager — cross-tab lock", () => {
     });
     vi.stubGlobal("navigator", { locks: { request } });
     persistAccessToken("OLD", "MAIN");
-    const refresh = vi.fn(async () => "NEW");
+    const refresh = vi.fn(async () => ({ accessToken: "NEW" }));
     const mgr = new RefreshTokenManager({ service: "MAIN", refresh, onRefreshFailed: () => {} });
 
     expect(await mgr.getFreshToken("OLD")).toBe("FROM_OTHER_TAB");
@@ -131,7 +198,7 @@ describe("RefreshTokenManager — cross-tab lock", () => {
   it("falls back to an unlocked refresh when navigator.locks is unavailable", async () => {
     vi.stubGlobal("navigator", {});
     persistAccessToken("OLD", "MAIN");
-    const refresh = vi.fn(async () => "NEW");
+    const refresh = vi.fn(async () => ({ accessToken: "NEW" }));
     const mgr = new RefreshTokenManager({ service: "MAIN", refresh, onRefreshFailed: () => {} });
 
     expect(await mgr.getFreshToken("OLD")).toBe("NEW");

@@ -69,7 +69,7 @@ SFCs and the composables they call SSR-safe.
 ### Guard browser-only access with `isClient`
 
 Never touch `window`, `document`, or `localStorage` at module scope or during
-setup without a client guard. The session-hint writer shows the pattern — on the
+setup without a client guard. The session hint writer shows the pattern — on the
 server it is a no-op:
 
 ```ts
@@ -130,7 +130,7 @@ flag set. Consequences:
 
 ```ts
 const { errorMessage, value } = useField<string | number>(() => props.name);
-export const useSessionQuery = defineQuery<AuthUser | null>({ key: "auth.me", fetcher: () => serverApiGet(authContract.paths.me) });
+export const useMeQuery = defineQuery<AuthUser | null>({ key: "auth.me", fetcher: fetchSessionUser });
 ```
 
 Validate via `pnpm typecheck` (`nuxt typecheck`).
