@@ -14,9 +14,8 @@ function base(overrides: Partial<ResolvedOptions> = {}): ResolvedOptions {
     git: true,
     install: true,
     force: false,
-    ref: "latest",
+    ref: "master",
     latest: false,
-    harness: false,
     targetDir: `${process.cwd()}/demo`,
     ...overrides,
   };

@@ -2,9 +2,10 @@ import { ScaffoldError, TemplateFetchError } from "../errors.js";
 import { getSource } from "./template-registry.js";
 import { validateRef } from "./validate-ref.js";
 import { downloadTemplate } from "giget";
-import { existsSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, realpathSync } from "node:fs";
 import { cp, mkdir, realpath } from "node:fs/promises";
-import { dirname, isAbsolute, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Template } from "../types.js";
 
@@ -39,11 +40,49 @@ const LOCAL_COPY_EXCLUDE = new Set([
   // The backend templates regenerate them on first run (`pnpm keys` / predev).
   "rsa.private",
   "rsa.public",
-  // Auto-generated typings (unplugin-* / Nuxt)
+]);
+// Generated auto-import stubs are shipped only when a template commits them
+// (vuejs does, so a cold scaffold lints/typechecks). Git mode follows the index;
+// the plain-copy fallback has no index, so it drops them.
+const FALLBACK_COPY_EXCLUDE = new Set([
   "auto-imports.d.ts",
   "components.d.ts",
   ".eslintrc-auto-import.json",
 ]);
+
+function isExcluded(relOrAbsPath: string, extra?: Set<string>): boolean {
+  const parts = relOrAbsPath.split(/[\\/]/);
+  return parts.some((p) => LOCAL_COPY_EXCLUDE.has(p) || (extra?.has(p) ?? false));
+}
+
+/**
+ * Files a local template would ship, mirroring a GitHub fetch: tracked plus
+ * untracked-but-not-ignored files (so a contributor's new files show up), minus
+ * the always-excluded set. Returns `null` — so the caller falls back to a plain
+ * copy — unless `srcDir` sits at `<repo>/templates/<name>` in its own git work
+ * tree; a templates folder nested in some other repo may be ignored there, and
+ * its listing would silently drop files.
+ */
+export function listLocalTemplateFiles(srcDir: string): string[] | null {
+  const git = (args: string[]) => spawnSync("git", args, { cwd: srcDir, encoding: "utf8" });
+
+  const top = git(["rev-parse", "--show-toplevel"]);
+  if (top.status !== 0 || typeof top.stdout !== "string") return null;
+  try {
+    const repoRoot = realpathSync.native(top.stdout.trim());
+    if (realpathSync.native(dirname(dirname(srcDir))) !== repoRoot) return null;
+  } catch {
+    return null;
+  }
+
+  const res = git(["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", "."]);
+  if (res.status !== 0 || typeof res.stdout !== "string") return null;
+  const files = res.stdout
+    .split("\0")
+    .filter((rel) => rel.length > 0 && !isExcluded(rel))
+    .filter((rel) => existsSync(join(srcDir, rel))); // skip tracked-but-deleted
+  return files.length > 0 ? files : null;
+}
 
 /**
  * Resolve the absolute path of a local template if available, else `null`.
@@ -86,12 +125,18 @@ async function resolveLocalTemplatePath(template: Template): Promise<string | nu
 
 async function copyLocalTemplate(srcDir: string, targetDir: string): Promise<void> {
   await mkdir(targetDir, { recursive: true });
+  const files = listLocalTemplateFiles(srcDir);
+  if (files) {
+    for (const rel of files) {
+      const dest = join(targetDir, rel);
+      await mkdir(dirname(dest), { recursive: true });
+      await cp(join(srcDir, rel), dest);
+    }
+    return;
+  }
   await cp(srcDir, targetDir, {
     recursive: true,
-    filter: (src) => {
-      const base = src.split("/").pop() ?? "";
-      return !LOCAL_COPY_EXCLUDE.has(base);
-    },
+    filter: (src) => !isExcluded(basename(src), FALLBACK_COPY_EXCLUDE),
   });
 }
 

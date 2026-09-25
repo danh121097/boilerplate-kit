@@ -64,9 +64,8 @@ npm create prism-app@latest -- \
 | `--git` / `--no-git` | Initialize a git repository (default: prompt) |
 | `--install` / `--no-install` | Install dependencies after scaffolding |
 | `--force` | Scaffold into a non-empty directory |
-| `--ref <branch\|tag\|sha>` | Template ref to fetch (default: `latest`) |
+| `--ref <branch\|tag\|sha>` | Template ref to fetch (default: `master`) |
 | `--latest` | Bump every dependency to its newest version before install |
-| `--harness` | Install the optional repository-harness durable CLI into the scaffold |
 | `--version` / `--help` | Print version / usage |
 
 Requires **Node.js >= 20**.
@@ -75,7 +74,7 @@ Requires **Node.js >= 20**.
 
 Templates live in [`templates/`](./templates) and are fetched on demand with
 [`giget`](https://github.com/unjs/giget) from
-`github:danh121097/boilerplate-kit/templates/<name>#latest` — so you always get
+`github:danh121097/boilerplate-kit/templates/<name>#master` — so you always get
 the current starter without installing every stack. After fetching, the CLI
 rewrites `package.json`, optionally runs git init + dependency install, and prints
 next steps.
@@ -116,8 +115,11 @@ npm unlink -g create-prism-app # undo
 When linked, the CLI auto-detects the sibling `templates/` directory (via
 `realpath` on `dist/cli.mjs`) and copies locally — no GitHub round-trip. Force a
 specific templates root with `BOILERPLATE_KIT_LOCAL=/abs/path` (or `=1` for
-`$cwd/templates`). Local copies skip `node_modules`, build output, lockfiles,
-keys, and generated typings, so scaffolding stays clean.
+`$cwd/templates`). Local copies mirror what git would ship (tracked plus
+untracked-but-not-ignored files), minus `node_modules`, build output, lockfiles,
+`.env`, and keys. When git can't list the template (no checkout, or not under
+`<repo>/templates/`), a plain copy runs instead and also drops generated
+auto-import typings.
 
 ## License
 

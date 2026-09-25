@@ -2,18 +2,17 @@ import { downloadCleanTemplate } from "../fetcher/download-template.js";
 import { verifyExtraction } from "../fetcher/verify-extraction.js";
 import { runGitInit } from "../postprocess/git-init.js";
 import { runInstall } from "../postprocess/install-dependencies.js";
-import { runHarnessInstall } from "../postprocess/install-harness.js";
 import { rewritePackageJson } from "../postprocess/rewrite-package-json.js";
 import { printSuccessBanner } from "../postprocess/success-banner.js";
 import { upgradeDependencies } from "../postprocess/upgrade-dependencies.js";
+import { DEFAULT_REF, type ResolvedOptions } from "../types.js";
 import { spinner } from "@clack/prompts";
-import type { ResolvedOptions } from "../types.js";
 import pc from "picocolors";
 
 export async function runScaffold(opts: ResolvedOptions): Promise<void> {
   const fetchSpin = spinner();
   const fetchMsg =
-    opts.ref === "latest"
+    opts.ref === DEFAULT_REF
       ? `Fetching ${opts.template} template…`
       : `Fetching ${opts.template} template (ref: ${opts.ref})…`;
   fetchSpin.start(fetchMsg);
@@ -36,11 +35,6 @@ export async function runScaffold(opts: ResolvedOptions): Promise<void> {
   if (opts.latest) {
     console.log(pc.dim("Upgrading dependencies to their absolute latest…"));
     await upgradeDependencies(opts.targetDir);
-  }
-
-  if (opts.harness) {
-    console.log(pc.dim("Installing the Harness durable CLI…"));
-    runHarnessInstall(opts.targetDir);
   }
 
   if (opts.git) {
