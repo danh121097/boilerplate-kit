@@ -3,6 +3,7 @@
 ```
 app/_layout.tsx (root layout)
   1. initServices()              ← sets axios baseURLs + installs interceptors
+     useEffect(watchSessionEnd)  ← reacts to the end of the auth session
   2. createNativeStackNavigator()
   3. render(
        <AppQueryClientProvider>    ← shared QueryClient
@@ -22,11 +23,12 @@ app/_layout.tsx (root layout)
 
 - `initServices()` (called once in `app/_layout.tsx`) must run before any `Api`
   instance makes a request, because it calls `Api.setBaseURL()` and
-  `Api.registerInterceptors()`. It also sets the `onSessionExpired` callback.
+  `Api.registerInterceptors()` with the per-service `RefreshOptions`.
 - Token storage is **async** — all `SecureStore.getItemAsync()` calls return promises.
-- Hard logout: the interceptor calls `onSessionExpired()` callback (injected at
-  init time) only for an unrefreshable 401 or a refresh rejected with 401/403;
-  the handler clears the query cache and calls `expireSession()`; the `(app)`
-  gate then redirects to `/(auth)/login` with a `returnTo` path.
+- Hard logout: only a refresh refused with 401/403 ends the session
+  (`endSession("expired", service)`). The root layout subscribes
+  `watchSessionEnd()`, which resets the query cache to signed out and calls
+  `expireSession()` for the auth service; the `(app)` gate then redirects to
+  `/(auth)/login` with a `returnTo` path.
 - Expo Router generates typed route navigation automatically from the `app/`
   directory structure. No need for explicit route definitions.

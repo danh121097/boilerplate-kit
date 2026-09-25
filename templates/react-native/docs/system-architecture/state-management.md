@@ -25,25 +25,30 @@ interface AuthState {
   isAuthenticated: boolean;  // tokens are stored and the session is live
   hydrated: boolean;         // boot-time SecureStore check finished
   sessionExpired: boolean;   // last sign-out was involuntary → gate adds returnTo
-  expireSession(): void;     // onSessionExpired: logged out + sessionExpired
+  expireSession(): void;     // session expired: logged out + sessionExpired
   setUser(user): void;       // also resets sessionExpired
   hydrate(): Promise<void>;  // read token → loadUser(); marks hydrated
   loadUser(): Promise<void>; // getMe; safe to retry after a transient failure
-  logout(): Promise<void>;   // revoke refresh token, clear tokens + query cache
+  logout(): Promise<void>;   // revoke refresh token, clear tokens, reset queries
 }
 ```
 
 Auth state rules:
-- `hydrate()` keeps the user signed in (`isAuthenticated: true`, `user: null`)
+- `hydrate()` starts from `hasStoredSession()` (access or refresh token stored)
+  and keeps the user signed in (`isAuthenticated: true`, `user: null`)
   when `getMe` fails for a non-auth reason (offline, 5xx, 429, timeout) and the
   tokens are still stored; only a session-ending failure logs out.
 - `loadUser()` reads the session epoch before `getMe` and drops a late result
   (success or failure) if a logout/expiry happened meanwhile.
-- `expireSession()` (from `onSessionExpired`) sets `sessionExpired: true`; the
-  `(app)` gate then redirects to `/login` with `returnTo`. `logout()` and
-  `setUser()` reset it.
-- `logout()` and the root layout's `onSessionExpired` handler both call
-  `queryClient.clear()`, so no cached server data survives into the next session.
+- `expireSession()` is called by `watchSessionEnd()` (subscribed by the root
+  layout) when the auth service's session ends as `"expired"`; it sets
+  `sessionExpired: true` and the `(app)` gate redirects to `/login` with
+  `returnTo`. `logout()` and `setUser()` reset it. Session ends of other
+  services are ignored.
+- `logout()` and `watchSessionEnd()` both call `resetQueriesToSignedOut` (the
+  latter through `resetQueriesOnSessionEnd`): every cached query is reset and
+  `queryKeys.auth.me` is pinned to `null`, so no cached server data survives into
+  the next session. Not `queryClient.clear()`, which orphans mounted observers.
 
 Stores are imported explicitly — no auto-import or global injection.
 

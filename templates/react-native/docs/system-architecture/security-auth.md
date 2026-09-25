@@ -31,25 +31,32 @@ ctime (ms epoch)\n
 ```
 
 The signed Content-Type is the one actually sent (the backend verifies the raw
-header): for a request with a body, the pinned `Content-Type` (looked up
-case-insensitively), or `application/json` when none is pinned; for a bodyless
-request, an empty string — axios drops the header when there is no body. The
-refresh client always sends a JSON body, so it signs `application/json`.
+header), computed by `resolveContentType(config)`:
+- no body (`data === undefined`): an empty string — axios drops the header;
+- a pinned `Content-Type` (looked up case-insensitively): sent as is;
+- otherwise axios' default for the body: `URLSearchParams` →
+  `application/x-www-form-urlencoded;charset=utf-8`, a string →
+  `application/x-www-form-urlencoded`, anything else (including `null`) →
+  `application/json`.
 
-The signed path is `config.url` relative to the baseURL with any inline query
-stripped (`url.split("?")[0]`); `params` are never signed — the backend verifies
-`req.url.split("?")[0]`.
+The refresh client always sends a JSON body, so it signs `application/json`.
+
+The signed path is `config.url` relative to the baseURL with any inline query or
+hash stripped (`url.split(/[?#]/)[0]`); `params` are never signed — the backend
+verifies `req.url.split("?")[0]`.
 
 Signed with HMAC-SHA256, Base64-encoded → `sig` header. Also sends `ctime` and
-`x-version` headers. Implemented in `HMACSignatureGenerator.generateSignature()`.
+`x-version` headers. The pure signer is `HMACSignatureGenerator.signRequest({
+method, path, contentType, ctime })`; the request interceptor uses the
+`generateSignature(config)` adapter.
 
 **This is anti-casual-abuse only, not a security boundary.** `EXPO_PUBLIC_*`
 values are inlined into the JS bundle, so anyone with the app binary can extract
 the secret and sign arbitrary requests. It raises the bar for scripted traffic
 against the API; authorization must still be enforced server-side by the JWT.
 
-The bare refresh client (`auth-refresh-client.ts`) signs its own request manually
-(it bypasses the app interceptors to prevent refresh recursion).
+The bare refresh client (`auth-refresh-client.ts`) signs its own request with
+`signRequest` (it bypasses the app interceptors to prevent refresh recursion).
 
 **Multipart is unsupported with HMAC on.** `postFormData` pins
 `multipart/form-data`, but the header actually sent carries a boundary the signer
@@ -71,35 +78,46 @@ concurrent 401s → getFreshToken() → inFlight promise already exists → join
 A burst of N concurrent 401s triggers exactly ONE `POST /auth/refresh`. All N
 callers await the same promise and retry with the new token. The refresher
 (`createTokenRefresher`) only fetches; the manager persists the rotated access +
-refresh tokens.
+refresh tokens, then calls `onRefreshed`. When the stored access token already
+differs from the one the failed request was sent with (an earlier refresh
+rotated it), the manager returns the stored token without a network refresh.
+
+Refresh is configured per service in `initServices()` as `RefreshOptions`
+(`endpoint`, `skipPaths`, `hasSession`, `onRefreshed`); the auth service's
+`skipPaths` are the login, register and logout endpoints.
 
 ## 401 handling
 
 A 401 is routed in this order:
-1. **Credential endpoints** (login, register, logout pass `skipAuthRefresh`):
-   passed through untouched — no refresh, no token clear, no session-expired.
+1. **No refresh for the service, the refresh endpoint or a `skipPaths` entry**
+   (login, register, logout; matched on the path without `?query` / `#hash`):
+   passed through untouched — no refresh, no token clear, no session-ended event.
 2. **Session ended after send**: the request interceptor stamps the session epoch
-   on every request; if a clear (logout / expiry) happened since, the 401 rejects
-   with `SessionClearedError` (`error_code: 401`, `message: "session_ended"`) and
-   nothing else happens — no `/auth/refresh` call, no second clear, no expiry.
-3. **Refresh + replay** when ALL are true: `config._retry` is not set (not already
-   retried), the URL is not the refresh endpoint (no recursion), and a token
-   exists for the service.
-4. **Unrecoverable session** (token held, but already retried or no refresh config
-   for the service): clear that service's tokens and fire `onSessionExpired`.
-5. **Anonymous** (no token): passed through; it never expires a session.
+   on every request; if the session ended since (logout, expiry, a new login),
+   the 401 rejects with `SessionEndedError` (`error_code: 401`,
+   `message: "session_ended"`) and nothing else happens — no `/auth/refresh`
+   call, no clear, no event. The check runs again after every await of the 401
+   handler (the `hasSession` SecureStore read, the refresh), so a logout that
+   lands while the handler is reading tokens still wins.
+3. **Anonymous** (`hasSession()` false — neither token stored) or **already
+   replayed once** (`config._retry`): passed through. A replayed request that
+   401s again does not end the session — only the refresh endpoint decides that.
+4. Otherwise **refresh + replay** with the new token. A replay's own outcome
+   (e.g. a later 500) propagates as is and never clears the refreshed token.
 
 ## Refresh failure policy
 
 | Refresh outcome | Tokens | Session | Error the caller sees |
 |-----------------|--------|---------|-----------------------|
 | 2xx with tokens | Rotated + saved | Continues | Replayed request's own result |
-| **401 / 403** | Cleared | Expired → `onSessionExpired(service)` | `RefreshRejectedError` |
-| Anything else: offline, timeout (15s), 429, 5xx, **any other 4xx** (400, 404, 422, ...), malformed body | **Kept** | Continues | `RefreshUnavailableError` (`retryable: true`, `error_code` = HTTP status or 0) |
-| Session cleared (logout / re-login) while in flight — whatever the outcome, including a 401/403 | Not saved, not cleared | Newer session untouched | `SessionClearedError` (`error_code: 401`, `session_ended`) |
+| **401 / 403** (`isRefreshRefused`) | Cleared | Ended → `endSession("expired", service)` | The original 401 |
+| Anything else: offline, timeout (15s), 429, 5xx, **any other 4xx** (400, 404, 422, ...), malformed body | **Kept** | Continues | `refreshUnavailable(error)`: `message: "refresh_unavailable"`, `retryable: true`, `error_code` = HTTP status or 0 |
+| Session ended (logout / re-login) while in flight — whatever the outcome, including a 401/403 | Not saved, not cleared | Newer session untouched | `SessionEndedError` (`error_code: 401`, `session_ended`) |
 
-All three errors carry the `ApiResponseError` envelope fields (`status: "error"`,
-`message`, `error_code`, `error_message`), so screens render them like any API error.
+Every error carries the `ApiResponseError` envelope fields (`status: "error"`,
+`message`, `error_code`, `error_message`), so screens render them like any API
+error. Only the refused refresh of a service ends that service's session: a
+secondary backend's refused refresh never signs the user out of the app.
 
 Only an explicit 401/403 from the refresh endpoint ends the session — a deliberate
 decision: every other refresh failure, including other 4xx statuses, is treated
@@ -117,34 +135,47 @@ the user is signed out. This is by design on the server side.
 ## Logout
 
 `AuthModel.logout()` revokes the **latest** refresh token:
-1. It waits for any in-flight refresh (`RefreshTokenManager.waitForPendingRefresh`,
-   re-checked in a loop) so it never revokes a token that refresh is rotating
-   away — the rotated one would otherwise stay valid on the server. The total
-   wait is capped at `LOGOUT_REFRESH_WAIT_MS` (15s); after the cap, logout
+0. It marks a logout as pending (`beginLogout`) synchronously, before any
+   await: from then on no refresh starts or is joined, and a 401 rejects as
+   `session_ended` without calling `/auth/refresh`.
+1. It runs inside `withSessionLock(service, …)`, which waits for any in-flight
+   refresh (re-checked in a loop) so it never revokes a token that refresh is
+   rotating away — the rotated one would otherwise stay valid on the server. The
+   wait is capped at `SESSION_WAIT_TIMEOUT_MS` (15s); after the cap, logout
    proceeds with whatever tokens are stored. If that refresh later rotates the
    pair server-side, the epoch guard drops its result locally, but the rotated
    refresh token stays valid on the server until it expires (accepted limit).
-2. It reads the refresh token **and** the access token together (one
-   `Promise.all`), then — synchronously after the last check — clears every
-   stored token, bumping the epoch. With no access token left, no new refresh can
-   start, and any 401 for a request sent before the clear rejects as
-   `session_ended` without calling `/auth/refresh`.
+   A single JS context has no tabs, so there is no cross-context lock.
+2. It reads the refresh token **and** the access token again, preferring what
+   is stored now (a rotated pair) and falling back to the pair it started
+   reading when logout began (those reads are kicked off before the wait, since
+   SecureStore is async) if storage is empty by then. It then bumps the session
+   epoch: every request sent before now that 401s rejects as `session_ended`.
 3. It posts `{ refreshToken }` to `/auth/logout` (body — no cookie jar in RN) with
    `Authorization: Bearer <access token read in step 2>`, only when one was held.
-   The request interceptor never overrides a caller-set `Authorization` (after the
-   clear it has nothing to attach anyway). The request carries `skipAuthRefresh`,
-   so a 401 from logout never refreshes, clears or fires session-expired.
+   The request interceptor never overrides a caller-set `Authorization`. The
+   logout path is in the auth service's `skipPaths`, so a 401 from logout never
+   refreshes, clears or ends the session.
+4. Whatever the response, it clears every stored token and calls
+   `endSession("logout", service)`.
 
-Tokens are cleared even if the request fails. The auth store also calls
-`queryClient.clear()` and resets its state. A voluntary logout never fires
-`onSessionExpired` and never adds a `returnTo`.
+Overlapping `loadUser()` calls of the same session share one `getMe`, so two
+screens hitting the same 401 run a single logout.
+
+The auth store then calls `resetQueriesToSignedOut(queryClient,
+queryKeys.auth.me)` — every cached query is reset and the session query is
+pinned to `null` (signed out), unlike `queryClient.clear()`, which would leave
+mounted observers on orphaned queries — and resets its state. A voluntary logout
+is a `"logout"` session end: it never sets `sessionExpired` and never adds a
+`returnTo`.
 
 Refresh coordination is in memory only (single app process — no cross-tab case),
 so it uses no storage keys. Every SecureStore key comes from `STORAGE_KEYS` or
-the exported, sanitized `APP_PREFIX`.
+the sanitized app prefix (`getAppPrefix()`).
 
-**Epoch guard:** every token clear (`clearServiceTokens` / `clearAuthTokens`,
-the only clear helpers) bumps an in-memory per-service session epoch. Work that
+**Epoch guard:** every token clear (`clearServiceTokens`, `clearAuthTokens`,
+`clearAccessToken`, `clearRefreshToken`) and every `endSession` bumps an
+in-memory per-service session epoch (`session.ts`). Work that
 started before the clear sees a different epoch when it finishes and discards
 its result:
 - a refresh never re-saves tokens, and a stale 401/403 never clears or expires a
@@ -156,17 +187,19 @@ are rolled back (compare-and-delete).
 
 ## Hard logout (session expired)
 
-When an authenticated 401 cannot be refreshed (no refresh config, already retried) or
-the refresh endpoint rejects with 401/403, the service's tokens are cleared and
-the injected `onSessionExpired()` callback (registered in `initServices`) fires.
-The root layout's handler is idempotent: it clears the TanStack Query cache and
-calls `useAuthStore.expireSession()` (`isAuthenticated: false`,
-`sessionExpired: true`). It does not navigate itself: the `(app)` gate reacts
-and redirects to `/login?returnTo=<current path>` (`usePathname()`), so there is
-a single navigation. No `window.location.reload()`.
+When the refresh endpoint refuses the refresh with 401/403, the service's tokens
+are cleared and `endSession("expired", service)` notifies `onSessionEnded`
+listeners. The root layout subscribes `watchSessionEnd()` (in `stores/auth.ts`),
+which reacts only to the auth service: it resets every cached query to signed
+out (`resetQueriesOnSessionEnd`) and, when the session expired while
+authenticated, calls `useAuthStore.expireSession()` (`isAuthenticated: false`,
+`sessionExpired: true`) once. It does not navigate itself: the `(app)` gate
+reacts and redirects to `/login?returnTo=<current path>` (`usePathname()`), so
+there is a single navigation. No `window.location.reload()`.
 
 After sign-in, the login screen and the `(auth)` gate both go to
-`safeReturnPath(returnTo)` — only in-app paths: at most 512 chars, a single
+`safeReturnPath(returnTo)` (from `@/services/core`) — only in-app paths: at most
+512 chars, a single
 leading `/` (no `//host`, no `/\host`), no backslash anywhere, no control
 characters (`\u0000`–`\u001F`, `\u007F`), no `://`, and not `/login` (with or
 without a query, trailing slash or subpath); anything else goes to `/`.
@@ -175,10 +208,16 @@ is kept; the stack history before the expiry is not restored.
 
 ## Boot hydration
 
-`useAuthStore.hydrate()` reads the stored access token and calls `getMe`:
+`useAuthStore.hydrate()` checks `hasStoredSession()` (an access **or** a refresh
+token is stored) and calls `getMe`:
 - success → authenticated with `user`;
-- session-ending failure (tokens cleared by a rejected refresh, or `error_code`
-  401) → logged out;
+- a 401 (the refresh was refused, or the session query itself was refused) →
+  logged out; unless the session already ended, the store runs
+  `AuthModel.logout()` to revoke and clear the tokens;
 - any other failure (offline, 5xx, 429, timeout) with tokens still stored →
   **stays authenticated with `user: null`**. `loadUser()` retries; the profile
   screen calls it when it opens authenticated without a user (never after logout).
+
+`useMeQuery` (a TanStack query on `queryKeys.auth.me`) fetches through
+`AuthModel.getSession()`, which resolves `null` on a 401 instead of throwing, so
+a signed-out session reads as `data: null`.

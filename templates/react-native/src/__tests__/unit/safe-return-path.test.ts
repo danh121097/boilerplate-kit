@@ -1,4 +1,8 @@
-import { safeReturnPath } from "@/utils/safe-return-path";
+import { safeReturnPath } from "@/services/core/session";
+
+jest.mock("expo-secure-store", () =>
+  require("@/__tests__/helpers/fake-secure-store").fakeSecureStore(),
+);
 
 describe("safeReturnPath", () => {
   it.each(["/", "/profile", "/users/42?tab=posts", "/a#frag"])("accepts in-app path %j", (p) => {

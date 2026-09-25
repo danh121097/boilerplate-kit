@@ -1,4 +1,6 @@
 import { STORAGE_KEYS } from "@/enums";
+import { bumpSessionEpoch, getSessionEpoch } from "@/services/core/session";
+import type { ApiService, RefreshedTokens } from "@/services/core/types";
 import * as SecureStore from "expo-secure-store";
 
 /**
@@ -10,11 +12,11 @@ import * as SecureStore from "expo-secure-store";
  * Most apps only ever need the default MAIN context and touch nothing here.
  * To talk to a second authenticated backend (admin panel, partner API, ...),
  * register its slots once at startup alongside its base URL, reusing the
- * sanitized `APP_PREFIX` from `@/enums` so the keys stay SecureStore-legal:
+ * sanitized app prefix (`getAppPrefix()`) so the keys stay SecureStore-legal:
  *
  *   Api.setBaseURL(adminURL, "ADMIN");
- *   registerServiceToken("ADMIN", { access: `${APP_PREFIX}_admin_ACCESS_TOKEN`,
- *                                   refresh: `${APP_PREFIX}_admin_REFRESH_TOKEN` });
+ *   registerServiceToken("ADMIN", { access: `${getAppPrefix()}_admin_ACCESS_TOKEN`,
+ *                                   refresh: `${getAppPrefix()}_admin_REFRESH_TOKEN` });
  *
  * Security note: `expo-secure-store` persists values in the iOS Keychain /
  * Android Keystore — encrypted at rest and not readable by other apps. Reads are
@@ -26,11 +28,12 @@ import * as SecureStore from "expo-secure-store";
  * SecureStore keys must match `[A-Za-z0-9._-]`; `STORAGE_KEYS` sanitizes the
  * app-name prefix, so its values are always legal.
  *
- * Session epoch: every clear (`clearServiceTokens` / `clearAuthTokens` — the
- * only clear helpers, so no path can skip the bump) bumps a per-service counter. A token refresh reads
- * the epoch before its network call and only persists the rotated tokens if the
- * epoch is unchanged — so a refresh still in flight when the user logs out (or
- * the session expires) can never resurrect the cleared session.
+ * Session epoch (owned by `session.ts`): every clear (`clearServiceTokens` /
+ * `clearAuthTokens` — the only clear helpers, so no path can skip the bump)
+ * bumps the service's epoch synchronously, before the async delete. A token
+ * refresh only persists the rotated tokens if the epoch is unchanged — so a
+ * refresh still in flight when the user logs out (or the session expires) can
+ * never resurrect the cleared session.
  */
 export interface ServiceTokenKeys {
   access: string;
@@ -49,16 +52,21 @@ const DEFAULT_KEYS: ServiceTokenKeys = {
 
 const serviceTokenKeys = new Map<string, ServiceTokenKeys>([["MAIN", DEFAULT_KEYS]]);
 
-/** In-memory per-service session epoch; bumped synchronously on every clear. */
-const sessionEpochs = new Map<string, number>();
+type TokensChangedListener = (service: ApiService) => void;
 
-/** Current session epoch for a service (0 until its tokens are first cleared). */
-export function getSessionEpoch(service: string = "MAIN"): number {
-  return sessionEpochs.get(service) ?? 0;
+const tokensChangedListeners = new Set<TokensChangedListener>();
+
+/** Subscribe to token writes and clears (fired once the SecureStore write
+ * settled). Returns the unsubscribe. */
+export function onTokensChanged(listener: TokensChangedListener): () => void {
+  tokensChangedListeners.add(listener);
+  return () => {
+    tokensChangedListeners.delete(listener);
+  };
 }
 
-function bumpSessionEpoch(service: string): void {
-  sessionEpochs.set(service, getSessionEpoch(service) + 1);
+function notifyTokensChanged(service: ApiService): void {
+  for (const listener of [...tokensChangedListeners]) listener(service);
 }
 
 /** Register (or override) the SecureStore slots a service keeps its tokens in. */
@@ -75,39 +83,52 @@ export function getAccessToken(service: string = "MAIN"): Promise<string | null>
   return SecureStore.getItemAsync(resolveKeys(service).access);
 }
 
-export function persistAccessToken(token: string, service: string = "MAIN"): Promise<void> {
-  return SecureStore.setItemAsync(resolveKeys(service).access, token, SECURE_OPTIONS);
+export async function persistAccessToken(token: string, service: string = "MAIN"): Promise<void> {
+  await SecureStore.setItemAsync(resolveKeys(service).access, token, SECURE_OPTIONS);
+  notifyTokensChanged(service);
 }
 
 export function getRefreshToken(service: string = "MAIN"): Promise<string | null> {
   return SecureStore.getItemAsync(resolveKeys(service).refresh);
 }
 
-export function persistRefreshToken(token: string, service: string = "MAIN"): Promise<void> {
-  return SecureStore.setItemAsync(resolveKeys(service).refresh, token, SECURE_OPTIONS);
+export async function persistRefreshToken(token: string, service: string = "MAIN"): Promise<void> {
+  await SecureStore.setItemAsync(resolveKeys(service).refresh, token, SECURE_OPTIONS);
+  notifyTokensChanged(service);
 }
 
-/** Clear both tokens for a single service (e.g. when its refresh fails). */
+/** Clear the access token of a single service (the refresh token is kept). */
+export async function clearAccessToken(service: string = "MAIN"): Promise<void> {
+  bumpSessionEpoch(service);
+  await SecureStore.deleteItemAsync(resolveKeys(service).access);
+  notifyTokensChanged(service);
+}
+
+/** Clear the refresh token of a single service (the access token is kept). */
+export async function clearRefreshToken(service: string = "MAIN"): Promise<void> {
+  bumpSessionEpoch(service);
+  await SecureStore.deleteItemAsync(resolveKeys(service).refresh);
+  notifyTokensChanged(service);
+}
+
+/** Clear both tokens for a single service (e.g. when its refresh is refused). */
 export async function clearServiceTokens(service: string = "MAIN"): Promise<void> {
   bumpSessionEpoch(service);
   const { access, refresh } = resolveKeys(service);
   await Promise.all([SecureStore.deleteItemAsync(access), SecureStore.deleteItemAsync(refresh)]);
+  notifyTokensChanged(service);
 }
 
 /** Clear every registered service's access + refresh tokens (e.g. on logout). */
 export async function clearAuthTokens(): Promise<void> {
+  const services = [...serviceTokenKeys.keys()];
   const deletions: Promise<void>[] = [];
   serviceTokenKeys.forEach(({ access, refresh }, service) => {
     bumpSessionEpoch(service);
     deletions.push(SecureStore.deleteItemAsync(access), SecureStore.deleteItemAsync(refresh));
   });
   await Promise.all(deletions);
-}
-
-/** Tokens minted by a refresh; the refresh token is present when the backend rotates. */
-export interface RefreshedTokens {
-  accessToken: string;
-  refreshToken?: string;
+  services.forEach(notifyTokensChanged);
 }
 
 /**
@@ -115,6 +136,8 @@ export interface RefreshedTokens {
  * `epoch` was read. Returns false (and writes nothing) when the session moved on.
  * If a clear lands while the writes are in flight, the just-written values are
  * rolled back — compare-and-delete, so tokens from a newer login are never touched.
+ * React Native only: SecureStore writes are async, so the epoch can move between
+ * the check and the write.
  */
 export async function persistRefreshedTokensIfCurrent(
   tokens: RefreshedTokens,
@@ -128,7 +151,10 @@ export async function persistRefreshedTokensIfCurrent(
     writes.push(SecureStore.setItemAsync(refresh, tokens.refreshToken, SECURE_OPTIONS));
   }
   await Promise.all(writes);
-  if (getSessionEpoch(service) === epoch) return true;
+  if (getSessionEpoch(service) === epoch) {
+    notifyTokensChanged(service);
+    return true;
+  }
 
   const rollback = async (key: string, written?: string) => {
     if (written && (await SecureStore.getItemAsync(key)) === written) {

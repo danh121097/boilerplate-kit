@@ -1,5 +1,6 @@
 import { resetSecureStore } from "@/__tests__/helpers/fake-secure-store";
 import { bearerOf, httpError, makeClient, ok } from "@/__tests__/helpers/http-mocks";
+import { queryClient } from "@/providers/query-client-provider";
 import { AuthModel } from "@/services/auth";
 import { Api } from "@/services/core";
 import {
@@ -38,6 +39,9 @@ describe("logout during an in-flight refresh", () => {
     useAuthStore.setState({ user: null, isAuthenticated: true, hydrated: true });
   });
   afterEach(() => jest.restoreAllMocks());
+  // Signing out pins the session query to null; drop it so its GC timer does
+  // not keep jest alive.
+  afterAll(() => queryClient.clear());
 
   it("revokes the rotated token, persists nothing and stays logged out", async () => {
     let releaseRefresh: () => void = () => {};

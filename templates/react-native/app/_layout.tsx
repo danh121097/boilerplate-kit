@@ -1,7 +1,7 @@
 import { initI18n } from "@/i18n/i18n";
-import { AppQueryClientProvider, queryClient } from "@/providers/query-client-provider";
+import { AppQueryClientProvider } from "@/providers/query-client-provider";
 import { initServices } from "@/services";
-import { useAuthStore } from "@/stores/auth";
+import { useAuthStore, watchSessionEnd } from "@/stores/auth";
 import { Stack } from "expo-router";
 import { useEffect } from "react";
 import { I18nextProvider } from "react-i18next";
@@ -13,23 +13,16 @@ import "@/styles/global.css";
 // One-time boot wiring (runs on first import of the root layout):
 // 1. i18n resources + device-locale detection.
 initI18n();
-// 2. axios base URLs + interceptors. The injected `onSessionExpired` replaces the
-//    web template's `window.location.reload()`: it resets auth state when a 401
-//    can't be recovered by a refresh; the (app) gate then routes to /login.
-initServices(() => {
-  // Idempotent: a burst of concurrent unrecoverable 401s must redirect ONCE, not
-  // once per failed request. After the first reset `isAuthenticated` is false, so
-  // later fires no-op until the next successful login.
-  if (!useAuthStore.getState().isAuthenticated) return;
-  // Drop every cached query so the next user never sees the previous user's data.
-  queryClient.clear();
-  // The (app) auth gate reacts to this and redirects to /login with a `returnTo`
-  // of the current screen — navigating here too would race it and drop the param.
-  useAuthStore.getState().expireSession();
-});
+// 2. axios base URLs + interceptors.
+initServices();
 
 export default function RootLayout() {
   const hydrate = useAuthStore((s) => s.hydrate);
+
+  // Session ends of the auth service: reset the query cache, and after an
+  // expiry let the (app) gate redirect to /login with a `returnTo`. Subscribed
+  // before the hydrate effect so an expiry during boot is not missed.
+  useEffect(() => watchSessionEnd(), []);
 
   // Restore any persisted session from SecureStore on boot.
   useEffect(() => {

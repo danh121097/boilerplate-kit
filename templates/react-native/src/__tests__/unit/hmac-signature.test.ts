@@ -1,4 +1,4 @@
-import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
+import { HMACSignatureGenerator, resolveContentType } from "@/services/core/hmac-signature";
 import { AxiosHeaders } from "axios";
 import { createHmac } from "node:crypto";
 import type { InternalAxiosRequestConfig } from "axios";
@@ -117,6 +117,33 @@ describe("hmac-signature", () => {
     expect(sig!.sig).toBe(serverSign("shared-secret", "GET", "", sig!.ctime, "/users"));
   });
 
+  it("signs the path without a #hash", () => {
+    process.env.EXPO_PUBLIC_HMAC_SECRET = "shared-secret";
+    const config = { url: "/users#top", method: "get", headers: {} } as never;
+    const sig = HMACSignatureGenerator.generateSignature(config);
+    expect(sig!.sig).toBe(serverSign("shared-secret", "GET", "", sig!.ctime, "/users"));
+  });
+
+  it("signRequest signs the given method, content type and path", () => {
+    process.env.EXPO_PUBLIC_HMAC_SECRET = "shared-secret";
+    const sig = HMACSignatureGenerator.signRequest({
+      method: "post",
+      path: "auth/refresh?x=1",
+      contentType: "application/json",
+      ctime: 1234,
+    });
+    expect(sig).toMatchObject({ ctime: 1234 });
+    expect(sig!.sig).toBe(
+      serverSign("shared-secret", "POST", "application/json", 1234, "/auth/refresh"),
+    );
+  });
+
+  it("signRequest signs application/json when no content type is given", () => {
+    process.env.EXPO_PUBLIC_HMAC_SECRET = "shared-secret";
+    const sig = HMACSignatureGenerator.signRequest({ method: "post", path: "/x", ctime: 1 });
+    expect(sig!.sig).toBe(serverSign("shared-secret", "POST", "application/json", 1, "/x"));
+  });
+
   it("includes the build version as x-version", () => {
     process.env.EXPO_PUBLIC_HMAC_SECRET = "shared-secret";
     process.env.EXPO_PUBLIC_BUILD_VERSION = "9.9.9";
@@ -152,5 +179,32 @@ describe("hmac-signature", () => {
       ),
     );
     post.mockRestore();
+  });
+});
+
+describe("resolveContentType (what axios sends)", () => {
+  const JSON_TYPE = "application/json";
+  it.each([
+    ["no body", undefined, {}, ""],
+    ["a null body", null, {}, JSON_TYPE],
+    ["a null body with a pinned type", null, { "Content-Type": "text/plain" }, "text/plain"],
+    [
+      "URLSearchParams",
+      new URLSearchParams("a=1"),
+      {},
+      "application/x-www-form-urlencoded;charset=utf-8",
+    ],
+    ["a string", "a=1", {}, "application/x-www-form-urlencoded"],
+    ["an object", { a: 1 }, {}, JSON_TYPE],
+    ["a lowercase pinned header", { a: 1 }, { "content-type": "text/csv" }, "text/csv"],
+    [
+      "an AxiosHeaders instance",
+      { a: 1 },
+      AxiosHeaders.from({ "Content-Type": "application/vnd.api+json" }),
+      "application/vnd.api+json",
+    ],
+  ])("%s", (_label, data, headers, expected) => {
+    const config = { url: "/x", method: "post", headers, data } as never;
+    expect(resolveContentType(config)).toBe(expected);
   });
 });

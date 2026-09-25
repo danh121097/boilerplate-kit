@@ -5,10 +5,13 @@ import {
   clearServiceTokens,
   getAccessToken,
   getRefreshToken,
+  onTokensChanged,
   persistAccessToken,
+  persistRefreshedTokensIfCurrent,
   persistRefreshToken,
   registerServiceToken,
 } from "@/services/core/auth-token-storage";
+import { getSessionEpoch, hasStoredSession } from "@/services/core/session";
 
 jest.mock("expo-secure-store", () =>
   require("@/__tests__/helpers/fake-secure-store").fakeSecureStore(),
@@ -74,5 +77,42 @@ describe("auth-token-storage (async / SecureStore)", () => {
     for (const value of Object.values(STORAGE_KEYS)) {
       expect(value).toMatch(/^[A-Za-z0-9._-]+$/);
     }
+  });
+
+  it("every clear bumps the cleared service's session epoch", async () => {
+    const main = getSessionEpoch("MAIN");
+    const admin = getSessionEpoch("ADMIN");
+    const clearing = clearServiceTokens("MAIN");
+    expect(getSessionEpoch("MAIN")).toBe(main + 1); // synchronously, before the delete
+    await clearing;
+    expect(getSessionEpoch("ADMIN")).toBe(admin);
+    await clearAuthTokens();
+    expect(getSessionEpoch("MAIN")).toBe(main + 2);
+    expect(getSessionEpoch("ADMIN")).toBe(admin + 1);
+  });
+
+  it("notifies onTokensChanged after writes and clears, until unsubscribed", async () => {
+    const changed = jest.fn();
+    const unsubscribe = onTokensChanged(changed);
+    await persistAccessToken("a", "MAIN");
+    await clearServiceTokens("ADMIN");
+    unsubscribe();
+    await persistRefreshToken("r", "MAIN");
+    expect(changed.mock.calls).toEqual([["MAIN"], ["ADMIN"]]);
+  });
+
+  it("hasStoredSession is true while either token is stored", async () => {
+    expect(await hasStoredSession("MAIN")).toBe(false);
+    await persistRefreshToken("r", "MAIN");
+    expect(await hasStoredSession("MAIN")).toBe(true);
+  });
+
+  it("persistRefreshedTokensIfCurrent writes nothing once the epoch moved", async () => {
+    const epoch = getSessionEpoch("MAIN");
+    await clearServiceTokens("MAIN");
+    expect(await persistRefreshedTokensIfCurrent({ accessToken: "late" }, epoch, "MAIN")).toBe(
+      false,
+    );
+    expect(await getAccessToken("MAIN")).toBeNull();
   });
 });

@@ -1,7 +1,15 @@
 import { queryClient } from "@/providers/query-client-provider";
-import { AuthModel } from "@/services/auth";
-import { getAccessToken, getSessionEpoch } from "@/services/core/auth-token-storage";
-import { RefreshRejectedError } from "@/services/core/refresh-errors";
+import { AuthModel, authContract } from "@/services/auth";
+import {
+  getSessionEpoch,
+  hasStoredSession,
+  isUnauthorizedError,
+  onSessionEnded,
+  resetQueriesOnSessionEnd,
+  resetQueriesToSignedOut,
+  SessionEndedError,
+} from "@/services/core";
+import { queryKeys } from "@/services/query-keys";
 import { create } from "zustand";
 import type { AuthUser } from "@/services/auth/types/auth";
 
@@ -17,7 +25,7 @@ interface AuthState {
   /** True after an involuntary sign-out (session expired): the auth gate then
    * sends the user to /login with a `returnTo` of the screen they were on. */
   sessionExpired: boolean;
-  /** Reset auth state after an unrecoverable 401 / rejected refresh. */
+  /** Reset auth state after the refresh endpoint refused the session. */
   expireSession: () => void;
   setUser: (user: AuthUser | null) => void;
   /** Boot-time restore: read the persisted token, resolve the user, mark hydrated. */
@@ -28,17 +36,10 @@ interface AuthState {
   logout: () => Promise<void>;
 }
 
-/** Did this failure end the session (vs. offline / 5xx / 429 / timeout)? */
-function isSessionEnding(error: unknown): boolean {
-  if (error instanceof RefreshRejectedError) return true;
-  const code = (error as { error_code?: unknown } | null)?.error_code;
-  return code === 401;
-}
-
 /**
  * Zustand auth store — the app's session source of truth. The auth-gated route
- * group reads `isAuthenticated`/`hydrated`; the injected `onSessionExpired`
- * callback (wired in the root layout) resets it on an unrecoverable 401.
+ * group reads `isAuthenticated`/`hydrated`; `watchSessionEnd` (subscribed by the
+ * root layout) resets it when the refresh endpoint refuses the session.
  */
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
@@ -51,37 +52,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setUser: (user) => set({ user, isAuthenticated: Boolean(user), sessionExpired: false }),
 
   hydrate: async () => {
-    const token = await getAccessToken().catch(() => null);
-    if (!token) {
+    const signedIn = await hasStoredSession(authContract.service).catch(() => false);
+    if (!signedIn) {
       set({ user: null, isAuthenticated: false, hydrated: true });
       return;
     }
-    // Token present — resolve the user. A stale token 401s here; the interceptor
-    // refreshes if it can. Only a session-ending failure (tokens cleared) logs out.
+    // A session is stored — resolve the user. A stale token 401s here; the
+    // interceptor refreshes if it can. Only a 401 ends the session.
     await get().loadUser();
     set({ hydrated: true });
   },
 
-  loadUser: async () => {
-    // A logout / expiry while getMe is in flight bumps the epoch; a late result
-    // (success or failure) must not resurrect or rewrite that ended session.
-    const epoch = getSessionEpoch();
-    const isStale = () => getSessionEpoch() !== epoch;
-    try {
-      const user = await AuthModel.getMe();
-      if (isStale()) return;
-      set({ user, isAuthenticated: true });
-    } catch (error) {
-      // Offline / 5xx / 429 / timeout keep the tokens: stay signed in with an
-      // unknown user and let the UI retry. Logged out only when the session ended.
-      const stillHasToken = Boolean(await getAccessToken().catch(() => null));
-      if (isStale()) return;
-      if (isSessionEnding(error) || !stillHasToken) {
-        set({ user: null, isAuthenticated: false });
-      } else {
-        set({ isAuthenticated: true });
-      }
-    }
+  loadUser: () => {
+    // Overlapping calls in the same session share one getMe, so two callers
+    // hitting the same 401 run a single logout.
+    const epoch = getSessionEpoch(authContract.service);
+    if (inFlightLoad?.epoch === epoch) return inFlightLoad.promise;
+    const promise = loadUserOnce(epoch).finally(() => {
+      if (inFlightLoad?.promise === promise) inFlightLoad = null;
+    });
+    inFlightLoad = { epoch, promise };
+    return promise;
   },
 
   logout: async () => {
@@ -90,8 +81,60 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch {
       // Ignore network errors — tokens are cleared by the model regardless.
     } finally {
-      queryClient.clear();
+      resetQueriesToSignedOut(queryClient, queryKeys.auth.me);
       set({ user: null, isAuthenticated: false, sessionExpired: false });
     }
   },
 }));
+
+/** The getMe that `loadUser` shares with overlapping calls of the same session. */
+let inFlightLoad: { epoch: number; promise: Promise<void> } | null = null;
+
+/** Resolve the signed-in user for the session of `epoch`. A logout / expiry
+ * while getMe is in flight bumps the epoch; a late result (success or failure)
+ * must not resurrect or rewrite that ended session. */
+async function loadUserOnce(epoch: number): Promise<void> {
+  const isStale = () => getSessionEpoch(authContract.service) !== epoch;
+  try {
+    const user = await AuthModel.getMe();
+    if (isStale()) return;
+    useAuthStore.setState({ user, isAuthenticated: true });
+  } catch (error) {
+    if (isStale()) return;
+    if (isUnauthorizedError(error)) {
+      // The session query itself was refused: the session is over. Revoke and
+      // drop the tokens — unless it already ended (logout in progress).
+      if (!(error instanceof SessionEndedError)) await AuthModel.logout().catch(() => {});
+      useAuthStore.setState({ user: null, isAuthenticated: false });
+      return;
+    }
+    // Offline / 5xx / 429 / timeout / an unavailable refresh keep the tokens:
+    // stay signed in with an unknown user and let the UI retry.
+    const stillSignedIn = await hasStoredSession(authContract.service).catch(() => false);
+    if (isStale()) return;
+    useAuthStore.setState(
+      stillSignedIn ? { isAuthenticated: true } : { user: null, isAuthenticated: false },
+    );
+  }
+}
+
+/**
+ * React to the end of the app's session (auth service only — a secondary
+ * backend's refused refresh ends just that backend's session): reset every
+ * cached query to signed-out, and after an expiry mark the involuntary sign-out
+ * so the `(app)` gate redirects to /login with a `returnTo`. Idempotent: a burst
+ * of expiries resets state once. Subscribed by the root layout; returns the
+ * unsubscribe.
+ */
+export function watchSessionEnd(): () => void {
+  const stopReset = resetQueriesOnSessionEnd(queryClient, queryKeys.auth.me, authContract.service);
+  const stopExpire = onSessionEnded((reason, service) => {
+    if (reason !== "expired" || service !== authContract.service) return;
+    if (!useAuthStore.getState().isAuthenticated) return;
+    useAuthStore.getState().expireSession();
+  });
+  return () => {
+    stopReset();
+    stopExpire();
+  };
+}

@@ -41,7 +41,7 @@ templates/react-native/
     │   └── query-client-provider.tsx
     ├── services/
     │   ├── index.ts
-    │   ├── init-services.ts   # setBaseURL, registerInterceptors, onSessionExpired
+    │   ├── init-services.ts   # setBaseURL, registerInterceptors, refresh options
     │   ├── core/              # api, interceptors, hmac, token-storage, model, tanstack, types
     │   ├── auth/              # AuthModel + mutations/queries
     │   └── users/             # UsersModel + useUsersListQuery

@@ -10,11 +10,6 @@ import type { AxiosInstance, AxiosRequestConfig } from "axios";
 export type ApiService = "MAIN" | (string & {});
 
 declare module "axios" {
-  interface AxiosRequestConfig {
-    /** Credential endpoints (login, register, logout): a 401 is passed through
-     * as-is — never refreshed, never clears tokens or fires session-expired. */
-    skipAuthRefresh?: boolean;
-  }
   interface InternalAxiosRequestConfig {
     serviceType?: ApiService;
     /** Set once a request has already been replayed after a token refresh, so a
@@ -26,14 +21,11 @@ declare module "axios" {
   }
 }
 
-/**
- * Called when a service's session is unrecoverable (a 401 that cannot be
- * refreshed, or the refresh endpoint rejecting with 401/403 — NOT a transient
- * refresh failure such as offline, timeout, 429 or 5xx). On web the app reloaded the page;
- * on React Native there is no `window`, so the app injects a callback that clears
- * auth state and navigates back to `/login`. Defaults to a no-op.
- */
-export type SessionExpiredHandler = (service: ApiService) => void;
+/** Tokens minted by a refresh; the refresh token is present when the backend rotates. */
+export interface RefreshedTokens {
+  accessToken: string;
+  refreshToken?: string;
+}
 
 /**
  * Resolved refresh config for one service. The refresh token is read from
@@ -44,6 +36,16 @@ export interface RefreshOptions {
   endpoint: string;
   /** Which backend owns the refresh flow. */
   service: ApiService;
+  /** Credential paths (login, register, logout) whose 401 is passed through
+   * as-is — never refreshed. Matched on the path without query or hash, exactly
+   * or as a suffix. The refresh endpoint is always exempt. */
+  skipPaths: string[];
+  /** Whether a session exists to refresh. Default: an access or refresh token
+   * is stored for the service (`hasStoredSession`). Async on React Native
+   * because SecureStore reads are async. */
+  hasSession: () => boolean | Promise<boolean>;
+  /** Called after a refresh persisted the rotated tokens. */
+  onRefreshed?: () => void;
 }
 
 /**
@@ -65,6 +67,9 @@ export interface ApiResponseError {
   message: string;
   error_code: number;
   error_message: string;
+  /** True for a transient failure (offline, timeout, 408, 429, 5xx, an
+   * unavailable refresh): retrying later may succeed and the session is kept. */
+  retryable?: boolean;
   data?: Record<string, unknown>;
 }
 

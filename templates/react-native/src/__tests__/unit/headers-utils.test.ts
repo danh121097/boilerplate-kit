@@ -1,6 +1,7 @@
 import { resetSecureStore } from "@/__tests__/helpers/fake-secure-store";
 import { persistAccessToken } from "@/services/core/auth-token-storage";
 import { HeadersUtils } from "@/services/core/headers-utils";
+import { AxiosHeaders } from "axios";
 import type { InternalAxiosRequestConfig } from "axios";
 
 jest.mock("expo-secure-store", () =>
@@ -54,5 +55,16 @@ describe("headers-utils", () => {
     const config = configWith();
     await HeadersUtils.addAuthorizationHeader(config, "MAIN");
     expect(config.headers.authorization).toBeUndefined();
+  });
+
+  it("addAuthorizationHeader keeps an Authorization already set on AxiosHeaders", async () => {
+    await persistAccessToken("stored", "MAIN");
+    const config = {
+      url: "/x",
+      method: "get",
+      headers: AxiosHeaders.from({ Authorization: "Bearer explicit" }),
+    } as unknown as InternalAxiosRequestConfig;
+    await HeadersUtils.addAuthorizationHeader(config, "MAIN");
+    expect(config.headers.get("authorization")).toBe("Bearer explicit");
   });
 });

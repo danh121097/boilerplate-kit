@@ -25,7 +25,7 @@ src/
 │   ├── core/            # Api, interceptors, HMAC, SecureStore, TanStack helpers
 │   ├── auth/            # AuthModel + query/mutation definitions
 │   ├── users/           # UsersModel + useUsersListQuery
-│   └── init-services.ts # Wire base URLs, interceptors, onSessionExpired
+│   └── init-services.ts # Wire base URLs, interceptors, per-service refresh options
 ├── stores/              # Zustand stores (auth, socket-io)
 ├── styles/              # global.css (Tailwind entry for NativeWind)
 └── __tests__/           # jest-expo suite (helpers + unit + integration)

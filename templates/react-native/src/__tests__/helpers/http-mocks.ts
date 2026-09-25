@@ -1,17 +1,25 @@
 import { ApiInterceptors } from "@/services/core";
-import type { ServiceRefreshConfig, SessionExpiredHandler } from "@/services/core";
+import axios, { AxiosError, AxiosHeaders } from "axios";
+import type { ServiceRefreshConfig } from "@/services/core";
 import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from "axios";
-import axios from "axios";
+
+/** The MAIN refresh config the app registers: refresh endpoint + credential paths. */
+export const MAIN_REFRESH: Record<string, ServiceRefreshConfig> = {
+  MAIN: {
+    endpoint: "/auth/refresh",
+    skipPaths: ["/auth/login", "/auth/register", "/auth/logout"],
+  },
+};
 
 /** Build an axios instance wired with the real request + response interceptors. */
 export function makeClient(
   adapter: AxiosAdapter,
-  refresh: Record<string, ServiceRefreshConfig> = { MAIN: { endpoint: "/auth/refresh" } },
-  onSessionExpired?: SessionExpiredHandler,
+  refresh: Record<string, ServiceRefreshConfig> = MAIN_REFRESH,
+  service = "MAIN",
 ) {
-  const interceptors = new ApiInterceptors(refresh, onSessionExpired);
+  const interceptors = new ApiInterceptors(refresh);
   const instance = axios.create({ adapter });
-  interceptors.setupRequestInterceptor(instance, "MAIN");
+  interceptors.setupRequestInterceptor(instance, service);
   interceptors.setupResponseInterceptor(instance);
   return instance;
 }
@@ -43,4 +51,14 @@ export function httpError(
   err.config = config;
   err.response = { status, data, headers: {}, config };
   return Promise.reject(err);
+}
+
+/** A failed refresh POST as axios would reject it (no status = offline/timeout). */
+export function refreshFailure(code: string, status?: number): AxiosError {
+  const config = { headers: new AxiosHeaders() };
+  const response =
+    status === undefined
+      ? undefined
+      : ({ status, data: { success: false }, headers: {}, config, statusText: "" } as never);
+  return new AxiosError("refresh failed", code, config as never, {}, response);
 }

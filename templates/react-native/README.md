@@ -82,19 +82,20 @@ src/
 4. On a 401 the response interceptor refreshes once (single-flight — concurrent
    401s share one network refresh), replays the request with the new token, and
    rotates the stored refresh token. Only a 401/403 from the refresh endpoint ends
-   the session (tokens cleared, query cache cleared, and the auth gate sends the
+   the session (tokens cleared, queries reset to signed out, and the auth gate sends the
    user to `/login` with a `returnTo` of the current screen, restored after
    sign-in); offline, timeout, 429 and 5xx keep the tokens and surface a
    retryable error.
-5. Logout waits for any in-flight refresh, clears tokens locally, then sends the
-   latest refresh token in the body so the backend revokes it; tokens and the
-   query cache are cleared even if the request fails.
+5. Logout blocks new refreshes, waits for any in-flight one, sends the latest
+   refresh token in the body so the backend revokes it, then clears the tokens and
+   resets the queries to signed out even if the request fails.
 
 HMAC signing is anti-casual-abuse only: `EXPO_PUBLIC_HMAC_SECRET` ships inside the
 bundle. See [security-auth](./docs/system-architecture/security-auth.md).
 
 Unlike the web templates there is no `window.location.reload()` — hard logout is
-a state reset through `onSessionExpired`, and the `(app)` auth gate redirects.
+a state reset through `watchSessionEnd` (an `onSessionEnded` listener), and the
+`(app)` auth gate redirects.
 
 ## Out of scope
 

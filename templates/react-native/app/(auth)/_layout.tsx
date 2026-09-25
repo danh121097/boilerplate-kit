@@ -1,5 +1,5 @@
+import { safeReturnPath } from "@/services/core";
 import { useAuthStore } from "@/stores/auth";
-import { safeReturnPath } from "@/utils";
 import { Redirect, Stack, useGlobalSearchParams } from "expo-router";
 import type { Href } from "expo-router";
 
