@@ -6,7 +6,6 @@ import {
   getAccessToken,
   getSessionEpoch,
   hasStoredSession,
-  isLogoutPending,
   isUnauthorizedError,
   onSessionEnded,
   onTokensChanged,
@@ -68,29 +67,25 @@ export const useAuthStore = defineStore("auth", () => {
 
   /**
    * Read the persisted session once at boot; if present, resolve the profile.
-   * A rejected session (401 after the refresh attempt) is revoked and cleared
-   * through `AuthModel.logout()` — unless it already ended while the request
-   * ran (a refused refresh or another logout cleared the tokens / moved the
-   * epoch), in which case only local state is reset. A network error, timeout
-   * or 5xx keeps the tokens so the session survives an outage.
+   * A rejected session (401 after the refresh attempt) is revoked through
+   * `AuthModel.revokeSession()`, which ends it as "expired" (the expiry redirect
+   * keeps a return path) — or posts nothing when it already ended while the
+   * request ran. Either way local state is reset. A network error, timeout or
+   * 5xx keeps the tokens so the session survives an outage.
    */
   async function hydrate() {
     if (hydrated.value) return;
     hydrateError.value = null;
     const service = authContract.service;
     if (hasStoredSession(service)) {
-      const epoch = getSessionEpoch(service);
+      const sinceEpoch = getSessionEpoch(service);
       try {
         user.value = await AuthModel.getMe();
       } catch (error) {
-        const ended =
-          getSessionEpoch(service) !== epoch ||
-          !hasStoredSession(service) ||
-          isLogoutPending(service);
-        if (isUnauthorizedError(error) && !ended) {
-          await AuthModel.logout().catch(() => {});
+        if (isUnauthorizedError(error)) {
+          await AuthModel.revokeSession(sinceEpoch);
           resetSignedOut();
-        } else if (isUnauthorizedError(error) || ended) {
+        } else if (getSessionEpoch(service) !== sinceEpoch || !hasStoredSession(service)) {
           resetSignedOut();
         } else {
           hydrateError.value = { ...asApiError(error), retryable: true };

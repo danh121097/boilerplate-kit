@@ -130,21 +130,22 @@ export function onSessionEnded(listener: SessionEndListener): () => void {
   };
 }
 
-function finishSession(reason: SessionEndReason, service: ApiService, announce: boolean): void {
+/** Bump the epoch and notify listeners — no hint change, no broadcast. */
+function notifySessionEnded(reason: SessionEndReason, service: ApiService): void {
   bumpSessionEpoch(service);
-  if (service === "MAIN") {
-    clearSessionHint();
-    if (announce) broadcast("logout");
-  }
   for (const listener of listeners) listener(reason, service);
 }
 
 /**
- * End `service`'s session: bump its epoch; for the main session also drop the
- * hint and tell the other tabs; then notify listeners.
+ * End `service`'s session in this tab: bump its epoch; for the main session
+ * also drop the hint and tell the other tabs; then notify listeners.
  */
 export function endSession(reason: SessionEndReason, service: ApiService = "MAIN"): void {
-  finishSession(reason, service, true);
+  if (service === "MAIN") {
+    clearSessionHint();
+    broadcast("logout");
+  }
+  notifySessionEnded(reason, service);
 }
 
 export interface AuthSyncHandlers {
@@ -158,8 +159,8 @@ export interface AuthSyncHandlers {
  * Keep this tab in step with logins / logouts made in other tabs: the
  * `AUTH_SYNC` storage event, plus a hint re-read on focus / visibility (the
  * hint is a cookie, so its expiry emits no event). A remote logout ends the
- * local session ("logout", without re-broadcasting) then calls `onLogout`; a
- * remote login calls `onLogin`. Browser-only; returns the unsubscribe.
+ * local session ("logout") without touching the hint cookie or re-broadcasting,
+ * then calls `onLogout`; a remote login calls `onLogin`. Browser-only; returns the unsubscribe.
  */
 export function syncAuthAcrossTabs(handlers: AuthSyncHandlers = {}): () => void {
   if (typeof window === "undefined" || typeof document === "undefined") return () => {};
@@ -169,8 +170,14 @@ export function syncAuthAcrossTabs(handlers: AuthSyncHandlers = {}): () => void 
     knownHint = true;
     handlers.onLogin?.();
   };
+  // Another tab ended the session: reset this tab only. The hint cookie is
+  // shared and already handled by that tab — never touched or re-broadcast
+  // here. Repeated signals for the same logout (broadcast, then focus) end it
+  // once.
   const signedOut = () => {
-    finishSession("logout", "MAIN", false);
+    if (knownHint === false) return;
+    knownHint = false;
+    notifySessionEnded("logout", "MAIN");
     handlers.onLogout?.();
   };
 

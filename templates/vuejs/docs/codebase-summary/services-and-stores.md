@@ -64,8 +64,10 @@ const SERVICES: ServiceDefinition[] = [
 ### Auth & Users services
 
 - `auth/auth.ts` — `AuthModel` (`/auth`): `login`, `register`, `logout`,
+  `revokeSession` (`Promise<boolean>`; a server-rejected session is revoked and
+  ended as `"expired"`, single-flight, no request when it already ended),
   `getMe` (`Promise<AuthUser>`), `getSession` (`Promise<AuthUser | null>`; a
-  401 → `null`); persists both tokens on login/register; `logout` runs under the
+  401 → `revokeSession`, then `null`); persists both tokens on login/register; `logout` runs under the
   refresh lock (`withSessionLock` — never overlaps a refresh), sends the latest
   `{ refreshToken }` so the backend revokes it, then clears all tokens and
   calls `endSession("logout", service)`. Exposes `useLoginMutation`,
@@ -85,10 +87,11 @@ Setup-style stores. Imported explicitly — never auto-imported.
 
 - `auth.ts` — `useAuthStore`: `user`, `isAuthenticated` (profile or a token, via
   a `hasToken` ref synced by `onTokensChanged` and by other tabs' `storage` events), `hydrate()` (on a 401 calls
-  `AuthModel.logout()` unless the session already ended; keeps the session on network errors), `logout()` and `clearSession()` (user + tokens +
+  `AuthModel.revokeSession()`; keeps the session on network errors), `logout()` and `clearSession()` (user + tokens +
   `resetQueriesToSignedOut` from `services/core/query-client.ts`, which resets
-  queries in place so mounted views stay attached). `plugins/session-expiry.ts` calls `clearSession()` and
-  routes to `/login` on session expiry.
+  queries in place so mounted views stay attached). `plugins/session-expiry.ts` routes to
+  `/login?redirect=…` on session expiry and leaves a protected page for plain
+  `/login` on logout (this tab's or another's).
 - `counter.ts` — `useCounterStore`: demo `count` + `increment/decrement/reset`.
 - `socket-io.ts` — `useSocketIOStore`: holds the live `Socket | null` and an
   `authenticated` flag; `setSocketIO(partial)` merges state.

@@ -195,8 +195,12 @@ cookies cannot be cleared from JS, and nothing reloads the page.
 `endSession(reason, service)` bumps that service's epoch; for the MAIN service
 it also clears the hint and broadcasts `logout` to the other tabs
 (`<APP_NAME>_AUTH_SYNC`); then it notifies `onSessionEnded((reason, service) =>
-…)` listeners. Reasons are `"logout"` (voluntary, or another tab's) and
-`"expired"` (a refused refresh).
+…)` listeners. Reasons are `"logout"` (the user signed out — in this tab, or
+another tab's logout) and `"expired"` (every server-rejected session: a refused
+refresh, or a session revoked by `AuthModel.revokeSession()`). A remote logout
+does not go through `endSession`: a private helper bumps the epoch and notifies
+the listeners without touching the hint or broadcasting (see "Cross-tab session
+sync").
 
 `plugins/04.session-expiry.client.ts` registers once:
 
@@ -219,9 +223,23 @@ them) and no `://`; the login page itself (`/login`, `/login/`, `/login?…`,
 cold page load with an expired access cookie and a dead refresh cookie, where
 nothing is cached yet: the refresh is attempted and its refusal ends the session.
 
+### Revoking a rejected session
+
+`AuthModel.revokeSession(sinceEpoch?): Promise<boolean>` handles a session the
+server rejects outside a refused refresh: a browser-side 401 on the session read
+(`AuthModel.getSession()` behind `useMeQuery`) that survived the refresh while
+the hint is set. It shares `logout`'s steps below (the private
+`endServerSession(reason, sinceEpoch?)`) but ends the session as `"expired"`, so
+`04.session-expiry.client.ts` routes to `/login?redirect=…`. When the session
+already ended while the request ran — the epoch moved since `sinceEpoch`, no
+hint (an anonymous visitor), or a logout is running — it posts nothing and
+resolves `false`. Otherwise it resolves `true`, also when the request failed.
+Concurrent callers share one in-flight revoke: one request, one session end.
+SSR never revokes (`readServerSession` keeps returning `null` or rejecting).
+
 ### Logout vs an in-flight refresh
 
-`AuthModel.logout`:
+`AuthModel.logout` (and `revokeSession`, through the same helper):
 
 1. Synchronously, before any await, calls `const done = beginLogout(service)` (a
    counter, so overlapping logouts never clear each other's flag). From then until
@@ -261,7 +279,7 @@ two signals:
 
 | Change | Effect |
 | --- | --- |
-| signed out elsewhere | this tab ends its session as `"logout"` (without re-broadcasting) — `resetQueriesOnSessionEnd` drops every query's data in place, session `null` |
+| signed out elsewhere | this tab ends its session as `"logout"` — epoch bumped, `resetQueriesOnSessionEnd` drops every query's data in place, session `null`. It never re-broadcasts, never touches the (shared) hint cookie and posts nothing; the broadcast and a later focus re-read of the same logout end it once |
 | signed in elsewhere | `onLogin` → `resyncQueriesAfterLogin` — session reset, every query stale; mounted ones refetch |
 
 The shared refresh timestamp (`<APP_NAME>:auth-refresh:<service>:at` in
@@ -277,7 +295,7 @@ close this gap.
 
 | Read | SSR | Browser |
 | --- | --- | --- |
-| `useMeQuery` (`auth.me`) | `readServerSession()`: `serverApiGet` with forwarded cookie; a 401 without the hint → `null` (anonymous); a 401 with the hint, or any other failure, rejects | `AuthModel.getSession()` via axios → refresh-and-retry; a 401 after refresh → `null` (anonymous); other errors surface |
+| `useMeQuery` (`auth.me`) | `readServerSession()`: `serverApiGet` with forwarded cookie; a 401 without the hint → `null` (anonymous); a 401 with the hint, or any other failure, rejects | `AuthModel.getSession()` via axios → refresh-and-retry; a 401 after refresh → `revokeSession` (posts only while the hint is set and the session has not already ended), then `null`; other errors surface |
 | `useUsersListQuery` | `serverApiPaginate`; failures reject | `UsersModel.list()` via axios → refresh-and-retry; errors surface |
 
 Pages prefetch the session with `queryClient.prefetchQuery(...)`, which never

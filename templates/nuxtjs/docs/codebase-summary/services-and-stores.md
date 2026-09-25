@@ -120,8 +120,10 @@ onRefreshed? }`.
 `AuthModel extends Model` (path `/auth`). Methods: `login`, `register` (both
 call `startSession()`), `logout` (runs under the refresh lock via
 `withSessionLock`, so it never overlaps a refresh, and always ends the session
-with `endSession("logout")`), `getMe` (`Promise<AuthUser>`), `getSession`
-(`Promise<AuthUser | null>`; a 401 → `null`).
+with `endSession("logout")`), `revokeSession` (`Promise<boolean>`; browser-only,
+revokes a server-rejected session and ends it as `"expired"`, single-flight, no
+request when it already ended), `getMe` (`Promise<AuthUser>`), `getSession`
+(`Promise<AuthUser | null>`; a 401 → `revokeSession`, then `null`).
 Cookie-first: the backend sets httpOnly access/refresh cookies, so there is no
 client-side token persistence. The response interceptor already unwraps the
 envelope, so each method reads `res.data` once. Exposes `useLoginMutation`,

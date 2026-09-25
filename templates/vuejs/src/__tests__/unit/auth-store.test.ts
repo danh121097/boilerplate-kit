@@ -81,41 +81,6 @@ describe("auth store", () => {
     expect(getMe).toHaveBeenCalledTimes(2);
   });
 
-  it("hydrate revokes a rejected session through logout on a 401", async () => {
-    vi.spyOn(AuthModel, "getMe").mockRejectedValue({ error_code: 401, message: "expired" });
-    const logout = vi.spyOn(AuthModel, "logout").mockImplementation(async () => {
-      clearServiceTokens("MAIN");
-      endSession("logout", "MAIN");
-    });
-    const store = useAuthStore();
-    store.setUser({ _id: "u1", email: "a@b.com", name: "A", role: "user" } as never);
-
-    await store.hydrate();
-
-    expect(logout).toHaveBeenCalledTimes(1);
-    expect(getAccessToken("MAIN")).toBeNull();
-    expect(store.user).toBeNull();
-    expect(store.isAuthenticated).toBe(false);
-  });
-
-  it("hydrate only resets local state on a 401 when the session already ended", async () => {
-    vi.spyOn(AuthModel, "getMe").mockImplementation(async () => {
-      // A refused refresh ended the session while the profile request ran.
-      clearServiceTokens("MAIN");
-      endSession("expired", "MAIN");
-      throw { error_code: 401, message: "expired" };
-    });
-    const logout = vi.spyOn(AuthModel, "logout");
-    const store = useAuthStore();
-
-    await store.hydrate();
-
-    expect(logout).not.toHaveBeenCalled();
-    expect(store.user).toBeNull();
-    expect(store.isAuthenticated).toBe(false);
-    expect(store.hydrateError).toBeNull();
-  });
-
   it("isAuthenticated reacts to token writes and clears (localStorage is not reactive)", () => {
     const store = useAuthStore();
     expect(store.isAuthenticated).toBe(true);
@@ -276,7 +241,7 @@ describe("auth store", () => {
     pinia.setActivePinia(activePinia);
     const replace = vi.fn().mockResolvedValue(undefined);
     const router = {
-      currentRoute: { value: { name: "users", fullPath: "/users?page=2" } },
+      currentRoute: { value: { name: "users", fullPath: "/users?page=2", meta: {} } },
       replace,
     } as unknown as Parameters<typeof setupSessionExpiry>[0];
     setupSessionExpiry(router, activePinia);

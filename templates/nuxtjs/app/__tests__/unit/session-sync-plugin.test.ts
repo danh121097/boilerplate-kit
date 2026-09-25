@@ -128,6 +128,28 @@ describe("05.session-sync.client plugin", () => {
     expect(queryClient.getQueryData(["auth.me"])).toBeNull();
   });
 
+  it("a remote logout does not clear the session hint or re-broadcast", () => {
+    const setItem = vi.fn();
+    vi.stubGlobal("localStorage", { getItem: () => null, setItem, removeItem: vi.fn() });
+    const ended = vi.fn();
+    const unsubscribe = onSessionEnded(ended);
+    try {
+      doc.cookie = ""; // the other tab dropped the hint and announced it
+      authSync("logout");
+      focus(); // the same logout seen again on focus
+
+      expect(ended).toHaveBeenCalledExactlyOnceWith("logout", "MAIN");
+      expect(doc.cookie).toBe(""); // never rewritten by this tab
+      expect(setItem).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe();
+      vi.unstubAllGlobals();
+      vi.stubGlobal("defineNuxtPlugin", (fn: PluginFn) => fn);
+      vi.stubGlobal("window", win);
+      vi.stubGlobal("document", doc);
+    }
+  });
+
   it("another tab's login broadcast re-reads the session", () => {
     doc.cookie = "";
     focus();

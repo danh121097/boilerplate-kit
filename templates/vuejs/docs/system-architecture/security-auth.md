@@ -39,7 +39,9 @@ interceptor-driven clears. Cross-tab sync goes through
 logins and logouts (`onTokensChanged`) update that value too. When another
 tab logs out, this tab ends its own session as `"logout"` (`endSession`), so the
 store drops its profile and every query's data (`resetQueriesToSignedOut`, see
-below), and the guard state (`hasToken`) follows. When another tab logs in, this
+below), the guard state (`hasToken`) follows, and a protected page is left for
+`/login` without a `redirect`. The receiving tab writes nothing to storage and
+posts nothing — the tab that logged out already revoked and cleared. When another tab logs in, this
 tab resets its profile, marks every query stale (`resyncQueriesAfterLogin`, so
 mounted views refetch) and re-reads the profile. A token rotation elsewhere,
 where presence is unchanged, is ignored.
@@ -213,7 +215,9 @@ touches nothing. Nothing in the service layer reloads the page.
 `services/core/session.ts` carries the session-end pub/sub:
 `endSession(reason, service)` bumps that service's epoch, then notifies
 `onSessionEnded((reason, service) => …)` listeners. Reasons are `"logout"`
-(voluntary, or another tab's) and `"expired"` (a refused refresh).
+(the user signed out — in this tab, or another tab's logout) and `"expired"`
+(every server-rejected session: a refused refresh, or a session revoked by
+`AuthModel.revokeSession()`).
 
 - The auth store subscribes and, for the MAIN service, drops the user and the
   hydrate error, re-syncs `hasToken` and calls `resetQueriesToSignedOut`
@@ -225,21 +229,34 @@ touches nothing. Nothing in the service layer reloads the page.
   `redirectOnSessionExpired(redirect, authContract.service)`: only an
   `"expired"` end of the auth service navigates, client-side, to
   `loginPathWithReturn(currentRoute.fullPath)` (`/login?redirect=<encoded
-  path>`), unless already on the login page.
+  path>`), unless already on the login page. A `"logout"` end leaves a
+  protected route (`meta.requiresAuth`) for `/login` without a `redirect`.
 
 ## Boot Hydration and Logout (`stores/auth.ts`)
 
 - `hydrate()` resolves the profile when a token is stored. On a 401 (after the
-  refresh attempt) it calls `AuthModel.logout()` (revoke, clear, end the session
-  as `"logout"`) — unless the session already ended while the request ran (a
-  refused refresh or another logout cleared the tokens or moved the session
-  epoch), in which case it only resets local state, with no second logout
-  request. A network error, timeout or 5xx keeps the tokens and sets
+  refresh attempt) it calls `AuthModel.revokeSession(sinceEpoch)` and resets
+  local state (see "Revoking a rejected session" below). A network error, timeout or 5xx keeps the tokens and sets
   `hydrateError` (`retryable: true`); `App.vue` shows it with a Retry button
   (`retryHydrate()`).
 - `logout()` posts `{ refreshToken }` to `/auth/logout` (so the backend revokes
   it), then clears tokens, user and every query's data — even if the request
-  fails.
+  fails. It ends the session as `"logout"`; `App.vue` navigates to `/login`
+  without a `redirect`.
+
+### Revoking a rejected session
+
+`AuthModel.revokeSession(sinceEpoch?): Promise<boolean>` handles a session the
+server rejects outside a refused refresh — a 401 on the session read (`hydrate`,
+or `getSession` behind `useMeQuery`) that survived a successful refresh. It
+shares `logout`'s internals (the private `endServerSession(reason,
+sinceEpoch?)`: token capture, lock, epoch bump, `POST /auth/logout`, clear) but
+ends the session as `"expired"`, so the expiry redirect keeps a return path.
+When the session already ended while the request ran — the epoch moved since
+`sinceEpoch`, no token is stored, or a logout is running — it posts nothing and
+resolves `false`; the caller only resets local state. Otherwise it resolves
+`true`, also when the request failed (the session is ended locally either way).
+Concurrent callers share one in-flight revoke: one request, one session end.
 - The login view follows `?redirect=` after signing in, and the router guard
   (`router/auth-guard.ts`) does the same when a signed-in user opens `/login`.
   Both go through `safeRedirect(value)` (`services/core/session.ts`), which keeps
@@ -251,7 +268,7 @@ touches nothing. Nothing in the service layer reloads the page.
 
 ### Logout vs an in-flight refresh
 
-`AuthModel.logout` marks a logout as running (`const done = beginLogout(service)`,
+`AuthModel.logout` (and `revokeSession`, through the same helper) marks a logout as running (`const done = beginLogout(service)`,
 a counter, so overlapping logouts never clear each other's flag) in its first
 tick, then runs through `withSessionLock(service, …)`: under the same
 `<APP_PREFIX>:auth-refresh:<service>` Web Lock as the refresh (or, without `navigator.locks`,
