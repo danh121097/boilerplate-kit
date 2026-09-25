@@ -35,6 +35,13 @@ import { ESLintUtils, type TSESLint, type TSESTree } from "@typescript-eslint/ut
  * destructure (`{ isPending, mutateAsync }`). A trailing `...rest` is pinned
  * last; patterns with defaults or nested patterns are left untouched (a default
  * may reference a sibling binding, so reordering could break scope).
+ *
+ * Safety: dependencies include JSX usage (`<Foo />` depends on `Foo`), comments
+ * (leading own-line and same-line trailing) travel with their statement, and an
+ * initializer that mutates or suspends (`n++`, `x = …`, `await …`) is a barrier
+ * nothing may cross. When a sorted order exists but the rewrite cannot be proven
+ * safe (a barrier would move, a comment would be lost), the rule still reports
+ * but offers no autofix.
  */
 
 type MessageIds = "unsorted" | "unsortedPattern";
@@ -98,7 +105,10 @@ function collectPatternNames(node: TSESTree.Node | null, out: Set<string>): void
  * dependencies (e.g. `s.setUser`).
  */
 function collectRefs(node: TSESTree.Node, out: Set<string>): void {
-  if (node.type === "Identifier") {
+  // `<Foo />` / `<Foo.Bar />` reference the `Foo` binding just like `Foo` in code
+  // does — missing them would let the sort hoist JSX above the component it
+  // renders (a TDZ ReferenceError at runtime).
+  if (node.type === "Identifier" || node.type === "JSXIdentifier") {
     out.add(node.name);
     return;
   }
@@ -107,6 +117,10 @@ function collectRefs(node: TSESTree.Node, out: Set<string>): void {
     if (key === "parent" || key === "loc" || key === "range") continue;
     // `foo.bar` — `bar` is a member name, not a binding reference.
     if (node.type === "MemberExpression" && key === "property" && !node.computed) continue;
+    // `<Foo.Bar />` — only the root `Foo` is a binding; `Bar` is a member name.
+    if (node.type === "JSXMemberExpression" && key === "property") continue;
+    // `<div onClick={…} />` — the attribute name is not a binding reference.
+    if (node.type === "JSXAttribute" && key === "name") continue;
     // `{ bar: x }` / `class { bar() {} }` — `bar` key is not a reference.
     if (node.type === "Property" && key === "key" && !node.computed) continue;
     const value = record[key];
@@ -116,6 +130,94 @@ function collectRefs(node: TSESTree.Node, out: Set<string>): void {
       collectRefs(value, out);
     }
   }
+}
+
+const HOOK_NAME = /^use[A-Z0-9]/;
+
+/** `useX(…)` / `Obj.useX(…)` — a React hook call, treated as order-independent. */
+function isHookCall(node: TSESTree.CallExpression): boolean {
+  const callee = node.callee;
+  if (callee.type === "Identifier") return HOOK_NAME.test(callee.name);
+  return (
+    callee.type === "MemberExpression" &&
+    callee.property.type === "Identifier" &&
+    HOOK_NAME.test(callee.property.name)
+  );
+}
+
+/**
+ * Whether an initializer may have a side effect at declaration time: `x++`,
+ * `x = …`, `delete o.k`, `await …`, `yield …`, `new …`, a tagged template, or any
+ * call (including an IIFE) other than a hook call. Moving such a declaration
+ * across another one can change what either observes, so these act as barriers
+ * (the rule still reports, but offers no autofix). Hook calls are assumed
+ * order-independent — reordering them is the whole point of the rule — though
+ * their arguments are still inspected. Nested function bodies are skipped: they
+ * do not run at declaration time.
+ */
+function hasSideEffect(node: TSESTree.Node): boolean {
+  switch (node.type) {
+    case "UpdateExpression":
+    case "AssignmentExpression":
+    case "AwaitExpression":
+    case "YieldExpression":
+    case "NewExpression":
+    case "TaggedTemplateExpression":
+      return true;
+    case "CallExpression":
+      if (!isHookCall(node)) return true;
+      break;
+    case "UnaryExpression":
+      if (node.operator === "delete") return true;
+      break;
+    case "FunctionExpression":
+    case "ArrowFunctionExpression":
+    case "FunctionDeclaration":
+      return false;
+  }
+  const record = node as unknown as Record<string, unknown>;
+  for (const key of Object.keys(record)) {
+    if (key === "parent" || key === "loc" || key === "range") continue;
+    const value = record[key];
+    if (Array.isArray(value)) {
+      for (const child of value) if (isNode(child) && hasSideEffect(child)) return true;
+    } else if (isNode(value) && hasSideEffect(value)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Lexicographic topological sort: repeatedly emit the smallest (by `lessThan`)
+ * item whose dependencies are all emitted. Returns null on a dependency cycle.
+ */
+function topologicalOrder(
+  n: number,
+  deps: ReadonlyArray<ReadonlySet<number>>,
+  lessThan: (a: number, b: number) => boolean,
+): number[] | null {
+  const done = new Array<boolean>(n).fill(false);
+  const order: number[] = [];
+  for (let step = 0; step < n; step++) {
+    let best = -1;
+    for (let i = 0; i < n; i++) {
+      if (done[i]) continue;
+      let ready = true;
+      for (const dep of deps[i]!) {
+        if (!done[dep]) {
+          ready = false;
+          break;
+        }
+      }
+      if (!ready) continue;
+      if (best === -1 || lessThan(i, best)) best = i;
+    }
+    if (best === -1) return null;
+    done[best] = true;
+    order.push(best);
+  }
+  return order;
 }
 
 /** Resolve typed parser services, or null when full type info is unavailable. */
@@ -192,34 +294,20 @@ const rule: TSESLint.RuleModule<MessageIds, []> = {
         return result;
       });
 
+      // Declarations whose initializer mutates/suspends must keep their position
+      // relative to every other declaration (see `hasSideEffect`).
+      const effectful = run.map((decl) =>
+        decl.declarations.some((d) => d.init !== null && hasSideEffect(d.init)),
+      );
+
       // Sort key = [category, subKey, originalIndex]; lower wins.
       const lessThan = (a: number, b: number): boolean =>
         categories[a]! < categories[b]! ||
         (categories[a] === categories[b] &&
           (subKeys[a]! < subKeys[b]! || (subKeys[a] === subKeys[b] && a < b)));
 
-      // Lexicographic topological sort respecting dependencies.
-      const n = run.length;
-      const done = new Array<boolean>(n).fill(false);
-      const order: number[] = [];
-      for (let step = 0; step < n; step++) {
-        let best = -1;
-        for (let i = 0; i < n; i++) {
-          if (done[i]) continue;
-          let ready = true;
-          for (const dep of deps[i]!) {
-            if (!done[dep]) {
-              ready = false;
-              break;
-            }
-          }
-          if (!ready) continue;
-          if (best === -1 || lessThan(i, best)) best = i;
-        }
-        if (best === -1) return; // dependency cycle — leave the code untouched
-        done[best] = true;
-        order.push(best);
-      }
+      const order = topologicalOrder(run.length, deps, lessThan);
+      if (!order) return; // dependency cycle — leave the code untouched
 
       const indent = " ".repeat(run[0]!.loc.start.column);
 
@@ -231,6 +319,11 @@ const rule: TSESLint.RuleModule<MessageIds, []> = {
           return !prev || prev.loc.end.line !== c.loc.start.line;
         });
 
+      // Comments that trail a statement on its last line (`const a = 1; // why`)
+      // belong to that statement and must travel with it.
+      const trailingComments = (node: TSESTree.Node): TSESTree.Comment[] =>
+        sourceCode.getCommentsAfter(node).filter((c) => c.loc.start.line === node.loc.end.line);
+
       // Whether a declaration had a blank line before it (before its own
       // comments) in the source — used to preserve intentional spacing between
       // same-category declarations (e.g. multi-line helper functions).
@@ -241,18 +334,25 @@ const rule: TSESLint.RuleModule<MessageIds, []> = {
         return prev ? anchor.loc.start.line - prev.loc.end.line >= 2 : false;
       };
 
-      // A statement's own-line comments + its own text, re-indented as one block.
+      // Every comment the rebuilt text carries, by start offset — compared against
+      // the region's comments so a fix can never silently drop one.
+      const carried = new Set<number>();
+      const commentText = (c: TSESTree.Comment): string => {
+        carried.add(c.range[0]);
+        return c.type === "Block" ? `/*${c.value}*/` : `//${c.value}`;
+      };
+
+      // A statement's own-line comments + its own text + its trailing comments,
+      // re-indented as one block.
       const contentOf = (j: number): string => {
         const node = run[j]!;
-        const comments = ownLineComments(node);
-        const prefix = comments.length
-          ? comments
-              .map((c) => (c.type === "Block" ? `/*${c.value}*/` : `//${c.value}`))
-              .join("\n" + indent) +
-            "\n" +
-            indent
+        const leading = ownLineComments(node);
+        const prefix = leading.length
+          ? leading.map(commentText).join("\n" + indent) + "\n" + indent
           : "";
-        return prefix + sourceCode.getText(node);
+        const trailing = trailingComments(node);
+        const suffix = trailing.length ? " " + trailing.map(commentText).join(" ") : "";
+        return prefix + sourceCode.getText(node) + suffix;
       };
 
       // Rebuild the block: one blank line between different categories, and keep
@@ -266,17 +366,35 @@ const rule: TSESLint.RuleModule<MessageIds, []> = {
       }
 
       const firstNode = run[0]!;
-      const leadingOfFirst = ownLineComments(firstNode);
-      const regionStart = leadingOfFirst[0]?.range[0] ?? firstNode.range[0];
-      const regionEnd = run[run.length - 1]!.range[1];
+      const lastNode = run[run.length - 1]!;
+      const regionStart = ownLineComments(firstNode)[0]?.range[0] ?? firstNode.range[0];
+      const regionEnd = trailingComments(lastNode).at(-1)?.range[1] ?? lastNode.range[1];
 
       // Report when either order OR category spacing differs from the source.
       if (output === sourceCode.text.slice(regionStart, regionEnd)) return;
 
+      // Autofix only when it is provably behavior- and content-preserving: no
+      // side-effecting initializer changes position relative to another
+      // declaration, and every comment in the region survives the rebuild.
+      const position = new Array<number>(order.length);
+      order.forEach((original, sorted) => (position[original] = sorted));
+      const movesEffect = effectful.some((isEffect, i) => {
+        if (!isEffect) return false;
+        return position.some((p, j) => j !== i && j < i !== p < position[i]!);
+      });
+      const dropsComment = sourceCode
+        .getAllComments()
+        .some(
+          (c) => c.range[0] >= regionStart && c.range[1] <= regionEnd && !carried.has(c.range[0]),
+        );
+
       context.report({
         node: firstNode,
         messageId: "unsorted",
-        fix: (fixer) => fixer.replaceTextRange([regionStart, regionEnd], output),
+        fix:
+          movesEffect || dropsComment
+            ? null
+            : (fixer) => fixer.replaceTextRange([regionStart, regionEnd], output),
       });
     }
 
@@ -321,10 +439,24 @@ const rule: TSESLint.RuleModule<MessageIds, []> = {
       const parts = order.map((i) => sourceCode.getText(sortable[i]!));
       if (hasRest) parts.push(sourceCode.getText(rest!));
 
+      // The pattern node's range also covers a type annotation
+      // (`const { a, b }: Props = …`); rewrite only the braces so it survives.
+      const closeBrace = pattern.typeAnnotation
+        ? sourceCode.getTokenBefore(pattern.typeAnnotation)
+        : sourceCode.getLastToken(pattern);
+      const braces: [number, number] = [pattern.range[0], closeBrace?.range[1] ?? pattern.range[1]];
+      // A comment inside the braces has no safe new home — report, don't fix.
+      const hasInnerComment = sourceCode
+        .getAllComments()
+        .some((c) => c.range[0] >= braces[0] && c.range[1] <= braces[1]);
+
       context.report({
         node: pattern,
         messageId: "unsortedPattern",
-        fix: (fixer) => fixer.replaceText(pattern, `{ ${parts.join(", ")} }`),
+        fix:
+          hasInnerComment || closeBrace?.value !== "}"
+            ? null
+            : (fixer) => fixer.replaceTextRange(braces, `{ ${parts.join(", ")} }`),
       });
     }
 
