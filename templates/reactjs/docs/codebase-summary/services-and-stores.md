@@ -9,7 +9,8 @@ src/services/
 ├── core/
 │   ├── api.ts              # Api class — multi-service axios wrapper
 │   ├── interceptors.ts     # ApiInterceptors — request (HMAC+Bearer) + response (refresh)
-│   ├── refresh-token-manager.ts  # Single-flight refresh deduplication
+│   ├── refresh-token-manager.ts  # Single-flight + cross-tab (Web Lock) refresh
+│   ├── session-events.ts   # onSessionEnded / endSession (logout, refresh failure)
 │   ├── auth-refresh-client.ts    # Bare axios refresh call (no interceptors)
 │   ├── auth-token-storage.ts     # Per-service localStorage token registry
 │   ├── headers-utils.ts    # HeadersUtils.setAuthHeaders / addAuthorizationHeader

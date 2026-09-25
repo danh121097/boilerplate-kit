@@ -5,21 +5,30 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useLoginMutation } from "@/services/auth";
 import { useAuth } from "@/services/auth/session";
+import { safeRedirect } from "@/services/core/session";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { FormEvent } from "react";
 
+/** Where to go after signing in: the same-origin `?redirect=` path (set when a
+ * session expired), else home. Read at call time — `useSearchParams` would force
+ * a Suspense boundary on this statically rendered page. */
+function returnPath(): string {
+  return safeRedirect(new URLSearchParams(window.location.search).get("redirect"));
+}
+
 /**
  * Login page — cookie-based auth. The login mutation invalidates `auth.me`, so
- * on success the session query re-resolves and we return home (the header flips
- * to Logout). No token is stored in JS; the backend sets httpOnly cookies.
+ * on success the session query re-resolves and we return to `?redirect=` (or
+ * home; the header flips to Logout). No token is stored in JS; the backend sets
+ * httpOnly cookies.
  */
 export default function LoginPage() {
   const router = useRouter();
 
   const login = useLoginMutation({
-    onSuccess: () => router.replace("/"),
+    onSuccess: () => router.replace(returnPath()),
   });
 
   const { t } = useTranslation();
@@ -30,7 +39,7 @@ export default function LoginPage() {
 
   // Already signed in → no reason to show the form.
   useEffect(() => {
-    if (isAuthenticated) router.replace("/");
+    if (isAuthenticated) router.replace(returnPath());
   }, [isAuthenticated, router]);
 
   function onSubmit(e: FormEvent) {

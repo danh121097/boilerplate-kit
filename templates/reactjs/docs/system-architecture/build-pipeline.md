@@ -19,7 +19,7 @@
 pnpm dev       → vite (HMR, auto-generates routeTree.gen.ts)
 pnpm build     → tsc -b && vite build (type check then bundle)
 pnpm preview   → vite preview
-pnpm typecheck → tsc -b --noEmit
+pnpm typecheck → tsc -b (both project references; noEmit set in each)
 pnpm test      → vitest run
 pnpm test:watch→ vitest
 pnpm lint      → eslint .
@@ -29,9 +29,21 @@ pnpm format    → prettier --write .
 ## Route codegen
 
 `@tanstack/router-plugin/vite` scans `src/routes/` on every dev server start and
-build, generating `src/routeTree.gen.ts`. This file is gitignored — it must NOT
-be committed. Any CI step that needs the route tree must run `pnpm build` or
-`pnpm dev` first.
+build, generating `src/routeTree.gen.ts`. The file is committed as a
+cold-typecheck stub (together with `auto-imports.d.ts` from unplugin-auto-import)
+so `pnpm typecheck` passes on a fresh checkout before the first dev/build. The
+plugins regenerate both; re-commit them when routes or the auto-imported surface
+change. `.eslintrc-auto-import.json` stays local — the ESLint config reads it
+only when present.
+
+## Auto-import and route code splitting
+
+`tanstackRouter({ autoCodeSplitting: true })` moves each route `component` into a
+virtual module (`src/routes/login.tsx?tsr-split=component`). unplugin-auto-import's
+default `include` (`/\.[jt]sx?$/`) does not match that query suffix, so
+`autoImportOptions.include` in `vite.config.ts` adds `/\.[jt]sx\?tsr-split=/` —
+without it the split chunks call `useNavigate`/`useState`/`<Button>` with no import
+and throw `ReferenceError` at runtime.
 
 ## TypeScript project references
 

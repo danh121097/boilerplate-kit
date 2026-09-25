@@ -16,5 +16,9 @@ src/routeTree.gen.ts
 .nitro
 .vinxi
 
+# Auto-generated typings (unplugin-auto-import)
+auto-imports.d.ts
+.eslintrc-auto-import.json
+
 # Docs are hand-authored — Prettier formats code only, not Markdown.
 *.md

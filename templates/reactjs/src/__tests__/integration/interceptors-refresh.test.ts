@@ -1,7 +1,7 @@
 import { installLocalStorage } from "@/__tests__/helpers/fake-storage";
 import { bearerOf, httpError, makeClient, ok } from "@/__tests__/helpers/http-mocks";
 import { STORAGE_KEYS } from "@/enums";
-import { Api } from "@/services/core";
+import { Api, onSessionEnded } from "@/services/core";
 import { getAccessToken, getRefreshToken } from "@/services/core/auth-token-storage";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import axios from "axios";
@@ -77,7 +77,7 @@ describe("interceptors — token refresh", () => {
     expect(getAccessToken("MAIN")).toBe("NEW");
   });
 
-  it("gives up after one retry (no infinite loop) and clears the token", async () => {
+  it("a 401 on the replayed request goes back to the caller and keeps the session (no infinite loop)", async () => {
     localStorage.setItem(TOKEN_KEY, "OLD");
     vi.spyOn(axios, "post").mockResolvedValue(NEW_TOKEN);
 
@@ -87,9 +87,14 @@ describe("interceptors — token refresh", () => {
       return httpError(config);
     });
 
-    await expect(client.get("/users")).rejects.toBeTruthy();
+    const ended = vi.fn();
+    const off = onSessionEnded(ended);
+
+    await expect(client.get("/users")).rejects.toMatchObject({ error_code: 401 });
     expect(calls).toBe(2);
-    expect(getAccessToken("MAIN")).toBeNull();
+    expect(getAccessToken("MAIN")).toBe("NEW");
+    expect(ended).not.toHaveBeenCalled();
+    off();
   });
 
   it("does not attempt refresh for anonymous traffic (no token)", async () => {

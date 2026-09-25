@@ -1,4 +1,5 @@
-const APP_PREFIX = import.meta.env.VITE_APP_NAME || "PRISM_APP";
+/** Namespaces every storage key and Web Lock name so apps on one origin never collide. */
+export const APP_PREFIX = import.meta.env.VITE_APP_NAME || "PRISM_APP";
 
 /**
  * Centralised localStorage key registry. Always go through this map so a single

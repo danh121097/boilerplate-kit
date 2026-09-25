@@ -9,7 +9,7 @@
  * a future theme toggle; the ACCESS/REFRESH_TOKEN entries are vestigial — auth is
  * httpOnly-cookie-based and never touches these.)
  */
-const APP_PREFIX =
+export const APP_PREFIX =
   typeof process !== "undefined"
     ? (process.env.NEXT_PUBLIC_APP_NAME ?? "NEXTJS_APP")
     : "NEXTJS_APP";
@@ -19,6 +19,11 @@ export const STORAGE_KEYS = {
   REFRESH_TOKEN: `${APP_PREFIX}_REFRESH_TOKEN`,
   LANGUAGE: `${APP_PREFIX}_LANGUAGE`,
   THEME: `${APP_PREFIX}_THEME`,
+  /** Readable (non-httpOnly) "a session exists" hint — see `services/core/session`. */
+  SESSION: `${APP_PREFIX}_SESSION`,
+  /** localStorage key other tabs watch (`storage` event) for login/logout — see
+   * `services/core/session`. */
+  AUTH_SYNC: `${APP_PREFIX}_AUTH_SYNC`,
 } as const;
 
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];

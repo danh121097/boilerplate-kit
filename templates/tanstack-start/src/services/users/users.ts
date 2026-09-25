@@ -1,5 +1,5 @@
 import { getUsersServerFn } from "@/server/get-users";
-import { defineQuery, Model } from "@/services/core";
+import { defineQuery, Model, withSessionRefresh } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
 import { usersContract } from "@/services/users/contract";
 import type { UpdateUserPayload, User } from "@/services/users/types/user";
@@ -24,5 +24,5 @@ export class UsersModel extends Model {
 
 export const useUsersListQuery = defineQuery({
   key: queryKeys.users.list,
-  fetcher: () => getUsersServerFn(),
+  fetcher: () => withSessionRefresh(() => getUsersServerFn()),
 });

@@ -86,7 +86,7 @@ The axios service layer (`src/services/`) is **client-only**:
 - `initServices()` is called only in `src/client.tsx` (browser entry).
 - All `localStorage` access is guarded: `if (typeof window === "undefined") return null`.
 - Server functions in `src/server/` use `fetch` directly — no axios, no token registry.
-- The `reloadPage()` helper in interceptors is guarded: `if (typeof window !== "undefined")`.
+- Session sync (`syncAuthAcrossTabs`) and the Web Lock are guarded: no `window` / `navigator.locks` → no-op or per-tab fallback. A 401 never reloads the page.
 
 ## QueryClient Per Request
 

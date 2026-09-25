@@ -35,8 +35,8 @@ Full standards: [docs/code-standards.md](./docs/code-standards.md).
 
 ```bash
 pnpm dev          # Vite dev server (generates routeTree.gen.ts)
-pnpm build        # tsc + vite build
-pnpm typecheck    # tsc --noEmit
+pnpm build        # tsc -b + vite build
+pnpm typecheck    # tsc -b
 pnpm test         # vitest run
 pnpm test:watch   # vitest
 pnpm lint         # eslint

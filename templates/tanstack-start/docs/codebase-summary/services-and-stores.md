@@ -8,11 +8,13 @@ src/services/
 ├── index.ts                # Barrel re-export
 ├── core/
 │   ├── api.ts              # Api class — multi-service axios wrapper
-│   ├── interceptors.ts     # ApiInterceptors — request (HMAC+Bearer) + response (refresh)
-│   ├── refresh-token-manager.ts  # Single-flight refresh deduplication
+│   ├── interceptors.ts     # ApiInterceptors — request (HMAC) + response (401 → refresh)
+│   ├── refresh-token-manager.ts  # Single-flight + cross-tab (Web Lock) refresh
 │   ├── auth-refresh-client.ts    # Bare axios refresh call (no interceptors)
-│   ├── auth-token-storage.ts     # Per-service localStorage token registry
-│   ├── headers-utils.ts    # HeadersUtils.setAuthHeaders / addAuthorizationHeader
+│   ├── session.ts          # Session hint cookie + onSessionEnded / endSession
+│   ├── server-auth.ts      # ServerUnauthorized + withSessionRefresh (server-fn reads)
+│   ├── query-client.ts     # makeQueryClient + resetQueriesOnSessionEnd
+│   ├── headers-utils.ts    # HeadersUtils.setAuthHeaders (HMAC; cookies auto-sent)
 │   ├── hmac-signature.ts   # HMACSignatureGenerator (crypto-js, VITE_HMAC_SECRET)
 │   ├── model.ts            # Model base class — subclass + Model.setup()
 │   ├── tanstack.ts         # defineQuery / defineMutation (React Query)

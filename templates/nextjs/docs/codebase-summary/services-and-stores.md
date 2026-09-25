@@ -6,7 +6,7 @@
 
 | File              | Purpose                                                              |
 | ----------------- | -------------------------------------------------------------------- |
-| `server-api.ts`   | `serverApiGet<T>(path)` — fetch with forwarded auth cookies + HMAC   |
+| `server-api.ts`   | `serverApiGet<T>(path)` — fetch with the access cookie + HMAC; throws `ServerAuthError` on 401 (no server refresh) |
 | `get-me.ts`       | `getMeServerData()` — resolve current user server-side               |
 | `get-users.ts`    | `getUsersServerData()` — fetch users list server-side                |
 
@@ -25,7 +25,9 @@ never touches `localStorage` or reads tokens directly.
 | `headers-utils.ts`         | Attach HMAC headers to requests (no Bearer — cookies auto-sent)    |
 | `interceptors.ts`          | Request/response interceptors + 401 → refresh → replay             |
 | `model.ts`                 | Base `Model` class — subclass + call `Model.setup()`               |
-| `refresh-token-manager.ts` | Single-flight token refresh deduplication                          |
+| `refresh-token-manager.ts` | Single-flight + cross-tab (Web Lock) token refresh                 |
+| `session.ts`               | Session hint cookie + `onSessionEnded` / `endSession`              |
+| `query-client.ts`          | `makeQueryClient` + `resetQueriesOnSessionEnd`                     |
 | `tanstack.ts`              | `defineQuery` + `defineMutation` factory helpers                   |
 | `types.ts`                 | Shared TypeScript types + axios module augmentation                |
 

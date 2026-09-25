@@ -1,11 +1,19 @@
 import { authContract } from "@/services/auth/contract";
 import {
+  beginLogout,
+  bumpSessionEpoch,
   clearAuthTokens,
   defineMutation,
   defineQuery,
+  endSession,
+  getAccessToken,
+  getRefreshToken,
   Model,
   persistAccessToken,
   persistRefreshToken,
+  SESSION_WAIT_TIMEOUT_MS,
+  settleInFlightRefreshes,
+  withSessionLock,
 } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
 import type {
@@ -33,11 +41,49 @@ export class AuthModel extends Model {
     return this.storeSession(res.data);
   }
 
+  /** Revoke the refresh token server-side (sent in the body, with the access
+   * token as Bearer), then always drop local tokens and end the session so
+   * listeners clear cached queries, even when the request fails.
+   *
+   * Ordering, so the token revoked is the latest one: in the first tick no
+   * refresh may start (a 401 meanwhile rejects with `session_ended` without
+   * calling /auth/refresh) and both tokens are captured; a refresh already
+   * running in this tab settles and stores its rotated pair first, and the
+   * refresh lock waits out one running in another tab. Both waits share a 15s
+   * cap, after which logout proceeds anyway. The epoch bump then makes anything
+   * still in flight store nothing. */
   static async logout(): Promise<void> {
+    const deadline = Date.now() + SESSION_WAIT_TIMEOUT_MS;
+    const captured = {
+      access: getAccessToken(this.service),
+      refresh: getRefreshToken(this.service),
+    };
+    const done = beginLogout();
     try {
-      await this.api.post({ url: authContract.paths.logout });
+      await settleInFlightRefreshes(SESSION_WAIT_TIMEOUT_MS);
+      const maxWaitMs = Math.max(0, deadline - Date.now());
+      await withSessionLock(
+        this.service,
+        async () => {
+          bumpSessionEpoch();
+          // Prefer a pair a settled refresh just rotated in; else what was captured.
+          const access = getAccessToken(this.service) ?? captured.access;
+          const refreshToken = getRefreshToken(this.service) ?? captured.refresh;
+          try {
+            await this.api.post({
+              url: authContract.paths.logout,
+              data: { refreshToken: refreshToken ?? undefined },
+              customHeaders: access ? { authorization: `Bearer ${access}` } : undefined,
+            });
+          } finally {
+            clearAuthTokens();
+            endSession("logout", this.service);
+          }
+        },
+        { maxWaitMs },
+      );
     } finally {
-      clearAuthTokens();
+      done();
     }
   }
 

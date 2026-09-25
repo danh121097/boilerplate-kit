@@ -26,7 +26,11 @@ const SERVICES: ServiceDefinition[] = [
     name: "MAIN",
     baseURL: getApiBaseUrl(),
     tokenKeys: { access: STORAGE_KEYS.ACCESS_TOKEN, refresh: STORAGE_KEYS.REFRESH_TOKEN },
-    refresh: { endpoint: authContract.paths.refresh },
+    refresh: {
+      endpoint: authContract.paths.refresh,
+      // A 401 from a credential endpoint (wrong password, ...) is final.
+      skipPaths: [authContract.paths.login, authContract.paths.register, authContract.paths.logout],
+    },
   },
 ];
 
@@ -43,5 +47,6 @@ export function initServices(): void {
   // On a 401 the interceptor calls the failing service's own refresh endpoint
   // (sending the stored refresh token in the body), stores the new access +
   // refresh tokens, and replays the request. Each service refreshes independently.
+  // A failed refresh ends the session (the auth store routes to /login) — no reload.
   Api.registerInterceptors(new ApiInterceptors(refreshByService));
 }

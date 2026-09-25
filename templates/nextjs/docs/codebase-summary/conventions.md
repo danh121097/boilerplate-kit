@@ -31,10 +31,6 @@ Add `"use client"` at the top of any file that uses:
 Guard browser APIs that may be called from server contexts:
 
 ```ts
-function reloadPage(): void {
-  if (typeof window !== "undefined") window.location.reload();
-}
-
 export function initI18n(): void {
   // Safe to call from RSC + client; returns env default when window is undefined
   const lang = typeof window !== "undefined" ? getSavedLanguage() : DEFAULT_LANG;
@@ -43,7 +39,7 @@ export function initI18n(): void {
 ```
 
 **Note:** Auth tokens are httpOnly cookies (inaccessible to JavaScript on any platform).
-Storage guards only apply to i18n locale persistence and client-side reload logic.
+Storage guards only apply to i18n locale persistence and the session hint / cross-tab sync.
 
 ## Commit Style
 

@@ -34,12 +34,24 @@ use the server helpers in `src/server/` instead.
 
 - Blob passthrough (for file downloads)
 - Envelope unwrap: `{ status: "success"|"error" }` or `{ success: boolean }`
-- 401 handling: refresh + replay if eligible, else reload page
+- 401 handling: refresh + replay if eligible; otherwise reject with `error_code: 401`.
+  Never reloads. Not eligible: the refresh/credential endpoints (`skipPaths` —
+  login/register/logout), an already-replayed request, or no session hint
+  (anonymous). A refused refresh (401/403) calls `endSession("expired")` and
+  rejects with the original 401 (providers route to `/login`); a transient one
+  (network, 15 s timeout, 429, 5xx) keeps the session and rejects with a
+  `retryable: true` non-401 error. During a logout, a 401 rejects with
+  `{ error_code: 401, message: "session_ended" }` without calling
+  `/auth/refresh`.
 
-## Single-Flight Refresh
+## Single-Flight + Cross-Tab Refresh
 
 `RefreshTokenManager` ensures concurrent 401s trigger exactly one refresh
-network call. All parallel requests await the same in-flight promise.
+network call. All parallel requests await the same in-flight promise. Across
+tabs a Web Lock (`navigator.locks`, `${APP_PREFIX}:auth-refresh:<service>`) lets one tab
+refresh at a time; a tab that waited skips its own refresh when the shared
+`${APP_PREFIX}:auth-refresh:<service>:at` stamp shows another tab already rotated the
+cookies. See [security-auth.md](./security-auth.md).
 
 ## Envelope Convention
 

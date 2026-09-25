@@ -8,7 +8,7 @@ export default defineConfig({
   test: {
     // Run in Node so localStorage stubs and node:crypto work without jsdom overhead.
     environment: "node",
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "eslint-rules/**/*.test.ts"],
   },
   resolve: {
     alias: {

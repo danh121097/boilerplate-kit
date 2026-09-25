@@ -1,7 +1,11 @@
+import { makeClient, ok } from "@/__tests__/helpers/http-mocks";
+import { Api } from "@/services/core/api";
+import { createTokenRefresher } from "@/services/core/auth-refresh-client";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import { createHmac } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { InternalAxiosRequestConfig } from "axios";
+import axios from "axios";
 
 /**
  * Re-implements the SERVER's signing (Express `verifyHmac`) to prove the client
@@ -33,7 +37,42 @@ function configFor(
 }
 
 describe("hmac-signature", () => {
-  afterEach(() => vi.unstubAllEnvs());
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it("signs the Content-Type actually sent: pinned type with a body, '' without one", () => {
+    vi.stubEnv("NEXT_PUBLIC_HMAC_SECRET", "shared-secret");
+    const withBody = HMACSignatureGenerator.generateSignature(
+      configFor("/notes", "post", { contentType: "text/plain", data: "hi" }),
+    );
+    expect(withBody!.sig).toBe(
+      serverSign("shared-secret", "POST", "text/plain", withBody!.ctime, "/notes"),
+    );
+
+    // Instance-pinned JSON header, but no body → axios drops Content-Type → "".
+    const bodyless = HMACSignatureGenerator.generateSignature(configFor("/auth/logout", "post"));
+    expect(bodyless!.sig).toBe(
+      serverSign("shared-secret", "POST", "", bodyless!.ctime, "/auth/logout"),
+    );
+  });
+
+  it("the refresh client signs '' — it posts no body, so no Content-Type is sent", async () => {
+    vi.stubEnv("NEXT_PUBLIC_HMAC_SECRET", "shared-secret");
+    Api.setBaseURL("http://api.test", "MAIN");
+    const post = vi.spyOn(axios, "post").mockResolvedValue({ data: {} });
+
+    await createTokenRefresher("/auth/refresh", "MAIN")();
+
+    const [, body, options] = post.mock.calls[0]!;
+    const headers = options!.headers as Record<string, string | number>;
+    expect(body).toBeUndefined();
+    expect(headers["Content-Type"]).toBeUndefined();
+    expect(headers.sig).toBe(
+      serverSign("shared-secret", "POST", "", Number(headers.ctime), "/auth/refresh"),
+    );
+  });
 
   it("returns null when no secret is configured", () => {
     expect(HMACSignatureGenerator.generateSignature(configFor("/users", "get"))).toBeNull();
@@ -87,5 +126,42 @@ describe("hmac-signature", () => {
     });
     expect(sig).not.toBeNull();
     expect(sig!.sig).toBe(serverSign("shared-secret", "GET", "", ctime, "/auth/me"));
+  });
+
+  it("never signs the query string, inline or via params", () => {
+    vi.stubEnv("NEXT_PUBLIC_HMAC_SECRET", "shared-secret");
+    const config = { ...configFor("/users?page=2&q=a", "get"), params: { limit: 5 } };
+    const sig = HMACSignatureGenerator.generateSignature(config as InternalAxiosRequestConfig);
+    expect(sig!.sig).toBe(serverSign("shared-secret", "GET", "", sig!.ctime, "/users"));
+  });
+
+  it("signs a pinned charset exactly as it is sent", () => {
+    vi.stubEnv("NEXT_PUBLIC_HMAC_SECRET", "shared-secret");
+    const pinned = "application/json; charset=utf-8";
+    const config = {
+      url: "/notes",
+      method: "post",
+      data: { a: 1 },
+      headers: { "Content-Type": pinned },
+    } as unknown as InternalAxiosRequestConfig;
+    const sig = HMACSignatureGenerator.generateSignature(config);
+    expect(sig!.sig).toBe(serverSign("shared-secret", "POST", pinned, sig!.ctime, "/notes"));
+  });
+
+  it("the request interceptor sends the pinned Content-Type unchanged and signs that value", async () => {
+    vi.stubEnv("NEXT_PUBLIC_HMAC_SECRET", "shared-secret");
+    const pinned = "application/json; charset=utf-8";
+    let sent: Record<string, unknown> = {};
+    const http = makeClient(async (config) => {
+      sent = { ...(config.headers as unknown as Record<string, unknown>) };
+      return ok(config, { status: "success", data: null });
+    });
+
+    await http.post("/notes?draft=1", { a: 1 }, { headers: { "Content-Type": pinned } });
+
+    expect(sent["Content-Type"]).toBe(pinned);
+    expect(sent.sig).toBe(
+      serverSign("shared-secret", "POST", pinned, Number(sent.ctime), "/notes"),
+    );
   });
 });

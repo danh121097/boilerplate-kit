@@ -74,12 +74,17 @@ export function defineQuery<TData, TParams = void>(config: DefineQueryConfig<TDa
  * refetch. Declare loaders without the boilerplate arrow:
  *
  *   loader: prefetchQueries(useSessionQuery, useUsersListQuery),
+ *
+ * Uses `prefetchQuery` (never throws): a failed prefetch — e.g. an expired
+ * session deferred to the browser — must not fail the route. The query is left
+ * in an error state without data, so the component's hook refetches on mount.
  */
 export function prefetchQueries(
   ...defs: Array<{ queryOptions: () => QueryOptionsObject<unknown> }>
 ) {
-  return ({ context }: { context: { queryClient: QueryClient } }) =>
-    Promise.all(defs.map((def) => context.queryClient.ensureQueryData(def.queryOptions())));
+  return async ({ context }: { context: { queryClient: QueryClient } }): Promise<void> => {
+    await Promise.all(defs.map((def) => context.queryClient.prefetchQuery(def.queryOptions())));
+  };
 }
 
 type MutationDefOpts<TData, TVars, TCtx = unknown> = Omit<

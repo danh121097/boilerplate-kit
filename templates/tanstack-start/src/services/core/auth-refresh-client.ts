@@ -10,6 +10,9 @@ import axios from "axios";
  * the httpOnly refresh cookie, the backend rotates both cookies, the caller replays
  * its request — no token touches JS. Client-only (called from the interceptor).
  */
+/** A hung refresh must not stall every queued request forever. */
+const REFRESH_TIMEOUT_MS = 15_000;
+
 export function createTokenRefresher(endpoint: string, service: ApiService) {
   return async (): Promise<void> => {
     const headers: Record<string, string | number> = { Accept: "application/json" };
@@ -27,6 +30,7 @@ export function createTokenRefresher(endpoint: string, service: ApiService) {
     await axios.post(`${Api.getBaseURL(service)}${endpoint}`, undefined, {
       withCredentials: true,
       headers,
+      timeout: REFRESH_TIMEOUT_MS,
     });
   };
 }

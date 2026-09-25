@@ -14,6 +14,11 @@ interface PrefetchEntry {
  * forwarded by the server fetchers), dehydrates the per-request cache, and wraps
  * children so matching client queries hydrate on first paint with no refetch.
  *
+ * A fetcher that throws (e.g. the access cookie expired) is NOT dehydrated
+ * (`prefetchQuery` swallows the error; default dehydration skips failed
+ * queries), so the client query simply fetches on mount through axios — which
+ * refreshes the session — instead of hydrating a stale empty result.
+ *
  * Each page only declares WHAT to prefetch (keys + server fetchers) — it cannot be
  * hoisted to the root because every route needs different data:
  *

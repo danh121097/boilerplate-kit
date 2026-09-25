@@ -28,8 +28,17 @@ export interface RefreshOptions {
   endpoint: string;
   /** Which backend owns the refresh cookie. */
   service: ApiService;
-  /** Reload the page when a refresh ultimately fails (session truly expired). */
-  reloadOnFailure: boolean;
+  /**
+   * Paths (relative to the service baseURL) whose 401 is final — never refreshed.
+   * Credential endpoints belong here: a 401 from login/register means "wrong
+   * credentials", not "expired session". The refresh endpoint is always implied.
+   */
+  skipPaths: string[];
+  /**
+   * Whether a session is believed to exist. Anonymous 401s (false) are final:
+   * no refresh request is made. Defaults to always true.
+   */
+  hasSession: () => boolean;
 }
 
 /**
@@ -91,6 +100,9 @@ export interface ApiResponseError {
   error_code: number;
   error_message: string;
   data?: Record<string, unknown>;
+  /** Set when a request failed only because the token refresh was temporarily
+   * unavailable (network / timeout / 5xx / 429) — the session is intact, retry later. */
+  retryable?: boolean;
 }
 
 export interface HMACSignatureData {

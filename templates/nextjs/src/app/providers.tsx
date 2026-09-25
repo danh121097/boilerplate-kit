@@ -1,10 +1,21 @@
 "use client";
 
 import { initI18n } from "@/i18n/i18n";
-import { makeQueryClient } from "@/services/core/query-client";
+import {
+  makeQueryClient,
+  resetQueriesOnSessionEnd,
+  resyncQueriesAfterLogin,
+} from "@/services/core/query-client";
+import {
+  loginPathWithReturn,
+  redirectOnSessionExpired,
+  syncAuthAcrossTabs,
+} from "@/services/core/session";
 import { initServices } from "@/services/init-services";
+import { queryKeys } from "@/services/query-keys";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { I18nextProvider } from "react-i18next";
 import type { QueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
@@ -45,9 +56,40 @@ interface ProvidersProps {
 }
 
 export function Providers({ children, initialLanguage }: ProvidersProps) {
+  const router = useRouter();
+
   const [queryClient] = useState(() => getQueryClient());
   // Lazy init: one stable i18n instance across renders, seeded with the SSR locale.
   const [i18nInstance] = useState(() => initI18n(initialLanguage));
+
+  // Logout / failed refresh → reset the cache in place and pin `auth.me` to null.
+  useEffect(() => resetQueriesOnSessionEnd(queryClient, queryKeys.auth.me), [queryClient]);
+
+  // Refused refresh (session expired) → send the user to /login, remembering
+  // where they were so the login page can bring them back. No reload.
+  useEffect(
+    () =>
+      redirectOnSessionExpired(() => {
+        const { pathname, search } = window.location;
+        if (pathname !== "/login") router.replace(loginPathWithReturn(pathname + search));
+      }),
+    [router],
+  );
+
+  // Login/logout in another tab → re-read the session here and re-render the
+  // Server Components (their server reads depend on the auth cookies). A remote
+  // logout has already cleared this tab's cache via the session-end listener.
+  useEffect(
+    () =>
+      syncAuthAcrossTabs({
+        onLogin: () => {
+          resyncQueriesAfterLogin(queryClient, queryKeys.auth.me);
+          router.refresh();
+        },
+        onLogout: () => router.refresh(),
+      }),
+    [queryClient, router],
+  );
 
   return (
     <QueryClientProvider client={queryClient}>

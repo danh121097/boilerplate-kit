@@ -19,17 +19,17 @@ declare module "axios" {
 }
 
 /**
- * Resolved refresh config for one service. The refresh token itself lives in an
- * httpOnly cookie owned by the backend — only the short-lived access token is
- * managed client-side.
+ * Resolved refresh config for one service. Both tokens live in localStorage
+ * (see `auth-token-storage`); the refresh token is sent in the refresh body.
  */
 export interface RefreshOptions {
   /** Refresh endpoint, relative to the owning service's baseURL. */
   endpoint: string;
-  /** Which backend owns the refresh cookie. */
+  /** Which backend owns the tokens. */
   service: ApiService;
-  /** Reload the page when a refresh ultimately fails (session truly expired). */
-  reloadOnFailure: boolean;
+  /** Credential endpoints (login/register/logout) whose 401 is final — a wrong
+   * password must surface as an error, never trigger a refresh. */
+  skipPaths: string[];
 }
 
 /**
@@ -52,6 +52,9 @@ export interface ApiResponseError {
   error_code: number;
   error_message: string;
   data?: Record<string, unknown>;
+  /** Set when a request failed only because the token refresh was temporarily
+   * unavailable (network / timeout / 5xx / 429) — the session is intact, retry later. */
+  retryable?: boolean;
 }
 
 export interface HMACSignatureData {

@@ -1,6 +1,9 @@
+import { STORAGE_KEYS } from "@/enums";
 import { getApiBaseUrl } from "@/services/core/api-config";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
+import { isServerUnauthorized } from "@/services/core/server-auth";
 import { getCookie } from "@tanstack/react-start/server";
+import type { ServerUnauthorized } from "@/services/core/server-auth";
 import type {
   ApiResponse,
   CursorParams,
@@ -11,23 +14,22 @@ import type {
 
 /**
  * Server-side authenticated fetch — SSR counterpart of the browser-only axios
- * client. Forwards the request's auth cookies + signs the same HMAC the backend
+ * client. Forwards the request's access cookie + signs the same HMAC the backend
  * requires, so server functions reuse it instead of re-plumbing cookie/HMAC.
  *
  * `path` is AFTER the API prefix (e.g. "/auth/me") — the value the client signs.
  * Deployment: the SSR server only gets the cookie when it shares a site with the
  * backend (same host in dev; same registrable domain / same-origin proxy in prod).
+ *
+ * Expired access cookie (it lives 15 min): the server NEVER refreshes. The
+ * backend scopes the refresh cookie to `${apiPrefix}/auth`, so page / server-fn
+ * requests do not carry it, and a server-side rotation would have to be shared
+ * across concurrent reads — weakening the backend's reuse detection. The read
+ * returns `ServerUnauthorized` instead and the browser refreshes + replays via
+ * `withSessionRefresh`. Never resolves an auth failure to a cacheable empty
+ * value; other failures throw.
  */
 const API_BASE = getApiBaseUrl();
-
-/** Rebuild a Cookie header from ONLY the auth cookies (never the whole jar). */
-function authCookieHeader(): string {
-  const access = getCookie("accessToken");
-  const refresh = getCookie("refreshToken");
-  return [access && `accessToken=${access}`, refresh && `refreshToken=${refresh}`]
-    .filter(Boolean)
-    .join("; ");
-}
 
 function hmacHeaders(method: string, path: string, contentType: string): Record<string, string> {
   const sig = HMACSignatureGenerator.signRequest({ method, path, contentType });
@@ -38,31 +40,35 @@ function hmacHeaders(method: string, path: string, contentType: string): Record<
 }
 
 /**
- * Authenticated SSR GET core — forwards the auth cookies + HMAC and returns the
- * parsed body (full envelope), or null when unauthenticated / failed. The HMAC
- * signs the path only; `query` is appended as the `?key=value` string.
+ * Authenticated SSR GET core — returns the parsed body (full envelope), or
+ * `ServerUnauthorized` when the access cookie is missing or rejected. The HMAC signs the path only; `query` is appended as `?key=value`.
  */
 async function authedFetch<R>(
   path: string,
   query?: Record<string, string | number>,
-): Promise<R | null> {
-  const cookie = authCookieHeader();
-  if (!cookie) return null; // no session → skip the round-trip
-
+): Promise<R | ServerUnauthorized> {
+  const access = getCookie("accessToken");
+  const unauthorized: ServerUnauthorized = {
+    unauthorized: true,
+    hasSession: getCookie(STORAGE_KEYS.SESSION) === "1",
+  };
   const qs = query
     ? `?${new URLSearchParams(Object.entries(query).map(([k, v]) => [k, String(v)])).toString()}`
     : "";
+  if (!access) return unauthorized;
+
   const res = await fetch(`${API_BASE}${path}${qs}`, {
-    headers: { cookie, ...hmacHeaders("GET", path, "") },
+    headers: { cookie: `accessToken=${access}`, ...hmacHeaders("GET", path, "") },
   });
-  if (!res.ok) return null;
+  if (res.status === 401) return unauthorized;
+  if (!res.ok) throw new Error(`GET ${path} failed with status ${res.status}`);
   return (await res.json()) as R;
 }
 
-/** Single resource — unwraps the envelope's `data`. Returns null on failure. */
-export async function serverApiGet<T>(path: string): Promise<T | null> {
+/** Single resource — unwraps the envelope's `data`. */
+export async function serverApiGet<T>(path: string): Promise<T | ServerUnauthorized> {
   const body = await authedFetch<ApiResponse<T>>(path);
-  return body?.data ?? null;
+  return isServerUnauthorized(body) ? body : body.data;
 }
 
 /**
@@ -72,7 +78,7 @@ export async function serverApiGet<T>(path: string): Promise<T | null> {
 export function serverApiPaginate<T>(
   path: string,
   params?: PaginationParams,
-): Promise<PaginatedResponse<T> | null> {
+): Promise<PaginatedResponse<T> | ServerUnauthorized> {
   return authedFetch<PaginatedResponse<T>>(
     path,
     params as Record<string, string | number> | undefined,
@@ -86,7 +92,7 @@ export function serverApiPaginate<T>(
 export function serverApiCursorPaginate<T>(
   path: string,
   params?: CursorParams,
-): Promise<CursorResponse<T> | null> {
+): Promise<CursorResponse<T> | ServerUnauthorized> {
   return authedFetch<CursorResponse<T>>(
     path,
     params as Record<string, string | number> | undefined,

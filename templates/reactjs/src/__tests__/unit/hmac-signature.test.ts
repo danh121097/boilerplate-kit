@@ -1,7 +1,12 @@
+import { installLocalStorage } from "@/__tests__/helpers/fake-storage";
+import { makeClient, ok } from "@/__tests__/helpers/http-mocks";
+import { Api } from "@/services/core/api";
+import { createTokenRefresher } from "@/services/core/auth-refresh-client";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import { createHmac } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { InternalAxiosRequestConfig } from "axios";
+import axios from "axios";
 
 /** Re-implements the SERVER's signing (Express `verifyHmac`) to prove the client
  * signs exactly what the backend verifies. */
@@ -31,7 +36,11 @@ function configFor(
 }
 
 describe("hmac-signature", () => {
-  afterEach(() => vi.unstubAllEnvs());
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
 
   it("returns null when no secret is configured", () => {
     vi.stubEnv("VITE_HMAC_SECRET", "");
@@ -72,5 +81,64 @@ describe("hmac-signature", () => {
     vi.stubEnv("VITE_BUILD_VERSION", "9.9.9");
     const sig = HMACSignatureGenerator.generateSignature(configFor("/x", "get"));
     expect(sig!["x-version"]).toBe("9.9.9");
+  });
+
+  it("never signs the query string, inline or via params", () => {
+    vi.stubEnv("VITE_HMAC_SECRET", "shared-secret");
+    const config = { ...configFor("/users?page=2&q=a", "get"), params: { limit: 5 } };
+    const sig = HMACSignatureGenerator.generateSignature(config as InternalAxiosRequestConfig);
+    expect(sig!.sig).toBe(serverSign("shared-secret", "GET", "", sig!.ctime, "/users"));
+  });
+
+  it("signs a pinned charset exactly as it is sent", () => {
+    vi.stubEnv("VITE_HMAC_SECRET", "shared-secret");
+    const pinned = "application/json; charset=utf-8";
+    const sig = HMACSignatureGenerator.generateSignature(
+      configFor("/notes", "post", { contentType: pinned, data: { a: 1 } }),
+    );
+    expect(sig!.sig).toBe(serverSign("shared-secret", "POST", pinned, sig!.ctime, "/notes"));
+  });
+
+  it("the request interceptor sends the pinned Content-Type unchanged and signs that value", async () => {
+    vi.stubEnv("VITE_HMAC_SECRET", "shared-secret");
+    installLocalStorage();
+    const pinned = "application/json; charset=utf-8";
+    let sent: Record<string, unknown> = {};
+    const http = makeClient(async (config) => {
+      sent = { ...(config.headers as unknown as Record<string, unknown>) };
+      return ok(config, { status: "success", data: null });
+    });
+
+    await http.post("/notes?draft=1", { a: 1 }, { headers: { "Content-Type": pinned } });
+
+    expect(sent["Content-Type"]).toBe(pinned);
+    expect(sent.sig).toBe(
+      serverSign("shared-secret", "POST", pinned, Number(sent.ctime), "/notes"),
+    );
+  });
+
+  it("the refresh client signs its JSON body's Content-Type", async () => {
+    vi.stubEnv("VITE_HMAC_SECRET", "shared-secret");
+    installLocalStorage();
+    Api.setBaseURL("http://api.test", "MAIN");
+    const post = vi
+      .spyOn(axios, "post")
+      .mockResolvedValue({ data: { data: { tokens: { accessToken: "AT" } } } });
+
+    await createTokenRefresher("/auth/refresh", "MAIN")();
+
+    const [, body, options] = post.mock.calls[0]!;
+    const headers = options!.headers as Record<string, string | number>;
+    expect(body).toEqual({ refreshToken: undefined });
+    expect(headers["Content-Type"]).toBe("application/json");
+    expect(headers.sig).toBe(
+      serverSign(
+        "shared-secret",
+        "POST",
+        "application/json",
+        Number(headers.ctime),
+        "/auth/refresh",
+      ),
+    );
   });
 });

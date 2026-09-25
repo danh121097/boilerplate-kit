@@ -10,7 +10,8 @@ Next.js build
               ├── initServices() (called in useEffect — browser only)
               │     ├── Api.setBaseURL(getApiBaseUrl(), "MAIN")  // NEXT_PUBLIC_APP_ENDPOINT + /api/v1
               │     └── Api.registerInterceptors(new ApiInterceptors({
-              │           MAIN: { endpoint: "/auth/refresh", reloadOnFailure: true }
+              │           MAIN: { endpoint: "/auth/refresh", skipPaths: [login, register, logout],
+              │                   hasSession: hasSessionHint }
               │         }))
               ├── QueryClientProvider
               └── I18nextProvider

@@ -1,11 +1,7 @@
-import { serverApiGet } from "@/server/server-api";
-import { authContract } from "@/services/auth/contract";
+import { readSessionUser } from "@/server/read-session-user";
 import { createServerFn } from "@tanstack/react-start";
-import type { AuthUser } from "@/services/auth/types/auth";
 
-export const getMeServerFn = createServerFn({ method: "GET" }).handler(
-  async (): Promise<AuthUser | null> => {
-    const body = await serverApiGet<{ user?: AuthUser }>(authContract.paths.me);
-    return body?.user ?? null;
-  },
-);
+/** Current user as a server function (runs on the server, RPC from the browser).
+ * The handler body is stripped from the client bundle, and with it the
+ * server-only import chain behind `readSessionUser`. */
+export const getMeServerFn = createServerFn({ method: "GET" }).handler(() => readSessionUser());

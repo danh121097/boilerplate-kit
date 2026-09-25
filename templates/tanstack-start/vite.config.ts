@@ -23,7 +23,12 @@ import AutoImport from "unplugin-auto-import/vite";
  * Auto-import registry, shared with vitest.config.ts so tests that import route /
  * store modules resolve the same injected globals.
  */
-export const autoImportOptions: Pick<AutoImportOptions, "imports" | "dirs"> = {
+export const autoImportOptions: Pick<AutoImportOptions, "imports" | "dirs" | "include"> = {
+  // Default include is /\.[jt]sx?$/, which misses the virtual modules TanStack
+  // Router's code splitting moves each route `component` into
+  // (`routes/login.tsx?tsr-split=component`) — their hooks would be left
+  // un-imported ("useNavigate is not defined"). Match those ids too.
+  include: [/\.[jt]sx?$/, /\.[jt]sx?\?tsr-split=/],
   imports: [
     "react",
     "react-i18next",

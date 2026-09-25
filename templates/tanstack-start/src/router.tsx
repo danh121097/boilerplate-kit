@@ -1,10 +1,17 @@
 import { initI18n } from "@/i18n/i18n";
 import { routeTree } from "@/routeTree.gen";
 import { initServices } from "@/services";
-import { keepPreviousData, QueryClient } from "@tanstack/react-query";
+import {
+  makeQueryClient,
+  resetQueriesOnSessionEnd,
+  resyncQueriesAfterLogin,
+} from "@/services/core/query-client";
+import { redirectOnSessionExpired, syncAuthAcrossTabs } from "@/services/core/session";
+import { queryKeys } from "@/services/query-keys";
 import { createRouter } from "@tanstack/react-router";
 import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
 import { I18nextProvider } from "react-i18next";
+import type { QueryClient } from "@tanstack/react-query";
 
 /** Router context shape — exposed to every route loader and component. */
 export interface RouterContext {
@@ -22,18 +29,11 @@ export function getRouter() {
   // Client-only: wire the axios service layer (baseURL + interceptors) once.
   if (typeof window !== "undefined") initServices();
 
-  const client = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-        refetchOnWindowFocus: true,
-        placeholderData: keepPreviousData,
-        // Non-zero so hydrated SSR data isn't stale-on-mount (which would refetch
-        // immediately and waste the server prefetch).
-        staleTime: 60_000,
-      },
-    },
-  });
+  // Shared defaults (non-zero staleTime so hydrated SSR data isn't refetched on mount).
+  const client = makeQueryClient();
+
+  // Browser: logout / failed refresh resets the cache in place and pins `auth.me` to null.
+  if (typeof window !== "undefined") resetQueriesOnSessionEnd(client, queryKeys.auth.me);
 
   const i18n = initI18n();
 
@@ -49,6 +49,26 @@ export function getRouter() {
       <I18nextProvider i18n={i18n}>{children}</I18nextProvider>
     ),
   });
+
+  if (typeof window !== "undefined") {
+    // A refused refresh (session expired) routes to /login, carrying the current
+    // path so the login page can bring the user back. No reload.
+    redirectOnSessionExpired(() => {
+      const { pathname, href } = router.state.location;
+      if (pathname !== "/login") void router.navigate({ to: "/login", search: { redirect: href } });
+    });
+
+    // Login/logout in another tab → re-read the session and re-run the route
+    // loaders here. A remote logout has already cleared this tab's cache via the
+    // session-end listener.
+    syncAuthAcrossTabs({
+      onLogin: () => {
+        resyncQueriesAfterLogin(client, queryKeys.auth.me);
+        void router.invalidate();
+      },
+      onLogout: () => void router.invalidate(),
+    });
+  }
 
   // Dehydrate/hydrate the QueryClient across the SSR boundary + supply QueryClientProvider.
   setupRouterSsrQueryIntegration({ router, queryClient: client });

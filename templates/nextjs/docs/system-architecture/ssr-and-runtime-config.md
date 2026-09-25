@@ -9,15 +9,10 @@ runs in the browser; server components use auth cookies directly via
 
 ## Browser-Only APIs
 
-The `reloadPage()` helper in `interceptors.ts` is guarded:
-
-```ts
-function reloadPage(): void {
-  if (typeof window !== "undefined") window.location.reload();
-}
-```
-
-This is called only when a token refresh fails and `reloadOnFailure` is true.
+Session code that touches the browser is guarded: the session hint and
+cross-tab sync no-op without `document` / `window`, and the refresh lock falls
+back to per-tab single-flight without `navigator.locks`. A 401 never reloads the
+page — a refused refresh ends the session and routes to `/login` client-side.
 During SSR, server components never hit this code path.
 
 ## SSR Cookie Access
@@ -32,7 +27,10 @@ const access = store.get("accessToken")?.value;
 ```
 
 The `serverApiGet<T>()` helper in `src/server/server-api.ts` wraps this,
-forwarding only the auth cookies (via HMAC signature) to the backend.
+forwarding only the access cookie (plus HMAC headers) to the backend. It never
+refreshes: an RSC cannot set cookies, so a server-side refresh would rotate the
+token without delivering it to the browser. An expired or missing access cookie
+throws `ServerAuthError` instead (see [security-auth.md](./security-auth.md#ssr-data-fetching)).
 
 ## Environment Variables
 

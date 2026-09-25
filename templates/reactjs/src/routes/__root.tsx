@@ -1,5 +1,6 @@
 import { setLocale } from "@/i18n/i18n";
-import { useAuthStore } from "@/stores/auth";
+import { onSessionEnded } from "@/services/core";
+import { syncAuthWithOtherTabs, useAuthStore } from "@/stores/auth";
 import { createRootRouteWithContext } from "@tanstack/react-router";
 import type { QueryClient } from "@tanstack/react-query";
 
@@ -13,6 +14,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 
 function RootLayout() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const router = useRouter();
   const navigate = useNavigate();
   const hydrate = useAuthStore((s) => s.hydrate);
   const logout = useAuthStore((s) => s.logout);
@@ -23,6 +25,23 @@ function RootLayout() {
   useEffect(() => {
     hydrate();
   }, [hydrate]);
+
+  // An expired session (refresh failed) routes to /login instead of reloading,
+  // carrying the current path so the login page can bring the user back.
+  useEffect(
+    () =>
+      onSessionEnded((reason) => {
+        const { pathname, href } = router.state.location;
+        if (reason === "expired" && pathname !== "/login") {
+          void navigate({ to: "/login", search: { redirect: href } });
+        }
+      }),
+    [navigate, router],
+  );
+
+  // Login/logout in another tab → recompute the session here and re-run the
+  // route guards (`beforeLoad`), e.g. bounce a protected page to /login.
+  useEffect(() => syncAuthWithOtherTabs(() => void router.invalidate()), [router]);
 
   function toggleLocale() {
     const next = i18n.language === "en" ? "ja" : "en";

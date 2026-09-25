@@ -12,7 +12,7 @@ templates/reactjs/
 ├── components.json            # shadcn/ui: new-york, neutral
 ├── pnpm-workspace.yaml
 ├── .env.example
-├── .gitignore                 # includes routeTree.gen.ts
+├── .gitignore                 # routeTree.gen.ts + auto-imports.d.ts are committed stubs
 ├── AGENTS.md / CLAUDE.md / README.md
 ├── docs/                      # technical docs
 └── src/

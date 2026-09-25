@@ -1,7 +1,7 @@
 # Agent Instructions
 
 **Project**: Next.js 16 + TypeScript SSR starter — App Router, TanStack React Query,
-Zustand, shadcn/ui + Tailwind v4, axios service layer with JWT bearer + httpOnly
+Zustand, shadcn/ui + Tailwind v4, axios service layer with httpOnly JWT cookies +
 refresh-token rotation and HMAC-signed requests, react-i18next (en/ja).
 Package manager: **pnpm**.
 

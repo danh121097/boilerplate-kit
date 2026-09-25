@@ -1,5 +1,11 @@
 import { authContract } from "@/services/auth/contract";
-import { Api, ApiInterceptors, getApiBaseUrl } from "@/services/core";
+import {
+  Api,
+  ApiInterceptors,
+  getApiBaseUrl,
+  hasSessionHint,
+  registerSessionRefresher,
+} from "@/services/core";
 import type { ServiceRefreshConfig } from "@/services/core";
 
 /**
@@ -20,12 +26,14 @@ const SERVICES: ServiceDefinition[] = [
   {
     name: "MAIN",
     baseURL: getApiBaseUrl(),
-    // reloadOnFailure: true — most endpoints need auth, so a failed refresh means
-    // the session is truly dead → reload to a clean (logged-out) state. Safe here:
-    // client axios calls are gated behind auth and the session bootstrap runs via
-    // server functions (not this interceptor). If you add a PUBLIC client call that
-    // fires for anonymous users, gate it or it will 401→refresh→reload loop.
-    refresh: { endpoint: authContract.paths.refresh, reloadOnFailure: true },
+    // A 401 is refreshed only while the session hint says a session exists
+    // (anonymous 401s are final), never for credential endpoints (a login 401 is
+    // "wrong password"), and a failed refresh ends the session — no page reload.
+    refresh: {
+      endpoint: authContract.paths.refresh,
+      skipPaths: [authContract.paths.login, authContract.paths.register, authContract.paths.logout],
+      hasSession: hasSessionHint,
+    },
   },
 ];
 
@@ -41,5 +49,9 @@ export function initServices(): void {
   // On a 401 the interceptor calls the failing service's own refresh endpoint
   // (the httpOnly refresh cookie is sent automatically); the backend rotates the
   // cookies and the request is replayed. Each service refreshes independently.
-  Api.registerInterceptors(new ApiInterceptors(refreshByService));
+  const interceptors = new ApiInterceptors(refreshByService);
+  Api.registerInterceptors(interceptors);
+  // Server-function reads report an expired session instead of refreshing (the
+  // server never sees the path-scoped refresh cookie); they refresh through here.
+  registerSessionRefresher((service) => interceptors.refreshSession(service));
 }

@@ -10,6 +10,25 @@ export interface SignRequestInput {
   ctime?: number;
 }
 
+/** The Content-Type pinned on the request config (AxiosHeaders or a plain object). */
+function readContentType(config: InternalAxiosRequestConfig): string | undefined {
+  const headers = config.headers as unknown as
+    | (Record<string, unknown> & { get?: (name: string) => unknown })
+    | undefined;
+  const raw =
+    typeof headers?.get === "function"
+      ? headers.get("Content-Type")
+      : (headers?.["Content-Type"] ?? headers?.["content-type"]);
+  return typeof raw === "string" && raw ? raw : undefined;
+}
+
+/** The Content-Type pinned on the request, exactly as it will be sent. Pin no
+ * charset: the backend signs the header it receives, so a pinned one must be
+ * sent (and signed) unchanged. */
+export function pinnedContentType(config: InternalAxiosRequestConfig): string | undefined {
+  return readContentType(config);
+}
+
 /**
  * HMAC request signer — active only when `VITE_HMAC_SECRET` is set. The secret is
  * client-readable (a soft integrity layer matching the backend's HMAC_SECRET).
@@ -17,8 +36,12 @@ export interface SignRequestInput {
  * functions so a forwarded SSR fetch carries the same headers the backend requires.
  */
 export class HMACSignatureGenerator {
+  /** The path the backend verifies: leading "/", no query string or hash (it
+   * signs `req.url` with the query stripped, so an inline `?x=1` must not be
+   * signed either). */
   private static normalizeUrl(url: string): string {
-    return url.startsWith("/") ? url : `/${url}`;
+    const path = url.split(/[?#]/)[0] ?? "";
+    return path.startsWith("/") ? path : `/${path}`;
   }
 
   private static sign(stringToSign: string, secret: string): string {
@@ -52,14 +75,17 @@ export class HMACSignatureGenerator {
    *
    * The signed content-type MUST equal what the request actually sends, because
    * the backend signs the `Content-Type` header it receives. axios omits
-   * Content-Type on body less requests (GET, or POST/DELETE with no data), so we
-   * sign "" for those and "application/json" only when a body is present. A
-   * request that pins its own content-type (e.g. multipart form-data) keeps it. */
+   * Content-Type on bodyless requests (GET, or POST with no data), so those sign
+   * ""; a request with a body sends the pinned Content-Type (instance default or
+   * per-request header, signed exactly as sent) or axios's JSON default.
+   *
+   * Not covered: multipart uploads. The browser sends
+   * `multipart/form-data; boundary=…` with a boundary the client cannot know
+   * when signing, so upload routes need a backend-side exemption or
+   * normalization. */
   static generateSignature(config: InternalAxiosRequestConfig): HMACSignatureData | null {
-    const pinned = config.headers?.["Content-Type"] as string | undefined;
-    const isMultipart = typeof pinned === "string" && pinned.startsWith("multipart");
     const hasBody = config.data !== undefined && config.data !== null;
-    const contentType = isMultipart ? pinned : hasBody ? "application/json" : "";
+    const contentType = hasBody ? (pinnedContentType(config) ?? "application/json") : "";
 
     return this.signRequest({
       method: config.method || "",

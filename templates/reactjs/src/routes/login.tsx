@@ -1,4 +1,5 @@
 import { useLoginMutation } from "@/services/auth/auth";
+import { safeRedirect } from "@/services/core";
 import { useAuthStore } from "@/stores/auth";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createFileRoute } from "@tanstack/react-router";
@@ -10,10 +11,10 @@ export const Route = createFileRoute("/login")({
   validateSearch: (search: Record<string, unknown>): { redirect?: string } => ({
     redirect: typeof search.redirect === "string" ? search.redirect : undefined,
   }),
-  // Guests only: an authenticated user hitting /login is sent home.
-  beforeLoad: () => {
+  // Guests only: an authenticated user hitting /login is sent on (or home).
+  beforeLoad: ({ search }) => {
     if (useAuthStore.getState().isAuthenticated) {
-      throw redirect({ to: "/" });
+      throw redirect({ href: safeRedirect(search.redirect) });
     }
   },
   component: LoginPage,
@@ -50,7 +51,8 @@ function LoginPage() {
     try {
       const result = await mutateAsync(values);
       setUser(result.user);
-      await navigate({ to: redirectTo ?? "/" });
+      // Same-origin paths only — never an open redirect to another site.
+      await navigate({ href: safeRedirect(redirectTo) });
     } catch (err) {
       setError(err instanceof Error ? err.message : t("login.error"));
     }

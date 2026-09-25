@@ -7,7 +7,7 @@ Route component
   → useUsersListQuery()          defineQuery hook
   → UsersModel.list()            Model method
   → Api.get<User[]>()            axios instance
-  → request interceptor          HMAC headers + Bearer token
+  → request interceptor          HMAC headers (auth cookies auto-sent)
   → HTTP
   → response interceptor         envelope unwrap / 401 refresh
   → resolved data

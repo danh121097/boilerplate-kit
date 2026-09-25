@@ -1,5 +1,5 @@
 import { authContract } from "@/services/auth/contract";
-import { Api, ApiInterceptors, getApiBaseUrl } from "@/services/core";
+import { Api, ApiInterceptors, getApiBaseUrl, hasSessionHint } from "@/services/core";
 import type { ServiceRefreshConfig } from "@/services/core";
 
 /**
@@ -20,9 +20,14 @@ const SERVICES: ServiceDefinition[] = [
   {
     name: "MAIN",
     baseURL: getApiBaseUrl(),
-    // reloadOnFailure: true — most endpoints need auth, so a failed refresh means
-    // the session is truly dead → reload to a clean (logged-out) state.
-    refresh: { endpoint: authContract.paths.refresh, reloadOnFailure: true },
+    // A 401 is refreshed only while the session hint says a session exists
+    // (anonymous 401s are final), never for credential endpoints (a login 401 is
+    // "wrong password"), and a failed refresh ends the session — no page reload.
+    refresh: {
+      endpoint: authContract.paths.refresh,
+      skipPaths: [authContract.paths.login, authContract.paths.register, authContract.paths.logout],
+      hasSession: hasSessionHint,
+    },
   },
 ];
 

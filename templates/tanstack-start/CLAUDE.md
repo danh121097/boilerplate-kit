@@ -6,7 +6,7 @@ Guidance for Claude Code (and other coding agents) working in this repository.
 
 TanStack Start + TypeScript SSR starter — TanStack Router (file-based routes),
 TanStack React Query, Zustand, shadcn/ui + Tailwind v4, an axios service layer
-with JWT bearer + httpOnly refresh-token rotation + HMAC-signed requests,
+with httpOnly JWT cookies + refresh-token rotation + HMAC-signed requests,
 react-i18next (en/ja). Package manager: **pnpm**.
 
 **Key distinction**: this is SSR-first (TanStack Start via Vite plugin — `@tanstack/react-start`).
@@ -43,8 +43,8 @@ Full standards: [docs/code-standards.md](./docs/code-standards.md).
 
 ```bash
 pnpm dev          # Vite dev server with HMR (auto-generates routeTree.gen.ts)
-pnpm build        # SSR build via Vite (outputs dist/client + dist/server)
-pnpm start        # Serve the SSR build: node .output/server/index.mjs
+pnpm build        # tsc --noEmit, then SSR build via Vite (outputs dist/client + dist/server)
+pnpm start        # Serve the SSR build (dist/) via vite preview
 pnpm typecheck    # tsc --noEmit
 pnpm test         # vitest run
 pnpm test:watch   # vitest

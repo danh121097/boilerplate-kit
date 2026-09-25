@@ -6,6 +6,8 @@ export * from "@/services/core/headers-utils";
 export * from "@/services/core/hmac-signature";
 export * from "@/services/core/interceptors";
 export * from "@/services/core/model";
+export * from "@/services/core/query-client";
 export * from "@/services/core/refresh-token-manager";
+export * from "@/services/core/session-events";
 export * from "@/services/core/tanstack";
 export * from "@/services/core/types";

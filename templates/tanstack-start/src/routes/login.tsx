@@ -1,21 +1,31 @@
 import { useAuth, useLoginMutation } from "@/services/auth";
+import { safeRedirect } from "@/services/core/session";
 import { createFileRoute } from "@tanstack/react-router";
 import type { FormEvent } from "react";
 
 export const Route = createFileRoute("/login")({
+  // The page an expired session bounced the user away from, to return to.
+  validateSearch: (search: Record<string, unknown>): { redirect?: string } => ({
+    redirect: typeof search.redirect === "string" ? search.redirect : undefined,
+  }),
   component: LoginPage,
 });
 
 /**
  * Login page — cookie-based auth. The login mutation invalidates `auth.me`, so
- * on success the session query re-resolves and we return home (the header flips
- * to Logout). No token is stored in JS; the backend sets httpOnly cookies.
+ * on success the session query re-resolves and we return to `?redirect=` when it
+ * is a same-origin path, else home (the header flips to Logout). No token is
+ * stored in JS; the backend sets httpOnly cookies.
  */
 function LoginPage() {
   const navigate = useNavigate();
 
+  const { redirect: redirectTo } = Route.useSearch();
+
+  const returnTo = safeRedirect(redirectTo);
+
   const login = useLoginMutation({
-    onSuccess: () => navigate({ to: "/" }),
+    onSuccess: () => navigate({ href: returnTo }),
   });
 
   const { t } = useTranslation();
@@ -26,8 +36,8 @@ function LoginPage() {
 
   // Already signed in → no reason to show the form.
   useEffect(() => {
-    if (isAuthenticated) navigate({ to: "/" });
-  }, [isAuthenticated, navigate]);
+    if (isAuthenticated) void navigate({ href: returnTo });
+  }, [isAuthenticated, navigate, returnTo]);
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();

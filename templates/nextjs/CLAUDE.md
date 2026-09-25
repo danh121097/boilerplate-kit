@@ -5,8 +5,8 @@ Guidance for Claude Code (and other coding agents) working in this repository.
 ## Project Overview
 
 Next.js 16 + TypeScript SSR starter — App Router, TanStack React Query, Zustand,
-shadcn/ui + Tailwind v4, an SSR-guarded axios service layer with JWT bearer +
-httpOnly refresh-token rotation + HMAC-signed requests, react-i18next (en/ja).
+shadcn/ui + Tailwind v4, an SSR-guarded axios service layer with httpOnly JWT
+cookies + refresh-token rotation + HMAC-signed requests, react-i18next (en/ja).
 Package manager: **pnpm**.
 
 ## Start Here

@@ -1,4 +1,4 @@
-const APP_PREFIX = import.meta.env.VITE_APP_NAME || "PRISM_APP";
+export const APP_PREFIX = import.meta.env.VITE_APP_NAME || "PRISM_APP";
 
 /**
  * Centralised cookie key registry for UI preferences. Always go through this map
@@ -12,6 +12,11 @@ const APP_PREFIX = import.meta.env.VITE_APP_NAME || "PRISM_APP";
 export const STORAGE_KEYS = {
   LANGUAGE: `${APP_PREFIX}_LANGUAGE`,
   THEME: `${APP_PREFIX}_THEME`,
+  /** Readable (non-httpOnly) "a session exists" hint — see `services/core/session`. */
+  SESSION: `${APP_PREFIX}_SESSION`,
+  /** localStorage key other tabs watch (`storage` event) for login/logout — see
+   * `services/core/session`. */
+  AUTH_SYNC: `${APP_PREFIX}_AUTH_SYNC`,
 } as const;
 
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
