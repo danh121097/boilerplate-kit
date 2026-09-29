@@ -40,9 +40,9 @@ export default defineConfig({
 
 ### Auto-Import Scope
 
-`ref`, `computed`, `onMounted`, `useThrottleFn`, `storeToRefs`, etc. are used
-without imports (see `useSocketIO.ts`, which never imports `ref`/`onMounted`/
-`useThrottleFn`/`storeToRefs`). Generated declaration files keep types and lint
+`ref`, `computed`, `onMounted`, `storeToRefs`, etc. are used
+without imports (see `useSocketIO.ts`, which never imports `onMounted`/
+`storeToRefs`). Generated declaration files keep types and lint
 honest:
 
 - `auto-imports.d.ts` — typings for auto-imported APIs.
@@ -98,6 +98,7 @@ pnpm preview      # vite preview — serve the production build locally
 pnpm typecheck    # vue-tsc --noEmit — types only, no emit
 pnpm test         # vitest run
 pnpm test:watch   # vitest — watch mode
-pnpm lint         # eslint .
+pnpm lint         # eslint . && prettier --check . (read-only)
+pnpm lint:fix     # eslint . --fix && prettier --write .
 pnpm format       # prettier --write .
 ```

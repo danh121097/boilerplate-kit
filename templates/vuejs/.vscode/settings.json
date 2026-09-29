@@ -1,5 +1,7 @@
 {
-  // Run ESLint auto-fix (incl. perfectionist import sorting) on every save.
+  // Run ESLint auto-fix on every save: perfectionist import sorting +
+  // local/sort-setup-declarations (props -> composables ->
+  // const -> refs -> computed -> functions).
   "editor.codeActionsOnSave": {
     "source.fixAll.eslint": "explicit"
   },

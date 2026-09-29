@@ -21,6 +21,12 @@ const router = createRouter({
       component: () => import("@/views/login-view.vue"),
       meta: { guestOnly: true },
     },
+    // Unknown URLs render the not-found page instead of a blank view.
+    {
+      path: "/:pathMatch(.*)*",
+      name: "not-found",
+      component: () => import("@/views/not-found-view.vue"),
+    },
   ],
 });
 

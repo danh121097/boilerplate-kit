@@ -1,9 +1,11 @@
 import { SOCKET_EVENT, SOCKET_UNAUTHORIZED_MESSAGE } from "@/enums";
 import { getAccessToken } from "@/services/core/auth-token-storage";
+import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import { useSocketIOStore } from "@/stores/socket-io";
 import { io, type Socket } from "socket.io-client";
-import Base64 from "crypto-js/enc-base64";
-import HmacSHA256 from "crypto-js/hmac-sha256";
+
+/** Trailing delay before a failed handshake is retried. */
+const RECONNECT_THROTTLE_MS = 2000;
 
 /**
  * Build the per-handshake `{ sig, ctime }` headers expected by HMAC-protected
@@ -15,21 +17,21 @@ import HmacSHA256 from "crypto-js/hmac-sha256";
  * proxy) and forward the resulting headers to the socket handshake.
  */
 function signHeader(): { sig: string; ctime: number } | Record<string, never> {
-  const secret = import.meta.env.VITE_HMAC_SECRET;
-  if (!secret) return {};
-  const ctime = Date.now();
-  const stringToSign = ["GET", "application/json", ctime, "/socket", ""].join("\n");
-  const sig = Base64.stringify(HmacSHA256(stringToSign, secret));
-  return { sig, ctime };
+  const signature = HMACSignatureGenerator.signRequest({
+    method: "GET",
+    path: "/socket",
+    contentType: "application/json",
+  });
+  if (!signature) return {};
+  return { sig: signature.sig, ctime: signature.ctime };
 }
 
 /**
  * Initialize a socket.io connection scoped to the current component tree.
  *
- * Auth payload defaults to `{ token: 'Bearer <localStorage access_token>', role: 'user' }`.
- * Extend with HMAC signing or extra claims by spreading additional fields in
- * the `auth` object below — see `@/services/core/hmac-signature` for a ready-to-go
- * signer.
+ * Auth payload: `{ token: 'Bearer <access_token>', role: 'user' }`, plus `sig`/`ctime`
+ * from `HMACSignatureGenerator` when `VITE_HMAC_SECRET` is set. Add extra claims
+ * by spreading fields into the `auth` object below.
  */
 export function useSocketIO() {
   const storeSocketIO = useSocketIOStore();
@@ -68,17 +70,24 @@ export function useSocketIO() {
     }
   }
 
-  const reConnect = useThrottleFn(() => {
-    destroySocket();
-    connectSocket();
-  }, 2000);
+  // Trailing timer: the first failure schedules one reconnect, further failures
+  // inside the window are ignored.
+  let reConnectTimer: ReturnType<typeof setTimeout> | null = null;
+  function reConnect() {
+    if (reConnectTimer) return;
+    reConnectTimer = setTimeout(() => {
+      reConnectTimer = null;
+      destroySocket();
+      connectSocket();
+    }, RECONNECT_THROTTLE_MS);
+  }
 
   const handleAuthenticated = () => storeSocketIO.setSocketIO({ authenticated: true, socket });
-  const handleConnectError = useThrottleFn((e: Error) => {
+  const handleConnectError = (e: Error) => {
     if (e.message === SOCKET_UNAUTHORIZED_MESSAGE)
       storeSocketIO.setSocketIO({ authenticated: false });
     reConnect();
-  }, 1000);
+  };
   const onSocketUnauthorized = () => destroySocket();
 
   socket.on(SOCKET_EVENT.AUTHENTICATED, handleAuthenticated);
@@ -88,6 +97,10 @@ export function useSocketIO() {
   onMounted(connectSocket);
 
   onScopeDispose(() => {
+    if (reConnectTimer) {
+      clearTimeout(reConnectTimer);
+      reConnectTimer = null;
+    }
     socket.off(SOCKET_EVENT.AUTHENTICATED, handleAuthenticated);
     socket.off(SOCKET_EVENT.CONNECT_ERROR, handleConnectError);
     socket.off(SOCKET_EVENT.UNAUTHORIZED, onSocketUnauthorized);

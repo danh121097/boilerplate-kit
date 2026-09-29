@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { setLocale } from "@/plugins/i18n";
+import { useLogoutMutation } from "@/services/auth";
 import { useAuthStore } from "@/stores/auth";
 
 const router = useRouter();
@@ -20,31 +21,59 @@ function toggleLocale() {
   setLocale(next);
 }
 
-async function onLogout() {
-  await authStore.logout();
-  router.push({ name: "login" });
-}
+// Settled, not success: the client signs out locally even when the server call fails.
+const { mutate: doLogout, isPending: logoutPending } = useLogoutMutation({
+  onSettled: async () => {
+    authStore.clearSession();
+    await router.push({ name: "login" });
+  },
+});
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 text-gray-900">
-    <header class="border-b bg-white">
+  <div class="min-h-screen bg-background text-foreground">
+    <header class="border-b border-border bg-card">
       <nav class="mx-auto flex max-w-3xl items-center gap-6 px-6 py-3 text-sm">
-        <RouterLink to="/" class="font-semibold hover:text-indigo-600">
+        <RouterLink
+          to="/"
+          class="font-semibold text-muted-foreground hover:text-primary [&.router-link-active]:text-primary"
+        >
           {{ t("nav.home") }}
         </RouterLink>
-        <RouterLink to="/counter" class="hover:text-indigo-600">{{ t("nav.counter") }}</RouterLink>
-        <RouterLink to="/users" class="hover:text-indigo-600">{{ t("nav.users") }}</RouterLink>
-        <RouterLink to="/form" class="hover:text-indigo-600">{{ t("nav.form") }}</RouterLink>
-        <RouterLink v-if="!isAuthenticated" to="/login" class="ml-auto hover:text-indigo-600">
+        <RouterLink
+          to="/counter"
+          class="text-muted-foreground hover:text-primary [&.router-link-active]:text-primary"
+          >{{ t("nav.counter") }}</RouterLink
+        >
+        <RouterLink
+          to="/users"
+          class="text-muted-foreground hover:text-primary [&.router-link-active]:text-primary"
+          >{{ t("nav.users") }}</RouterLink
+        >
+        <RouterLink
+          to="/form"
+          class="text-muted-foreground hover:text-primary [&.router-link-active]:text-primary"
+          >{{ t("nav.form") }}</RouterLink
+        >
+        <RouterLink
+          v-if="!isAuthenticated"
+          to="/login"
+          class="ml-auto text-muted-foreground hover:text-primary [&.router-link-active]:text-primary"
+        >
           {{ t("nav.login") }}
         </RouterLink>
-        <Button v-else variant="unstyled" class="ml-auto hover:text-indigo-600" @click="onLogout">
+        <Button
+          v-else
+          variant="unstyled"
+          class="ml-auto text-muted-foreground hover:text-primary"
+          :disabled="logoutPending"
+          @click="doLogout()"
+        >
           {{ t("nav.logout") }}
         </Button>
         <Button
           variant="unstyled"
-          class="rounded-md border px-2 py-0.5 text-xs hover:bg-gray-100"
+          class="rounded-md border border-border px-2 py-0.5 text-xs hover:bg-accent"
           @click="toggleLocale"
         >
           {{ locale.toUpperCase() }}

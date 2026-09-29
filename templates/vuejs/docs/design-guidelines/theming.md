@@ -50,6 +50,12 @@ The base palette is intentionally **neutral grayscale** (`components.json`
 
 ## Usage Rules
 
+- Layout chrome (`App.vue`, views) uses tokens: `bg-background`,
+  `text-foreground`, `bg-card`, `border-border`, `text-muted-foreground`, and
+  `text-primary` for the active nav link (`router-link-active`). There is no
+  dark-mode toggle: the `.dark` block exists for downstream apps but nothing
+  applies the class.
+
 - Use token utilities, not raw colors: `bg-card`, `text-muted-foreground`,
   `border-input`, `text-destructive`, `ring-ring`.
 - Pair foregrounds with their surface: `bg-primary` + `text-primary-foreground`,

@@ -246,7 +246,7 @@ Implementation: `router/auth-guard.ts` (`authGuard`, a global `beforeEach`) read
   path>`), unless already on the login page. Another tab's logout
   leaves a protected route (`meta.requiresAuth`) for
   `/login?redirect=<current full path>` (a public page stays); this tab's own logout (`AuthModel.isLoggingOut()` is true while
-  `logout()` ends the session) is skipped, since the logout action navigates
+  `AuthModel.logout()` ends the session) is skipped, since the logout mutation navigates
   itself. A revoke waiting for the refresh lock does not set it, so another
   tab's logout during that wait still leaves the protected route.
 
@@ -255,12 +255,17 @@ Implementation: `router/auth-guard.ts` (`authGuard`, a global `beforeEach`) read
 - `hydrate()` resolves the profile when a token is stored. On a 401 (after the
   refresh attempt) it calls `AuthModel.revokeSession(sinceEpoch)` and resets
   local state (see "Revoking a rejected session" below). A network error, timeout or 5xx keeps the tokens and sets
-  `hydrateError` (`retryable: true`); `App.vue` shows it with a Retry button
-  (`retryHydrate()`).
-- `logout()` posts `{ refreshToken }` to `/auth/logout` (so the backend revokes
-  it), then clears tokens, user and every query's data — even if the request
-  fails. It ends the session as `"logout"`; `App.vue` navigates to `/login`
-  without a `redirect`.
+  `hydrateError` (`retryable: true`); `App.vue` shows a `role="alert"` banner
+  (`session.unavailable`) with a `session.retry` button that calls
+  `retryHydrate()`, and the banner disappears once the restore succeeds. A 401
+  never sets `hydrateError`: it is the normal logged-out flow.
+- Logout is `useLogoutMutation` in `App.vue` (the button is disabled while it is
+  pending). `AuthModel.logout()` posts `{ refreshToken }` to `/auth/logout` (so
+  the backend revokes it), clears tokens and ends the session as `"logout"`,
+  even if the request fails. `onSettled` (not `onSuccess`, so a failed call
+  still signs out) runs the store's local-only `clearSession()` (user, tokens,
+  every query's data) and navigates to `/login` without a `redirect`. The store
+  has no `logout` action.
 
 - The login view follows `?redirect=` after signing in, and the router guard
   (`router/auth-guard.ts`) does the same when a signed-in user opens `/login`.

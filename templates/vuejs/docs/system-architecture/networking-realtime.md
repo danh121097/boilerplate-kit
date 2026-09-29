@@ -78,9 +78,9 @@ never misread as an error.
 definitions with stable key builders.
 
 ```ts
-export const useUsersListQuery = defineQuery<User[]>({
+export const useUsersListQuery = defineQuery<PaginatedResponse<User>>({
   key: "users.list",
-  fetcher: async () => (await UsersModel.list()).data,
+  fetcher: () => UsersModel.list(),
 });
 ```
 
@@ -110,11 +110,14 @@ const socket = io(URL, {
 ```
 
 - `buildAuth()` attaches the bearer token plus, when `VITE_HMAC_SECRET` is set,
-  an HMAC `{ sig, ctime }` over the canonical string for `GET /socket`.
+  an HMAC `{ sig, ctime }` for `GET /socket`, produced by the core
+  `HMACSignatureGenerator.signRequest` (the same signer as HTTP requests).
 - Lifecycle: connects `onMounted`, tears down on `onScopeDispose`. Events come
   from the `SOCKET_EVENT` registry (`enums/socket-events.ts`):
   `authenticated`, `unauthorized`, `connect_error`.
 - `connect_error` with message `"Unauthorized!"` flips `authenticated` false and
-  throttle-reconnects; `unauthorized` destroys the socket.
+  schedules one reconnect on a trailing timer (`RECONNECT_THROTTLE_MS`, 2 s;
+  further errors inside the window are ignored); `unauthorized` destroys the
+  socket.
 - Helpers: `useIo()` (get/lazy-init the shared socket), `useSocketEvent(event, cb)`
   (auto-unsubscribe on unmount).

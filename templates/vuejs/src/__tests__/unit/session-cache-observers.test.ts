@@ -105,7 +105,8 @@ describe("mounted observers across session end and login", () => {
     onTestFinished(view.unmount);
     await flush();
 
-    await store.logout();
+    await AuthModel.logout();
+    store.clearSession();
     expect(view.list.getCurrentResult().data).toBeUndefined();
 
     rows = [{ _id: "u2-row" }]; // login succeeds → the mutation invalidates the list

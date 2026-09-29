@@ -74,7 +74,11 @@ overridable via `cn('…', props.class)`.
 - Type-aware behavior: password show/hide toggle, search icon, `tel`/`number`
   input sanitizing + `inputmode="numeric"`, optional `clearable` (X) button.
 - Digit `mask` support (`#` = digit; array of masks picks the shortest that fits).
-- Error styling driven by the `error` boolean; `errorMessage` rendered below.
+- Error styling driven by the `error` boolean; `errorMessage` rendered below as
+  plain text (interpolated, never `v-html`).
+- The `<label>` is bound to the `<input>` (`for`/`id` via `useId()`), and an
+  `autocomplete` prop forwards the native hint (`username`, `current-password`).
+- The password toggle's `aria-label` comes from `input.toggle_password`.
 
 ### VeeInput — vee-validate wrapper
 

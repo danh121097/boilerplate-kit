@@ -5,7 +5,13 @@ import en from "@/i18n/locales/en";
 import ja from "@/i18n/locales/ja";
 
 function getLanguage(): string {
-  return localStorage.getItem(STORAGE_KEYS.LANGUAGE) || import.meta.env.VITE_LANGUAGE_CODE || "en";
+  try {
+    return (
+      localStorage.getItem(STORAGE_KEYS.LANGUAGE) || import.meta.env.VITE_LANGUAGE_CODE || "en"
+    );
+  } catch {
+    return import.meta.env.VITE_LANGUAGE_CODE || "en";
+  }
 }
 
 function createI18nInstance() {
@@ -35,5 +41,9 @@ export function installI18n(app: App) {
 export function setLocale(locale: Locale) {
   if (!i18n) return;
   i18n.locale.value = locale;
-  localStorage.setItem(STORAGE_KEYS.LANGUAGE, locale);
+  try {
+    localStorage.setItem(STORAGE_KEYS.LANGUAGE, locale);
+  } catch {
+    // localStorage unavailable (e.g. private browsing strict mode) — ignore
+  }
 }

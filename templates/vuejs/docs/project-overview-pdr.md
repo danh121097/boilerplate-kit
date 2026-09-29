@@ -40,7 +40,8 @@ pnpm preview      # preview the production build
 pnpm typecheck    # vue-tsc --noEmit
 pnpm test         # vitest run
 pnpm test:watch   # vitest (watch mode)
-pnpm lint         # eslint .
+pnpm lint         # eslint . && prettier --check . (read-only)
+pnpm lint:fix     # eslint . --fix && prettier --write .
 pnpm format       # prettier --write .
 ```
 

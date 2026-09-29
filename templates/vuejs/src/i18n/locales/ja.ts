@@ -24,8 +24,23 @@ export default {
     description: "Vue 3 + Vite + Vue Router + Pinia + Reka UI + TanStack Query + Tailwind v4.",
     open_dialog: "Reka UI ダイアログを開く",
   },
+  not_found: {
+    title: "ページが見つかりません",
+    description: "お探しのページは存在しません。",
+    back_home: "ホームに戻る",
+  },
+  validation: {
+    email: "有効なメールアドレスを入力してください",
+    password_min: "パスワードは8文字以上で入力してください",
+  },
+  input: { toggle_password: "パスワードの表示を切り替える" },
   counter: { title: "Pinia カウンター", count: "カウント" },
-  users: { title: "ユーザー (TanStack Query)", loading: "読み込み中…", error: "エラー: {message}" },
+  users: {
+    title: "ユーザー (TanStack Query)",
+    loading: "読み込み中…",
+    error: "エラー: {message}",
+    empty: "ユーザーはまだいません。",
+  },
   form: {
     title: "フォーム (vee-validate + zod)",
     email: "メールアドレス",

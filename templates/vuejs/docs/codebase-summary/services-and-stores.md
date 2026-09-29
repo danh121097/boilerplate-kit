@@ -75,8 +75,14 @@ const SERVICES: ServiceDefinition[] = [
   `useRegisterMutation`, `useLogoutMutation`, `useMeQuery`
   (`defineQuery<AuthUser | null>` over `getSession`). Types in
   `auth/types/auth.ts`.
-- `users/users.ts` — `UsersModel` (`/users`): `list`, `get`, `update`; exposes
-  `useUsersListQuery`. Types in `users/types/user.ts`.
+- `users/users.ts` — `UsersModel` (`/users`): `list(params?: PaginationParams)`
+  returns `PaginatedResponse<User>` (`{ status, data, meta }`, read through
+  `Api.paginate`); `get` and `update` return the unwrapped `User`. Exposes
+  `useUsersListQuery` (same paginated shape, key `users.list`). Pages read
+  `data.data` and show `users.empty` for an empty list. Types in
+  `users/types/user.ts`; pagination types (`OffsetMeta`, `CursorMeta`,
+  `PaginatedResponse`, `CursorResponse`, `PaginationParams`, `CursorParams`) in
+  `core/types.ts`, with `Api.paginate` / `Api.cursorPaginate` in `core/api.ts`.
 
 Models read responses as already-unwrapped payloads because the response
 interceptor strips a recognized envelope (`{ status: "success" }` or
@@ -88,11 +94,11 @@ Setup-style stores. Imported explicitly — never auto-imported.
 
 - `auth.ts` — `useAuthStore`: `user`, `isAuthenticated` (profile or a token, via
   a `hasToken` ref synced by `onTokensChanged` and by other tabs' `storage` events), `hydrate()` (on a 401 calls
-  `AuthModel.revokeSession()`; keeps the session on network errors), `logout()` and `clearSession()` (user + tokens +
+  `AuthModel.revokeSession()`; keeps the session on network errors), `hydrateError` / `retryHydrate()`, and a local-only `clearSession()` (user + tokens +
   `resetQueriesToSignedOut` from `services/core/query-client.ts`, which resets
   queries in place so mounted views stay attached). `plugins/session-expiry.ts` routes to
   `/login?redirect=…` on session expiry and leaves a protected page for plain
-  `/login` on another tab's logout (this tab's logout navigates itself).
+  `/login` on another tab's logout (this tab's logout navigates itself). The store has no `logout` action: `App.vue` runs `useLogoutMutation`, whose `onSettled` calls `clearSession()` and routes to `/login`.
 - `counter.ts` — `useCounterStore`: demo `count` + `increment/decrement/reset`.
 - `socket-io.ts` — `useSocketIOStore`: holds the live `Socket | null` and an
   `authenticated` flag; `setSocketIO(partial)` merges state.

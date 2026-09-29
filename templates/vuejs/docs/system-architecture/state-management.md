@@ -24,13 +24,13 @@ recovery, so blind retries would only mask real errors.
 Builds a reusable, typed query with a stable key builder:
 
 ```ts
-export const useUsersListQuery = defineQuery<User[]>({
+export const useUsersListQuery = defineQuery<PaginatedResponse<User>>({
   key: "users.list",
-  fetcher: async () => (await UsersModel.list()).data,
+  fetcher: () => UsersModel.list(),
 });
 
 // in a component:
-const { data, isLoading, error } = useUsersListQuery();
+const { data, isLoading, error } = useUsersListQuery(); // data.value?.data is User[]
 ```
 
 - Key shape is `[key]` or `[key, params]`. The key is **reactive** — built from a

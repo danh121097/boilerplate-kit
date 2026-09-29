@@ -39,7 +39,8 @@ pnpm build        # vue-tsc + vite build
 pnpm typecheck    # vue-tsc --noEmit
 pnpm test         # vitest run
 pnpm test:watch   # vitest
-pnpm lint         # eslint
+pnpm lint         # read-only: eslint . && prettier --check .
+pnpm lint:fix     # eslint . --fix && prettier --write .
 pnpm format       # prettier --write
 ```
 
@@ -55,5 +56,5 @@ docs/
 ├── codebase-summary.md      # → codebase-summary/* (structure, services-and-stores, conventions)
 ├── code-standards.md        # → code-standards/* (file-naming, vue-typescript, lint, commits)
 ├── system-architecture.md   # → system-architecture/* (bootstrap, networking, security-auth, state, build, errors)
-└── design-guidelines.md     # → design-guidelines/* (tailwind, shadcn-vue, theming, a11y)
+└── design-guidelines.md     # → design-guidelines/* (tailwind, shadcn-components, theming, a11y)
 ```

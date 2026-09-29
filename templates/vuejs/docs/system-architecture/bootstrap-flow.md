@@ -77,8 +77,8 @@ export function registerPlugins(app: App) {
 | --- | --- | --- |
 | i18n | `plugins/i18n.ts` | `createI18n` (Composition mode, `legacy: false`), `en`/`ja` messages, fallback `en`. Locale persisted to `STORAGE_KEYS.LANGUAGE` via `setLocale`. |
 | pinia | `plugins/pinia.ts` | A single `createPinia()` instance for all stores. |
-| router | `router/index.ts` | `createWebHistory` SPA routing; home/counter/users/form routes are lazy `import()`s. |
-| vue-query | `plugins/vue-query.ts` | One `QueryClient` (`retry: false`, `refetchOnWindowFocus: true`, `keepPreviousData`); exported for direct use. |
+| router | `router/index.ts` | `createWebHistory` SPA routing; home/counter/users/form/login routes are lazy `import()`s; `/:pathMatch(.*)*` renders `not-found-view.vue`. |
+| vue-query | `plugins/vue-query.ts` | One `QueryClient` (`retry: false`, `refetchOnWindowFocus: true`, `staleTime: 60_000`, `keepPreviousData`); exported for direct use. |
 | directives | `plugins/directives.ts` | Registers app-wide directives (`v-track` from `@/directives`). |
 
 ## Mount

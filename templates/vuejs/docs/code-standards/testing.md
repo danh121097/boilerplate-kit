@@ -2,6 +2,16 @@
 
 Vitest conventions for test setup and teardown.
 
+## What is covered
+
+Vitest runs in the `node` environment with no DOM or Vue render harness, so tests
+target the service layer (`services/core`, `auth`, `users` incl. the dev mock),
+the Pinia auth store (transient restore failure sets `hydrateError`, retry
+recovers, a 401 does not), and the router (unknown URLs resolve to the
+`not-found` route). Auto-imported globals a store needs (`defineStore`, `ref`,
+`computed`) are stubbed with `vi.stubGlobal` before the module is imported.
+`pnpm test` runs everything once.
+
 ## Restoring mocks and globals
 
 Restore mocks and stubbed globals in `afterEach` by default:

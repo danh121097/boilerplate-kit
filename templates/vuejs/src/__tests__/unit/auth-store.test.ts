@@ -80,6 +80,17 @@ describe("auth store", () => {
     expect(getMe).toHaveBeenCalledTimes(2);
   });
 
+  it("a 401 on hydrate is a normal logged-out flow: no retry banner state", async () => {
+    vi.spyOn(AuthModel, "getMe").mockRejectedValue({ error_code: 401, message: "expired" });
+    vi.spyOn(AuthModel, "revokeSession").mockResolvedValue(undefined as never);
+    const store = useAuthStore();
+
+    await store.hydrate();
+
+    expect(store.hydrateError).toBeNull();
+    expect(store.user).toBeNull();
+  });
+
   it("isAuthenticated reacts to token writes and clears (localStorage is not reactive)", () => {
     const store = useAuthStore();
     expect(store.isAuthenticated).toBe(true);
@@ -91,12 +102,13 @@ describe("auth store", () => {
     expect(store.isAuthenticated).toBe(true);
   });
 
-  it("logout sends the refresh token in the body and clears tokens + query cache", async () => {
+  it("logout + clearSession sends the refresh token in the body and clears tokens + query cache", async () => {
     const post = vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
     queryClient.setQueryData(["users.list"], ["someone"]);
     const store = useAuthStore();
 
-    await store.logout();
+    await AuthModel.logout();
+    store.clearSession();
 
     expect(post).toHaveBeenCalledWith(
       expect.objectContaining({ url: "/auth/logout", data: { refreshToken: "RT" } }),
@@ -115,7 +127,8 @@ describe("auth store", () => {
     const store = useAuthStore();
     store.setUser({ _id: "u1", email: "a@b.com", name: "A", role: "user" } as never);
 
-    await store.logout();
+    await AuthModel.logout().catch(() => {});
+    store.clearSession();
 
     expect(ended).toHaveBeenCalledExactlyOnceWith("logout", "MAIN");
     expect(store.user).toBeNull();

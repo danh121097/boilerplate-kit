@@ -50,7 +50,8 @@ export const useAuthStore = defineStore("auth", () => {
     user.value = next;
   }
 
-  /** Drop the session client-side: profile, tokens and every cached query's
+  /** Local sign-out, run after `useLogoutMutation` settles (success or failure):
+   * drop the session client-side: profile, tokens and every cached query's
    * data (so the next user never sees the previous user's data). Mounted views
    * keep their observers, so the next login's refetch reaches them. */
   function clearSession() {
@@ -101,12 +102,6 @@ export const useAuthStore = defineStore("auth", () => {
     return hydrate();
   }
 
-  /** Revoke the session server-side (best effort) and clear it client-side. */
-  async function logout() {
-    await AuthModel.logout().catch(() => {});
-    clearSession();
-  }
-
   function syncHasToken() {
     hasToken.value = Boolean(getAccessToken(authContract.service));
   }
@@ -147,6 +142,5 @@ export const useAuthStore = defineStore("auth", () => {
     clearSession,
     hydrate,
     retryHydrate,
-    logout,
   };
 });

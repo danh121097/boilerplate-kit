@@ -18,7 +18,7 @@ const open = ref(false);
 <template>
   <section>
     <h1 class="mb-3 text-3xl font-bold">{{ t("home.welcome") }} 👋</h1>
-    <p class="mb-6 text-gray-600">{{ t("home.description") }}</p>
+    <p class="mb-6 text-muted-foreground">{{ t("home.description") }}</p>
     <DialogRoot v-model:open="open">
       <DialogTrigger as-child>
         <Button>{{ t("home.open_dialog") }}</Button>
@@ -26,10 +26,10 @@ const open = ref(false);
       <DialogPortal>
         <DialogOverlay class="fixed inset-0 bg-black/40" />
         <DialogContent
-          class="fixed left-1/2 top-1/2 w-105 -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-6 shadow-xl"
+          class="fixed left-1/2 top-1/2 w-105 -translate-x-1/2 -translate-y-1/2 rounded-lg bg-card text-card-foreground p-6 shadow-xl"
         >
           <DialogTitle class="text-lg font-semibold">Hello from Reka UI</DialogTitle>
-          <DialogDescription class="mt-1 text-sm text-gray-600">
+          <DialogDescription class="mt-1 text-sm text-muted-foreground">
             Headless components — bring your own styles.
           </DialogDescription>
           <DialogClose as-child>

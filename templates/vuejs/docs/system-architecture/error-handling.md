@@ -115,3 +115,13 @@ every other error uses, instead of handing back an unreadable error blob.
 | Network / blocked | `onError` | log; reject `{ message, error_code: 0 }` |
 | Non-2xx blob | `onSuccess` | reject synthetic `ApiResponseError` |
 | Anything else | pass-through | raw response returned |
+
+## Not-Found and Page-Level Errors
+
+- Unknown URLs match the router catch-all `/:pathMatch(.*)*` and render
+  `views/not-found-view.vue` (`not_found.title`, `not_found.description`,
+  `not_found.back_home`), instead of a blank view.
+- The login form shows the server message via
+  `getApiErrorMessage(err, t("login.error"))` in a `role="alert"` element.
+- The users page shows `t("users.error", { message })` on failure and
+  `users.empty` when the list is empty.

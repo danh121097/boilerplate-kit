@@ -2,6 +2,7 @@ import { mockAuthAdapter } from "@/services/auth/mock-auth";
 import { defineQuery, Model } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
 import { usersContract } from "@/services/users/contract";
+import type { PaginatedResponse, PaginationParams } from "@/services/core";
 import type { UpdateUserPayload, User } from "@/services/users/types/user";
 
 export class UsersModel extends Model {
@@ -14,21 +15,23 @@ export class UsersModel extends Model {
     });
   }
 
-  static list() {
-    return this.api.get<User[]>({ url: usersContract.paths.list });
+  static list(params?: PaginationParams): Promise<PaginatedResponse<User>> {
+    return this.api.paginate<User>({ url: usersContract.paths.list, params });
   }
 
-  static get(id: string) {
-    return this.api.get<User>({ url: usersContract.paths.byId(id) });
+  static async get(id: string): Promise<User> {
+    const res = await this.api.get<User>({ url: usersContract.paths.byId(id) });
+    return res.data;
   }
 
-  static update(id: string, payload: UpdateUserPayload) {
-    return this.api.patch<User>({ url: usersContract.paths.byId(id), data: payload });
+  static async update(id: string, payload: UpdateUserPayload): Promise<User> {
+    const res = await this.api.patch<User>({ url: usersContract.paths.byId(id), data: payload });
+    return res.data;
   }
 }
 
 // Queries
-export const useUsersListQuery = defineQuery<User[]>({
+export const useUsersListQuery = defineQuery<PaginatedResponse<User>>({
   key: queryKeys.users.list,
-  fetcher: async () => (await UsersModel.list()).data,
+  fetcher: () => UsersModel.list(),
 });

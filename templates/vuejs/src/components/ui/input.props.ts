@@ -33,6 +33,8 @@ export interface BaseInputProps {
   clearable?: boolean;
   /** `#` = digit, every other char literal. Pass an array of masks to pick the shortest that fits. */
   mask?: string | string[];
+  /** Native `autocomplete` hint (e.g. `username`, `current-password`). */
+  autocomplete?: string;
   /** Extra classes applied to the inner `<input>`. */
   inputClass?: string;
 }

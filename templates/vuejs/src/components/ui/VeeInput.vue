@@ -9,6 +9,8 @@ interface Props extends BaseInputProps {
 
 const props = withDefaults(defineProps<Props>(), { type: "text", variant: "default" });
 
+const { t } = useI18n();
+
 const { errorMessage, value } = useField<string | number>(() => props.name, undefined, {
   validateOnValueUpdate: true,
 });
@@ -29,12 +31,13 @@ const showError = computed(() => hasValidationError.value || props.error);
       :placeholder="placeholder"
       :autofocus="autofocus"
       :maxlength="maxlength"
+      :autocomplete="autocomplete"
       :center="center"
       :clearable="clearable"
       :mask="mask"
       :input-class="inputClass"
       :error="showError"
-      :error-message="errorMessage"
+      :error-message="errorMessage ? t(errorMessage) : undefined"
     >
       <template v-if="$slots.prepend" #prepend>
         <slot name="prepend" />

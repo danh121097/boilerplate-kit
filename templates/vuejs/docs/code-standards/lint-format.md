@@ -7,7 +7,8 @@ disables any stylistic ESLint rules that would conflict).
 ## Scripts
 
 ```bash
-pnpm lint          # eslint .
+pnpm lint          # eslint . && prettier --check .  (read-only, used by CI)
+pnpm lint:fix      # eslint . --fix && prettier --write .
 pnpm format        # prettier --write .
 pnpm typecheck     # vue-tsc --noEmit
 pnpm build         # vue-tsc --noEmit && vite build
@@ -82,6 +83,6 @@ Auto-import scope (`vite.config.ts`): APIs from `vue`, `vue-router`,
 ## Before committing
 
 1. `pnpm format` — apply Prettier.
-2. `pnpm lint` — no errors (warnings like import order should be cleaned up).
+2. `pnpm lint` — no errors; run `pnpm lint:fix` to clean up import order and formatting.
 3. `pnpm typecheck` — passes.
 4. `pnpm test` — passes (run before pushing).

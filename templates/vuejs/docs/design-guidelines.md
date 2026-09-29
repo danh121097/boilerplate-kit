@@ -9,7 +9,7 @@ This is a thin hub. Each topic lives in a focused, concrete file below.
 | Doc | Covers |
 | --- | --- |
 | [tailwindcss.md](./design-guidelines/tailwindcss.md) | Tailwind v4 setup (Vite plugin, `tailwind.css`), `@theme` tokens, `@utility`, the `cn()` helper, utility conventions |
-| [shadcn-vue-components.md](./design-guidelines/shadcn-vue-components.md) | The `components/ui/` pattern — how Badge / Button / Card / Input / VeeInput are structured (`*.variants.ts`, `*.props.ts`), auto-registration scope |
+| [shadcn-components.md](./design-guidelines/shadcn-components.md) | The `components/ui/` pattern — how Badge / Button / Card / Input / VeeInput are structured (`*.variants.ts`, `*.props.ts`), auto-registration scope |
 | [theming.md](./design-guidelines/theming.md) | Color tokens, light/dark mode, CSS variables as defined in `tailwind.css` + `main.scss` |
 | [accessibility.md](./design-guidelines/accessibility.md) | Short, actionable a11y checklist grounded in what the UI components actually do |
 

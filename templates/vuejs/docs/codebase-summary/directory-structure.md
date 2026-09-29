@@ -34,7 +34,7 @@ src/
 │   ├── vue-query.ts             QueryClient + VueQueryPlugin setup
 │   └── directives.ts            Registers app.directive("track", ...)
 ├── router/
-│   └── index.ts                 vue-router with lazy public routes
+│   └── index.ts                 vue-router with lazy routes and a not-found catch-all
 ├── scss/
 │   ├── tailwind.css             Tailwind v4 entry + theme tokens
 │   └── main.scss                Global resets, safe-area vars, body styles
@@ -54,7 +54,9 @@ src/
 └── views/
     ├── home-view.vue            Landing page
     ├── counter-view.vue         Demos the counter store
-    ├── users-view.vue           Demos a TanStack query
+    ├── users-view.vue           Paginated users list (TanStack query) with empty state
+    ├── login-view.vue           vee-validate + zod sign-in, server error in role="alert"
+    ├── not-found-view.vue       Router catch-all page for unknown URLs
     └── form-view.vue            Demos vee-validate + zod form
 ```
 

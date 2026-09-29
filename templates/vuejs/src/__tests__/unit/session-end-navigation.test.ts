@@ -53,7 +53,8 @@ describe("session end navigation", () => {
     vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
     const ended = watchEnds();
 
-    await useAuthStore().logout();
+    await AuthModel.logout();
+    useAuthStore().clearSession();
 
     expect(ended).toHaveBeenCalledExactlyOnceWith("logout", "MAIN");
   });
@@ -68,8 +69,9 @@ describe("session end navigation", () => {
     setupSessionExpiry(router, activePinia);
     vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
 
-    // What the logout button (App.vue) does: log out, then go to /login.
-    await useAuthStore(activePinia).logout();
+    // What the logout mutation's onSettled (App.vue) does: clear locally, then go to /login.
+    await AuthModel.logout();
+    useAuthStore(activePinia).clearSession();
     await router.push({ name: "login" });
 
     expect(replace).not.toHaveBeenCalled();
