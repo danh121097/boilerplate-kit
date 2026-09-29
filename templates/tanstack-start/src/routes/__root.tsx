@@ -71,8 +71,8 @@ function RootLayout() {
 
   // Login/logout in another tab → re-run the route loaders here; a login also
   // re-reads the session. On a logout the session-end listener above has
-  // already reset every query to signed-out; no route requires auth, so the
-  // page stays (no navigation).
+  // already reset every query to signed-out; the invalidate re-runs the route
+  // guards, so a protected page redirects to /login.
   useEffect(
     () =>
       syncAuthAcrossTabs({

@@ -33,6 +33,23 @@ Every rejected request uses the shape `{ error_code: <status, or 0 without a
 response>, message, retryable? }`; `retryable` is set for no response, 408, 429
 and 5xx.
 
+## Route guards
+
+- A guest on a protected route (`/users`) is sent to `/login?redirect=<original full path>`.
+- A signed-in user on the guest-only `/login` is sent to the validated return path
+  (same-origin only, `safeRedirect`), else home.
+- The decision uses the synchronous session signal (the readable session hint cookie) before any profile
+  fetch. SSR decides on the server in `src/proxy.ts` (the Next 16 replacement for middleware), which also runs for client-side navigations (they fetch the RSC payload), so a guest never sees a flash of the protected page. A hint whose tokens have expired still passes: the client refreshes
+  through the normal 401 flow.
+- Own-tab explicit logout goes to plain `/login`. A refused refresh (expired
+  session) goes to `/login?redirect=<current full path>` from any page. Another
+  tab's logout (or the session hint disappearing) goes to the same, from a
+  protected route only; a public route stays.
+- The URL `#fragment` is not preserved on a server-side guest redirect (the
+  server never receives it).
+
+Implementation: `src/proxy.ts` (`proxy`, matcher `/users/:path*` and `/login`). The login page keeps its own `useEffect` redirect for a login that lands in another tab.
+
 ## Logout
 
 `AuthModel.logout()` — the user's own sign-out in this tab; it ends as
@@ -134,9 +151,9 @@ re-checks the hint cookie whenever the tab regains focus or becomes visible:
 - another tab logged out → this tab ends its own state only: epoch bump and
   session-end listeners with "logout" (user, query cache). It does not touch the
   hint cookie (the other tab cleared it), does not re-broadcast and posts
-  nothing. No route requires auth, so it stays on the current page, which
-  re-renders signed-out (`router.refresh()` re-renders the Server Components); a template with protected routes would go to plain
-  `/login` (no `redirect`) from those only. A logout seen through both the
+  nothing. It stays on the current page, which re-renders signed-out
+  (`router.refresh()` re-renders the Server Components and re-runs `proxy.ts`, so
+  a protected page redirects to `/login?redirect=…`). A logout seen through both the
   storage event and the focus re-check fires once;
 - another tab logged in → this tab resets `auth.me` and invalidates every query
   so the profile refetches.

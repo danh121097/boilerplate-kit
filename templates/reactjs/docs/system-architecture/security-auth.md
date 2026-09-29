@@ -103,6 +103,20 @@ Per-service refresh options (`ServiceRefreshConfig` in `init-services.ts`):
 `endpoint` (default `/auth/refresh`), `skipPaths` (default `[]`),
 `hasSession`, and an optional `onRefreshed` hook.
 
+## Route guards
+
+- A guest on a protected route (`/users`) is sent to `/login?redirect=<original full path>`.
+- A signed-in user on the guest-only `/login` is sent to the validated return path
+  (same-origin only, `safeRedirect`), else home.
+- The decision uses the synchronous session signal (the stored session, via the auth store's `isAuthenticated`) before any profile
+  fetch. There is no SSR.
+- Own-tab explicit logout goes to plain `/login`. A refused refresh (expired
+  session) goes to `/login?redirect=<current full path>` from any page. Another
+  tab's logout (or the session hint disappearing) goes to the same, from a
+  protected route only; a public route stays.
+
+Implementation: `beforeLoad` in `routes/users.tsx` (protected, `staticData.requiresAuth`) and `routes/login.tsx` (guest only).
+
 ## Session end (no reload)
 
 A 401 never reloads the page. Only a **refused** refresh (HTTP 401/403 from the
@@ -208,7 +222,7 @@ state (kept current by this tab's own token writes via `onTokensChanged`):
 - another tab removed the tokens (logout) → `endSession("logout", "MAIN")`
   here (epoch, user, query cache), then `onLogout`. This tab writes no storage
   and posts nothing. On a protected page (route `staticData.requiresAuth`)
-  `setupSessionExpiry` navigates to `/login` without `redirect`. It skips a
+  `setupSessionExpiry` navigates to `/login?redirect=<current full path>`; a public page stays. It skips a
   `"logout"` end while `AuthModel.isLoggingOut()` is true — set only while
   this tab's own `logout()` ends the session, whose button already navigates —
   so a local logout navigates once. A revoke waiting for the refresh lock does

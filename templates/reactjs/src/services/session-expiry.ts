@@ -11,7 +11,8 @@ type SessionRouter = Pick<typeof appRouter, "navigate" | "state">;
  *   it was revoked): send the user to /login, returning them to the current
  *   page after sign-in;
  * - logout from another tab: leave a protected page (route
- *   `staticData.requiresAuth`) for /login without a return path. This tab's own
+ *   `staticData.requiresAuth`) for /login, returning to it after sign-in; a
+ *   public page stays. This tab's own
  *   logout (`AuthModel.isLoggingOut()`) is skipped — the logout action
  *   navigates by itself. A revoke waiting for the session lock is not this
  *   tab's logout: when another tab logs out first, the revoke backs out and
@@ -28,7 +29,7 @@ export function setupSessionExpiry(router: SessionRouter): () => void {
     if (reason !== "logout" || service !== authContract.service) return;
     if (AuthModel.isLoggingOut()) return;
     if (router.state.matches.some((m) => m.staticData.requiresAuth)) {
-      void router.navigate({ to: "/login" });
+      void router.navigate({ href: loginPathWithReturn(router.state.location.href) });
     }
   });
   return () => {

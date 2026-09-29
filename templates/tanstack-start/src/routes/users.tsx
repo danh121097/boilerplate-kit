@@ -1,4 +1,5 @@
 import { prefetchQueries } from "@/services/core";
+import { requireSession } from "@/services/core/route-guard";
 import { useUsersListQuery } from "@/services/users";
 import { createFileRoute } from "@tanstack/react-router";
 
@@ -9,6 +10,8 @@ import { createFileRoute } from "@tanstack/react-router";
  * envelope — `data` holds the user array, `meta` holds pagination info.
  */
 export const Route = createFileRoute("/users")({
+  // Protected: the session hint (sync, server and client) decides before the loader runs.
+  beforeLoad: ({ location }) => requireSession(location),
   loader: prefetchQueries(useUsersListQuery),
   component: UsersPage,
 });

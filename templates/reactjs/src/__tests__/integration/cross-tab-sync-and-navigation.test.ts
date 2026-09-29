@@ -169,14 +169,16 @@ describe("navigation on session end", () => {
     });
   });
 
-  it("a remote logout on a protected page goes to /login without a return path", () => {
+  it("a remote logout on a protected page goes to /login with a return path", () => {
     const router = fakeRouter("/users?page=2", true);
     const stop = setupSessionExpiry(router as never);
     onTestFinished(stop);
 
     endSession("logout", "MAIN"); // what cross-tab sync runs for another tab's logout
 
-    expect(router.navigate).toHaveBeenCalledExactlyOnceWith({ to: "/login" });
+    expect(router.navigate).toHaveBeenCalledExactlyOnceWith({
+      href: "/login?redirect=%2Fusers%3Fpage%3D2",
+    });
   });
 
   it("a remote logout on a public page stays there", () => {
@@ -242,6 +244,8 @@ describe("navigation on session end", () => {
 
     await expect(revoke).resolves.toBe(false);
     expect(post).not.toHaveBeenCalled();
-    expect(router.navigate).toHaveBeenCalledExactlyOnceWith({ to: "/login" });
+    expect(router.navigate).toHaveBeenCalledExactlyOnceWith({
+      href: "/login?redirect=%2Fusers",
+    });
   });
 });

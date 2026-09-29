@@ -27,6 +27,8 @@ describe("05.session-sync.client plugin", () => {
   const win = new EventTarget();
   const doc = Object.assign(new EventTarget(), { cookie: "", visibilityState: "visible" });
   const HINT = "PRISM_APP_SESSION=1";
+  const navigateTo = vi.fn();
+  let route: { fullPath: string; meta: Record<string, unknown> } = { fullPath: "/", meta: {} };
 
   const focus = () => win.dispatchEvent(new Event("focus"));
   const authSync = (type: string) =>
@@ -41,14 +43,24 @@ describe("05.session-sync.client plugin", () => {
     vi.stubGlobal("defineNuxtPlugin", (fn: PluginFn) => fn);
     vi.stubGlobal("window", win);
     vi.stubGlobal("document", doc);
+    vi.stubGlobal("navigateTo", navigateTo);
+    vi.stubGlobal("useRouter", () => ({
+      currentRoute: {
+        get value() {
+          return route;
+        },
+      },
+    }));
     doc.cookie = HINT; // this tab boots signed in
     resetQueriesOnSessionEnd(queryClient, "auth.me");
     const plugin = (await import("@/plugins/05.session-sync.client"))
       .default as unknown as PluginFn;
-    plugin({ $queryClient: queryClient });
+    plugin({ $queryClient: queryClient, runWithContext: (fn: () => unknown) => fn() });
   });
 
   beforeEach(() => {
+    route = { fullPath: "/", meta: {} };
+    navigateTo.mockClear();
     queryClient.clear();
     doc.cookie = HINT;
     focus(); // settle on "signed in"
@@ -56,6 +68,19 @@ describe("05.session-sync.client plugin", () => {
 
   afterEach(() => vi.restoreAllMocks());
   afterAll(() => vi.unstubAllGlobals());
+
+  it("another tab's logout sends a protected page to /login with a return path", () => {
+    route = { fullPath: "/users?page=2", meta: { middleware: ["auth"] } };
+    doc.cookie = "";
+    focus();
+    expect(navigateTo).toHaveBeenCalledWith("/login?redirect=%2Fusers%3Fpage%3D2");
+  });
+
+  it("another tab's logout leaves a public page where it is", () => {
+    doc.cookie = "";
+    focus();
+    expect(navigateTo).not.toHaveBeenCalled();
+  });
 
   it("another tab's logout clears the cached user and every query on focus", () => {
     queryClient.setQueryData(["auth.me"], { _id: "u1" });

@@ -16,8 +16,8 @@ import * as pinia from "pinia";
 /**
  * Where a session end sends the user: only a voluntary logout ends as
  * "logout", and it navigates on its own (to plain /login). A tab receiving
- * another tab's logout writes nothing and leaves a protected page for /login
- * without a return path.
+ * another tab's logout writes nothing and leaves a protected page for
+ * /login with a return path; a public page stays.
  */
 type Store = Awaited<ReturnType<typeof loadAuthStore>>;
 let useAuthStore: Store["useAuthStore"];
@@ -76,7 +76,7 @@ describe("session end navigation", () => {
     expect(push).toHaveBeenCalledExactlyOnceWith({ name: "login" });
   });
 
-  it("a remote logout writes nothing to storage and leaves a protected page without a return path", () => {
+  it("a remote logout writes nothing to storage and leaves a protected page with a return path", () => {
     const target = new EventTarget();
     Object.assign(globalThis, { window: target });
     try {
@@ -102,7 +102,7 @@ describe("session end navigation", () => {
       expect(setItem).not.toHaveBeenCalled();
       expect(removeItem).not.toHaveBeenCalled();
       expect(clear).not.toHaveBeenCalled();
-      expect(replace).toHaveBeenCalledExactlyOnceWith({ name: "login" });
+      expect(replace).toHaveBeenCalledExactlyOnceWith("/login?redirect=%2Fusers");
       expect(store.isAuthenticated).toBe(false);
     } finally {
       delete (globalThis as { window?: unknown }).window;
@@ -138,7 +138,7 @@ describe("session end navigation", () => {
       await expect(revoke).resolves.toBe(false);
       expect(post).not.toHaveBeenCalled();
       expect(ended).toHaveBeenCalledExactlyOnceWith("logout", "MAIN");
-      expect(replace).toHaveBeenCalledExactlyOnceWith({ name: "login" });
+      expect(replace).toHaveBeenCalledExactlyOnceWith("/login?redirect=%2Fusers");
       expect(push).not.toHaveBeenCalled();
     } finally {
       delete (globalThis as { window?: unknown }).window;

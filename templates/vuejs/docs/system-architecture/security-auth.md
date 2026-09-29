@@ -40,7 +40,7 @@ logins and logouts (`onTokensChanged`) update that value too. When another
 tab logs out, this tab ends its own session as `"logout"` (`endSession`), so the
 store drops its profile and every query's data (`resetQueriesToSignedOut`, see
 below), the guard state (`hasToken`) follows, and a protected page is left for
-`/login` without a `redirect`. The receiving tab writes nothing to storage and
+`/login?redirect=<current full path>` (a public page stays). The receiving tab writes nothing to storage and
 posts nothing — the tab that logged out already revoked and cleared. When another tab logs in, this
 tab resets its profile, marks every query stale (`resyncQueriesAfterLogin`, so
 mounted views refetch) and re-reads the profile. A token rotation elsewhere,
@@ -210,6 +210,20 @@ A 401 that is not eligible (credential endpoint, anonymous, already replayed, or
 a service **without** refresh config) rejects with `toApiError(error)` and
 touches nothing. Nothing in the service layer reloads the page.
 
+## Route guards
+
+- A guest on a protected route (`/users`) is sent to `/login?redirect=<original full path>`.
+- A signed-in user on the guest-only `/login` is sent to the validated return path
+  (same-origin only, `safeRedirect`), else home.
+- The decision uses the synchronous session signal (the persisted access token, via the auth store's `isAuthenticated`) before any profile
+  fetch. There is no SSR.
+- Own-tab explicit logout goes to plain `/login`. A refused refresh (expired
+  session) goes to `/login?redirect=<current full path>` from any page. Another
+  tab's logout (or the session hint disappearing) goes to the same, from a
+  protected route only; a public route stays.
+
+Implementation: `router/auth-guard.ts` (`authGuard`, a global `beforeEach`) reading the `requiresAuth` / `guestOnly` route meta set in `router/index.ts`.
+
 ## Session End → `/login`
 
 `services/core/session.ts` carries the session-end pub/sub:
@@ -230,8 +244,8 @@ touches nothing. Nothing in the service layer reloads the page.
   `"expired"` end of the auth service navigates, client-side, to
   `loginPathWithReturn(currentRoute.fullPath)` (`/login?redirect=<encoded
   path>`), unless already on the login page. Another tab's logout
-  leaves a protected route (`meta.requiresAuth`) for `/login` without a
-  `redirect`; this tab's own logout (`AuthModel.isLoggingOut()` is true while
+  leaves a protected route (`meta.requiresAuth`) for
+  `/login?redirect=<current full path>` (a public page stays); this tab's own logout (`AuthModel.isLoggingOut()` is true while
   `logout()` ends the session) is skipped, since the logout action navigates
   itself. A revoke waiting for the refresh lock does not set it, so another
   tab's logout during that wait still leaves the protected route.

@@ -4,6 +4,8 @@ import { getApiErrorMessage, safeRedirect } from "@/services/core";
 import { useQueryClient } from "@tanstack/vue-query";
 import { computed, ref } from "vue";
 
+definePageMeta({ middleware: "guest" });
+
 const { t } = useI18n();
 const route = useRoute();
 

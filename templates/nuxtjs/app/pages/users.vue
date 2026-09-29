@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useUsersListQuery } from "@/services/users";
 
+definePageMeta({ middleware: "auth" });
+
 const { t } = useI18n();
 const { data, isLoading, error } = useUsersListQuery();
 </script>

@@ -90,7 +90,7 @@ runs unconfigured (see `app/plugins/01.init-services.ts`); the REST base is `app
 
 - No `server/` (Nitro) routes — the directory is empty; this is a frontend that
   talks to an external backend (e.g. the Express template).
-- No global auth middleware / protected routes (`app/middleware/` is absent).
+- No global auth middleware — protected routes use the named `auth` / `guest` route middleware in `app/middleware/`.
 - No state-persistence plugin for Pinia.
 - No component library beyond a small `app/components/ui/` set (Button, Input,
   VeeInput, Badge, Card).

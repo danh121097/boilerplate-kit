@@ -137,7 +137,7 @@ export interface AuthSyncHandlers {
   /** Another tab signed in — re-read the session. */
   onLogin?: () => void;
   /** Another tab signed out (session-end listeners have already run with
-   * "logout") — e.g. leave a page that needs a session, without a return path. */
+   * "logout") — e.g. leave a protected page for `/login?redirect=<current path>`. */
   onLogout?: () => void;
 }
 

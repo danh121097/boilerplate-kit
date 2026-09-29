@@ -117,6 +117,23 @@ Every rejected request uses the shape `{ error_code: <status, or 0 without a
 response>, message, retryable? }`; `retryable` is set for no response, 408, 429
 and 5xx.
 
+## Route guards
+
+- A guest on a protected route (`/users`) is sent to `/login?redirect=<original full path>`.
+- A signed-in user on the guest-only `/login` is sent to the validated return path
+  (same-origin only, `safeRedirect`), else home.
+- The decision uses the synchronous session signal (the readable session hint cookie) before any profile
+  fetch. SSR decides on the server (the request cookie), client navigations read `document.cookie`, so a guest never sees a flash of the protected page. A hint whose tokens have expired still passes: the client refreshes
+  through the normal 401 flow.
+- Own-tab explicit logout goes to plain `/login`. A refused refresh (expired
+  session) goes to `/login?redirect=<current full path>` from any page. Another
+  tab's logout (or the session hint disappearing) goes to the same, from a
+  protected route only; a public route stays.
+- The URL `#fragment` is not preserved on a server-side guest redirect (the
+  server never receives it).
+
+Implementation: `services/core/route-guard.ts` (`requireSession`, `redirectIfSignedIn`, an isomorphic hint read) called from `beforeLoad` in `routes/users.tsx` and `routes/login.tsx`.
+
 ## Boot
 
 `auth.me` is read on boot (server function during SSR, then axios in the
@@ -198,9 +215,9 @@ the hint cookie whenever the tab regains focus or becomes visible:
 - another tab logged out → this tab ends its own state only: epoch bump and
   session-end listeners with "logout" (user, query cache). It does not touch the
   hint cookie (the other tab cleared it), does not re-broadcast and posts
-  nothing. No route requires auth, so it stays on the current page, which
-  re-renders signed-out (`router.invalidate()` re-runs the route loaders); a template with protected routes would go to plain
-  `/login` (no `redirect`) from those only. A logout seen through both the
+  nothing. `router.invalidate()` re-runs the route loaders and guards: a public
+  page re-renders signed-out, a protected one redirects to `/login?redirect=…`.
+  A logout seen through both the
   storage event and the focus re-check fires once;
 - another tab logged in → this tab resets `auth.me`, invalidates every query so
   the profile refetches, and re-runs the route guards.

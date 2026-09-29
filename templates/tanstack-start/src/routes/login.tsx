@@ -1,13 +1,16 @@
 import { useAuth, useLoginMutation } from "@/services/auth";
+import { redirectIfSignedIn } from "@/services/core/route-guard";
 import { safeRedirect } from "@/services/core/session";
 import { createFileRoute } from "@tanstack/react-router";
 import type { FormEvent } from "react";
 
 export const Route = createFileRoute("/login")({
-  // The page an expired session bounced the user away from, to return to.
+  // The page a guard or an expired session bounced the user away from, to return to.
   validateSearch: (search: Record<string, unknown>): { redirect?: string } => ({
     redirect: typeof search.redirect === "string" ? search.redirect : undefined,
   }),
+  // Guests only: a signed-in user is sent on to the safe `redirect` target (or home).
+  beforeLoad: ({ search }) => redirectIfSignedIn(search),
   component: LoginPage,
 });
 

@@ -29,6 +29,23 @@ never refresh; a 401 there is ambiguous (anonymous, or an access cookie that
 merely expired) and is handed to the browser — see
 [Session reads](#session-reads-ssr-vs-browser).
 
+## Route guards
+
+- A guest on a protected route (`/users`) is sent to `/login?redirect=<original full path>`.
+- A signed-in user on the guest-only `/login` is sent to the validated return path
+  (same-origin only, `safeRedirect`), else home.
+- The decision uses the synchronous session signal (the readable session hint cookie) before any profile
+  fetch. The route middleware runs on the server during SSR (request cookie) and on client navigations (`document.cookie`), so a guest never sees a flash of the protected page. A hint whose tokens have expired still passes: the client refreshes
+  through the normal 401 flow.
+- Own-tab explicit logout goes to plain `/login`. A refused refresh (expired
+  session) goes to `/login?redirect=<current full path>` from any page. Another
+  tab's logout (or the session hint disappearing) goes to the same, from a
+  protected route only; a public route stays.
+- The URL `#fragment` is not preserved on a server-side guest redirect (the
+  server never receives it).
+
+Implementation: named route middleware `app/middleware/auth.ts` and `app/middleware/guest.ts`, attached with `definePageMeta({ middleware: "auth" })` in `pages/users.vue` and `"guest"` in `pages/login.vue`.
+
 ## HMAC Request Signing (`hmac-signature.ts`)
 
 Active only when `runtimeConfig.public.hmacSecret` (`NUXT_PUBLIC_HMAC_SECRET`) is
@@ -276,7 +293,7 @@ session as `"expired"` and adds no `?redirect=`; `layouts/default.vue` routes to
 ### Cross-tab session sync
 
 The cookies are shared by every tab. `plugins/05.session-sync.client.ts` calls
-`syncAuthAcrossTabs({ onLogin })` (`services/core/session.ts`), which follows
+`syncAuthAcrossTabs({ onLogin, onLogout })` (`services/core/session.ts`), which follows
 two signals:
 
 - the `<APP_NAME>_AUTH_SYNC` localStorage `storage` event — `startSession()`
@@ -288,7 +305,7 @@ two signals:
 
 | Change | Effect |
 | --- | --- |
-| signed out elsewhere | this tab ends its session as `"logout"` — epoch bumped, `resetQueriesOnSessionEnd` drops every query's data in place, session `null`. It never re-broadcasts, never touches the (shared) hint cookie and posts nothing; the broadcast and a later focus re-read of the same logout end it once |
+| signed out elsewhere | this tab ends its session as `"logout"` — epoch bumped, `resetQueriesOnSessionEnd` drops every query's data in place, session `null`. It never re-broadcasts, never touches the (shared) hint cookie and posts nothing; the broadcast and a later focus re-read of the same logout end it once. `onLogout` sends a page using the `auth` middleware to `/login?redirect=<current path>`; a public page stays |
 | signed in elsewhere | `onLogin` → `resyncQueriesAfterLogin` — session reset, every query stale; mounted ones refetch |
 
 The shared refresh timestamp (`<APP_NAME>:auth-refresh:<service>:at` in

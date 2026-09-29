@@ -17,6 +17,7 @@ templates/nextjs/
 ├── README.md                 # Quick start
 ├── docs/                     # Full documentation (this directory)
 └── src/
+    ├── proxy.ts              # Route guard: guest → /login?redirect=…, signed-in off /login
     ├── app/
     │   ├── layout.tsx        # RootLayout (RSC, suppressHydrationWarning) → <Providers>
     │   ├── providers.tsx     # "use client": QueryClient + i18n + initServices (useEffect)

@@ -13,6 +13,7 @@ templates/nuxtjs/
 │   │   ├── 01.init-services.ts   # Wire Api base URLs, token slots, refresh interceptors
 │   │   ├── 02.vue-query.ts       # Install TanStack Vue Query (universal QueryClient)
 │   │   └── 03.directives.ts      # Register demo v-track directive
+│   ├── middleware/         # Route guards: auth.ts (protected), guest.ts (login)
 │   ├── pages/              # File-based routes
 │   │   ├── index.vue       # Home — Reka UI dialog demo
 │   │   ├── counter.vue     # Pinia counter store demo
