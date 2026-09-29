@@ -89,7 +89,6 @@ ck.md
 .agents/
 
 # Editor / CI configs not tracked in this repo
-.vscode/
 .github/
 
 # ...except the VSCode settings that ship with each starter template

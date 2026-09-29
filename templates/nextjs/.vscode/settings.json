@@ -1,0 +1,13 @@
+{
+  // Run ESLint auto-fix on every save: perfectionist import sorting +
+  // local/sort-component-declarations (let -> const -> destructuring).
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  // Flat config (eslint.config.ts); lint TS/JS source.
+  "eslint.useFlatConfig": true,
+  "eslint.validate": ["javascript", "typescript", "typescriptreact"],
+  // Prettier handles formatting; ESLint handles lint + declaration/import order.
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true
+}
