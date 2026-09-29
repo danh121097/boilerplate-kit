@@ -1,9 +1,13 @@
-import { SOCKET_EVENT, SOCKET_UNAUTHORIZED_MESSAGE } from "@/enums";
+import { SOCKET_EVENT } from "@/enums";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import { useSocketIOStore } from "@/stores/socket-io";
 
-/** Delay before a failed connection is retried; errors inside it share one retry. */
-const RECONNECT_THROTTLE_MS = 2000;
+/** First retry delay after the server rejects a handshake; doubles per attempt. */
+const RECONNECT_BASE_MS = 2000;
+/** Upper bound of the retry delay. */
+const RECONNECT_MAX_MS = 30_000;
+/** Disconnect reason when the server closed the socket; socket.io does not reconnect on its own. */
+const SERVER_DISCONNECT = "io server disconnect";
 
 function signHeader(): { sig: string; ctime: number } | Record<string, never> {
   const signed = HMACSignatureGenerator.signRequest({
@@ -25,17 +29,13 @@ export function useSocketIO() {
   // Keep a ref to the socket so event-handler closures stay stable across renders.
   const socketRef = useRef(socket);
 
+  // `authenticated` becomes true only when the server emits `authenticated`.
   const connectSocket = useCallback(() => {
-    if (socketRef.current?.connected) {
-      setSocketIO({ authenticated: true });
-      return;
-    }
-    if (socketRef.current) {
-      socketRef.current.auth = buildAuth();
-      socketRef.current.connect();
-      setSocketIO({ authenticated: true });
-    }
-  }, [setSocketIO]);
+    const sock = socketRef.current;
+    if (!sock || sock.connected) return;
+    sock.auth = buildAuth();
+    sock.connect();
+  }, []);
 
   const destroySocket = useCallback(() => {
     if (!socketRef.current) return;
@@ -53,9 +53,11 @@ export function useSocketIO() {
 
     // Lazy-import keeps socket.io-client out of the SSR bundle entirely.
     let cancelled = false;
-    // Trailing timer: the first error schedules one reconnect, later errors inside
-    // the window share it, so a burst of errors cannot cause a reconnect storm.
+    // One pending manual retry at most, with exponential backoff between attempts.
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let attempt = 0;
+    // Set once the socket exists; removes its listeners on unmount.
+    let unbind: (() => void) | null = null;
     import("socket.io-client").then(({ io }) => {
       if (cancelled) return;
 
@@ -74,38 +76,54 @@ export function useSocketIO() {
         setSocketIO({ socket: sock });
       }
 
-      const handleAuthenticated = () => setSocketIO({ authenticated: true, socket: sock });
-      const handleConnectError = (e: Error) => {
-        if (e.message === SOCKET_UNAUTHORIZED_MESSAGE) {
-          setSocketIO({ authenticated: false });
-        }
-        // Reconnect after a short delay — socket.io autoReconnect handles most
-        // cases but explicit reconnect is needed for auth-rejected handshakes.
+      const handleAuthenticated = () => {
+        attempt = 0;
+        setSocketIO({ authenticated: true, socket: sock });
+      };
+      // Retry manually, once at a time, with a fresh auth payload.
+      const scheduleRetry = () => {
         if (reconnectTimer) return;
+        const delay = Math.min(RECONNECT_BASE_MS * 2 ** attempt, RECONNECT_MAX_MS);
+        attempt += 1;
         reconnectTimer = setTimeout(() => {
           reconnectTimer = null;
           if (!cancelled) connectSocket();
-        }, RECONNECT_THROTTLE_MS);
+        }, delay);
+      };
+      const handleDisconnect = (reason: string) => {
+        setSocketIO({ authenticated: false });
+        // socket.io never reconnects after the server closes the socket itself (e.g.
+        // a graceful restart), so that case joins the same backoff as a rejected handshake.
+        if (reason === SERVER_DISCONNECT) scheduleRetry();
+      };
+      const handleConnectError = () => {
+        setSocketIO({ authenticated: false });
+        // `active` means socket.io is already reconnecting (network error, server
+        // down). Otherwise the server rejected the handshake.
+        if (!sock.active) scheduleRetry();
       };
       const handleUnauthorized = () => destroySocket();
 
       sock.on(SOCKET_EVENT.AUTHENTICATED, handleAuthenticated);
       sock.on(SOCKET_EVENT.CONNECT_ERROR, handleConnectError);
+      sock.on(SOCKET_EVENT.DISCONNECT, handleDisconnect);
       sock.on(SOCKET_EVENT.UNAUTHORIZED, handleUnauthorized);
 
-      connectSocket();
-
-      return () => {
+      unbind = () => {
         sock.off(SOCKET_EVENT.AUTHENTICATED, handleAuthenticated);
         sock.off(SOCKET_EVENT.CONNECT_ERROR, handleConnectError);
+        sock.off(SOCKET_EVENT.DISCONNECT, handleDisconnect);
         sock.off(SOCKET_EVENT.UNAUTHORIZED, handleUnauthorized);
       };
+
+      connectSocket();
     });
 
     return () => {
       cancelled = true;
       if (reconnectTimer) clearTimeout(reconnectTimer);
       reconnectTimer = null;
+      unbind?.();
       destroySocket();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

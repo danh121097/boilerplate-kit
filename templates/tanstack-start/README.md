@@ -66,7 +66,7 @@ src/
 ├── server/          # createServerFn handlers (server-only)
 ├── services/        # Axios service layer (core + auth + users), client-only
 ├── stores/          # Zustand stores
-├── components/      # not-found, mock-auth-badge; ui/ = shadcn/ui primitives
+├── components/      # not-found, socket-status, mock-auth-badge; ui/ = shadcn/ui primitives
 ├── i18n/            # react-i18next setup + locales
 ├── enums/           # Storage key registry
 ├── utils/           # cn(), cookie storage, date helpers

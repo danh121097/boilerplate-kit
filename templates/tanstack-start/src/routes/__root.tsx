@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 import { NotFound } from "@/components/not-found";
+import { SocketStatus } from "@/components/socket-status";
 import { setLocale } from "@/i18n/i18n";
 import { authContract, useLogoutMutation } from "@/services/auth";
 import { useAuth } from "@/services/auth/session";
@@ -126,20 +127,23 @@ function RootLayout() {
               {t("nav.form")}
             </Link>
             {auth.isAuthenticated ? (
-              <Button
-                variant="unstyled"
-                className="ml-auto hover:text-primary"
-                // Signed out either way (the client session ends even when the
-                // request fails): go to plain /login, no return path.
-                onClick={() =>
-                  logout.mutate(undefined, {
-                    onSettled: () => void router.navigate({ to: "/login" }),
-                  })
-                }
-                disabled={logout.isPending}
-              >
-                {t("nav.logout")}
-              </Button>
+              <div className="ml-auto flex items-center gap-3">
+                <SocketStatus />
+                <Button
+                  variant="unstyled"
+                  className="hover:text-primary"
+                  // Signed out either way (the client session ends even when the
+                  // request fails): go to plain /login, no return path.
+                  onClick={() =>
+                    logout.mutate(undefined, {
+                      onSettled: () => void router.navigate({ to: "/login" }),
+                    })
+                  }
+                  disabled={logout.isPending}
+                >
+                  {t("nav.logout")}
+                </Button>
+              </div>
             ) : (
               <Link to="/login" className={cn(navLink, "ml-auto")}>
                 {t("nav.login")}

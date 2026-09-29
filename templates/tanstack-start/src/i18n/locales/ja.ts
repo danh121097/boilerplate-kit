@@ -11,6 +11,10 @@ export default {
     unavailable: "サーバーに接続できませんでした。ログイン状態は維持されています。",
     retry: "再試行",
   },
+  socket: {
+    connected: "リアルタイム接続済み",
+    reconnecting: "リアルタイム再接続中",
+  },
   validation: {
     email: "有効なメールアドレスを入力してください",
     password_min: "パスワードは8文字以上で入力してください",

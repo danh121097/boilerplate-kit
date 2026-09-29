@@ -12,9 +12,8 @@ export const SOCKET_EVENT = {
   UNAUTHORIZED: "unauthorized",
   /** Built-in socket.io event fired when a connection attempt fails. */
   CONNECT_ERROR: "connect_error",
+  /** Built-in socket.io event fired when an established connection drops. */
+  DISCONNECT: "disconnect",
 } as const;
-
-/** Error message the server sends in `connect_error` when a handshake is rejected. */
-export const SOCKET_UNAUTHORIZED_MESSAGE = "Unauthorized!";
 
 export type SocketEvent = (typeof SOCKET_EVENT)[keyof typeof SOCKET_EVENT];

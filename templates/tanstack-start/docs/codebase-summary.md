@@ -19,7 +19,7 @@ src/
 │                          # loaders: queryClient.ensureQueryData(queryOptions)
 ├── server/               # createServerFn handlers (server-only, no axios)
 │                          # e.g. getUsersServerFn() — direct fetch, no auth layer
-├── components/           # not-found, mock-auth-badge
+├── components/           # not-found, socket-status, mock-auth-badge
 ├── components/ui/        # shadcn/ui primitives (button, badge, card, dialog, input, form-field)
 ├── stores/               # Zustand stores (counter)
 ├── services/             # Axios service layer (client-only, SSR-guarded)

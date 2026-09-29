@@ -31,6 +31,7 @@ templates/tanstack-start/
     │   └── get-users.ts       # createServerFn handler (server-only, no axios)
     ├── components/
     │   ├── not-found.tsx      # root notFoundComponent
+    │   ├── socket-status.tsx  # header realtime indicator; owns the socket while signed in
     │   └── mock-auth-badge.tsx
     ├── components/ui/
     │   ├── button.tsx
