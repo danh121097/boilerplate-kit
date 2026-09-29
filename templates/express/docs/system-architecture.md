@@ -30,7 +30,8 @@ to a focused page under [`system-architecture/`](./system-architecture/).
 4. `createServer(app)` + `initSocket(httpServer)` + `httpServer.listen(port)`.
 
 `SIGINT` / `SIGTERM` trigger `gracefulShutdown()`: close Socket.IO, MongoDB, then
-Redis, and exit.
+Redis, and exit. A failing step is logged and the rest still run; the exit code is 0
+only when every step closed cleanly, 1 otherwise or when shutdown exceeds 10 s.
 
 ## Topics
 

@@ -73,4 +73,32 @@ describe("socket core — enabled Redis", () => {
     await closeSocket();
     expect(sub.quit).toHaveBeenCalledTimes(1);
   });
+
+  it("falls back to disconnect when QUIT on the subscriber fails", async () => {
+    const ack = (_ch: string, cb?: (e: Error | null) => void) => cb?.(null);
+    const sub = {
+      subscribe: vi.fn(ack),
+      psubscribe: vi.fn(ack),
+      on: vi.fn(),
+      status: "ready",
+      quit: vi.fn().mockRejectedValue(new Error("Connection is closed.")),
+      disconnect: vi.fn(),
+    };
+    getRedisMock.mockReturnValue({
+      duplicate: vi.fn(() => sub),
+      on: vi.fn(),
+      publish: vi.fn(),
+      subscribe: vi.fn(ack),
+      psubscribe: vi.fn(ack),
+    });
+
+    const { initSocket, closeSocket } = await import("@/socket");
+    initSocket(httpServer);
+
+    await expect(closeSocket()).resolves.toBeUndefined();
+    expect(sub.disconnect).toHaveBeenCalledTimes(1);
+    // Already released: a second close does not touch the subscriber again.
+    await closeSocket();
+    expect(sub.quit).toHaveBeenCalledTimes(1);
+  });
 });

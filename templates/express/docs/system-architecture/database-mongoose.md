@@ -21,6 +21,9 @@ await mongoose.connect(config.mongodbUri, { serverSelectionTimeoutMS: 15000 });
   (unlike Redis, the app cannot run without Mongo).
 - Connection-level `error` / `disconnected` events are logged.
 - `gracefulShutdown` (`SIGINT`/`SIGTERM`) closes Socket.IO, then Mongo, then Redis.
+  Each step runs even if an earlier one fails; exit code 0 when all closed cleanly,
+  1 when a step failed or the whole shutdown passed `SHUTDOWN_TIMEOUT_MS` (10 s, below
+  a typical 30 s SIGKILL grace period). A repeated signal during shutdown is ignored.
 
 ## User Model
 

@@ -132,9 +132,11 @@ export async function closeSocket(): Promise<void> {
     io = null;
   }
   if (subClient) {
-    // quit() needs a live connection; drop a dead subscriber instead of hanging.
-    if (subClient.status === "ready") await subClient.quit();
-    else subClient.disconnect();
+    const closing = subClient;
     subClient = null;
+    // quit() needs a live connection; drop a dead subscriber instead of hanging,
+    // and fall back to disconnect when QUIT itself fails.
+    if (closing.status === "ready") await closing.quit().catch(() => closing.disconnect());
+    else closing.disconnect();
   }
 }
