@@ -1,10 +1,13 @@
 <script setup lang="ts">
+import { useServerRenderedQuery } from "@/services/core";
 import { useUsersListQuery } from "@/services/users";
 
 definePageMeta({ middleware: "auth" });
 
 const { t } = useI18n();
-const { data, isLoading, error } = useUsersListQuery();
+// Resolved during SSR: the server renders the list (or the error) that the
+// client then hydrates, instead of a "loading" state the client never shows.
+const { data, isLoading, error } = useServerRenderedQuery(useUsersListQuery);
 </script>
 
 <template>

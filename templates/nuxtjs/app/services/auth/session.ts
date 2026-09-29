@@ -14,8 +14,9 @@ import type { AuthUser } from "@/services/auth/types/auth";
  *   401 without the session hint is an anonymous visitor → null. Any other
  *   failure — including a 401 while the hint says a session exists (an access
  *   cookie that merely expired) — rejects. Prefetch with `prefetchQuery` (which
- *   swallows it): a failed query is not dehydrated, so the browser resolves it on
- *   hydration instead of the page rendering a stale "logged out".
+ *   swallows it): the browser resolves a failed query again on hydration (a 401
+ *   is not dehydrated; other errors are, and are retried on mount) instead of
+ *   the page rendering a stale "logged out".
  * - Browser: through the axios Model, which refreshes-and-retries on 401. A 401
  *   that survives the refresh resolves null; while the hint is set it is a
  *   session the server rejected, so it is first revoked

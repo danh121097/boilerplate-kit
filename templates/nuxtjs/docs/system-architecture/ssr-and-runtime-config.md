@@ -118,6 +118,20 @@ production note in [Security & Auth](./security-auth.md).
   authenticated data after mount. Components should render a loading state
   rather than assuming a token exists.
 - **TanStack Query:** a `QueryClient` exists on both sides so `useQuery` in
-  `<script setup>` is safe during SSR; the same key refetches on the client.
+  `<script setup>` is safe during SSR, but it does not wait: the server renders
+  the loading state while the fetch finishes after render and lands in the
+  payload, so the client hydrates data the HTML lacks (a hydration mismatch). A
+  page that renders a query's data resolves it during SSR with
+  `useServerRenderedQuery(useXxxQuery)` (`services/core/tanstack.ts`, used by
+  `pages/users.vue`):
+
+  | SSR result | Server renders | Client hydrates |
+  | --- | --- | --- |
+  | success | the data | the dehydrated data, no refetch |
+  | 401 | loading | nothing dehydrated — fetches through the Model (refreshes) |
+  | other failure | the error | the dehydrated error, not retried while hydrating |
+
+  The plugin dehydrates with `shouldDehydrateQuery` (successes + non-401
+  errors). A later mount of the same query (client navigation) retries as usual.
 - **Socket.IO:** the `io()` constructor is lazy and safe server-side; the actual
   handshake fires in `onMounted`, which only runs on the client.
