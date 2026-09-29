@@ -84,9 +84,12 @@ the SSR bundle.
 - **Handshake auth** is `{ role: "user", sig, ctime }`. `sig`/`ctime` come from the
   same `HMACSignatureGenerator.signRequest` the HTTP interceptor uses (method
   `GET`, path `/socket`); without `NEXT_PUBLIC_HMAC_SECRET` they are omitted.
-- **Reconnect** — an auth-rejected `connect_error` schedules one trailing
-  `RECONNECT_THROTTLE_MS` (2000 ms) timer that destroys the socket; further
-  errors inside that window do not reschedule. The timer is cleared on unmount.
+- **Reconnect** — any `connect_error` schedules one trailing
+  `RECONNECT_THROTTLE_MS` (2000 ms) timer that refreshes `auth` (fresh signature)
+  on the existing socket and calls `connect()`; the socket stays in the store.
+  Further errors inside that window do not reschedule, and the timer is cleared
+  on unmount so nothing connects afterwards. An `unauthorized` event destroys the
+  socket instead.
 - **State** lives in `stores/socket-io.ts` (`socket`, `authenticated`).
   `useSocketEvent(event, cb)` reads the socket through a selector
   (`useSocketIOStore((s) => s.socket)`), so it rebinds when the socket changes.

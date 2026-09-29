@@ -1,9 +1,9 @@
 import { SOCKET_EVENT, SOCKET_UNAUTHORIZED_MESSAGE } from "@/enums";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import { useSocketIOStore } from "@/stores/socket-io";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect } from "react";
 
-/** Trailing delay before an auth-rejected handshake tears the socket down. */
+/** Trailing delay before a failed handshake is retried. */
 const RECONNECT_THROTTLE_MS = 2000;
 
 /** Handshake signature, built by the same signer as the HTTP requests. Empty when
@@ -22,8 +22,6 @@ function buildAuth() {
 }
 
 export function useSocketIO() {
-  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const { socket, authenticated, setSocketIO } = useSocketIOStore();
 
   const connectSocket = useCallback(() => {
@@ -72,19 +70,21 @@ export function useSocketIO() {
   useEffect(() => {
     if (!socket) return;
 
-    const handleAuthenticated = () => setSocketIO({ authenticated: true });
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
+    const handleAuthenticated = () => setSocketIO({ authenticated: true });
+    // Any failed handshake schedules ONE trailing retry that reconnects the same
+    // socket with a fresh signature (`connectSocket` rebuilds `auth`).
     const handleConnectError = (e: Error) => {
       if (e.message === SOCKET_UNAUTHORIZED_MESSAGE) {
         setSocketIO({ authenticated: false });
       }
-      if (reconnectTimer.current) return;
-      reconnectTimer.current = setTimeout(() => {
-        reconnectTimer.current = null;
-        destroySocket();
+      if (reconnectTimer) return;
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        connectSocket();
       }, RECONNECT_THROTTLE_MS);
     };
-
     const handleUnauthorized = () => destroySocket();
 
     socket.on(SOCKET_EVENT.AUTHENTICATED, handleAuthenticated);
@@ -97,10 +97,8 @@ export function useSocketIO() {
       socket.off(SOCKET_EVENT.AUTHENTICATED, handleAuthenticated);
       socket.off(SOCKET_EVENT.CONNECT_ERROR, handleConnectError);
       socket.off(SOCKET_EVENT.UNAUTHORIZED, handleUnauthorized);
-      if (reconnectTimer.current) {
-        clearTimeout(reconnectTimer.current);
-        reconnectTimer.current = null;
-      }
+      // Cancel a pending retry so nothing connects after unmount.
+      if (reconnectTimer) clearTimeout(reconnectTimer);
       destroySocket();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
