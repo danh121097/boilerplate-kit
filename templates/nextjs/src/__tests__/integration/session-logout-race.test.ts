@@ -1,48 +1,20 @@
 import { installFakeLocks } from "@/__tests__/helpers/fake-web-locks";
 import { httpError, makeClient } from "@/__tests__/helpers/http-mocks";
-import { APP_PREFIX, STORAGE_KEYS } from "@/enums";
+import { installLocalStorage } from "@/__tests__/helpers/session-browser";
+import { APP_PREFIX } from "@/enums";
 import { AuthModel } from "@/services/auth";
 import {
   Api,
   endSession,
-  getSessionEpoch,
   hasSessionHint,
-  loginPathWithReturn,
   markSessionActive,
   onSessionEnded,
-  safeRedirect,
   SESSION_WAIT_TIMEOUT_MS,
-  syncAuthAcrossTabs,
 } from "@/services/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import axios from "axios";
 
-/**
- * Logout vs an in-flight refresh, cross-tab login/logout sync, and the
- * same-origin return path used after a session expires.
- */
-
-function installLocalStorage() {
-  const store = new Map<string, string>();
-  vi.stubGlobal("localStorage", {
-    getItem: (k: string) => store.get(k) ?? null,
-    setItem: (k: string, v: string) => void store.set(k, v),
-    removeItem: (k: string) => void store.delete(k),
-  });
-  return store;
-}
-
-/** Browser globals with capturable `storage` / `visibilitychange` listeners. */
-function installBrowser() {
-  const handlers: Record<string, (event: unknown) => void> = {};
-  const listen = (type: string, fn: (event: unknown) => void) => {
-    handlers[type] = fn;
-  };
-  const doc = { cookie: "", visibilityState: "visible", addEventListener: listen };
-  vi.stubGlobal("window", { addEventListener: listen, removeEventListener: vi.fn() });
-  vi.stubGlobal("document", { ...doc, removeEventListener: vi.fn() });
-  return handlers;
-}
+/** Logout vs an in-flight (or hung, or locked-elsewhere) refresh. */
 
 function deferred() {
   let resolve!: () => void;
@@ -227,99 +199,5 @@ describe("logout during an in-flight refresh", () => {
     expect(ended).toHaveBeenCalledTimes(1);
     expect(ended).toHaveBeenCalledWith("logout", "MAIN");
     off();
-  });
-});
-
-describe("cross-tab auth sync", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.unstubAllGlobals();
-  });
-
-  it("session end broadcasts a logout other tabs can observe", () => {
-    installBrowser();
-    const store = installLocalStorage();
-    endSession("logout");
-    expect(store.get(STORAGE_KEYS.AUTH_SYNC)).toMatch(/^logout:/);
-  });
-
-  it("a logout in another tab ends this tab's session; a login re-reads it", () => {
-    const handlers = installBrowser();
-    installLocalStorage();
-    markSessionActive();
-    const ended = vi.fn();
-    const off = onSessionEnded(ended);
-    const onLogin = vi.fn();
-    const onLogout = vi.fn();
-    const stop = syncAuthAcrossTabs({ onLogin, onLogout });
-    const epoch = getSessionEpoch();
-
-    document.cookie = `${STORAGE_KEYS.SESSION}=; path=/; max-age=0`; // other tab cleared it
-    handlers.storage!({ key: STORAGE_KEYS.AUTH_SYNC, newValue: "logout:1" });
-    expect(ended).toHaveBeenCalledWith("logout", "MAIN");
-    expect(onLogout).toHaveBeenCalledTimes(1);
-    expect(getSessionEpoch()).toBeGreaterThan(epoch); // in-flight refreshes persist nothing
-
-    handlers.visibilitychange!({}); // same state on focus → no duplicate
-    expect(onLogout).toHaveBeenCalledTimes(1);
-
-    handlers.storage!({ key: "unrelated", newValue: "login:2" });
-    expect(onLogin).not.toHaveBeenCalled();
-    handlers.storage!({ key: STORAGE_KEYS.AUTH_SYNC, newValue: "login:2" });
-    expect(onLogin).toHaveBeenCalledTimes(1);
-    stop();
-    off();
-  });
-
-  it("notices a hint-cookie change when the tab becomes visible or regains focus", () => {
-    const handlers = installBrowser();
-    installLocalStorage();
-    const onLogin = vi.fn();
-    const onLogout = vi.fn();
-    const stop = syncAuthAcrossTabs({ onLogin, onLogout });
-
-    document.cookie = `${STORAGE_KEYS.SESSION}=1`; // another tab signed in
-    handlers.visibilitychange!({});
-    expect(onLogin).toHaveBeenCalledTimes(1);
-
-    const epoch = getSessionEpoch();
-    document.cookie = `${STORAGE_KEYS.SESSION}=`; // …then signed out; this tab regains focus
-    handlers.focus!({});
-    expect(onLogout).toHaveBeenCalledTimes(1);
-    expect(getSessionEpoch()).toBe(epoch + 1);
-    stop();
-  });
-});
-
-describe("return path after session expiry", () => {
-  it("login path carries the current path", () => {
-    expect(loginPathWithReturn("/users?page=2")).toBe("/login?redirect=%2Fusers%3Fpage%3D2");
-  });
-
-  it.each([
-    ["/users?page=2", "/users?page=2"],
-    ["/", "/"],
-    ["//evil.example", "/"],
-    ["/\\evil.example", "/"],
-    ["/users\\x", "/"],
-    ["https://evil.example", "/"],
-    ["/r?next=https://evil.example", "/"],
-    ["users", "/"],
-    ["/\t/evil.example", "/"],
-    ["/\n/evil.example", "/"],
-    ["/ok\u007F", "/"],
-    ["/login", "/"],
-    ["/login/", "/"],
-    ["/login?redirect=%2Fusers", "/"],
-    ["/login-help", "/login-help"],
-    [null, "/"],
-  ])("safeRedirect(%j) → %j", (value, expected) => {
-    expect(safeRedirect(value)).toBe(expected);
-  });
-
-  it("safeRedirect accepts up to 512 characters and rejects longer values", () => {
-    const max = `/${"a".repeat(511)}`;
-    expect(safeRedirect(max)).toBe(max);
-    expect(safeRedirect(`${max}a`)).toBe("/");
   });
 });

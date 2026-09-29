@@ -46,11 +46,10 @@ export class AuthModel extends Model {
 
   /** The user signs out in this tab: revoke the refresh token server-side (sent
    * by cookie) and always end the client session — hint + cached queries — even
-   * if the request fails. Ends as "logout": no return path. A revoke already in
-   * flight has the same effect, so logout joins it instead of posting again. */
+   * if the request fails. Ends as "logout": no return path. */
   static async logout(): Promise<void> {
-    // A revoke that backs out (session already ended elsewhere) leaves this
-    // one to be logged out normally.
+    // A revoke in flight already ends this session: wait for it, post nothing.
+    // If that revoke backs out (nothing to end), log out normally.
     if (revoking && (await revoking)) return;
     await this.endServerSession("logout");
   }
@@ -61,24 +60,31 @@ export class AuthModel extends Model {
    * "expired" so the expiry redirect carries a return path. `sinceEpoch` is the
    * epoch seen when the rejected request started (undefined: no epoch check).
    * Resolves true when this call — or the in-flight one it joined — ended the
-   * session; false when it had already ended (no hint, a logout running, or the
-   * epoch moved): nothing is posted, whoever ended it already reset the client
-   * state.
+   * session; false when it had already ended (server side, no hint, a logout
+   * running, or the epoch moved): nothing is posted, whoever ended it already
+   * reset the client state.
    */
   static revokeSession(sinceEpoch?: number): Promise<boolean> {
-    revoking ??= this.endServerSession("expired", sinceEpoch)
-      .catch(() => true) // best effort: the client session ended either way
-      .finally(() => {
-        revoking = null;
-      });
+    // The server render has no session of its own to revoke.
+    if (typeof document === "undefined") return Promise.resolve(false);
+    if (sinceEpoch !== undefined && getSessionEpoch(this.service) !== sinceEpoch) {
+      return Promise.resolve(false);
+    }
+    revoking ??= this.endServerSession("expired", sinceEpoch).finally(() => {
+      revoking = null;
+    });
     return revoking;
   }
 
   /** Shared by `logout` and `revokeSession`: revoke server-side, then end the
-   * client session with `reason`. A revoke ("expired") stands down — resolving
-   * false, nothing posted — when the session already ended: no hint, a logout
-   * running, or (when `sinceEpoch` is given) the epoch moved. Resolves true once
-   * it ended the session; a failed POST rejects after ending it.
+   * client session with `reason`. A revoke ("expired") backs out — resolving
+   * false, nothing posted, no session end — when the session already ended: no
+   * hint, a logout running, or the epoch moved since `sinceEpoch` (else since
+   * this call started). It checks before waiting for the lock and again once it
+   * holds it, so a refused refresh that ends the session meanwhile is not
+   * ended twice. A revoke is best effort (a failed POST still ends the session
+   * and resolves true); a logout whose POST fails rejects after ending it.
+   * Logout never backs out.
    *
    * Ordering, so the token revoked is the latest one: from the first line no
    * refresh may start (a 401 meanwhile rejects with `session_ended` without
@@ -90,27 +96,27 @@ export class AuthModel extends Model {
     reason: SessionEndReason,
     sinceEpoch?: number,
   ): Promise<boolean> {
-    if (reason === "expired") {
-      const ended =
-        !hasSessionHint() ||
-        isLogoutPending(this.service) ||
-        (sinceEpoch !== undefined && getSessionEpoch(this.service) !== sinceEpoch);
-      if (ended) return false;
-    }
-    const done = beginLogout(this.service);
+    const service = this.service;
+    const epoch = sinceEpoch ?? getSessionEpoch(service);
+    const alreadyEnded = () => !hasSessionHint() || getSessionEpoch(service) !== epoch;
+    if (reason === "expired" && (alreadyEnded() || isLogoutPending(service))) return false;
+    const done = beginLogout(service);
     try {
-      await withSessionLock(this.service, async () => {
-        bumpSessionEpoch(this.service);
+      return await withSessionLock(service, async () => {
+        if (reason === "expired" && alreadyEnded()) return false;
+        bumpSessionEpoch(service);
         try {
           await this.api.post({ url: authContract.paths.logout });
+        } catch (error) {
+          if (reason === "logout") throw error;
         } finally {
-          endSession(reason, this.service);
+          endSession(reason, service);
         }
+        return true;
       });
     } finally {
       done();
     }
-    return true;
   }
 
   static async getMe(): Promise<AuthUser> {

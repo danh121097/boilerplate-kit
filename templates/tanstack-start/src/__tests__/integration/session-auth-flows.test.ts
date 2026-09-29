@@ -1,54 +1,20 @@
-import { httpError, makeClient, ok } from "@/__tests__/helpers/http-mocks";
+import { httpError, ok } from "@/__tests__/helpers/http-mocks";
+import { setupRefreshClient as setup } from "@/__tests__/helpers/session-browser";
 import { STORAGE_KEYS } from "@/enums";
 import { AuthModel } from "@/services/auth";
-import {
-  Api,
-  ApiInterceptors,
-  getSessionEpoch,
-  hasSessionHint,
-  markSessionActive,
-  onSessionEnded,
-  redirectOnSessionExpired,
-} from "@/services/core";
+import { Api, hasSessionHint, markSessionActive, onSessionEnded } from "@/services/core";
 import {
   makeQueryClient,
   resetQueriesOnSessionEnd,
   resyncQueriesAfterLogin,
 } from "@/services/core/query-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import axios from "axios";
 
 /**
  * Regression tests for the session rules: an anonymous or credential 401 never
- * refreshes or reloads, a failed refresh ends the session instead of reloading,
- * and logout always clears the session + query cache.
+ * refreshes or reloads, a successful refresh replays the request, and logout
+ * always clears the session + query cache.
  */
-
-const CREDENTIAL_PATHS = ["/auth/login", "/auth/register", "/auth/logout"];
-
-/** What the bare refresh client's `axios.post` rejects with. */
-function refreshError(failure: { status?: number; code?: string }) {
-  return Object.assign(new Error("refresh failed"), {
-    isAxiosError: true,
-    code: failure.code,
-    response: failure.status ? { status: failure.status, data: {} } : undefined,
-  });
-}
-
-function setup(hasSession: boolean | (() => boolean)) {
-  const reload = vi.fn();
-  vi.stubGlobal("window", { location: { reload } });
-  const post = vi.spyOn(axios, "post");
-  const client = (adapter: Parameters<typeof makeClient>[0]) =>
-    makeClient(adapter, {
-      MAIN: {
-        endpoint: "/auth/refresh",
-        skipPaths: CREDENTIAL_PATHS,
-        hasSession: typeof hasSession === "function" ? hasSession : () => hasSession,
-      },
-    });
-  return { reload, post, client };
-}
 
 describe("session auth flows", () => {
   beforeEach(() => {
@@ -100,109 +66,6 @@ describe("session auth flows", () => {
     expect(post).not.toHaveBeenCalled();
     expect(reload).not.toHaveBeenCalled();
   });
-
-  it("refresh failure ends the session without reloading and rejects with the original 401", async () => {
-    const { post, reload, client } = setup(true);
-    post.mockRejectedValue(refreshError({ status: 401 }));
-    const ended = vi.fn();
-    const off = onSessionEnded(ended);
-
-    const http = client(async (config) => httpError(config, 401));
-
-    await expect(http.get("/users")).rejects.toMatchObject({ error_code: 401 });
-    expect(post).toHaveBeenCalledTimes(1);
-    expect(ended).toHaveBeenCalledWith("expired", "MAIN");
-    expect(reload).not.toHaveBeenCalled();
-    off();
-  });
-
-  it.each([
-    ["network error", { code: "ERR_NETWORK" }],
-    ["timeout", { code: "ECONNABORTED" }],
-    ["503", { status: 503 }],
-    ["429", { status: 429 }],
-  ])(
-    "transient refresh failure (%s) keeps the hint, no session end, rejects retryable",
-    async (_label, failure) => {
-      markSessionActive();
-      const { post, reload, client } = setup(hasSessionHint);
-      post.mockRejectedValue(refreshError(failure));
-      const ended = vi.fn();
-      const off = onSessionEnded(ended);
-
-      const http = client(async (config) => httpError(config, 401));
-
-      const error = await http.get("/users").catch((e: unknown) => e);
-      expect(error).toMatchObject({ retryable: true });
-      expect((error as { error_code: number }).error_code).not.toBe(401);
-      expect(ended).not.toHaveBeenCalled();
-      expect(reload).not.toHaveBeenCalled();
-      expect(hasSessionHint()).toBe(true);
-      off();
-    },
-  );
-
-  it("the refresh request gives up after 15s so a hung refresh cannot stall requests", async () => {
-    markSessionActive();
-    const { post, client } = setup(hasSessionHint);
-    post.mockResolvedValue({ data: {} });
-    const http = client(async (config) =>
-      config._retry ? ok(config, { status: "success", data: 1 }) : httpError(config, 401),
-    );
-
-    await http.get("/users");
-
-    expect(post.mock.calls[0]![2]).toMatchObject({ timeout: 15_000 });
-  });
-
-  it("refused refresh (403) ends the session and clears the hint", async () => {
-    markSessionActive();
-    const { post, client } = setup(hasSessionHint);
-    post.mockRejectedValue(refreshError({ status: 403 }));
-    const ended = vi.fn();
-    const off = onSessionEnded(ended);
-
-    const http = client(async (config) => httpError(config, 401));
-
-    await expect(http.get("/users")).rejects.toMatchObject({ error_code: 401 });
-    expect(ended).toHaveBeenCalledWith("expired", "MAIN");
-    expect(hasSessionHint()).toBe(false);
-    off();
-  });
-
-  it("redirects to /login when a hinted session's refresh is refused", async () => {
-    markSessionActive();
-    const { post, client } = setup(hasSessionHint);
-    post.mockRejectedValue(refreshError({ status: 401 }));
-    const redirect = vi.fn();
-    const off = redirectOnSessionExpired(redirect);
-
-    const http = client(async (config) => httpError(config, 401));
-
-    await expect(http.get("/users")).rejects.toMatchObject({ error_code: 401 });
-    expect(redirect).toHaveBeenCalledTimes(1);
-    off();
-  });
-
-  it("never redirects an anonymous visitor (no hint) or on a transient failure", async () => {
-    const { post, client } = setup(hasSessionHint);
-    post.mockRejectedValue(refreshError({ status: 503 }));
-    const redirect = vi.fn();
-    const off = redirectOnSessionExpired(redirect);
-    const http = client(async (config) => httpError(config, 401));
-
-    await expect(http.get("/auth/me")).rejects.toMatchObject({ error_code: 401 }); // anonymous
-    expect(post).not.toHaveBeenCalled();
-
-    markSessionActive();
-    await expect(http.get("/users")).rejects.toMatchObject({ retryable: true }); // transient
-    expect(redirect).not.toHaveBeenCalled();
-
-    await AuthModel.logout().catch(() => {}); // logout is not a redirect trigger
-    expect(redirect).not.toHaveBeenCalled();
-    off();
-  });
-
   it("a successful refresh replays the request", async () => {
     const { post, client } = setup(true);
     post.mockResolvedValue({ data: { success: true } } as never);
@@ -253,41 +116,5 @@ describe("session auth flows", () => {
 
     expect(queryClient.getQueryData(["auth.me"])).toBeUndefined();
     expect(queryClient.getQueryState(["users.list"])?.isInvalidated).toBe(true);
-  });
-
-  it("a refused refresh of another service keeps the main session", async () => {
-    markSessionActive();
-    const post = vi.spyOn(axios, "post").mockRejectedValue(refreshError({ status: 401 }));
-    Api.setBaseURL("http://billing.test", "BILLING");
-    const interceptors = new ApiInterceptors({
-      BILLING: { endpoint: "/auth/refresh", hasSession: () => true },
-    });
-    const billing = axios.create({ adapter: async (config) => httpError(config, 401) });
-    interceptors.setupRequestInterceptor(billing, "BILLING");
-    interceptors.setupResponseInterceptor(billing);
-
-    const queryClient = makeQueryClient();
-    queryClient.setQueryData(["auth.me"], { _id: "1" });
-    const offReset = resetQueriesOnSessionEnd(queryClient, "auth.me");
-    const redirect = vi.fn();
-    const offRedirect = redirectOnSessionExpired(redirect);
-    const ended = vi.fn();
-    const off = onSessionEnded(ended);
-    const mainEpoch = getSessionEpoch("MAIN");
-    const billingEpoch = getSessionEpoch("BILLING");
-
-    await expect(billing.get("/invoices")).rejects.toMatchObject({ error_code: 401 });
-
-    expect(post).toHaveBeenCalledTimes(1);
-    expect(ended).toHaveBeenCalledWith("expired", "BILLING");
-    expect(getSessionEpoch("BILLING")).toBe(billingEpoch + 1);
-    // The main session is untouched: hint, epoch, cache and route all stay.
-    expect(hasSessionHint()).toBe(true);
-    expect(getSessionEpoch("MAIN")).toBe(mainEpoch);
-    expect(queryClient.getQueryData(["auth.me"])).toEqual({ _id: "1" });
-    expect(redirect).not.toHaveBeenCalled();
-    off();
-    offRedirect();
-    offReset();
   });
 });

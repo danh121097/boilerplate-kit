@@ -1,28 +1,21 @@
 import { installLocalStorage } from "@/__tests__/helpers/fake-storage";
-import { STORAGE_KEYS } from "@/enums";
+import { watchNavigation } from "@/__tests__/helpers/watch-session-navigation";
 import { AuthModel } from "@/services/auth";
-import {
-  clearServiceTokens,
-  endSession,
-  getSessionEpoch,
-  loginPathWithReturn,
-  onSessionEnded,
-  redirectOnSessionExpired,
-} from "@/services/core";
+import { clearServiceTokens, endSession, getSessionEpoch } from "@/services/core";
 import {
   getAccessToken,
   getRefreshToken,
   persistAccessToken,
   persistRefreshToken,
 } from "@/services/core/auth-token-storage";
-import { syncAuthWithOtherTabs, useAuthStore } from "@/stores/auth";
+import { useAuthStore } from "@/stores/auth";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * The two ways a session ends from the client: a voluntary logout ("logout",
  * no return path) and a session the server rejected ("expired", the login page
- * returns to the current path). A logout received from another tab only resets
- * this tab.
+ * returns to the current path). How a revoke meets a logout or a refresh lives
+ * in session-revoke-logout-and-refresh.test.ts.
  */
 
 // The auth store reads localStorage at import time.
@@ -38,22 +31,6 @@ vi.hoisted(() => {
 });
 
 const UNAUTHORIZED = { status: "error", error_code: 401, message: "expired" };
-
-/** Where the root layout sends the user on each kind of session end. */
-function watchNavigation(currentPath: string) {
-  const expiredTo = vi.fn();
-  const reasons = vi.fn();
-  const offRedirect = redirectOnSessionExpired(() => expiredTo(loginPathWithReturn(currentPath)));
-  const offEnded = onSessionEnded(reasons);
-  return {
-    expiredTo,
-    reasons,
-    stop: () => {
-      offRedirect();
-      offEnded();
-    },
-  };
-}
 
 describe("session revoke and logout", () => {
   beforeEach(() => {
@@ -120,22 +97,6 @@ describe("session revoke and logout", () => {
     nav.stop();
   });
 
-  it("a revoke while a logout is running does not post logout", async () => {
-    persistAccessToken("AT");
-    let answer!: () => void;
-    const post = vi
-      .spyOn(AuthModel.api, "post")
-      .mockImplementation(() => new Promise((resolve) => (answer = () => resolve({} as never))));
-
-    const logout = AuthModel.logout();
-    expect(await AuthModel.revokeSession()).toBe(false);
-    await vi.waitFor(() => expect(post).toHaveBeenCalledTimes(1));
-    answer();
-    await logout;
-
-    expect(post).toHaveBeenCalledTimes(1);
-  });
-
   it("concurrent revokes post logout once", async () => {
     persistAccessToken("AT");
     persistRefreshToken("RT");
@@ -151,26 +112,6 @@ describe("session revoke and logout", () => {
     expect(results).toEqual([true, true, null]);
     expect(post).toHaveBeenCalledTimes(1);
     expect(nav.reasons).toHaveBeenCalledExactlyOnceWith("expired", "MAIN");
-    nav.stop();
-  });
-
-  it("a logout during an in-flight revoke posts once and ends the session once", async () => {
-    persistAccessToken("AT");
-    let answer!: () => void;
-    const post = vi
-      .spyOn(AuthModel.api, "post")
-      .mockImplementation(() => new Promise((resolve) => (answer = () => resolve({} as never))));
-    const nav = watchNavigation("/users");
-
-    const revoke = AuthModel.revokeSession();
-    const logout = AuthModel.logout();
-    await vi.waitFor(() => expect(post).toHaveBeenCalledTimes(1));
-    answer();
-    await Promise.all([revoke, logout]);
-
-    expect(post).toHaveBeenCalledTimes(1);
-    expect(nav.reasons).toHaveBeenCalledExactlyOnceWith("expired", "MAIN");
-    expect(getAccessToken()).toBeNull();
     nav.stop();
   });
 
@@ -191,33 +132,6 @@ describe("session revoke and logout", () => {
 
     expect(nav.reasons).toHaveBeenCalledExactlyOnceWith("logout", "MAIN");
     expect(nav.expiredTo).not.toHaveBeenCalled();
-    nav.stop();
-  });
-
-  it("a remote logout resets this tab without writing storage or posting", () => {
-    let onStorage!: (event: { key: string | null }) => void;
-    vi.stubGlobal("window", {
-      addEventListener: (_type: string, fn: typeof onStorage) => (onStorage = fn),
-      removeEventListener: vi.fn(),
-    });
-    persistAccessToken("AT");
-    useAuthStore.setState({ isAuthenticated: true, user: { _id: "u1" } as never });
-    const post = vi.spyOn(AuthModel.api, "post");
-    const nav = watchNavigation("/users");
-    const stop = syncAuthWithOtherTabs(vi.fn());
-    localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN); // the other tab's logout
-    const setItem = vi.spyOn(localStorage, "setItem");
-    const removeItem = vi.spyOn(localStorage, "removeItem");
-
-    onStorage({ key: STORAGE_KEYS.ACCESS_TOKEN });
-
-    expect(setItem).not.toHaveBeenCalled();
-    expect(removeItem).not.toHaveBeenCalled();
-    expect(post).not.toHaveBeenCalled();
-    expect(nav.reasons).toHaveBeenCalledExactlyOnceWith("logout", "MAIN");
-    expect(nav.expiredTo).not.toHaveBeenCalled();
-    expect(useAuthStore.getState()).toMatchObject({ user: null, isAuthenticated: false });
-    stop();
     nav.stop();
   });
 });

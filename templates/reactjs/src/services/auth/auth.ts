@@ -29,6 +29,9 @@ import type { SessionEndReason } from "@/services/core";
 /** The revoke in flight, shared by concurrent callers. */
 let revoking: Promise<boolean> | null = null;
 
+/** Logouts started in this tab and still ending the session. */
+let loggingOut = 0;
+
 export class AuthModel extends Model {
   static {
     Model.setup.call(this, { path: authContract.base, service: authContract.service });
@@ -49,39 +52,53 @@ export class AuthModel extends Model {
 
   /** The user signs out from this tab. Revokes the refresh token server-side
    * and always drops local tokens and ends the session ("logout", so the
-   * login page gets no return path), even when the request fails. While a
-   * revoke is in flight it only waits for it: that revoke already posts and
-   * ends the session. */
+   * login page gets no return path); rejects when the request fails. */
   static async logout(): Promise<void> {
-    // A revoke that backs out (session already ended elsewhere) leaves this
-    // one to be logged out normally.
+    // A revoke in flight already ends this session: wait for it, post nothing.
+    // If that revoke backs out (nothing to end), log out normally.
     if (revoking && (await revoking)) return;
-    await this.endServerSession("logout");
+    loggingOut++;
+    try {
+      await this.endServerSession("logout");
+    } finally {
+      loggingOut--;
+    }
+  }
+
+  /** True while this tab's own `logout` is ending the session, including when
+   * its "logout" session end is emitted. A revoke or another tab's logout never
+   * sets it, so session-end listeners can tell this tab's logout apart. */
+  static isLoggingOut(): boolean {
+    return loggingOut > 0;
   }
 
   /** The server rejected the session outside a refused refresh (a 401 on the
    * session read). Revokes it like logout (best effort, never rejects) but ends
    * it as "expired", so the expiry redirect carries the current path. Resolves
    * `true` when this call — or the in-flight one it joined — ended the session;
-   * `false` when it had already ended since `sinceEpoch` (the epoch the request
-   * started at), holds no tokens, or a logout is running: nothing is posted and
-   * the caller only resets local state. */
+   * `false` when there was nothing to end (see `endServerSession`): nothing is
+   * posted and the caller only resets local state. */
   static revokeSession(sinceEpoch?: number): Promise<boolean> {
-    if (revoking) return revoking;
-    revoking = this.endServerSession("expired", sinceEpoch)
-      .catch(() => true) // the request failed; tokens were cleared and the session ended anyway
-      .finally(() => {
-        revoking = null;
-      });
+    if (sinceEpoch !== undefined && getSessionEpoch(this.service) !== sinceEpoch) {
+      return Promise.resolve(false);
+    }
+    revoking ??= this.endServerSession("expired", sinceEpoch).finally(() => {
+      revoking = null;
+    });
     return revoking;
   }
 
-  /** End the session server-side, then locally with `reason`. An "expired" end
-   * first checks the session is still live (see `revokeSession`) and resolves
-   * `false` without posting when it is not. Otherwise: POST /auth/logout with
-   * the latest token pair (refresh token in the body, access token as Bearer),
-   * then clear local tokens and end the session, even when the request fails
-   * (which rejects).
+  /** End the session server-side, then locally with `reason`. POST
+   * /auth/logout with the latest token pair (refresh token in the body, access
+   * token as Bearer), then clear local tokens and end the session, even when
+   * the request fails (a logout then rejects; a revoke does not).
+   *
+   * An "expired" end backs out — resolves `false`, posts nothing, ends nothing —
+   * when the session already ended: the epoch moved since `sinceEpoch` (else
+   * since the call started), no tokens are stored, or a logout is running. It
+   * checks at the start and again once it holds the lock, since a refused
+   * refresh it waited for may have ended the session meanwhile. A logout never
+   * backs out.
    *
    * Ordering, so the token revoked is the latest one: from the first tick no
    * refresh may start (a 401 meanwhile rejects with `session_ended` without
@@ -96,17 +113,14 @@ export class AuthModel extends Model {
     sinceEpoch?: number,
   ): Promise<boolean> {
     const service = this.service;
-    if (reason === "expired") {
-      const ended =
-        (sinceEpoch !== undefined && getSessionEpoch(service) !== sinceEpoch) ||
-        !hasStoredSession(service) ||
-        isLogoutPending(service);
-      if (ended) return false;
-    }
+    const since = sinceEpoch ?? getSessionEpoch(service);
+    const ended = () => getSessionEpoch(service) !== since || !hasStoredSession(service);
+    if (reason === "expired" && (ended() || isLogoutPending(service))) return false;
     const held = { access: getAccessToken(service), refresh: getRefreshToken(service) };
     const done = beginLogout(service);
     try {
-      await withSessionLock(service, async () => {
+      return await withSessionLock(service, async () => {
+        if (reason === "expired" && ended()) return false;
         const access = getAccessToken(service) ?? held.access;
         const refreshToken = getRefreshToken(service) ?? held.refresh;
         bumpSessionEpoch(service);
@@ -116,12 +130,15 @@ export class AuthModel extends Model {
             data: { refreshToken: refreshToken ?? undefined },
             customHeaders: access ? { authorization: `Bearer ${access}` } : undefined,
           });
+        } catch (error) {
+          // A revoke is best effort: the session ends below either way.
+          if (reason === "logout") throw error;
         } finally {
           clearAuthTokens();
           endSession(reason, service);
         }
+        return true;
       });
-      return true;
     } finally {
       done();
     }

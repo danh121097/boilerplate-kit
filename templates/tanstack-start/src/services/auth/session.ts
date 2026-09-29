@@ -20,7 +20,7 @@ export async function fetchSession(): Promise<AuthUser | null> {
     return await withSessionRefresh(() => getMeServerFn());
   } catch (error) {
     if (!isUnauthorizedError(error)) throw error; // network/5xx or "deferred to the browser" — never cached as signed out
-    if (typeof window !== "undefined") await AuthModel.revokeSession(epoch);
+    await AuthModel.revokeSession(epoch); // resolves false during SSR
     return null;
   }
 }

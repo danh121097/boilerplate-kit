@@ -5,6 +5,7 @@
 ```
 src/services/
 ├── init-services.ts        # Wire baseURLs + register tokens + install interceptors
+├── session-expiry.ts       # setupSessionExpiry: /login on session end (return path on expiry)
 ├── index.ts                # Barrel re-export
 ├── core/
 │   ├── api.ts              # Api class — multi-service axios wrapper
@@ -24,7 +25,7 @@ src/services/
 │   ├── types.ts            # Shared TS types + axios module augmentation
 │   └── index.ts
 ├── auth/
-│   ├── auth.ts             # AuthModel (getMe, getSession → AuthUser | null, logout, revokeSession) + useMeQuery, mutations
+│   ├── auth.ts             # AuthModel (getMe, getSession → AuthUser | null, logout, isLoggingOut, revokeSession) + useMeQuery, mutations
 │   ├── types/auth.ts       # AuthUser, AuthResult, LoginPayload, RegisterPayload
 │   └── index.ts
 └── users/

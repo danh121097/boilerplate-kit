@@ -1,6 +1,5 @@
 import { setLocale } from "@/i18n/i18n";
-import { authContract } from "@/services/auth/contract";
-import { loginPathWithReturn, redirectOnSessionExpired } from "@/services/core";
+import { setupSessionExpiry } from "@/services/session-expiry";
 import { syncAuthWithOtherTabs, useAuthStore } from "@/stores/auth";
 import { createRootRouteWithContext } from "@tanstack/react-router";
 import type { QueryClient } from "@tanstack/react-query";
@@ -27,30 +26,18 @@ function RootLayout() {
     hydrate();
   }, [hydrate]);
 
-  // An expired auth session (refresh refused) routes to /login instead of
-  // reloading, carrying the current path so the login page can bring the user
-  // back. Another service's session end does not sign the user out.
-  useEffect(
-    () =>
-      redirectOnSessionExpired(() => {
-        const { pathname, href } = router.state.location;
-        if (pathname !== "/login") void navigate({ href: loginPathWithReturn(href) });
-      }, authContract.service),
-    [navigate, router],
-  );
+  // Session end → /login: with a return path when it expired, without one on
+  // a protected page when another tab logged out. Never reloads.
+  useEffect(() => setupSessionExpiry(router), [router]);
 
-  // Login/logout in another tab → recompute the session here. A remote logout
-  // on a protected page goes to /login without a return path (the user chose
-  // to sign out); otherwise the route guards (`beforeLoad`) re-run.
+  // Login in another tab → recompute the session here and re-run the route
+  // guards (`beforeLoad`). A remote logout is handled by the listener above.
   useEffect(
     () =>
       syncAuthWithOtherTabs(() => {
-        const signedOut = !useAuthStore.getState().isAuthenticated;
-        const onProtectedPage = router.state.matches.some((m) => m.staticData.requiresAuth);
-        if (signedOut && onProtectedPage) void navigate({ to: "/login" });
-        else void router.invalidate();
+        if (useAuthStore.getState().isAuthenticated) void router.invalidate();
       }),
-    [navigate, router],
+    [router],
   );
 
   function toggleLocale() {

@@ -1,68 +1,37 @@
-import { STORAGE_KEYS } from "@/enums";
-import { AuthModel } from "@/services/auth";
 import {
-  Api,
-  endSession,
-  getSessionEpoch,
-  loginPathWithReturn,
-  onSessionEnded,
-  redirectOnSessionExpired,
-  syncAuthAcrossTabs,
-} from "@/services/core";
+  HINT,
+  installBrowser,
+  installLocalStorage,
+  observeSessionEnd,
+  UNAUTHORIZED,
+} from "@/__tests__/helpers/session-browser";
+import { AuthModel } from "@/services/auth";
+import { Api, bumpSessionEpoch, endSession, RefreshTokenManager } from "@/services/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * The two ways a session ends from this tab — the user's logout ("logout", no
  * return path) and a server-rejected live session ("expired", revoked, with a
- * return path) — and how a tab reacts to a logout made in another tab.
+ * return path).
  */
 
-const UNAUTHORIZED = { status: "error", error_code: 401, message: "Unauthorized" };
-const HINT = `${STORAGE_KEYS.SESSION}=1`;
-
-function installLocalStorage() {
-  const store = new Map<string, string>();
-  vi.stubGlobal("localStorage", {
-    getItem: (k: string) => store.get(k) ?? null,
-    setItem: (k: string, v: string) => void store.set(k, v),
-    removeItem: (k: string) => void store.delete(k),
-  });
-  return store;
-}
-
-/** Browser globals with capturable `storage` / `focus` / `visibilitychange` listeners. */
-function installBrowser(cookie = "") {
-  const handlers: Record<string, (event: unknown) => void> = {};
-  const listen = (type: string, fn: (event: unknown) => void) => {
-    handlers[type] = fn;
-  };
-  vi.stubGlobal("window", { addEventListener: listen, removeEventListener: vi.fn() });
-  vi.stubGlobal("document", {
-    cookie,
-    visibilityState: "visible",
-    addEventListener: listen,
-    removeEventListener: vi.fn(),
-  });
-  return handlers;
-}
-
-/** Record session-end events and expiry redirects (the app's redirect adds the
- * current path as the return path). */
-function observeSessionEnd() {
-  const ended = vi.fn();
-  const redirected = vi.fn();
-  const offEnded = onSessionEnded(ended);
-  const offRedirect = redirectOnSessionExpired(() =>
-    redirected(loginPathWithReturn("/users?page=2#top")),
+/** A refresh of the main session that stays in flight until settled by hand. */
+function startHeldRefresh() {
+  const settle = { resolve: () => {}, reject: (_error: unknown) => {} };
+  const refresh = vi.fn(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        settle.resolve = resolve;
+        settle.reject = reject;
+      }),
   );
-  return {
-    ended,
-    redirected,
-    off: () => {
-      offEnded();
-      offRedirect();
-    },
-  };
+  const manager = new RefreshTokenManager({
+    service: "MAIN",
+    refresh,
+    onRefreshFailed: () => endSession("expired"),
+  });
+  const done = manager.refresh().catch(() => {});
+  return { refresh, settle, done };
 }
 
 describe("revoking a server-rejected session", () => {
@@ -172,6 +141,71 @@ describe("revoking a server-rejected session", () => {
     off();
   });
 
+  it("a revoke waiting for the lock does nothing when a refused refresh ends the session first", async () => {
+    const post = vi.spyOn(AuthModel.api, "post");
+
+    const { ended, off } = observeSessionEnd();
+    const { settle, done, refresh } = startHeldRefresh();
+    await vi.waitFor(() => expect(refresh).toHaveBeenCalled()); // refresh holds the lock
+
+    const revoked = AuthModel.revokeSession();
+    settle.reject({ response: { status: 401 } }); // refused: the session ends as expired
+    await done;
+
+    await expect(revoked).resolves.toBe(false);
+    expect(post).not.toHaveBeenCalled();
+    expect(ended).toHaveBeenCalledTimes(1);
+    expect(ended).toHaveBeenCalledWith("expired", "MAIN");
+    off();
+  });
+
+  it("a logout joining a revoke that backs out still signs out", async () => {
+    const post = vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
+
+    const { ended, redirected, off } = observeSessionEnd();
+    const { settle, done, refresh } = startHeldRefresh();
+    await vi.waitFor(() => expect(refresh).toHaveBeenCalled()); // refresh holds the lock
+
+    const revoked = AuthModel.revokeSession();
+    const logout = AuthModel.logout(); // joins the revoke
+    bumpSessionEpoch(); // the epoch moves while the revoke waits: it is stale
+    settle.resolve();
+    await done;
+
+    await expect(revoked).resolves.toBe(false);
+    await logout;
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(ended).toHaveBeenCalledTimes(1);
+    expect(ended).toHaveBeenCalledWith("logout", "MAIN");
+    expect(redirected).not.toHaveBeenCalled();
+    expect(document.cookie).not.toContain(HINT);
+    off();
+  });
+
+  it("without Web Locks, a logout joining a revoke that backs out still signs out", async () => {
+    vi.stubGlobal("navigator", {}); // the revoke waits on this tab's in-flight refresh instead
+    const post = vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
+
+    const { ended, redirected, off } = observeSessionEnd();
+    const { settle, done, refresh } = startHeldRefresh();
+    await vi.waitFor(() => expect(refresh).toHaveBeenCalled()); // refresh holds the lock
+
+    const revoked = AuthModel.revokeSession();
+    const logout = AuthModel.logout(); // joins the revoke
+    bumpSessionEpoch(); // the epoch moves while the revoke waits: it is stale
+    settle.resolve();
+    await done;
+
+    await expect(revoked).resolves.toBe(false);
+    await logout;
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(ended).toHaveBeenCalledTimes(1);
+    expect(ended).toHaveBeenCalledWith("logout", "MAIN");
+    expect(redirected).not.toHaveBeenCalled();
+    expect(document.cookie).not.toContain(HINT);
+    off();
+  });
+
   it("a voluntary logout ends as logout without a return path", async () => {
     vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
     const { ended, redirected, off } = observeSessionEnd();
@@ -179,45 +213,6 @@ describe("revoking a server-rejected session", () => {
     await AuthModel.logout();
     expect(ended).toHaveBeenCalledWith("logout", "MAIN");
     expect(redirected).not.toHaveBeenCalled();
-    off();
-  });
-});
-
-describe("a logout made in another tab", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.unstubAllGlobals();
-  });
-
-  it("a remote logout does not clear the session hint or re-broadcast", () => {
-    const handlers = installBrowser(HINT);
-    const store = installLocalStorage();
-    const post = vi.spyOn(AuthModel.api, "post");
-    const epoch = getSessionEpoch();
-
-    const onLogout = vi.fn();
-    const stop = syncAuthAcrossTabs({ onLogout });
-
-    const { ended, redirected, off } = observeSessionEnd();
-
-    handlers.storage!({ key: STORAGE_KEYS.AUTH_SYNC, newValue: "logout:1" });
-
-    expect(document.cookie).toBe(HINT); // untouched: the other tab owns the write
-    expect(store.has(STORAGE_KEYS.AUTH_SYNC)).toBe(false); // no re-broadcast
-    expect(post).not.toHaveBeenCalled();
-    expect(ended).toHaveBeenCalledWith("logout", "MAIN");
-    expect(redirected).not.toHaveBeenCalled(); // no return path
-    expect(onLogout).toHaveBeenCalledTimes(1);
-    expect(getSessionEpoch()).toBe(epoch + 1);
-
-    // The shared cookie jar now shows the other tab's cleared hint: the focus
-    // re-check sees the same logout and fires nothing more.
-    document.cookie = "";
-    handlers.focus!({});
-    handlers.storage!({ key: STORAGE_KEYS.AUTH_SYNC, newValue: "logout:1" });
-    expect(ended).toHaveBeenCalledTimes(1);
-    expect(onLogout).toHaveBeenCalledTimes(1);
-    stop();
     off();
   });
 });

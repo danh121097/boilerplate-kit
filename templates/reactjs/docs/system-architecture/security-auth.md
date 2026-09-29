@@ -114,7 +114,8 @@ Only the auth service (`authContract.service`, `MAIN`) is the user's session.
 When it ends, the auth store drops the user and resets every cached query in
 place (`resetQueriesOnSessionEnd` → `resetQueriesToSignedOut` — mounted
 components see signed-out data, `auth.me` is pinned to `null`, nothing
-refetches), and the root layout (`redirectOnSessionExpired`) navigates
+refetches), and the root layout (`setupSessionExpiry` in
+`services/session-expiry.ts`, via `redirectOnSessionExpired`) navigates
 client-side to `loginPathWithReturn(<current full path>)`, i.e.
 `/login?redirect=…`. Another service's refused refresh clears only that
 service's tokens: the user stays signed in, the cache is kept and no redirect
@@ -152,15 +153,21 @@ revokes the same way and resolves `null` on a 401, and rejects on anything else.
 - `AuthModel.logout()` — only when the user signs out in this tab. Ends the
   session as `"logout"`: the login page gets no `redirect`.
 - `AuthModel.revokeSession(sinceEpoch?)` — the server rejected the session
-  outside a refused refresh (a 401 on the session read). When the session
-  already ended (the epoch moved since the request started, no tokens are
-  stored, or a logout is running) it posts nothing and resolves `false`; the
-  caller only resets local state. Otherwise it runs the same steps as logout
-  below (best effort, never rejects), ends the session as `"expired"` and
-  resolves `true`, so the expiry redirect carries `redirect=<current path>`.
-  Concurrent calls share one in-flight revoke: one POST, one event.
-  A `logout()` called meanwhile waits for that revoke and returns: no second
-  POST, no second event.
+  outside a refused refresh (a 401 on the session read). When the epoch moved
+  since `sinceEpoch` (the request started) it resolves `false` at once.
+  Otherwise concurrent calls share one in-flight revoke — one POST, one event —
+  which runs the same steps as logout below (best effort, never rejects), ends
+  the session as `"expired"` and resolves `true`, so the expiry redirect
+  carries `redirect=<current path>`.
+- A revoke backs out — resolves `false`, posts nothing, ends nothing; the
+  caller only resets local state — when the session already ended: the epoch
+  moved (since `sinceEpoch`, else since the revoke started), no tokens are
+  stored, or a logout is running. It checks when it starts and again once it
+  holds the lock, since a refused refresh it waited for may have ended the
+  session meanwhile. A logout never backs out.
+- A `logout()` called while a revoke is in flight waits for it: when the
+  revoke ended the session it returns (no second POST, no second event); when
+  the revoke backed out it logs out normally.
 
 Both share one private helper, `endServerSession(reason, sinceEpoch?)`.
 
@@ -200,11 +207,15 @@ state (kept current by this tab's own token writes via `onTokensChanged`):
 
 - another tab removed the tokens (logout) → `endSession("logout", "MAIN")`
   here (epoch, user, query cache), then `onLogout`. This tab writes no storage
-  and posts nothing. On a protected page (route `staticData.requiresAuth`) the
-  root layout navigates to `/login` without `redirect`; elsewhere it re-runs
-  the guards;
+  and posts nothing. On a protected page (route `staticData.requiresAuth`)
+  `setupSessionExpiry` navigates to `/login` without `redirect`. It skips a
+  `"logout"` end while `AuthModel.isLoggingOut()` is true — set only while
+  this tab's own `logout()` ends the session, whose button already navigates —
+  so a local logout navigates once. A revoke waiting for the refresh lock does
+  not set it, so another tab's logout during that wait still navigates;
 - another tab stored tokens (login) → `onLogin` resets `auth.me`, invalidates
-  every query so the profile refetches, reloads the user and re-runs the guards.
+  every query so the profile refetches, reloads the user and re-runs the guards
+  (`router.invalidate()`, only while signed in).
 
 A token rotation by another tab's refresh is ignored. Guarded for tests and
 non-browser contexts (no `window` → no-op).

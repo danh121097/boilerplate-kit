@@ -134,8 +134,10 @@ the logout internals (`endServerSession`): logout pending, lock, epoch bump, a
 best-effort `POST /auth/logout`, then `endSession("expired", service)`, so the
 expiry redirect carries the return path. It resolves `true` when it ended the
 session and `false` — posting nothing — when the session had already ended (no
-hint, a logout running, or the epoch moved since the read started). Concurrent
-calls share one revoke: one POST, one event. Server functions and SSR never
+hint, a logout running, or the epoch moved since the read started). It checks
+again once it holds the lock, so a refused refresh that ended the session while
+the revoke waited is not ended twice. Concurrent calls share one revoke: one
+POST, one event. Server functions and SSR never
 revoke. `AuthModel.getSession()` (axios, browser) behaves the same way.
 
 ## Server functions (SSR reads)
@@ -166,7 +168,9 @@ refreshes on mount.
 `AuthModel.logout()` — the user's own sign-out in this tab; it ends as
 "logout", and the header then navigates to plain `/login` (no `redirect`),
 whether or not the request succeeded. A logout called while a revoke is in
-flight joins it (one POST, one session end):
+flight joins it (one POST, one session end, as "expired"); if that revoke backs
+out because the session had already ended, the logout then runs on its own
+(one POST, ends as "logout"):
 
 1. In the first synchronous tick, before any await, marks a logout as pending
    (`beginLogout`). From then on a 401 — and any refresh already queued — rejects

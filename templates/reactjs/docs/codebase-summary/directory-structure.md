@@ -38,6 +38,7 @@ templates/reactjs/
     ├── services/
     │   ├── index.ts
     │   ├── init-services.ts
+    │   ├── session-expiry.ts
     │   ├── core/              # api, interceptors, hmac, token-storage, model, tanstack, types
     │   ├── auth/              # AuthModel + mutations/queries
     │   └── users/             # UsersModel + useUsersListQuery

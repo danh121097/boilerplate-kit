@@ -38,7 +38,9 @@ and 5xx.
 `AuthModel.logout()` — the user's own sign-out in this tab; it ends as
 "logout", and the header then navigates to plain `/login` (no `redirect`),
 whether or not the request succeeded. A logout called while a revoke is in
-flight joins it (one POST, one session end):
+flight joins it (one POST, one session end, as "expired"); if that revoke backs
+out because the session had already ended, the logout then runs on its own
+(one POST, ends as "logout"):
 
 1. In the first synchronous tick, before any await, marks a logout as pending
    (`beginLogout`). From then on a 401 — and any refresh already queued — rejects
@@ -77,6 +79,8 @@ bump, a best-effort `POST /auth/logout`, then `endSession("expired", service)`,
 so the expiry redirect carries the return path. It resolves `true` when it
 ended the session and `false` — posting nothing — when the session had already
 ended (no hint, a logout running, or the epoch moved since the read started).
+It checks again once it holds the lock, so a refused refresh that ended the
+session while the revoke waited is not ended twice. It never runs on the server.
 Concurrent calls share one revoke: one POST, one event. The server-side read
 (`readServerSession`) never revokes. An anonymous 401 (no hint) resolves to
 `null` without a POST or an event.
