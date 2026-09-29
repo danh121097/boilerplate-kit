@@ -50,30 +50,41 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ user, isAuthenticated: Boolean(user) || hasStoredSession(authContract.service) }),
 
   hydrate: async () => {
-    set({ hydrateError: null });
     if (!hasStoredSession(authContract.service)) {
-      set({ hydrated: true });
+      set({ hydrated: true, hydrateError: null });
       return;
     }
     const epoch = getSessionEpoch(authContract.service);
     try {
       const user = await AuthModel.getMe();
-      set({ user, isAuthenticated: true, hydrated: true });
+      // The session ended while the request ran (logout here or in another tab):
+      // the session-end listener already signed the store out — do not resurrect the user.
+      if (
+        getSessionEpoch(authContract.service) !== epoch ||
+        !hasStoredSession(authContract.service)
+      ) {
+        set({ hydrated: true });
+        return;
+      }
+      set({ user, isAuthenticated: true, hydrated: true, hydrateError: null });
     } catch (error) {
+      // The session changed while the request ran (logout, or a new login with
+      // its own read): that path owns the state, so the failure is dropped.
+      if (getSessionEpoch(authContract.service) !== epoch) {
+        set({ hydrated: true });
+        return;
+      }
       if (isUnauthorizedError(error)) {
         // The server rejected the session: revoke it (ends as "expired", so the
         // login page returns here). A refused refresh or a running logout
         // already ended it — then this only resets local state.
         await AuthModel.revokeSession(epoch);
-        set({ user: null, isAuthenticated: false, hydrated: true });
+        set({ user: null, isAuthenticated: false, hydrated: true, hydrateError: null });
         return;
       }
-      // The session ended while the request ran (logout here or in another tab).
-      if (
-        getSessionEpoch(authContract.service) !== epoch ||
-        !hasStoredSession(authContract.service)
-      ) {
-        set({ user: null, isAuthenticated: false, hydrated: true });
+      // The tokens are gone (cleared without a session end).
+      if (!hasStoredSession(authContract.service)) {
+        set({ user: null, isAuthenticated: false, hydrated: true, hydrateError: null });
         return;
       }
       // Network error / timeout / 5xx: the session may still be valid — keep the

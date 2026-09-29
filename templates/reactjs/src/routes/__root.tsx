@@ -1,6 +1,6 @@
+import { LogoutButton } from "@/components/logout-button";
 import { NotFound } from "@/components/not-found";
 import { setLocale } from "@/i18n/i18n";
-import { useLogoutMutation } from "@/services/auth";
 import { setupSessionExpiry } from "@/services/session-expiry";
 import { syncAuthWithOtherTabs, useAuthStore } from "@/stores/auth";
 import { createRootRouteWithContext } from "@tanstack/react-router";
@@ -29,8 +29,7 @@ function RootLayout() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const router = useRouter();
   const hydrateError = useAuthStore((s) => s.hydrateError);
-  const logout = useLogoutMutation();
-  const navigate = useNavigate();
+  const hydrated = useAuthStore((s) => s.hydrated);
   const hydrate = useAuthStore((s) => s.hydrate);
   const retryHydrate = useAuthStore((s) => s.retryHydrate);
 
@@ -60,12 +59,6 @@ function RootLayout() {
     setLocale(next as "en" | "ja");
   }
 
-  // Signed out either way (the client session ends even when the request
-  // fails): go to plain /login, no return path.
-  function onLogout() {
-    logout.mutate(undefined, { onSettled: () => void navigate({ to: "/login" }) });
-  }
-
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border bg-card">
@@ -83,14 +76,7 @@ function RootLayout() {
             {t("nav.form")}
           </Link>
           {isAuthenticated ? (
-            <Button
-              variant="unstyled"
-              className="ml-auto hover:text-primary"
-              disabled={logout.isPending}
-              onClick={onLogout}
-            >
-              {t("nav.logout")}
-            </Button>
+            <LogoutButton />
           ) : (
             <Link to="/login" className={cn(navLink, "ml-auto")}>
               {t("nav.login")}
@@ -112,7 +98,12 @@ function RootLayout() {
             className="mb-4 flex items-center gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm"
           >
             {t("session.unavailable")}
-            <Button variant="unstyled" className="ml-auto underline" onClick={retryHydrate}>
+            <Button
+              variant="unstyled"
+              className="ml-auto underline"
+              disabled={!hydrated}
+              onClick={retryHydrate}
+            >
               {t("session.retry")}
             </Button>
           </p>

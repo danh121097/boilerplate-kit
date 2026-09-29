@@ -173,6 +173,55 @@ describe("session auth flows", () => {
     });
   });
 
+  it("boot: a profile that resolves after a logout does not resurrect the user", async () => {
+    persistAccessToken("AT");
+    persistRefreshToken("RT");
+    let resolveMe!: (user: never) => void;
+    vi.spyOn(AuthModel, "getMe").mockReturnValue(new Promise((resolve) => (resolveMe = resolve)));
+    vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
+
+    const pending = useAuthStore.getState().hydrate();
+    await AuthModel.logout();
+    resolveMe({ _id: "u1" } as never);
+    await pending;
+
+    expect(getAccessToken()).toBeNull();
+    expect(useAuthStore.getState()).toMatchObject({
+      user: null,
+      isAuthenticated: false,
+      hydrated: true,
+    });
+  });
+
+  it.each([
+    ["a network error", { error_code: 0, error_message: "Network Error" }],
+    ["a 401", { error_code: 401, error_message: "Unauthorized" }],
+  ])(
+    "boot: a profile read that fails with %s after a logout and a new login keeps the new user",
+    async (_label, failure) => {
+      persistAccessToken("AT");
+      persistRefreshToken("RT");
+      let rejectMe!: (error: unknown) => void;
+      vi.spyOn(AuthModel, "getMe").mockReturnValue(new Promise((_, reject) => (rejectMe = reject)));
+      vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
+
+      const pending = useAuthStore.getState().hydrate();
+      await AuthModel.logout();
+      // A new session starts before the old read settles.
+      persistAccessToken("AT2");
+      persistRefreshToken("RT2");
+      useAuthStore.getState().setUser({ _id: "u2" } as never);
+      rejectMe(failure);
+      await pending;
+
+      expect(useAuthStore.getState()).toMatchObject({
+        user: { _id: "u2" },
+        isAuthenticated: true,
+        hydrateError: null,
+      });
+    },
+  );
+
   it("logout whose request fails still signs out locally: tokens, cache and store are cleared", async () => {
     persistAccessToken("AT");
     persistRefreshToken("RT");
