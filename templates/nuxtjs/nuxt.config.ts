@@ -68,6 +68,10 @@ export default defineNuxtConfig({
       languageCode: "en",
       hmacSecret: "",
       buildVersion: "1.0.0",
+      // Dev-only mock auth (see services/auth/mock-auth.ts). Off unless "true"/"1".
+      authMock: "",
+      authMockEmail: "",
+      authMockPassword: "",
     },
   },
 

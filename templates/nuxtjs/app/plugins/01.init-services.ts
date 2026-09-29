@@ -1,4 +1,5 @@
 import { authContract } from "@/services/auth/contract";
+import { initMockAuth } from "@/services/auth/mock-auth";
 import {
   Api,
   ApiInterceptors,
@@ -22,6 +23,9 @@ export default defineNuxtPlugin(() => {
   // Resolve the app-name prefix (session hint cookie, refresh lock + timestamp)
   // while a Nuxt context exists — same prefix as `useStorageKeys`.
   setAppPrefix(useRuntimeConfig().public.appName);
+  // Dev-only mock auth: reads its flag and logs its one boot warning (or why the
+  // flag was ignored). Off by default; never active in a production build.
+  initMockAuth(useRuntimeConfig().public);
 
   const services: Array<{
     name: string;

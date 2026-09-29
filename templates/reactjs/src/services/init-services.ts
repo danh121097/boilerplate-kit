@@ -1,5 +1,6 @@
 import { STORAGE_KEYS } from "@/enums";
 import { authContract } from "@/services/auth/contract";
+import { getMockAuth } from "@/services/auth/mock-auth";
 import { Api, ApiInterceptors, getApiBaseUrl } from "@/services/core";
 import { registerServiceToken } from "@/services/core/auth-token-storage";
 import type { ServiceRefreshConfig, ServiceTokenKeys } from "@/services/core";
@@ -35,6 +36,9 @@ const SERVICES: ServiceDefinition[] = [
 ];
 
 export function initServices(): void {
+  // Dev-only mock auth: logs its one boot warning (or why the flag was ignored).
+  getMockAuth();
+
   const refreshByService: Record<string, ServiceRefreshConfig> = {};
 
   for (const svc of SERVICES) {

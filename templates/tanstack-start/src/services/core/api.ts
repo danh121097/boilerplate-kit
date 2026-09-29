@@ -40,6 +40,7 @@ export class Api {
       headers: { "Content-Type": "application/json", Accept: "*/*" },
       withCredentials: true,
       timeout: 30_000,
+      ...(config.adapter ? { adapter: config.adapter } : {}),
     });
 
     // Lazy baseURL resolver — set after Api instance construction via Api.setBaseURL().

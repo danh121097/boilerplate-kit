@@ -63,7 +63,13 @@ VITE_API_PREFIX=/api/v1
 VITE_LANGUAGE_CODE=en   # default locale
 VITE_HMAC_SECRET=       # HMAC signing secret (must match backend)
 VITE_BUILD_VERSION=     # injected by CI for x-version header
+# Optional, dev only — answer /auth/* in the browser before the backend auth exists
+# VITE_AUTH_MOCK=true
+# VITE_AUTH_MOCK_EMAIL=demo@example.com
+# VITE_AUTH_MOCK_PASSWORD=password
 ```
+
+See [Mock auth](./docs/system-architecture/security-auth.md#mock-auth-before-backend-integration): the flag is ignored in production builds.
 
 ## Commands
 

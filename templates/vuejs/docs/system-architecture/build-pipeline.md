@@ -84,6 +84,8 @@ Vite exposes `import.meta.env.VITE_*` to the client. Ones the app reads:
 | `VITE_BUILD_VERSION` | `hmac-signature.ts` | `x-version` header (default `1.0.0`). |
 | `VITE_LANGUAGE_CODE` | `i18n.ts` | Default locale fallback. |
 | `VITE_APP_NAME` | `storage-keys.ts` | Prefix for localStorage keys. |
+| `VITE_AUTH_MOCK` | `mock-auth.ts` | Dev only: `true`/`1` answers `/auth/*` in the browser. Ignored in production builds. |
+| `VITE_AUTH_MOCK_EMAIL` / `VITE_AUTH_MOCK_PASSWORD` | `mock-auth.ts` | Mock login credentials (default `demo@example.com` / `password`). |
 
 ## Scripts (`package.json`)
 

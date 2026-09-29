@@ -49,7 +49,13 @@ VITE_APP_NAME=MY_APP
 VITE_LANGUAGE_CODE=en
 VITE_HMAC_SECRET=           # must match backend HMAC_SECRET
 VITE_BUILD_VERSION=         # injected by CI
+# Optional, dev only — answer /auth/* in the browser before the backend auth exists
+# VITE_AUTH_MOCK=true
+# VITE_AUTH_MOCK_EMAIL=demo@example.com
+# VITE_AUTH_MOCK_PASSWORD=password
 ```
+
+See [Mock auth](./docs/system-architecture/security-auth.md#mock-auth-before-backend-integration): the flag is ignored in production builds.
 
 ## Project structure
 

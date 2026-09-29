@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { setLocale } from "@/i18n/i18n";
 import { useLogoutMutation } from "@/services/auth";
+import { isMockAuthEnabled } from "@/services/auth/mock-auth";
 import { useAuth } from "@/services/auth/session";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
@@ -14,6 +15,9 @@ const NAV = [
   { href: "/users", key: "nav.users" },
   { href: "/form", key: "nav.form" },
 ] as const;
+
+// Folds to false in a production build, so the badge is tree-shaken.
+const mockAuth = process.env.NODE_ENV !== "production" && isMockAuthEnabled();
 
 /** App header + nav — client component (i18n labels + locale toggle + auth). */
 export function SiteHeader() {
@@ -67,6 +71,15 @@ export function SiteHeader() {
           {i18n.language.toUpperCase()}
         </Button>
       </nav>
+      {mockAuth && (
+        <span
+          role="status"
+          title="NEXT_PUBLIC_AUTH_MOCK is on: sign-in is answered in the browser, not by the backend"
+          className="fixed bottom-3 left-3 z-50 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-900 ring-1 ring-amber-300"
+        >
+          Mock auth
+        </span>
+      )}
     </header>
   );
 }

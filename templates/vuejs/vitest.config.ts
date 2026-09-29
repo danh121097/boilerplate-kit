@@ -11,6 +11,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    setupFiles: ["./src/__tests__/setup-mock-auth-off.ts"],
     include: ["src/**/*.test.ts"],
   },
 });

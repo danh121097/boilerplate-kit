@@ -7,6 +7,9 @@ interface ImportMetaEnv {
   readonly VITE_LANGUAGE_CODE?: string;
   readonly VITE_HMAC_SECRET?: string;
   readonly VITE_BUILD_VERSION?: string;
+  readonly VITE_AUTH_MOCK?: string;
+  readonly VITE_AUTH_MOCK_EMAIL?: string;
+  readonly VITE_AUTH_MOCK_PASSWORD?: string;
 }
 
 interface ImportMeta {

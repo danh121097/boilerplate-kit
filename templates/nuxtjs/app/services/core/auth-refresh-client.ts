@@ -1,3 +1,4 @@
+import { mockAuthAdapter } from "@/services/auth/mock-auth";
 import { Api } from "@/services/core/api";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import type { TokenRefresher } from "@/services/core/refresh-token-manager";
@@ -33,6 +34,8 @@ export function createTokenRefresher(endpoint: string, service: ApiService): Tok
       withCredentials: true,
       headers,
       timeout: REFRESH_TIMEOUT_MS,
+      // Dev-only mock auth answers this call in the browser; undefined otherwise.
+      adapter: mockAuthAdapter,
     });
   };
 }

@@ -236,3 +236,55 @@ Mounted components (the header, a list page) stay subscribed, so they re-render
 signed-out at once, and the next login's `auth.me` invalidation — same tab or
 another tab — reaches them. `clear()` would detach them and leave the old user
 on screen.
+
+## Mock auth (before backend integration)
+
+`VITE_AUTH_MOCK=true` answers the auth routes in the browser so screens can be
+built before the backend auth exists. It is **off by default**; turn it off and
+the real backend is used with no change to screens, stores or guards.
+
+```
+VITE_AUTH_MOCK=true
+# Optional — defaults: demo@example.com / password
+# VITE_AUTH_MOCK_EMAIL=dev@example.com
+# VITE_AUTH_MOCK_PASSWORD=s3cret-pass
+```
+
+Truthy is `"true"` or `"1"`. Implementation: `services/auth/mock-auth.ts`
+(adapter), with `mock-auth-config.ts` (flag), `mock-auth-session.ts` (mock user
+cookie) and `mock-auth-responses.ts` (backend-shaped replies) in the browser,
+and `server/mock-session.ts` (SSR).
+
+- **Seam.** `mockAuthAdapter` replaces only axios's network adapter, on
+  `AuthModel`'s client and on the bare refresh call (`auth-refresh-client.ts`).
+  Requests still run the real interceptors, and answers use the backend's
+  shapes: login/register/refresh/logout/me return the `{ success, data }`
+  envelope, and a wrong password is the same 401
+  (`{ error_code: 401, message: "Invalid email or password!" }`) the login form
+  already shows. Every other API still calls the real backend.
+- **Session.** Login sets the readable session hint cookie exactly as before, so
+  the SSR route guards, cross-tab sync and logout are unchanged. The httpOnly
+  token cookies need a backend, so the mock keeps the signed-in user in a
+  readable `<APP>_MOCK_USER` cookie (7 days, like the hint). The browser sends it
+  with page requests, so `readServerSession` resolves the user during SSR and a
+  reload keeps the session. The mock `refresh` renews that cookie; with the
+  cookie gone but the hint left, the refresh is refused and the session ends as
+  "expired", like a real refused refresh.
+- **Credentials.** One login pair. `register` signs up any user, who stays
+  signed in but cannot log in again (no user store).
+- **Signals.** One `console.warn` at boot (`initServices`) and a "Mock auth"
+  badge in `routes/__root.tsx`, only while active.
+- **Dev SSR trust.** With the flag on, the dev SSR server takes the readable
+  `<APP>_MOCK_USER` cookie as the user's identity, with no signature or backend
+  check: anyone who can reach it can forge a session. Run with the flag only on
+  localhost, never on a shared, staging or tunnelled dev server.
+- **Production guard.** In a production build the flag is ignored, with one
+  `console.warn`, and the mock adapter and the server branch are removed from
+  the bundle (`import.meta.env.PROD`); the badge is gated on it too, so it never
+  renders.
+- **Limits.** Server functions that read other endpoints (`get-users`) forward
+  the `accessToken` cookie, which the mock never sets, so they see a signed-out
+  session and reject: point them at a backend that accepts it, or mock them
+  separately. The Socket.IO handshake relies on that same `accessToken` cookie,
+  so the socket is refused the same way. Tokens never expire, so expiry flows
+  need a real backend.

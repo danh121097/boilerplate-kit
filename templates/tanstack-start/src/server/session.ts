@@ -1,5 +1,7 @@
+import { readMockServerSession } from "@/server/mock-session";
 import { serverApiGet } from "@/server/server-api";
 import { authContract } from "@/services/auth/contract";
+import { getMockAuth } from "@/services/auth/mock-auth-config";
 import { isServerUnauthorized } from "@/services/core/server-session";
 import type { AuthUser } from "@/services/auth/types/auth";
 import type { ServerUnauthorized } from "@/services/core/server-session";
@@ -12,8 +14,13 @@ import type { ServerUnauthorized } from "@/services/core/server-session";
  * "signed out", and treats an unhinted one as anonymous (`fetchSession` maps it
  * to null). Other failures (5xx, unreachable) reject. Server-only — reached from
  * the client only through `getMeServerFn`.
+ *
+ * With the dev-only mock auth on (`VITE_AUTH_MOCK`) the user comes from the mock
+ * cookie instead of the backend; the branch is dropped from production builds.
  */
 export async function readServerSession(): Promise<AuthUser | null | ServerUnauthorized> {
+  const mock = getMockAuth();
+  if (!import.meta.env.PROD && mock) return readMockServerSession();
   const body = await serverApiGet<{ user?: AuthUser }>(authContract.paths.me);
   return isServerUnauthorized(body) ? body : (body.user ?? null);
 }

@@ -8,6 +8,7 @@ export default defineConfig({
   test: {
     // Run in Node so localStorage stubs and node:crypto work without jsdom overhead.
     environment: "node",
+    setupFiles: ["./src/__tests__/setup-mock-auth-off.ts"],
     include: ["src/**/*.test.{ts,tsx}"],
   },
   resolve: {

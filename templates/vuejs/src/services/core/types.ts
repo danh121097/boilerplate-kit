@@ -1,5 +1,5 @@
 import type { QueryKey, UseQueryOptions } from "@tanstack/vue-query";
-import type { AxiosInstance, AxiosRequestConfig } from "axios";
+import type { AxiosAdapter, AxiosInstance, AxiosRequestConfig } from "axios";
 
 /**
  * Logical name of a backend an Api instance talks to. "MAIN" is the default and
@@ -87,6 +87,8 @@ export interface ServiceConfig {
   path: string;
   service?: ApiService;
   baseURL?: string;
+  /** Replaces axios's network adapter for this service's client (dev-only mock auth). */
+  adapter?: AxiosAdapter;
 }
 
 export interface ApiRequestConfig extends AxiosRequestConfig {

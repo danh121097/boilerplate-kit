@@ -1,4 +1,5 @@
 import { authContract } from "@/services/auth/contract";
+import { mockAuthAdapter } from "@/services/auth/mock-auth";
 import {
   beginLogout,
   bumpSessionEpoch,
@@ -26,7 +27,12 @@ let revoking: Promise<boolean> | null = null;
 
 export class AuthModel extends Model {
   static {
-    Model.setup.call(this, { path: authContract.base, service: authContract.service });
+    Model.setup.call(this, {
+      path: authContract.base,
+      service: authContract.service,
+      // Dev-only mock auth answers /auth/* in the browser; undefined otherwise.
+      adapter: mockAuthAdapter,
+    });
   }
 
   static async login(payload: LoginPayload): Promise<AuthResult> {

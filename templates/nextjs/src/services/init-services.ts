@@ -1,4 +1,5 @@
 import { authContract } from "@/services/auth/contract";
+import { getMockAuth } from "@/services/auth/mock-auth";
 import {
   Api,
   ApiInterceptors,
@@ -40,6 +41,9 @@ const SERVICES: ServiceDefinition[] = [
 ];
 
 export function initServices(): void {
+  // Dev-only mock auth: logs its one boot warning (or why the flag was ignored).
+  getMockAuth();
+
   const refreshByService: Record<string, ServiceRefreshConfig> = {};
 
   for (const svc of SERVICES) {

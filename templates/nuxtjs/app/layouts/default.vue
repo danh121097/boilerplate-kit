@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useLogoutMutation, useMeQuery } from "@/services/auth";
+import { isMockAuthEnabled } from "@/services/auth/mock-auth";
 import { resetQueriesToSignedOut } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
 import { useQueryClient } from "@tanstack/vue-query";
@@ -25,6 +26,9 @@ const { mutate: doLogout, isPending: logoutPending } = useLogoutMutation({
     await navigateTo("/login");
   },
 });
+
+// `!PROD` is false in a production build, so the badge never renders.
+const mockAuth = !import.meta.env.PROD && isMockAuthEnabled();
 
 const isAuthenticated = computed(() => Boolean(sessionUser.value));
 
@@ -78,5 +82,13 @@ function toggleLocale() {
       </p>
       <slot />
     </main>
+    <span
+      v-if="mockAuth"
+      role="status"
+      title="NUXT_PUBLIC_AUTH_MOCK is on: sign-in is answered in the browser, not by the backend"
+      class="fixed bottom-3 left-3 z-50 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-900 ring-1 ring-amber-300"
+    >
+      Mock auth
+    </span>
   </div>
 </template>

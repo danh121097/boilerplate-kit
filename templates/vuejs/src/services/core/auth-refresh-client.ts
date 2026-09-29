@@ -1,3 +1,4 @@
+import { mockAuthAdapter } from "@/services/auth/mock-auth";
 import { Api } from "@/services/core/api";
 import { getRefreshToken } from "@/services/core/auth-token-storage";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
@@ -83,7 +84,13 @@ export function createTokenRefresher(endpoint: string, service: ApiService): Tok
     const { data } = await axios.post<RefreshResponseBody>(
       `${Api.getBaseURL(service)}${endpoint}`,
       body,
-      { withCredentials: true, headers, timeout: REFRESH_TIMEOUT_MS },
+      {
+        withCredentials: true,
+        headers,
+        timeout: REFRESH_TIMEOUT_MS,
+        // Dev-only mock auth answers this call in the browser; undefined otherwise.
+        adapter: mockAuthAdapter,
+      },
     );
 
     return { accessToken: extractAccessToken(data), refreshToken: extractRefreshToken(data) };

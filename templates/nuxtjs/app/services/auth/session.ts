@@ -1,5 +1,8 @@
 import { AuthModel } from "@/services/auth/auth";
 import { authContract } from "@/services/auth/contract";
+import { isMockAuthEnabled } from "@/services/auth/mock-auth-config";
+import { mockUnauthorizedError } from "@/services/auth/mock-auth-responses";
+import { readMockServerUser } from "@/services/auth/mock-auth-session";
 import { defineQuery, hasSessionHint, isUnauthorizedError, serverApiGet } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
 import type { AuthUser } from "@/services/auth/types/auth";
@@ -28,6 +31,14 @@ export function fetchSessionUser(): Promise<AuthUser | null> {
  * the request's Nuxt context: the hint is read before the first await. */
 export async function readServerSession(): Promise<AuthUser | null> {
   const hinted = hasSessionHint();
+  // Dev-only mock auth: the user comes from the mock cookie, not the backend.
+  // The branch is dropped from production builds.
+  if (!import.meta.env.PROD && isMockAuthEnabled()) {
+    const user = readMockServerUser();
+    if (user) return user;
+    if (!hinted) return null;
+    throw mockUnauthorizedError(); // hinted, cookie gone: the browser resolves it
+  }
   try {
     const body = await serverApiGet<{ user?: AuthUser }>(authContract.paths.me);
     return body?.user ?? null;
