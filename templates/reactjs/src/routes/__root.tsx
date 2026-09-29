@@ -1,5 +1,4 @@
 import { setLocale } from "@/i18n/i18n";
-import { isMockAuthEnabled } from "@/services/auth/mock-auth";
 import { setupSessionExpiry } from "@/services/session-expiry";
 import { syncAuthWithOtherTabs, useAuthStore } from "@/stores/auth";
 import { createRootRouteWithContext } from "@tanstack/react-router";
@@ -13,8 +12,11 @@ export const Route = createRootRouteWithContext<RouterContext>()({
   component: RootLayout,
 });
 
-// `!PROD` folds to false in a production build, so the badge is tree-shaken.
-const mockAuth = !import.meta.env.PROD && isMockAuthEnabled();
+// The import itself is gated on the production constant: a production build has no
+// badge code at all, not even an inert branch.
+const MockAuthBadge = import.meta.env.PROD
+  ? null
+  : lazy(() => import("@/components/mock-auth-badge").then((m) => ({ default: m.MockAuthBadge })));
 
 function RootLayout() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -91,14 +93,10 @@ function RootLayout() {
       <main className="mx-auto max-w-3xl px-6 py-8">
         <Outlet />
       </main>
-      {mockAuth && (
-        <span
-          role="status"
-          title="VITE_AUTH_MOCK is on: sign-in is answered in the browser, not by the backend"
-          className="fixed bottom-3 left-3 z-50 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-900 ring-1 ring-amber-300"
-        >
-          Mock auth
-        </span>
+      {MockAuthBadge && (
+        <Suspense fallback={null}>
+          <MockAuthBadge />
+        </Suspense>
       )}
     </div>
   );

@@ -247,9 +247,10 @@ on screen.
 
 ## Mock auth (before backend integration)
 
-`VITE_AUTH_MOCK=true` answers the auth routes in the browser so screens can be
-built before the backend auth exists. It is **off by default**; turn it off and
-the real backend is used with no change to screens, stores or guards.
+`VITE_AUTH_MOCK=true` answers the template's built-in endpoints in the browser —
+auth (`/auth/*`) and users (`/users`) — so screens can be built before the
+backend exists. It is **off by default**; turn it off and the real backend is
+used with no change to screens, stores or guards.
 
 ```
 VITE_AUTH_MOCK=true
@@ -260,28 +261,40 @@ VITE_AUTH_MOCK=true
 
 Truthy is `"true"` or `"1"`. Implementation: `services/auth/mock-auth.ts`
 (adapter), with `mock-auth-config.ts` (flag), `mock-auth-session.ts` (tokens)
-and `mock-auth-responses.ts` (backend-shaped replies).
+and `mock-auth-responses.ts` (backend-shaped replies), plus
+`services/users/mock-users.ts` (the users fixture and handlers).
 
 - **Seam.** `mockAuthAdapter` replaces only axios's network adapter, on
-  `AuthModel`'s client and on the bare refresh call (`auth-refresh-client.ts`).
-  Requests still run the real interceptors, and answers use the backend's
-  shapes: login/register/refresh/logout/me return the `{ success, data }`
-  envelope, and a wrong password is the same 401
+  `AuthModel`'s and `UsersModel`'s clients and on the bare refresh call
+  (`auth-refresh-client.ts`). Requests still run the real interceptors, and
+  answers use the backend's shapes: login/register/refresh/logout/me return the
+  `{ success, data }` envelope, and a wrong password is the same 401
   (`{ error_code: 401, message: "Invalid email or password!" }`) the login form
-  already shows. Every other API still calls the real backend.
+  already shows. Any other API still calls the real backend.
 - **Session.** Persisted exactly like the real mode: opaque
   `mock-access|…` / `mock-refresh|…` tokens go to the same localStorage slots,
   so a reload keeps the session, an invalid access token refreshes through the
   mock, cross-tab sync and logout work. The token carries the user, so `me` and
   `refresh` need no server state.
-- **Credentials.** One login pair. `register` signs up any user, who stays
-  signed in but cannot log in again (no user store).
+- **Credentials.** One login pair, signed in as an `admin` so the built-in
+  users screen works. `register` signs up any user, who stays signed in but
+  cannot log in again (no user store) and is a plain `user`.
+- **Users.** `GET /users` (offset-paginated `?page&limit`, envelope
+  `{ status: "success", data, meta }`) and `GET /users/:id` answer from a fixed
+  fixture: the demo user plus five sample users (`MOCK_SAMPLE_USERS`), newest
+  first, no passwords. Checks run in the backend's order: no session is `401`
+  ("Access token required!"), a role below `admin` is `403` ("Insufficient
+  permissions!"), an unknown id is `404` ("User not found!"). Users registered
+  in the mock session are not added to the list. Any unknown id is `404` here; the backend answers `400` for a malformed ObjectId. Other methods and paths fall
+  through to the real backend.
 - **Signals.** One `console.warn` at boot (`initServices`) and a "Mock auth"
-  badge in `routes/__root.tsx`, only while active.
+  badge (`components/mock-auth-badge.tsx`, rendered lazily by
+  `routes/__root.tsx`), only while active.
 - **Production guard.** In a production build the flag is ignored, with one
-  `console.warn`, and the mock adapter is removed from the bundle
-  (`import.meta.env.PROD`); the badge is gated on it too, so it never renders.
-- **Limits.** Protected non-auth endpoints on the real backend still reject a
-  mock token (401): point them at a backend that accepts it, or mock them
-  separately. The Socket.IO handshake sends the mock token and is refused the
-  same way. Tokens never expire, so expiry flows need a real backend.
+  `console.warn`, and the mock adapter and the users fixture are removed from
+  the bundle (`import.meta.env.PROD`). The badge component is imported only
+  outside production, so its code is not in a production bundle at all.
+- **Limits.** Endpoints beyond auth and users still call the real backend, which
+  rejects a mock token (401): point them at a backend that accepts it, or mock
+  them separately. The Socket.IO handshake sends the mock token and is refused
+  the same way. Tokens never expire, so expiry flows need a real backend.

@@ -9,14 +9,17 @@ import {
   unauthorized,
 } from "@/services/auth/mock-auth-responses";
 import { readMockUser, writeMockUser } from "@/services/auth/mock-auth-session";
+import { answerMockUsers, mockDemoUser } from "@/services/users/mock-users";
 import type { MockAuthConfig } from "@/services/auth/mock-auth-config";
 import type { AuthUser } from "@/services/auth/types/auth";
+import type { MockCaller } from "@/services/users/mock-users";
 import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import axios from "axios";
 
 /**
  * Dev-only mock of the backend auth routes (login, register, refresh, logout,
- * me), so the UI can be built before the backend auth exists. Turn it on with
+ * me) and the users routes (`services/users/mock-users.ts`), so the UI can be
+ * built before the backend exists. Turn it on with
  * `NUXT_PUBLIC_AUTH_MOCK=true` (runtimeConfig `public.authMock`); turn it off
  * and the real backend is used with no other change — pages, stores and route
  * middleware never know the difference.
@@ -53,7 +56,12 @@ export {
 } from "@/services/auth/mock-auth-config";
 export type { MockAuthConfig } from "@/services/auth/mock-auth-config";
 
-/** Answer one auth request the way the backend would, or null for a path this mock does not own. */
+/** Who sent the request: the mock session's user, or the backend's 401 message when there is none. */
+function callerOf(): MockCaller {
+  return readMockUser() ?? "Access token required!";
+}
+
+/** Answer one auth or users request the way the backend would, or null for a path this mock does not own. */
 function answer(
   mock: MockAuthConfig,
   config: InternalAxiosRequestConfig,
@@ -71,7 +79,7 @@ function answer(
     if (email !== mock.email.toLowerCase() || body.password !== mock.password) {
       return reply(config, 401, unauthorized("Invalid email or password!"));
     }
-    const user: AuthUser = { _id: "mock-user", email: mock.email, name: "Demo User", role: "user" };
+    const user = mockDemoUser(mock);
     writeMockUser(user);
     return reply(config, 200, succeed("Login successful!", authResult(user)));
   }
@@ -109,12 +117,12 @@ function answer(
   }
 
   if (method === "get" && path.endsWith(paths.me)) {
-    const user = readMockUser();
-    if (!user) return reply(config, 401, unauthorized("Access token required!"));
-    return reply(config, 200, succeed("", { user }));
+    const caller = callerOf();
+    if (typeof caller === "string") return reply(config, 401, unauthorized(caller));
+    return reply(config, 200, succeed("", { user: caller }));
   }
 
-  return null;
+  return answerMockUsers(mock, config, () => callerOf());
 }
 
 /** axios's own network adapter, resolved at call time so a paused mock falls through to it. */

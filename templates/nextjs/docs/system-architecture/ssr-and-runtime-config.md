@@ -45,6 +45,8 @@ the values at build time:
 | `NEXT_PUBLIC_HMAC_SECRET`   | `hmac-signature.ts` — HMAC signing                                                                              |
 | `NEXT_PUBLIC_BUILD_VERSION` | `hmac-signature.ts` — `x-version` header                                                                        |
 | `NEXT_PUBLIC_LANGUAGE_CODE` | `i18n/i18n.ts` — default locale fallback                                                                        |
+| `NEXT_PUBLIC_AUTH_MOCK`     | `mock-auth-config.ts` — dev only: `true`/`1` answers `/auth/*` and `/users`. Ignored in production builds       |
+| `NEXT_PUBLIC_AUTH_MOCK_EMAIL` / `NEXT_PUBLIC_AUTH_MOCK_PASSWORD` | `mock-auth-config.ts` — mock login credentials (default `demo@example.com` / `password`) |
 
 **Note:** `NEXT_PUBLIC_HMAC_SECRET` is client-readable. For a stronger guarantee,
 move signing into a Next.js Route Handler and keep the secret server-only

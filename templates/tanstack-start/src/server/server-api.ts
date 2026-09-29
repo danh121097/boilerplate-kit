@@ -35,7 +35,7 @@ const API_BASE = getApiBaseUrl();
 
 /** Build the `ApiResponseError` a server read rejects with, from the HTTP
  * status (0 = no response) and the response body when it is an envelope. */
-function toServerApiError(status: number, body?: unknown, fallback = "request_failed") {
+export function toServerApiError(status: number, body?: unknown, fallback = "request_failed") {
   const data = body && typeof body === "object" ? (body as Partial<ApiResponseError>) : undefined;
   const message = data?.message ?? fallback;
   const transient = !status || status === 408 || status === 429 || status >= 500;

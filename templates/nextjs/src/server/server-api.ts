@@ -32,6 +32,10 @@ import type {
  * prefetch is not dehydrated, so the client query refetches through axios,
  * which refreshes.
  *
+ * Dev only, with the mock-auth flag on: the users reads are answered from the
+ * mock session cookie instead (`mock-server-read.ts`), through the same error
+ * mapping, so a mock failure rejects exactly like a backend one.
+ *
  * Next 15+: cookies() is async — must be awaited before reading values.
  */
 const API_BASE = getApiBaseUrl();
@@ -74,6 +78,17 @@ function hmacHeaders(method: string, path: string, contentType: string): Record<
  * would cache as success.
  */
 async function authedFetch<R>(path: string, query?: Record<string, string | number>): Promise<R> {
+  // Dev-only mock auth answers the reads it owns from the mock cookie. The
+  // constant makes this branch (and the dynamic import) vanish in production.
+  if (process.env.NODE_ENV !== "production") {
+    const { answerMockServerRead } = await import("@/server/mock-server-read");
+    const mocked = await answerMockServerRead(path, query);
+    if (mocked) {
+      if (mocked.status === 200) return mocked.body as R;
+      throw toServerApiError(mocked.status, mocked.body);
+    }
+  }
+
   const access = (await cookies()).get("accessToken")?.value;
   // Expired (15 min) or anonymous: nothing to prove a session with.
   if (!access) throw toServerApiError(401, undefined, "Unauthorized");

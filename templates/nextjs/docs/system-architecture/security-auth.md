@@ -268,9 +268,10 @@ on screen.
 
 ## Mock auth (before backend integration)
 
-`NEXT_PUBLIC_AUTH_MOCK=true` answers the auth routes in the browser so screens
-can be built before the backend auth exists. It is **off by default**; turn it
-off and the real backend is used with no change to screens, stores or guards.
+`NEXT_PUBLIC_AUTH_MOCK=true` answers the template's built-in endpoints — auth
+(`/auth/*`) and users (`/users`) — so screens can be built before the backend
+exists. It is **off by default**; turn it off and the real backend is used with
+no change to screens, stores or guards.
 
 ```
 NEXT_PUBLIC_AUTH_MOCK=true
@@ -283,33 +284,54 @@ Truthy is `"true"` or `"1"`. These are build-time `NEXT_PUBLIC_*` values, so
 restart `next dev` after changing them. Implementation:
 `services/auth/mock-auth.ts` (adapter), with `mock-auth-config.ts` (flag),
 `mock-auth-session.ts` (mock user cookie) and `mock-auth-responses.ts`
-(backend-shaped replies).
+(backend-shaped replies), plus `services/users/mock-users.ts` (the users
+fixture and handlers) and `server/mock-server-read.ts` (the server-side read).
 
 - **Seam.** `mockAuthAdapter` replaces only axios's network adapter, on
-  `AuthModel`'s client and on the bare refresh call (`auth-refresh-client.ts`).
-  Requests still run the real interceptors, and answers use the backend's
-  shapes: login/register/refresh/logout/me return the `{ success, data }`
-  envelope, and a wrong password is the same 401
+  `AuthModel`'s and `UsersModel`'s clients and on the bare refresh call
+  (`auth-refresh-client.ts`). Requests still run the real interceptors, and
+  answers use the backend's shapes: login/register/refresh/logout/me return the
+  `{ success, data }` envelope, and a wrong password is the same 401
   (`{ error_code: 401, message: "Invalid email or password!" }`) the login form
-  already shows. Every other API still calls the real backend.
+  already shows. Any other API still calls the real backend.
 - **Session.** Login sets the readable session hint cookie exactly as before, so
   `proxy.ts`, cross-tab sync and logout are unchanged. The httpOnly token
   cookies need a backend, so the mock keeps the signed-in user in a readable
-  `<APP>_MOCK_USER` cookie (7 days, like the hint) that the `me` and `refresh`
-  answers read. A reload keeps the session. With the cookie gone but the hint
-  left, the refresh is refused and the session ends as "expired", like a real
-  refused refresh.
-- **Credentials.** One login pair. `register` signs up any user, who stays
-  signed in but cannot log in again (no user store).
+  `<APP>_MOCK_USER` cookie (7 days, like the hint) that the `me`, `refresh` and
+  users answers read. A reload keeps the session. With the cookie gone but the
+  hint left, the refresh is refused and the session ends as "expired", like a
+  real refused refresh.
+- **Credentials.** One login pair, signed in as an `admin` so the built-in
+  users screen works. `register` signs up any user, who stays signed in but
+  cannot log in again (no user store) and is a plain `user`.
+- **Users.** `GET /users` (offset-paginated `?page&limit`, envelope
+  `{ status: "success", data, meta }`) and `GET /users/:id` answer from a fixed
+  fixture: the demo user plus five sample users (`MOCK_SAMPLE_USERS`), newest
+  first, no passwords. Checks run in the backend's order: no session is `401`
+  ("Access token required!"), a role below `admin` is `403` ("Insufficient
+  permissions!"), an unknown id is `404` ("User not found!"). Users registered
+  in the mock session are not added to the list. Any unknown id is `404` here; the backend answers `400` for a malformed ObjectId. Other methods and paths fall
+  through to the real backend.
+- **Server-side fetch.** The `/users` page prefetches in a Server Component
+  (`getUsersServerData`), where there is no axios and no httpOnly `accessToken`
+  cookie. In development with the flag on, `serverApiPaginate` / `serverApiGet`
+  answer the users reads from the request's `<APP>_MOCK_USER` cookie instead
+  (`server/mock-server-read.ts`, the same handlers as the browser). A non-200
+  mock reply rejects with the same `ApiResponseError` a backend failure does, so
+  the prefetch is not dehydrated and the client query refetches through axios
+  and the mock.
 - **Signals.** One `console.warn` at boot (`initServices`) and a "Mock auth"
-  badge in `components/site-header.tsx`, only while active.
+  badge (`components/mock-auth-badge.tsx`, loaded via `next/dynamic` by
+  `components/site-header.tsx`), only while active.
 - **Production guard.** In a production build (`NODE_ENV === "production"`) the
-  flag is ignored, with one `console.warn`, and the mock adapter is removed from
-  the bundle; the badge is gated on it too, so it never renders.
-- **Limits.** Server Components that read other endpoints (`/users`) forward the
-  `accessToken` cookie, which the mock never sets, so the backend sees a
-  signed-out request: point them at a backend that accepts it, or mock them
-  separately. Server-side code has no `/me` read to mock (the session query
-  runs in the browser). The Socket.IO handshake relies on the `accessToken`
-  cookie, which the mock never sets, so the socket is refused. Tokens never
-  expire, so expiry flows need a real backend.
+  flag is ignored, with one `console.warn`, and the mock adapter and the users
+  fixture are removed from the bundle. The server-side branch and its dynamic
+  import sit behind the same constant, so they are not in the server build
+  either. The badge component is imported only outside production, so its code
+  is not in a production bundle at all.
+- **Limits.** Endpoints beyond auth and users still call the real backend: a
+  Server Component that reads one forwards the `accessToken` cookie, which the
+  mock never sets, so the backend sees a signed-out request. Point them at a
+  backend that accepts it, or mock them separately. The Socket.IO handshake
+  relies on the `accessToken` cookie, which the mock never sets, so the socket
+  is refused. Tokens never expire, so expiry flows need a real backend.

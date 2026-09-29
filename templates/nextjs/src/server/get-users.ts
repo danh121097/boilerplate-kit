@@ -5,7 +5,8 @@ import type { User } from "@/services/users/types/user";
 
 /** Users list for SSR prefetch. Throws on any failure (incl. an expired access
  * cookie) so the client query refetches — and refreshes — instead of caching an
- * empty list. */
+ * empty list. In dev with the mock-auth flag on it is answered from the mock
+ * session cookie (see `server-api.ts`). */
 export async function getUsersServerData(): Promise<PaginatedResponse<User>> {
   return serverApiPaginate<User>(usersContract.paths.list);
 }

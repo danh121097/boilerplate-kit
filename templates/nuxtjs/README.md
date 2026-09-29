@@ -148,13 +148,13 @@ NUXT_PUBLIC_APP_NAME=PRISM_APP
 NUXT_PUBLIC_APP_ENDPOINT=http://localhost:3000
 NUXT_PUBLIC_API_PREFIX=/api/v1
 NUXT_PUBLIC_LANGUAGE_CODE=en
-# Optional, dev only — answer /auth/* in the browser before the backend auth exists
+# Optional, dev only — answer /auth/* and /users in the browser before the backend exists
 # NUXT_PUBLIC_AUTH_MOCK=true
 # NUXT_PUBLIC_AUTH_MOCK_EMAIL=demo@example.com
 # NUXT_PUBLIC_AUTH_MOCK_PASSWORD=password
 ```
 
-See [Mock auth](./docs/system-architecture/security-auth.md#mock-auth-before-backend-integration): the flag is ignored in production builds.
+See [Mock auth](./docs/system-architecture/security-auth.md#mock-auth-before-backend-integration): mock mode answers auth and users; the flag is ignored in production builds.
 
 For private (server-only) secrets, add unprefixed keys (e.g. `NUXT_MY_SECRET=...`, declared under `runtimeConfig`) and access via `useRuntimeConfig().mySecret`. The HMAC secret is **not** one of them: the browser signs its own requests, so it must stay `NUXT_PUBLIC_HMAC_SECRET` — it is visible to every client and is an anti-casual-abuse measure, not authentication.
 

@@ -68,7 +68,7 @@ describe("mock auth", () => {
     const app = await boot();
     const result = await app.AuthModel.login(DEMO);
 
-    expect(result.user).toMatchObject({ email: DEMO.email, role: "user" });
+    expect(result.user).toMatchObject({ email: DEMO.email, role: "admin" });
     expect(result.tokens.accessToken).toEqual(expect.any(String));
     expect(jar.get(STORAGE_KEYS.SESSION)).toBe("1");
     expect(app.hasSessionHint()).toBe(true);
@@ -90,7 +90,7 @@ describe("mock auth", () => {
     const app = await boot();
 
     const result = await app.AuthModel.login(DEMO);
-    expect(result.user).toMatchObject({ email: DEMO.email, role: "user" });
+    expect(result.user).toMatchObject({ email: DEMO.email, role: "admin" });
   });
 
   it("rejects a wrong password with the backend's 401 and starts no session", async () => {

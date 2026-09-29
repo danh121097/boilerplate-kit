@@ -1,3 +1,4 @@
+import { installCookieJar, installLocalStorage } from "@/__tests__/helpers/fake-browser";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import axios from "axios";
 
@@ -15,42 +16,6 @@ const REAL_RESULT = {
   user: { _id: "real", email: "real@example.com", name: "Real", role: "user" },
   tokens: { accessToken: "real-access" },
 };
-
-function installLocalStorage() {
-  const store = new Map<string, string>();
-  vi.stubGlobal("localStorage", {
-    getItem: (k: string) => store.get(k) ?? null,
-    setItem: (k: string, v: string) => void store.set(k, v),
-    removeItem: (k: string) => void store.delete(k),
-  });
-}
-
-/** A browser cookie jar behind `document.cookie` (name=value; attributes, `max-age=0` deletes). */
-function installCookieJar() {
-  const jar = new Map<string, string>();
-
-  const noop = () => {};
-  vi.stubGlobal("window", { addEventListener: noop, removeEventListener: noop });
-  vi.stubGlobal("document", {
-    get cookie() {
-      return [...jar].map(([name, value]) => `${name}=${value}`).join("; ");
-    },
-    set cookie(raw: string) {
-      const [pair = "", ...attributes] = raw.split(";");
-
-      const eq = pair.indexOf("=");
-      const name = pair.slice(0, eq).trim();
-      if (attributes.some((a) => /^\s*max-age=0\s*$/i.test(a))) jar.delete(name);
-      else jar.set(name, pair.slice(eq + 1));
-    },
-    visibilityState: "visible",
-    // Vue's DOM runtime probes `document` when it loads (each `boot` re-imports it).
-    createElement: () => ({}),
-    addEventListener: noop,
-    removeEventListener: noop,
-  });
-  return jar;
-}
 
 /** The runtimeConfig the app boots with; `authMock*` come from the env in a real run. */
 const publicConfig: Record<string, unknown> = {};
@@ -95,7 +60,7 @@ describe("mock auth", () => {
     const app = await boot(jar);
     const result = await app.AuthModel.login(DEMO);
 
-    expect(result.user).toMatchObject({ email: DEMO.email, role: "user" });
+    expect(result.user).toMatchObject({ email: DEMO.email, role: "admin" });
     expect(result.tokens.accessToken).toEqual(expect.any(String));
     expect(jar.get(HINT)).toBe("1");
     expect(app.hasSessionHint()).toBe(true);
@@ -118,7 +83,7 @@ describe("mock auth", () => {
     const app = await boot(jar);
 
     const result = await app.AuthModel.login(DEMO);
-    expect(result.user).toMatchObject({ email: DEMO.email, role: "user" });
+    expect(result.user).toMatchObject({ email: DEMO.email, role: "admin" });
   });
 
   it("rejects a wrong password with the backend's 401 and starts no session", async () => {

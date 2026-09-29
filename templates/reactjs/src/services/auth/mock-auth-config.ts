@@ -33,7 +33,7 @@ export function getMockAuth(): MockAuthConfig | null {
   if (!warned.active) {
     warned.active = true;
     console.warn(
-      `[mock-auth] VITE_AUTH_MOCK is on: /auth/* is answered in the browser, no backend auth is called. Sign in as ${email}.`,
+      `[mock-auth] VITE_AUTH_MOCK is on: /auth/* and /users/* are answered by the mock, no backend is called for them. Sign in as ${email}.`,
     );
   }
   return { email, password: import.meta.env.VITE_AUTH_MOCK_PASSWORD || MOCK_AUTH_DEFAULT_PASSWORD };

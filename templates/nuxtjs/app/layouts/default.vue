@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { useLogoutMutation, useMeQuery } from "@/services/auth";
-import { isMockAuthEnabled } from "@/services/auth/mock-auth";
 import { resetQueriesToSignedOut } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
 import { useQueryClient } from "@tanstack/vue-query";
@@ -27,8 +26,12 @@ const { mutate: doLogout, isPending: logoutPending } = useLogoutMutation({
   },
 });
 
-// `!PROD` is false in a production build, so the badge never renders.
-const mockAuth = !import.meta.env.PROD && isMockAuthEnabled();
+// The import itself is gated on the production constant: a production build has no
+// badge code at all, not even an inert branch. Explicit (not the auto-imported
+// `<MockAuthBadge>`) so nothing registers it for production.
+const MockAuthBadge = import.meta.env.PROD
+  ? null
+  : defineAsyncComponent(() => import("@/components/mock-auth-badge.vue"));
 
 const isAuthenticated = computed(() => Boolean(sessionUser.value));
 
@@ -82,13 +85,6 @@ function toggleLocale() {
       </p>
       <slot />
     </main>
-    <span
-      v-if="mockAuth"
-      role="status"
-      title="NUXT_PUBLIC_AUTH_MOCK is on: sign-in is answered in the browser, not by the backend"
-      class="fixed bottom-3 left-3 z-50 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-900 ring-1 ring-amber-300"
-    >
-      Mock auth
-    </span>
+    <MockAuthBadge v-if="MockAuthBadge" />
   </div>
 </template>

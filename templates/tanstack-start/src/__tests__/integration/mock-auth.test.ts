@@ -1,3 +1,4 @@
+import { installCookieJar } from "@/__tests__/helpers/cookie-jar";
 import { installLocalStorage } from "@/__tests__/helpers/session-browser";
 import { APP_PREFIX, STORAGE_KEYS } from "@/enums";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -22,30 +23,6 @@ const requestCookies = vi.hoisted(() => new Map<string, string>());
 vi.mock("@tanstack/react-start/server", () => ({
   getCookie: (name: string) => requestCookies.get(name),
 }));
-
-/** A browser cookie jar behind `document.cookie` (name=value; attributes, `max-age=0` deletes). */
-function installCookieJar() {
-  const jar = new Map<string, string>();
-  const noop = () => {};
-  vi.stubGlobal("window", { addEventListener: noop, removeEventListener: noop });
-  vi.stubGlobal("document", {
-    get cookie() {
-      return [...jar].map(([name, value]) => `${name}=${value}`).join("; ");
-    },
-    set cookie(raw: string) {
-      const [pair = "", ...attributes] = raw.split(";");
-
-      const eq = pair.indexOf("=");
-      const name = pair.slice(0, eq).trim();
-      if (attributes.some((a) => /^\s*max-age=0\s*$/i.test(a))) jar.delete(name);
-      else jar.set(name, pair.slice(eq + 1));
-    },
-    visibilityState: "visible",
-    addEventListener: noop,
-    removeEventListener: noop,
-  });
-  return jar;
-}
 
 async function boot(jar: Map<string, string>) {
   vi.resetModules();
@@ -78,7 +55,7 @@ describe("mock auth", () => {
     const app = await boot(jar);
     const result = await app.AuthModel.login(DEMO);
 
-    expect(result.user).toMatchObject({ email: DEMO.email, role: "user" });
+    expect(result.user).toMatchObject({ email: DEMO.email, role: "admin" });
     expect(result.tokens.accessToken).toEqual(expect.any(String));
     expect(jar.get(STORAGE_KEYS.SESSION)).toBe("1");
     expect(app.hasSessionHint()).toBe(true);
@@ -100,7 +77,7 @@ describe("mock auth", () => {
     const app = await boot(jar);
 
     const result = await app.AuthModel.login(DEMO);
-    expect(result.user).toMatchObject({ email: DEMO.email, role: "user" });
+    expect(result.user).toMatchObject({ email: DEMO.email, role: "admin" });
   });
 
   it("rejects a wrong password with the backend's 401 and starts no session", async () => {

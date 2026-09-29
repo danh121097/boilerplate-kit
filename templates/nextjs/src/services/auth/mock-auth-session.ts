@@ -7,7 +7,7 @@ import type { AuthUser } from "@/services/auth/types/auth";
 // httpOnly token cookies a backend would set.
 
 /** Cookie holding the mock session's user (JSON). Same 7-day life as the hint. */
-const MOCK_USER_COOKIE = `${APP_PREFIX}_MOCK_USER`;
+export const MOCK_USER_COOKIE = `${APP_PREFIX}_MOCK_USER`;
 const MOCK_USER_MAX_AGE = 7 * 24 * 60 * 60;
 
 /** Access token a login returns in its body — opaque; nothing reads it back. */

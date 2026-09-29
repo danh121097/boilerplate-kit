@@ -35,14 +35,17 @@ export const authResult = (user: AuthUser) => ({
   tokens: { accessToken: MOCK_ACCESS_TOKEN },
 });
 
-export const unauthorized = (message: string) => ({
+/** The backend's error envelope (see its error handler): `errorType` names the class of failure. */
+export const failure = (status: number, errorType: string, message: string) => ({
   success: false,
   status: "error",
-  errorType: "AUTHENTICATION_ERROR",
+  errorType,
   message,
-  error_code: 401,
+  error_code: status,
   error_message: message,
 });
+
+export const unauthorized = (message: string) => failure(401, "AUTHENTICATION_ERROR", message);
 
 export function bodyOf(config: InternalAxiosRequestConfig): Record<string, unknown> {
   const raw: unknown = config.data;
@@ -57,4 +60,14 @@ export function bodyOf(config: InternalAxiosRequestConfig): Record<string, unkno
 /** Request path without query or hash; the refresh call passes an absolute URL, so callers match by suffix. */
 export function pathOf(config: InternalAxiosRequestConfig): string {
   return (config.url ?? "").split(/[?#]/)[0] ?? "";
+}
+
+/** Query values of a request: those already in the URL, then `params`. */
+export function queryOf(config: InternalAxiosRequestConfig): Record<string, unknown> {
+  const search = (config.url ?? "").split("#")[0]?.split("?")[1] ?? "";
+  const params: unknown = config.params;
+  return {
+    ...Object.fromEntries(new URLSearchParams(search)),
+    ...(params && typeof params === "object" ? params : {}),
+  };
 }

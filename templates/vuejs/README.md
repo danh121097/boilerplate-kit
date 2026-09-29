@@ -143,13 +143,13 @@ VITE_LANGUAGE_CODE=en
 # Optional — only used when your backend requires HMAC-signed requests
 # VITE_HMAC_SECRET=
 # VITE_BUILD_VERSION=1.0.0
-# Optional, dev only — answer /auth/* in the browser before the backend auth exists
+# Optional, dev only — answer /auth/* and /users in the browser before the backend exists
 # VITE_AUTH_MOCK=true
 # VITE_AUTH_MOCK_EMAIL=demo@example.com
 # VITE_AUTH_MOCK_PASSWORD=password
 ```
 
-See [Mock auth](./docs/system-architecture/security-auth.md#mock-auth-before-backend-integration): the flag is ignored in production builds.
+See [Mock auth](./docs/system-architecture/security-auth.md#mock-auth-before-backend-integration): mock mode answers auth and users; the flag is ignored in production builds.
 
 ## Documentation
 

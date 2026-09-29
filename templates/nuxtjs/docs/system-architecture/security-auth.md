@@ -365,9 +365,10 @@ request (stamped _sentAt) → 401
 
 ## Mock auth (before backend integration)
 
-`NUXT_PUBLIC_AUTH_MOCK=true` answers the auth routes in the browser so pages can
-be built before the backend auth exists. It is **off by default**; turn it off
-and the real backend is used with no change to pages, stores or middleware.
+`NUXT_PUBLIC_AUTH_MOCK=true` answers the template's built-in endpoints — auth
+(`/auth/*`) and users (`/users`) — so pages can be built before the backend
+exists. It is **off by default**; turn it off and the real backend is used with
+no change to pages, stores or middleware.
 
 ```
 NUXT_PUBLIC_AUTH_MOCK=true
@@ -383,15 +384,17 @@ parsing turns `TRUE` into `true`, so a differently-cased value is on here. They 
 `authMockEmail` and `authMockPassword` (declared in `nuxt.config.ts`), read once
 at boot by `01.init-services.ts`. Implementation: `services/auth/mock-auth.ts`
 (adapter), with `mock-auth-config.ts` (flag), `mock-auth-session.ts` (mock user
-cookie) and `mock-auth-responses.ts` (backend-shaped replies).
+cookie) and `mock-auth-responses.ts` (backend-shaped replies), plus
+`services/users/mock-users.ts` (the users fixture and handlers).
 
 - **Seam.** `mockAuthAdapter` replaces only axios's network adapter, on
-  `AuthModel`'s client and on the bare refresh call (`auth-refresh-client.ts`).
-  Requests still run the real interceptors, and answers use the backend's
+  `AuthModel`'s and `UsersModel`'s clients and on the bare refresh call
+  (`auth-refresh-client.ts`). Requests still run the real interceptors, and
+  answers use the backend's
   shapes: login/register/refresh/logout/me return the `{ success, data }`
   envelope, and a wrong password is the same 401
   (`{ error_code: 401, message: "Invalid email or password!" }`) the login form
-  already shows. Every other API still calls the real backend.
+  already shows. Any other API still calls the real backend.
 - **Session.** Login sets the readable session hint cookie exactly as before, so
   the `auth` / `guest` middleware, cross-tab sync and logout are unchanged. The
   httpOnly token cookies need a backend, so the mock keeps the signed-in user in
@@ -401,21 +404,36 @@ cookie) and `mock-auth-responses.ts` (backend-shaped replies).
   that cookie; with the cookie gone but the hint left, the SSR read rejects, the
   browser's read is refused and the session ends as "expired", like a real
   refused refresh.
-- **Credentials.** One login pair. `register` signs up any user, who stays
-  signed in but cannot log in again (no user store).
-- **Signals.** One `console.warn` at boot and a "Mock auth" badge in
-  `layouts/default.vue`, only while active.
+- **Credentials.** One login pair, signed in as an `admin` so the built-in
+  users page works. `register` signs up any user, who stays signed in but
+  cannot log in again (no user store) and is a plain `user`.
+- **Users.** `GET /users` (offset-paginated `?page&limit`, envelope
+  `{ status: "success", data, meta }`) and `GET /users/:id` answer from a fixed
+  fixture: the demo user plus five sample users (`MOCK_SAMPLE_USERS`), newest
+  first, no passwords. Checks run in the backend's order: no session is `401`
+  ("Access token required!"), a role below `admin` is `403` ("Insufficient
+  permissions!"), an unknown id is `404` ("User not found!"). Users registered
+  in the mock session are not added to the list. Any unknown id is `404` here; the backend answers `400` for a malformed ObjectId. Other methods and paths fall
+  through to the real backend. The browser reads go through the adapter; the
+  SSR list fetch (`fetchUsersOnServer`, behind `!import.meta.env.PROD`) is
+  answered from the request's `<APP>_MOCK_USER` cookie the same way, resolving
+  the envelope or rejecting with the backend's error body, so the `/users` page
+  renders server-side with no backend.
+- **Signals.** One `console.warn` at boot and a "Mock auth" badge
+  (`components/mock-auth-badge.vue`, rendered by `layouts/default.vue`), only
+  while active.
 - **Dev SSR trust.** With the flag on, the dev SSR server takes the readable
   `<APP>_MOCK_USER` cookie as the user's identity, with no signature or backend
   check: anyone who can reach it can forge a session. Run with the flag only on
   localhost, never on a shared, staging or tunnelled dev server.
 - **Production guard.** In a production build (`import.meta.env.PROD`) the flag
   is ignored, even though `runtimeConfig` is read at runtime, with one
-  `console.warn`; the mock adapter and the SSR branch are removed from the
-  bundle, and the badge is gated on it too, so it never renders.
-- **Limits.** `usersService` and other SSR reads (`serverApiGet`) forward the
-  `accessToken` cookie, which the mock never sets, so the backend sees a
-  signed-out request: point them at a backend that accepts it, or mock them
-  separately. The Socket.IO handshake relies on the httpOnly `accessToken`
-  cookie, which the mock never sets, so the socket is refused. Tokens never
-  expire, so expiry flows need a real backend.
+  `console.warn`; the mock adapter, the SSR branches and the users fixture are
+  removed from the bundle. The badge component is imported only outside
+  production, so its code is not in a production bundle at all.
+- **Limits.** Endpoints beyond auth and users (and other SSR reads through
+  `serverApiGet`) forward the `accessToken` cookie, which the mock never sets,
+  so the backend sees a signed-out request: point them at a backend that
+  accepts it, or mock them separately. The Socket.IO handshake relies on the
+  httpOnly `accessToken` cookie, which the mock never sets, so the socket is
+  refused. Tokens never expire, so expiry flows need a real backend.

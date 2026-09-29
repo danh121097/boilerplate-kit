@@ -9,22 +9,25 @@ import {
   unauthorized,
 } from "@/services/auth/mock-auth-responses";
 import { readMockUser, writeMockUser } from "@/services/auth/mock-auth-session";
+import { answerMockUsers, mockDemoUser } from "@/services/users/mock-users";
 import type { MockAuthConfig } from "@/services/auth/mock-auth-config";
 import type { AuthUser } from "@/services/auth/types/auth";
+import type { MockCaller } from "@/services/users/mock-users";
 import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import axios from "axios";
 
 /**
  * Dev-only mock of the backend auth routes (login, register, refresh, logout,
- * me), so the UI can be built before the backend auth exists. Turn it on with
- * `VITE_AUTH_MOCK=true`; turn it off and the real backend is used with no other
- * change — screens, stores and guards never know the difference.
+ * me) and the users routes (`services/users/mock-users.ts`), so the UI can be
+ * built before the backend auth exists. Turn it on with `VITE_AUTH_MOCK=true`;
+ * turn it off and the real backend is used with no other change — screens,
+ * stores and guards never know the difference.
  *
- * It sits at the axios transport seam: `AuthModel`'s client and the bare refresh
- * client use `mockAuthAdapter`, so requests still pass through the real request
+ * It sits at the axios transport seam: `AuthModel`'s and `UsersModel`'s clients
+ * and the bare refresh client use `mockAuthAdapter`, so requests still pass through the real request
  * and response interceptors and fail on the same error path (a wrong password is
  * the same 401 envelope, shown by the form as the backend's message). Only the
- * network call is replaced; every other API still hits the real backend.
+ * network call is replaced; any other API still hits the real backend.
  *
  * Session persistence is the real mode's: login sets the readable session hint
  * cookie exactly as before (`startSession`), so the SSR route guards, cross-tab
@@ -38,7 +41,8 @@ import axios from "axios";
  * signs up any user, who then stays signed in but cannot log in again.
  *
  * Files: `mock-auth-config.ts` (the flag), `mock-auth-session.ts` (the mock user cookie),
- * `mock-auth-responses.ts` (backend-shaped replies), and this file (the adapter).
+ * `mock-auth-responses.ts` (backend-shaped replies), `services/users/mock-users.ts`
+ * (the users fixture and handlers), and this file (the adapter).
  *
  * Never active in a production build: the flag is ignored there (with one
  * warning) and the adapter is not exported, so the bundler drops this code.
@@ -51,7 +55,12 @@ export {
 } from "@/services/auth/mock-auth-config";
 export type { MockAuthConfig } from "@/services/auth/mock-auth-config";
 
-/** Answer one auth request the way the backend would, or null for a path this mock does not own. */
+/** Who sent the request: the user in the mock session cookie, or the backend's 401 message when there is none. */
+function callerOf(_config: InternalAxiosRequestConfig): MockCaller {
+  return readMockUser() ?? "Access token required!";
+}
+
+/** Answer one auth or users request the way the backend would, or null for a path this mock does not own. */
 function answer(
   mock: MockAuthConfig,
   config: InternalAxiosRequestConfig,
@@ -69,7 +78,7 @@ function answer(
     if (email !== mock.email.toLowerCase() || body.password !== mock.password) {
       return reply(config, 401, unauthorized("Invalid email or password!"));
     }
-    const user: AuthUser = { _id: "mock-user", email: mock.email, name: "Demo User", role: "user" };
+    const user = mockDemoUser(mock);
     writeMockUser(user);
     return reply(config, 200, succeed("Login successful!", authResult(user)));
   }
@@ -107,12 +116,12 @@ function answer(
   }
 
   if (method === "get" && path.endsWith(paths.me)) {
-    const user = readMockUser();
-    if (!user) return reply(config, 401, unauthorized("Access token required!"));
-    return reply(config, 200, succeed("", { user }));
+    const caller = callerOf(config);
+    if (typeof caller === "string") return reply(config, 401, unauthorized(caller));
+    return reply(config, 200, succeed("", { user: caller }));
   }
 
-  return null;
+  return answerMockUsers(mock, config, () => callerOf(config));
 }
 
 /** axios's own network adapter, resolved at call time so a paused mock falls through to it. */
@@ -126,7 +135,7 @@ const handleAuthRequest: AxiosAdapter = (config) => {
 };
 
 /**
- * axios adapter for the auth client and the refresh call. Undefined in a
+ * axios adapter for the auth and users clients and the refresh call. Undefined in a
  * production build (axios then uses its network adapter, and the mock is
  * tree-shaken). While the flag is off in development it delegates every request
  * to axios's real adapter, so flipping `VITE_AUTH_MOCK` needs no code change.

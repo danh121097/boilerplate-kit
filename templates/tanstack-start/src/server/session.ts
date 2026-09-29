@@ -19,8 +19,8 @@ import type { ServerUnauthorized } from "@/services/core/server-session";
  * cookie instead of the backend; the branch is dropped from production builds.
  */
 export async function readServerSession(): Promise<AuthUser | null | ServerUnauthorized> {
-  const mock = getMockAuth();
-  if (!import.meta.env.PROD && mock) return readMockServerSession();
+  const mock = !import.meta.env.PROD ? getMockAuth() : null;
+  if (mock) return readMockServerSession();
   const body = await serverApiGet<{ user?: AuthUser }>(authContract.paths.me);
   return isServerUnauthorized(body) ? body : (body.user ?? null);
 }

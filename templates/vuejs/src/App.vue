@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { setLocale } from "@/plugins/i18n";
-import { isMockAuthEnabled } from "@/services/auth/mock-auth";
 import { useAuthStore } from "@/stores/auth";
 
 const router = useRouter();
@@ -8,8 +7,11 @@ const authStore = useAuthStore();
 const { locale, t } = useI18n();
 
 const { isAuthenticated, hydrateError } = storeToRefs(authStore);
-// `!PROD` is false in a production build, so the badge never renders.
-const mockAuth = !import.meta.env.PROD && isMockAuthEnabled();
+// The import itself is gated on the production constant: a production build has no
+// badge code at all, not even an inert branch.
+const MockAuthBadge = import.meta.env.PROD
+  ? null
+  : defineAsyncComponent(() => import("@/components/mock-auth-badge.vue"));
 
 onMounted(() => authStore.hydrate());
 
@@ -62,13 +64,6 @@ async function onLogout() {
       </p>
       <RouterView />
     </main>
-    <span
-      v-if="mockAuth"
-      role="status"
-      title="VITE_AUTH_MOCK is on: sign-in is answered in the browser, not by the backend"
-      class="fixed bottom-3 left-3 z-50 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-900 ring-1 ring-amber-300"
-    >
-      Mock auth
-    </span>
+    <MockAuthBadge v-if="MockAuthBadge" />
   </div>
 </template>

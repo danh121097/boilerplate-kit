@@ -108,6 +108,8 @@ VITE_APP_NAME        — localStorage key prefix
 VITE_LANGUAGE_CODE   — default locale
 VITE_HMAC_SECRET     — HMAC signing secret (client-readable, soft layer)
 VITE_BUILD_VERSION   — injected by CI for x-version header
+VITE_AUTH_MOCK       — dev only: `true`/`1` answers `/auth/*` and `/users` (browser and SSR); ignored in production builds
+VITE_AUTH_MOCK_EMAIL / VITE_AUTH_MOCK_PASSWORD — mock login credentials (default demo@example.com / password)
 ```
 
 Server functions can also read `process.env.*` for server-only secrets that

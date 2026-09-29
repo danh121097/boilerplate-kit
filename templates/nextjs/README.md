@@ -53,10 +53,10 @@ Copy `.env.example` to `.env.local` and fill in:
 | `NEXT_PUBLIC_LANGUAGE_CODE` | Default locale (`en` or `ja`)             |
 | `NEXT_PUBLIC_HMAC_SECRET`   | HMAC signing secret (must match backend)  |
 | `NEXT_PUBLIC_BUILD_VERSION` | Version string sent as `x-version` header |
-| `NEXT_PUBLIC_AUTH_MOCK`     | Optional, dev only: `true` answers `/auth/*` in the browser before the backend auth exists (ignored in production builds) |
+| `NEXT_PUBLIC_AUTH_MOCK`     | Optional, dev only: `true` answers `/auth/*` and `/users` before the backend exists (ignored in production builds) |
 | `NEXT_PUBLIC_AUTH_MOCK_EMAIL` / `NEXT_PUBLIC_AUTH_MOCK_PASSWORD` | Mock login credentials (default `demo@example.com` / `password`) |
 
-See [Mock auth](./docs/system-architecture/security-auth.md#mock-auth-before-backend-integration).
+See [Mock auth](./docs/system-architecture/security-auth.md#mock-auth-before-backend-integration): mock mode answers auth and users; the flag is ignored in production builds.
 
 ## Routes
 
