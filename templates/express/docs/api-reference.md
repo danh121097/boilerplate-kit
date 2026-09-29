@@ -25,7 +25,7 @@ list.
   (`src/middleware/role.ts`).
 - **Auth cookies** — register / login / refresh set `accessToken` and
   `refreshToken` as httpOnly cookies; logout clears them, and so does a refused
-  refresh (`401`/`403`; not `5xx`/`429`).
+  refresh (today always `401`; a future `403` clears too; `5xx`/`429` do not).
 
 ## Endpoints
 

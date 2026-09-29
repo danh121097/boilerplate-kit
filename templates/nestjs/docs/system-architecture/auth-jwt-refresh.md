@@ -126,7 +126,8 @@ All flows live in
   inactive or bad credentials (401 `AUTHENTICATION_ERROR`, **same message either
   way** — no enumeration), `comparePassword` (bcrypt), sign tokens, set cookies.
 - **refresh** (`POST /auth/refresh`, `@Public`) — read raw token from body or
-  the `refreshToken` cookie; controller 401s if absent. Any 401/403 refusal clears both
+  the `refreshToken` cookie; controller 401s if absent. A refused refresh
+  (today always 401; a 403 from a future guard is handled the same) clears both
   token cookies (same options as set) before the unchanged error is returned;
   5xx/429 do not. See rotation below.
 - **logout** (`POST /auth/logout`, `@Public`) — mark the stored refresh token

@@ -38,7 +38,9 @@ automatically — treat it as source of truth and this page as the stable summar
 - **`@Roles(role)`** — role-rank check, runs after the JWT step.
 - **Auth cookies** — register / login / refresh set `accessToken` and
   `refreshToken` as httpOnly cookies; logout clears them, and so does a refused
-  refresh (`401`/`403`; not `5xx`/`429`). `refresh` and `logout` also accept the token in the request body (SSR / non-browser clients).
+  refresh (today always `401`; a future `403` clears too; `5xx`/`429` do not).
+  `refresh` and `logout` also accept the token in the request body (SSR /
+  non-browser clients).
 
 ## Endpoints
 
