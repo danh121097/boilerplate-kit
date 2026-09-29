@@ -1,3 +1,4 @@
+import { closeServer, listenOnLoopback } from "@/__tests__/helpers/loopback-server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -43,10 +44,15 @@ describe("makeStore", () => {
       res.json({ ok: true });
     });
 
-    const started = Date.now();
-    expect((await request(app).get("/")).status).toBe(200);
-    expect((await request(app).get("/")).status).toBe(200);
-    expect(Date.now() - started).toBeLessThan(500);
+    const server = await listenOnLoopback(app);
+    try {
+      const started = Date.now();
+      expect((await request(server).get("/")).status).toBe(200);
+      expect((await request(server).get("/")).status).toBe(200);
+      expect(Date.now() - started).toBeLessThan(500);
+    } finally {
+      await closeServer(server);
+    }
     expect(call).not.toHaveBeenCalled();
   });
 });

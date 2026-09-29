@@ -1,11 +1,21 @@
 import { createTestUser } from "@/__tests__/helpers/create-test-user";
 import { signHmac } from "@/__tests__/helpers/hmac-sign";
+import { closeServer, listenOnLoopback } from "@/__tests__/helpers/loopback-server";
 import { User } from "@/models/user";
-import { describe, it, expect } from "vitest";
+import { afterAll, beforeAll, describe, it, expect } from "vitest";
+import type { Server } from "http";
 import app from "@/app";
 import request from "supertest";
 
 describe("User Routes — GET /users (offset pagination)", () => {
+  let server: Server;
+  beforeAll(async () => {
+    server = await listenOnLoopback(app);
+  });
+  afterAll(async () => {
+    await closeServer(server);
+  });
+
   const url = "/api/v1/users";
 
   /** Admin token (list is admin-and-above) + N extra regular users seeded. */
@@ -25,7 +35,7 @@ describe("User Routes — GET /users (offset pagination)", () => {
   };
 
   const list = (token: string, query = "") =>
-    request(app)
+    request(server)
       .get(url + query)
       .set(signHmac("GET", url))
       .set("Authorization", `Bearer ${token}`);
@@ -90,7 +100,7 @@ describe("User Routes — GET /users (offset pagination)", () => {
 
   it("rejects a request without HMAC with 401", async () => {
     const { accessToken } = await createTestUser({ email: "admin2@test.com", role: "admin" });
-    const res = await request(app).get(url).set("Authorization", `Bearer ${accessToken}`);
+    const res = await request(server).get(url).set("Authorization", `Bearer ${accessToken}`);
     expect(res.status).toBe(401);
   });
 });

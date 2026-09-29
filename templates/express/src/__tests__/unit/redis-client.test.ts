@@ -15,6 +15,8 @@ vi.mock("ioredis", () => ({
   default: class {
     on = onSpy;
     quit = quitSpy;
+    disconnect = vi.fn();
+    status = "ready";
     constructor(...args: unknown[]) {
       ctorSpy(...args);
     }
@@ -80,5 +82,43 @@ describe("redis client — enabled", () => {
 
     expect(quitSpy).toHaveBeenCalledTimes(1);
     expect(getRedis()).toBeNull();
+  });
+});
+
+describe("redis client — shutdown while Redis is down", () => {
+  it("disconnects instead of quitting when the client is not ready and never rejects", async () => {
+    process.env.REDIS_ENABLED = "true";
+    const { connectRedis, disconnectRedis, getRedis } = await import("@/config/redis");
+    connectRedis();
+    const client = getRedis() as unknown as {
+      status: string;
+      quit: ReturnType<typeof vi.fn>;
+      disconnect: ReturnType<typeof vi.fn>;
+    };
+    client.status = "reconnecting";
+    client.quit = vi.fn().mockRejectedValue(new Error("Stream isn't writeable"));
+    client.disconnect = vi.fn();
+
+    await expect(disconnectRedis()).resolves.toBeUndefined();
+    expect(client.quit).not.toHaveBeenCalled();
+    expect(client.disconnect).toHaveBeenCalledOnce();
+    expect(getRedis()).toBeNull();
+  });
+
+  it("falls back to disconnect when QUIT fails on a ready client", async () => {
+    process.env.REDIS_ENABLED = "true";
+    const { connectRedis, disconnectRedis, getRedis } = await import("@/config/redis");
+    connectRedis();
+    const client = getRedis() as unknown as {
+      status: string;
+      quit: ReturnType<typeof vi.fn>;
+      disconnect: ReturnType<typeof vi.fn>;
+    };
+    client.status = "ready";
+    client.quit = vi.fn().mockRejectedValue(new Error("boom"));
+    client.disconnect = vi.fn();
+
+    await expect(disconnectRedis()).resolves.toBeUndefined();
+    expect(client.disconnect).toHaveBeenCalledOnce();
   });
 });

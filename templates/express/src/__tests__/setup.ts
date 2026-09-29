@@ -9,6 +9,24 @@ import path from "path";
 
 let mongoServer: MongoMemoryServer;
 
+/**
+ * Start the in-memory mongod, retrying when its port is taken. MongoMemoryServer picks
+ * a free port itself (and lock-files it), but another process can bind that port
+ * before mongod does; it then throws "Port ... already in use" without retrying.
+ * Under many concurrent test runs that race is real, so each retry is a fresh
+ * create() that generates a new port.
+ */
+async function startMongo(attempts = 5): Promise<MongoMemoryServer> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await MongoMemoryServer.create();
+    } catch (err) {
+      const portTaken = err instanceof Error && /already in use/i.test(err.message);
+      if (!portTaken || attempt >= attempts) throw err;
+    }
+  }
+}
+
 // Set test env vars BEFORE any app imports
 process.env.NODE_ENV = "test";
 
@@ -32,7 +50,7 @@ process.env.HMAC_SECRET = "test-hmac-secret-key-for-testing-min32chars";
 process.env.MONGODB_URI = "mongodb://placeholder";
 
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
+  mongoServer = await startMongo();
   process.env.MONGODB_URI = mongoServer.getUri();
   await mongoose.connect(mongoServer.getUri());
 });

@@ -65,4 +65,16 @@ describe("socket helpers during a Redis outage", () => {
     await new Promise((resolve) => setTimeout(resolve, 2000));
     expect(unhandled).toEqual([]);
   }, 15000);
+
+  it("closing while the subscriber is still connecting raises no unhandled rejection", async () => {
+    await socketModule.closeSocket();
+    unhandled.length = 0;
+
+    // Fresh subscriber: the adapter's (p)subscribe are still queued on it.
+    socketModule.initSocket(createServer());
+    await socketModule.closeSocket();
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    expect(unhandled).toEqual([]);
+  }, 15000);
 });

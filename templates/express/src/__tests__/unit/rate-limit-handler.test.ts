@@ -1,3 +1,4 @@
+import { closeServer, listenOnLoopback } from "@/__tests__/helpers/loopback-server";
 import { errorHandler } from "@/middleware/error-handler";
 import { rateLimitHandler } from "@/middleware/rate-limit";
 import { describe, expect, it } from "vitest";
@@ -14,8 +15,14 @@ describe("rateLimitHandler", () => {
     });
     app.use(errorHandler);
 
-    expect((await request(app).get("/")).status).toBe(200);
-    const res = await request(app).get("/");
+    const server = await listenOnLoopback(app);
+    let res;
+    try {
+      expect((await request(server).get("/")).status).toBe(200);
+      res = await request(server).get("/");
+    } finally {
+      await closeServer(server);
+    }
     expect(res.status).toBe(429);
     expect(res.body).toMatchObject({
       success: false,

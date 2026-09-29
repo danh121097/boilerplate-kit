@@ -25,12 +25,23 @@ export async function connectDatabase(): Promise<void> {
   });
 }
 
-/** Close Socket.IO, MongoDB and Redis connections gracefully */
+/** Run one shutdown step; a failure is logged so it cannot skip the remaining steps. */
+async function closeStep(name: string, step: () => Promise<unknown>): Promise<void> {
+  try {
+    await step();
+  } catch (err) {
+    logger.warn(`Shutdown step failed: ${name}`, { err });
+  }
+}
+
+/** Close Socket.IO, MongoDB and Redis connections gracefully (best effort, then exit) */
 async function gracefulShutdown(): Promise<void> {
-  await closeSocket();
-  await mongoose.connection.close();
-  logger.info("MongoDB connection closed (app shutdown)");
-  await disconnectRedis();
+  await closeStep("socket", closeSocket);
+  await closeStep("mongodb", async () => {
+    await mongoose.connection.close();
+    logger.info("MongoDB connection closed (app shutdown)");
+  });
+  await closeStep("redis", disconnectRedis);
   process.exit(0);
 }
 

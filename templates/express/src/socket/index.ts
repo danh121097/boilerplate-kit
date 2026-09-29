@@ -39,6 +39,39 @@ function withSafePublish(client: Redis): Redis {
   });
 }
 
+const SUBSCRIPTION_METHODS = new Set<PropertyKey>([
+  "subscribe",
+  "psubscribe",
+  "unsubscribe",
+  "punsubscribe",
+]);
+
+/**
+ * The adapter also calls (p)subscribe and (p)unsubscribe without awaiting or catching
+ * them. Commands queued while the subscriber is still connecting reject with
+ * "Connection is closed" when it is disconnected (shutdown with Redis down) and would
+ * be unhandled rejections. Hand it a view whose subscription failures are logged; the
+ * raw client stays here for quit()/disconnect().
+ */
+function withSafeSubscriptions(client: Redis): Redis {
+  return new Proxy(client, {
+    get(target, prop): unknown {
+      const value = Reflect.get(target, prop, target);
+      if (typeof value !== "function") return value;
+      const fn = value.bind(target);
+      if (!SUBSCRIPTION_METHODS.has(prop)) return fn;
+      return (...args: unknown[]): Promise<unknown> =>
+        Promise.resolve(fn(...args)).catch((err: unknown) => {
+          logger.warn("Socket.IO Redis subscription command failed", {
+            command: String(prop),
+            err,
+          });
+          return 0;
+        });
+    },
+  });
+}
+
 /** Create the Socket.IO server, wire auth + (optional) Redis adapter, return it. */
 export function initSocket(httpServer: HttpServer): Server {
   io = new Server(httpServer, {
@@ -65,7 +98,7 @@ export function initSocket(httpServer: HttpServer): Server {
       maxRetriesPerRequest: null,
     });
     subClient.on("error", (err) => logger.warn("Socket.IO Redis subscriber error", { err }));
-    io.adapter(createAdapter(withSafePublish(pub), subClient));
+    io.adapter(createAdapter(withSafePublish(pub), withSafeSubscriptions(subClient)));
   }
 
   // Reject unauthenticated handshakes before any connection is established.

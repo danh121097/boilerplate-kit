@@ -1,10 +1,20 @@
 import { signHmac } from "@/__tests__/helpers/hmac-sign";
+import { closeServer, listenOnLoopback } from "@/__tests__/helpers/loopback-server";
 import { RefreshToken } from "@/models/refresh-token";
-import { describe, it, expect } from "vitest";
+import { afterAll, beforeAll, describe, it, expect } from "vitest";
+import type { Server } from "http";
 import app from "@/app";
 import request from "supertest";
 
 describe("Auth Routes", () => {
+  let server: Server;
+  beforeAll(async () => {
+    server = await listenOnLoopback(app);
+  });
+  afterAll(async () => {
+    await closeServer(server);
+  });
+
   const user = {
     email: "route@test.com",
     password: "Password1!",
@@ -43,7 +53,7 @@ describe("Auth Routes", () => {
   /** Register a fresh user and return its Set-Cookie array */
   const registerUser = async (): Promise<string[]> => {
     const url = "/api/v1/auth/register";
-    const res = await request(app)
+    const res = await request(server)
       .post(url)
       .set(signHmac("POST", url, user))
       .send(user);
@@ -52,7 +62,7 @@ describe("Auth Routes", () => {
 
   it("POST /api/v1/auth/register — 201 sets token cookies", async () => {
     const url = "/api/v1/auth/register";
-    const res = await request(app)
+    const res = await request(server)
       .post(url)
       .set(signHmac("POST", url, user))
       .send(user);
@@ -66,11 +76,11 @@ describe("Auth Routes", () => {
 
   it("POST /api/v1/auth/register — 409 duplicate email", async () => {
     const url = "/api/v1/auth/register";
-    await request(app)
+    await request(server)
       .post(url)
       .set(signHmac("POST", url, user))
       .send(user);
-    const res = await request(app)
+    const res = await request(server)
       .post(url)
       .set(signHmac("POST", url, user))
       .send(user);
@@ -80,7 +90,7 @@ describe("Auth Routes", () => {
   it("POST /api/v1/auth/register — 400 validation error", async () => {
     const url = "/api/v1/auth/register";
     const body = { email: "bad" };
-    const res = await request(app)
+    const res = await request(server)
       .post(url)
       .set(signHmac("POST", url, body))
       .send(body);
@@ -91,7 +101,7 @@ describe("Auth Routes", () => {
     await registerUser();
     const url = "/api/v1/auth/login";
     const body = { email: user.email, password: user.password };
-    const res = await request(app)
+    const res = await request(server)
       .post(url)
       .set(signHmac("POST", url, body))
       .send(body);
@@ -105,7 +115,7 @@ describe("Auth Routes", () => {
     await registerUser();
     const url = "/api/v1/auth/login";
     const body = { email: user.email, password: "WrongPass1!" };
-    const res = await request(app)
+    const res = await request(server)
       .post(url)
       .set(signHmac("POST", url, body))
       .send(body);
@@ -115,7 +125,7 @@ describe("Auth Routes", () => {
   it("POST /api/v1/auth/refresh — 200 rotates token cookie", async () => {
     const regCookies = await registerUser();
     const url = "/api/v1/auth/refresh";
-    const res = await request(app)
+    const res = await request(server)
       .post(url)
       .set(signHmac("POST", url))
       .set("Cookie", toCookieHeader(regCookies));
@@ -130,13 +140,13 @@ describe("Auth Routes", () => {
     const regCookies = await registerUser();
     const url = "/api/v1/auth/refresh";
     // First refresh rotates (revokes) the original token
-    await request(app)
+    await request(server)
       .post(url)
       .set(signHmac("POST", url))
       .set("Cookie", toCookieHeader(regCookies));
     await backdateAllRotations();
     // Reusing the now-revoked original cookie must be rejected
-    const res = await request(app)
+    const res = await request(server)
       .post(url)
       .set(signHmac("POST", url))
       .set("Cookie", toCookieHeader(regCookies));
@@ -148,7 +158,10 @@ describe("Auth Routes", () => {
     const url = "/api/v1/auth/refresh";
     const responses = await Promise.all(
       Array.from({ length: 5 }, () =>
-        request(app).post(url).set(signHmac("POST", url)).set("Cookie", toCookieHeader(regCookies)),
+        request(server)
+          .post(url)
+          .set(signHmac("POST", url))
+          .set("Cookie", toCookieHeader(regCookies)),
       ),
     );
     expect(responses.map((r) => r.status)).toEqual([200, 200, 200, 200, 200]);
@@ -156,7 +169,7 @@ describe("Auth Routes", () => {
 
   it("POST /api/v1/auth/refresh — 401 without cookie", async () => {
     const url = "/api/v1/auth/refresh";
-    const res = await request(app).post(url).set(signHmac("POST", url));
+    const res = await request(server).post(url).set(signHmac("POST", url));
     expect(res.status).toBe(401);
     expect(res.body).toMatchObject({
       success: false,
@@ -170,7 +183,7 @@ describe("Auth Routes", () => {
   it("POST /api/v1/auth/refresh — 401 with invalid token clears token cookies", async () => {
     const url = "/api/v1/auth/refresh";
     const body = { refreshToken: "completely-invalid-token" };
-    const res = await request(app)
+    const res = await request(server)
       .post(url)
       .set(signHmac("POST", url, body))
       .send(body);
@@ -182,12 +195,12 @@ describe("Auth Routes", () => {
   it("POST /api/v1/auth/refresh — 401 with reused token clears token cookies", async () => {
     const regCookies = await registerUser();
     const url = "/api/v1/auth/refresh";
-    await request(app)
+    await request(server)
       .post(url)
       .set(signHmac("POST", url))
       .set("Cookie", toCookieHeader(regCookies));
     await backdateAllRotations();
-    const res = await request(app)
+    const res = await request(server)
       .post(url)
       .set(signHmac("POST", url))
       .set("Cookie", toCookieHeader(regCookies));
@@ -198,7 +211,7 @@ describe("Auth Routes", () => {
   it("POST /api/v1/auth/refresh — 200 sets fresh non-expired token cookies", async () => {
     const regCookies = await registerUser();
     const url = "/api/v1/auth/refresh";
-    const res = await request(app)
+    const res = await request(server)
       .post(url)
       .set(signHmac("POST", url))
       .set("Cookie", toCookieHeader(regCookies));
@@ -215,7 +228,7 @@ describe("Auth Routes", () => {
   it("POST /api/v1/auth/logout — 200 (cookie / SSR client)", async () => {
     const regCookies = await registerUser();
     const url = "/api/v1/auth/logout";
-    const res = await request(app)
+    const res = await request(server)
       .post(url)
       .set(signHmac("POST", url))
       .set("Cookie", toCookieHeader(regCookies));
@@ -226,7 +239,7 @@ describe("Auth Routes", () => {
     // CSR clients hold the refresh token in localStorage and send it in the body
     // (no cookie). Logout must still revoke it — dual-mode, like refresh.
     const url = "/api/v1/auth/register";
-    const reg = await request(app)
+    const reg = await request(server)
       .post(url)
       .set(signHmac("POST", url, user))
       .send(user);
@@ -234,7 +247,7 @@ describe("Auth Routes", () => {
 
     const logoutUrl = "/api/v1/auth/logout";
     const body = { refreshToken };
-    const res = await request(app)
+    const res = await request(server)
       .post(logoutUrl)
       .set(signHmac("POST", logoutUrl, body))
       .send(body); // body only, NO cookie
@@ -247,7 +260,7 @@ describe("Auth Routes", () => {
       const url = `/api/v1/auth/${action}`;
       for (const refreshToken of [123, { a: 1 }, null, ["x"]]) {
         const body = { refreshToken };
-        const res = await request(app)
+        const res = await request(server)
           .post(url)
           .set(signHmac("POST", url, body))
           .send(body);
@@ -265,7 +278,7 @@ describe("Auth Routes", () => {
     const regCookies = await registerUser();
     const url = "/api/v1/auth/refresh";
     const body = { refreshToken: "" };
-    const res = await request(app)
+    const res = await request(server)
       .post(url)
       .set(signHmac("POST", url, body))
       .set("Cookie", toCookieHeader(regCookies))
@@ -277,7 +290,7 @@ describe("Auth Routes", () => {
     const regCookies = await registerUser();
     const url = "/api/v1/auth/logout";
     const body = { refreshToken: "" };
-    const res = await request(app)
+    const res = await request(server)
       .post(url)
       .set(signHmac("POST", url, body))
       .set("Cookie", toCookieHeader(regCookies))
@@ -289,7 +302,7 @@ describe("Auth Routes", () => {
   it("GET /api/v1/auth/me — 200 with cookie auth", async () => {
     const regCookies = await registerUser();
     const url = "/api/v1/auth/me";
-    const res = await request(app)
+    const res = await request(server)
       .get(url)
       .set(signHmac("GET", url))
       .set("Cookie", toCookieHeader(regCookies));
@@ -298,7 +311,7 @@ describe("Auth Routes", () => {
   });
 
   it("GET /api/v1/auth/me — 401 without hmac", async () => {
-    const res = await request(app).get("/api/v1/auth/me");
+    const res = await request(server).get("/api/v1/auth/me");
     expect(res.status).toBe(401);
   });
 });

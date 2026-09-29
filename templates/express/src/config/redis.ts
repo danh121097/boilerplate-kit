@@ -36,10 +36,15 @@ export function getRedis(): Redis | null {
   return client;
 }
 
-/** Graceful close; safe to call even if never connected. */
+/**
+ * Graceful close; safe to call even if never connected. QUIT needs a live
+ * connection (with the offline queue off it rejects when Redis is down), so a client
+ * that is not ready is dropped instead, and a failing QUIT falls back to disconnect.
+ */
 export async function disconnectRedis(): Promise<void> {
-  if (client) {
-    await client.quit();
-    client = null;
-  }
+  if (!client) return;
+  const closing = client;
+  client = null;
+  if (closing.status === "ready") await closing.quit().catch(() => closing.disconnect());
+  else closing.disconnect();
 }
