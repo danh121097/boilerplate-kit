@@ -101,7 +101,7 @@ routes and only the browser can rotate it. `readServerSession` (see
 | user | the user (dehydrated) |
 | 401 + no session hint | `null` — anonymous, safe to dehydrate |
 | 401 + session hint | rejects — the browser refreshes after hydration |
-| 5xx / unreachable | rejects (`retryable: true`) — the browser retries |
+| 5xx / unreachable | rejects (`retryable: true`) — rendered and hydrated as the retry banner |
 
 ## `server/` directory (Nitro)
 

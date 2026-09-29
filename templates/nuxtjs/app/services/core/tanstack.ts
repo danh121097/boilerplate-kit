@@ -111,6 +111,11 @@ export function shouldDehydrateQuery(query: Query): boolean {
  *   (client navigation) retries as usual;
  * - a 401 → both render loading: it is not dehydrated, and the browser fetches
  *   through the Model, which refreshes the access cookie.
+ *
+ * On the server a query is fetched at most once per request: a later reader of
+ * a key that already failed (e.g. a page reading the session the layout
+ * resolved) neither retries it on mount nor awaits a new fetch. A retry nobody
+ * awaits would land in the payload after the HTML was rendered — a mismatch.
  */
 export function useServerRenderedQuery<TData, TParams = void>(
   definition: QueryDefinition<TData, TParams>,
@@ -118,12 +123,14 @@ export function useServerRenderedQuery<TData, TParams = void>(
 ) {
   const nuxtApp = useNuxtApp();
 
-  const query = definition({ retryOnMount: !nuxtApp.isHydrating, ...config });
-  onServerPrefetch(() => query.suspense());
+  const onServer = Boolean(nuxtApp.ssrContext);
 
-  const leftForBrowser = computed(
-    () => Boolean(nuxtApp.ssrContext) && isUnauthorizedError(query.error.value),
-  );
+  const query = definition({ retryOnMount: !(onServer || nuxtApp.isHydrating), ...config });
+  onServerPrefetch(async () => {
+    if (!query.isError.value) await query.suspense();
+  });
+
+  const leftForBrowser = computed(() => onServer && isUnauthorizedError(query.error.value));
   return {
     ...query,
     isLoading: computed(() => query.isLoading.value || leftForBrowser.value),

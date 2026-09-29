@@ -13,10 +13,10 @@ import type { AuthUser } from "@/services/auth/types/auth";
  * - SSR: a direct signed fetch with the forwarded cookie. It cannot refresh. A
  *   401 without the session hint is an anonymous visitor → null. Any other
  *   failure — including a 401 while the hint says a session exists (an access
- *   cookie that merely expired) — rejects. Prefetch with `prefetchQuery` (which
- *   swallows it): the browser resolves a failed query again on hydration (a 401
- *   is not dehydrated; other errors are, and are retried on mount) instead of
- *   the page rendering a stale "logged out".
+ *   cookie that merely expired) — rejects. Read it with `useServerRenderedQuery`
+ *   (the layout does): a 401 renders signed-out and the browser resolves it after
+ *   hydration instead of the page showing a stale "logged out"; any other failure
+ *   is rendered and hydrated as that error (the layout's retry banner).
  * - Browser: through the axios Model, which refreshes-and-retries on 401. A 401
  *   that survives the refresh resolves null; while the hint is set it is a
  *   session the server rejected, so it is first revoked

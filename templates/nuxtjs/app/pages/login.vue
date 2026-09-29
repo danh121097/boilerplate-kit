@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useLoginMutation, useMeQuery } from "@/services/auth";
-import { getApiErrorMessage, safeRedirect } from "@/services/core";
-import { useQueryClient } from "@tanstack/vue-query";
+import { getApiErrorMessage, safeRedirect, useServerRenderedQuery } from "@/services/core";
 import { computed, ref } from "vue";
 
 definePageMeta({ middleware: "guest" });
@@ -9,15 +8,14 @@ definePageMeta({ middleware: "guest" });
 const { t } = useI18n();
 const route = useRoute();
 
-const queryClient = useQueryClient();
-
 // Where to go once signed in: the page session expiry bounced the user away
 // from (`?redirect=`, same-origin paths only), else home.
 const redirectTo = computed(() => safeRedirect(route.query.redirect));
 
-// Resolve the session on the server; if already signed in, skip the form.
-await queryClient.prefetchQuery(useMeQuery.queryOptions());
-const { data: sessionUser } = useMeQuery();
+// Already signed in → skip the form. The layout resolved the session first, so
+// this reads it instead of probing again (on the server, a second probe could
+// flip the already-rendered header).
+const { data: sessionUser } = useServerRenderedQuery(useMeQuery);
 if (sessionUser.value) await navigateTo(redirectTo.value);
 
 // The login mutation invalidates `auth.me`; on success the session re-resolves and

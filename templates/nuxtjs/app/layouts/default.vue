@@ -1,22 +1,22 @@
 <script setup lang="ts">
 import { useLogoutMutation, useMeQuery } from "@/services/auth";
-import { resetQueriesToSignedOut } from "@/services/core";
+import { resetQueriesToSignedOut, useServerRenderedQuery } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
 import { useQueryClient } from "@tanstack/vue-query";
 
 type Locale = "en" | "ja";
 
 const queryClient = useQueryClient();
-// prefetchQuery never throws: if the SSR probe fails (e.g. an expired access
-// cookie only the browser can refresh) the query is not dehydrated and the
-// browser resolves it on hydration.
-await queryClient.prefetchQuery(useMeQuery.queryOptions());
 
 const { locale, t, setLocale } = useI18n();
-const { data: sessionUser, error: sessionError, refetch: refetchSession } = useMeQuery();
-// A transient failure (offline, timeout, 5xx) keeps the session: offer a retry
-// instead of showing the visitor as logged out.
-const sessionUnavailable = computed(() => Boolean(sessionError.value?.retryable));
+// Resolved once during SSR, before the header renders. A 401 (an expired access
+// cookie only the browser can refresh) renders signed-out and the browser
+// resolves it after hydration; any other failure renders the retry banner.
+const {
+  data: sessionUser,
+  error: sessionError,
+  refetch: refetchSession,
+} = useServerRenderedQuery(useMeQuery);
 // Settled, not success: even if the server call fails, this browser's session
 // state and cached data must not outlive the logout.
 const { mutate: doLogout, isPending: logoutPending } = useLogoutMutation({
@@ -32,6 +32,10 @@ const { mutate: doLogout, isPending: logoutPending } = useLogoutMutation({
 const MockAuthBadge = import.meta.env.PROD
   ? null
   : defineAsyncComponent(() => import("@/components/mock-auth-badge.vue"));
+
+// A transient failure (offline, timeout, 5xx) keeps the session: offer a retry
+// instead of showing the visitor as logged out.
+const sessionUnavailable = computed(() => Boolean(sessionError.value?.retryable));
 
 const isAuthenticated = computed(() => Boolean(sessionUser.value));
 

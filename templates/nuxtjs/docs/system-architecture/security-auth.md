@@ -324,13 +324,16 @@ close this gap.
 | `useMeQuery` (`auth.me`) | `readServerSession()`: `serverApiGet` with forwarded cookie; a 401 without the hint → `null` (anonymous); a 401 with the hint, or any other failure, rejects | `AuthModel.getSession()` via axios → refresh-and-retry; a 401 after refresh → `revokeSession` (posts only while the hint is set and the session has not already ended), then `null`; other errors surface |
 | `useUsersListQuery` | `serverApiPaginate`; failures reject | `UsersModel.list()` via axios → refresh-and-retry; errors surface |
 
-Pages prefetch the session with `queryClient.prefetchQuery(...)`, which never
-throws. A failed SSR probe is resolved again by the browser on hydration
-(refreshing if the access cookie merely expired) instead of rendering a stale
-"logged out": a 401 is not dehydrated, and any other error is dehydrated but
-retried on mount. `pages/users.vue` resolves the users list during SSR with
-`useServerRenderedQuery`, so the server renders the list or its error (a 401
-renders loading and the browser refreshes). `serverApi*` helpers reject with an `ApiResponseError`
+`layouts/default.vue` resolves the session once per SSR request with
+`useServerRenderedQuery(useMeQuery)`, before the header renders; `pages/login.vue`
+reads that result instead of probing again. A 401 renders signed-out, is not
+dehydrated, and the browser resolves it after hydration (refreshing if the access
+cookie merely expired) instead of showing a stale "logged out". Any other failure
+is rendered and dehydrated as that error, so the retry banner shows on both sides.
+No second probe runs on the server: a retry nobody awaits would settle after the
+header was rendered and reach the payload — a hydration mismatch.
+`pages/users.vue` resolves the users list the same way, so the server renders the
+list or its error (a 401 renders loading and the browser refreshes). `serverApi*` helpers reject with an `ApiResponseError`
 (`error_code` = HTTP status, `0` when unreachable; `retryable: true` for
 unreachable, 408, 429 and 5xx) instead of returning `null`. SSR never calls
 `/auth/refresh`. Only a 401 ends the session on boot: a retryable failure keeps
