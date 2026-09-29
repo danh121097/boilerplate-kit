@@ -33,7 +33,7 @@ function resetStore() {
     user: null,
     isAuthenticated: false,
     hydrated: false,
-    sessionExpired: false,
+    loggedOut: false,
   });
 }
 
@@ -74,7 +74,7 @@ describe("auth store loadUser", () => {
       expect(useAuthStore.getState()).toMatchObject({
         user: null,
         isAuthenticated: false,
-        sessionExpired: true,
+        loggedOut: false,
       });
       expect(await getAccessToken("MAIN")).toBeNull();
     });

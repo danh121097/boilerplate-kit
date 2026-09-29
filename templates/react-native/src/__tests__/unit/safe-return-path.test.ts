@@ -24,7 +24,7 @@ describe("safeReturnPath", () => {
     "/redirect?to=https://evil.example",
     "javascript:alert(1)",
     "/login",
-    "/login?returnTo=/x",
+    "/login?redirect=/x",
     "/pro\nfile",
     `/${"a".repeat(600)}`,
   ])("rejects %j and falls back to home", (p) => {

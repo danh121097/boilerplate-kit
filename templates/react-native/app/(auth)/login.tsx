@@ -27,8 +27,8 @@ export default function LoginScreen() {
 
   const { t } = useTranslation();
   const { isPending, mutateAsync } = useLoginMutation();
-  // Set by the auth gate after a session expiry; validated (in-app paths only).
-  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  // Set by the auth gate for a guest on a protected screen; validated (in-app paths only).
+  const { redirect } = useLocalSearchParams<{ redirect?: string }>();
 
   const {
     control,
@@ -46,7 +46,7 @@ export default function LoginScreen() {
     try {
       const result = await mutateAsync(values);
       setUser(result.user);
-      router.replace(safeReturnPath(returnTo) as Href);
+      router.replace(safeReturnPath(redirect) as Href);
     } catch {
       setFailed(true);
     }

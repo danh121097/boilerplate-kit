@@ -70,7 +70,7 @@ export class AuthModel extends Model {
   /**
    * The server rejected the session outside a refused refresh (a 401 on the
    * session query): revoke it like logout, but end it as `expired`, so the
-   * auth gate sends the user to /login with a `returnTo` of the current screen.
+   * auth gate sends the user to /login with a `redirect` of the current screen.
    *
    * Nothing is posted when the session already ended (logout pending, no token
    * stored, or — with `sinceEpoch`, the epoch the caller read before its

@@ -95,7 +95,7 @@ export const DEFAULT_RETURN_PATH = "/";
 const MAX_RETURN_PATH_LENGTH = 512;
 
 /**
- * Validate a `returnTo` route param (untrusted: it can arrive via a deep link)
+ * Validate a `redirect` route param (untrusted: it can arrive via a deep link)
  * and fall back to home. Only in-app expo-router paths pass:
  * - a single leading "/" (rejects "//host", "/\host" and anything with a scheme);
  * - no backslash anywhere;

@@ -83,7 +83,7 @@ src/
    401s share one network refresh), replays the request with the new token, and
    rotates the stored refresh token. Only a 401/403 from the refresh endpoint ends
    the session (tokens cleared, queries reset to signed out, and the auth gate sends the
-   user to `/login` with a `returnTo` of the current screen, restored after
+   user to `/login` with a `redirect` of the current screen, restored after
    sign-in); offline, timeout, 429 and 5xx keep the tokens and surface a
    retryable error.
 5. Logout blocks new refreshes, waits for any in-flight one, sends the latest

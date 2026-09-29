@@ -165,8 +165,8 @@ The auth store then calls `resetQueriesToSignedOut(queryClient,
 queryKeys.auth.me)` — every cached query is reset and the session query is
 pinned to `null` (signed out), unlike `queryClient.clear()`, which would leave
 mounted observers on orphaned queries — and resets its state. A voluntary logout
-is a `"logout"` session end: it never sets `sessionExpired` and never adds a
-`returnTo`.
+is a `"logout"` session end: it never adds a
+`redirect` (it sets `loggedOut`, so the gate goes to a plain `/login`).
 
 Refresh coordination is in memory only (single app process — no cross-tab case),
 so it uses no storage keys. Every SecureStore key comes from `STORAGE_KEYS` or
@@ -183,6 +183,24 @@ its result:
 
 If a clear lands during the refresh's token write itself, the just-written values
 are rolled back (compare-and-delete).
+
+## Route guards
+
+- A guest on a protected route is sent to `/login?redirect=<original path>`.
+- A signed-in user on the guest-only login screen is sent to the validated return
+  path (in-app paths only, `safeReturnPath`), else home.
+- The decision uses the synchronous session signal (the auth store's
+  `isAuthenticated`, restored from SecureStore at boot) before any profile fetch.
+  There is no SSR. A guest arriving by deep link at boot goes to
+  `/login?redirect=<path>` once hydration finishes.
+- Own explicit logout goes to plain `/login`; an involuntary sign-out (expired
+  session) goes to `/login?redirect=<current path>`.
+
+Implementation: the `(app)` gate (`app/(app)/_layout.tsx`) and the `(auth)` gate
+(`app/(auth)/_layout.tsx`). The `redirect` value is the expo-router `pathname`, so
+a query string on the protected screen is not carried (`usePathname()` drops it).
+The `(auth)` gate clears `loggedOut` once a guest is on the login screen, so the
+next protected screen opened as a guest gets a return path again.
 
 ## Hard logout (session expired)
 
@@ -209,19 +227,19 @@ revoke (one POST, one event). A `logout()` called during it awaits that revoke
 and posts nothing; if the revoke backed out, logout then signs out normally (one
 POST, ended as `"logout"`). Logout itself never backs out. Overlapping
 `loadUser()` calls of the same session share one `getMe`. When the revoke ended
-the session, `loadUser()` sets `sessionExpired: true` itself, so a boot 401 (not
-yet authenticated) also gets a `returnTo`.
+the session, `loadUser()` signs the store out without `loggedOut`, so a boot 401
+(not yet authenticated) also gets a `redirect`.
 
 `endSession` notifies `onSessionEnded` listeners. The root layout subscribes
 `watchSessionEnd()` (in `stores/auth.ts`), which reacts only to the auth service: it resets every cached query to signed
 out (`resetQueriesOnSessionEnd`) and, when the session expired while
-authenticated, calls `useAuthStore.expireSession()` (`isAuthenticated: false`,
-`sessionExpired: true`) once. It does not navigate itself: the `(app)` gate
-reacts and redirects to `/login?returnTo=<current path>` (`usePathname()`), so
+authenticated, calls `useAuthStore.expireSession()` (`user: null`,
+`isAuthenticated: false`) once. It does not navigate itself: the `(app)` gate
+reacts and redirects to `/login?redirect=<current path>` (`usePathname()`), so
 there is a single navigation. No `window.location.reload()`.
 
 After sign-in, the login screen and the `(auth)` gate both go to
-`safeReturnPath(returnTo)` (from `@/services/core`) — only in-app paths: at most
+`safeReturnPath(redirect)` (from `@/services/core`) — only in-app paths: at most
 512 chars, a single
 leading `/` (no `//host`, no `/\host`), no backslash anywhere, no control
 characters (`\u0000`–`\u001F`, `\u007F`), no `://`, and not `/login` (with or
@@ -236,7 +254,7 @@ token is stored) and calls `getMe`:
 - success → authenticated with `user`;
 - a 401 (the refresh was refused, or the session query itself was refused) →
   logged out; unless the session already ended, the store runs
-  `AuthModel.revokeSession()` (revoke, clear, end as `"expired"`, `returnTo`);
+  `AuthModel.revokeSession()` (revoke, clear, end as `"expired"`, `redirect`);
 - any other failure (offline, 5xx, 429, timeout) with tokens still stored →
   **stays authenticated with `user: null`**. `loadUser()` retries; the profile
   screen calls it when it opens authenticated without a user (never after logout).

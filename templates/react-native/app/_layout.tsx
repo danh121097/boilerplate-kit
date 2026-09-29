@@ -20,7 +20,7 @@ export default function RootLayout() {
   const hydrate = useAuthStore((s) => s.hydrate);
 
   // Session ends of the auth service: reset the query cache, and after an
-  // expiry let the (app) gate redirect to /login with a `returnTo`. Subscribed
+  // expiry let the (app) gate redirect to /login with a `redirect`. Subscribed
   // before the hydrate effect so an expiry during boot is not missed.
   useEffect(() => watchSessionEnd(), []);
 

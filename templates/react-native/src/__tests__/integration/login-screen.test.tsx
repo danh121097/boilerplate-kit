@@ -77,8 +77,8 @@ describe("LoginScreen", () => {
     ["//evil.example/phish", "/"],
     ["https://evil.example", "/"],
     ["/login", "/"],
-  ])("after sign-in returns to returnTo=%j → %s", async (returnTo, expected) => {
-    mockParams = { returnTo };
+  ])("after sign-in returns to redirect=%j → %s", async (redirect, expected) => {
+    mockParams = { redirect };
     mockMutateAsync.mockResolvedValue({ user: USER, tokens: { accessToken: "AT" } });
     renderLogin();
 

@@ -13,25 +13,31 @@ const USER = { _id: "u1", email: "a@b.com", name: "A", role: "user" };
 // keep jest alive.
 afterAll(() => queryClient.clear());
 
-describe("auth store session expiry flag", () => {
+describe("auth store explicit-logout flag", () => {
   afterEach(() => jest.restoreAllMocks());
 
-  it("expireSession marks an involuntary sign-out; login and logout reset it", async () => {
-    useAuthStore.setState({ user: { _id: "u1" } as never, isAuthenticated: true });
+  it("expireSession signs out without marking an explicit logout", () => {
+    useAuthStore.setState({
+      user: { _id: "u1" } as never,
+      isAuthenticated: true,
+      loggedOut: false,
+    });
     useAuthStore.getState().expireSession();
     expect(useAuthStore.getState()).toMatchObject({
       user: null,
       isAuthenticated: false,
-      sessionExpired: true,
+      loggedOut: false,
     });
+  });
 
-    useAuthStore.getState().setUser({ _id: "u1" } as never);
-    expect(useAuthStore.getState().sessionExpired).toBe(false);
-
-    useAuthStore.getState().expireSession();
+  it("logout marks an explicit logout; setUser clears it", async () => {
+    useAuthStore.setState({ user: { _id: "u1" } as never, isAuthenticated: true });
     jest.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
     await useAuthStore.getState().logout();
-    expect(useAuthStore.getState().sessionExpired).toBe(false);
+    expect(useAuthStore.getState().loggedOut).toBe(true);
+
+    useAuthStore.getState().setUser({ _id: "u1" } as never);
+    expect(useAuthStore.getState().loggedOut).toBe(false);
   });
 });
 
@@ -45,19 +51,17 @@ describe("auth store session-end subscription", () => {
       user: USER as never,
       isAuthenticated: true,
       hydrated: true,
-      sessionExpired: false,
     });
     queryClient.setQueryData(["users", "list"], [USER]);
   });
   afterEach(() => unsubscribe());
 
-  it("an expiry of the auth service signs out, flags the expiry and resets the cache", () => {
+  it("an expiry of the auth service signs out and resets the cache", () => {
     endSession("expired", "MAIN");
 
     expect(useAuthStore.getState()).toMatchObject({
       user: null,
       isAuthenticated: false,
-      sessionExpired: true,
     });
     expect(queryClient.getQueryData(["users", "list"])).toBeUndefined();
     expect(queryClient.getQueryData(["auth.me"])).toBeNull();
@@ -69,7 +73,6 @@ describe("auth store session-end subscription", () => {
     expect(useAuthStore.getState()).toMatchObject({
       user: USER,
       isAuthenticated: true,
-      sessionExpired: false,
     });
     expect(queryClient.getQueryData(["users", "list"])).toEqual([USER]);
   });

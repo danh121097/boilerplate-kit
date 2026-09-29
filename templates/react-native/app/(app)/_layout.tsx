@@ -4,14 +4,15 @@ import { ActivityIndicator, View } from "react-native";
 
 /**
  * Authenticated route group. Renders a splash while the boot-time SecureStore
- * hydration is in flight (so it never flashes /login), then redirects
- * unauthenticated users to the login screen — with a `returnTo` of the current
- * path when the session expired.
+ * hydration is in flight (so it never flashes /login), then redirects guests to
+ * the login screen with `?redirect=<current path>` so sign-in returns there. The
+ * decision is the store's synchronous `isAuthenticated`, before any profile
+ * fetch. Only an explicit logout goes to a plain /login.
  */
 export default function AppLayout() {
   const pathname = usePathname();
 
-  const { hydrated, isAuthenticated, sessionExpired } = useAuthStore();
+  const { hydrated, isAuthenticated, loggedOut } = useAuthStore();
 
   if (!hydrated) {
     return (
@@ -22,12 +23,12 @@ export default function AppLayout() {
   }
 
   if (!isAuthenticated) {
-    // After a session expiry, come back to this screen once signed in again.
-    // A voluntary logout (or no session at boot) goes to a plain /login.
-    return sessionExpired ? (
-      <Redirect href={{ pathname: "/login", params: { returnTo: pathname } }} />
-    ) : (
+    // A guest (no session at boot, deep link, or an expired session) comes back
+    // to this screen once signed in. A voluntary logout goes to a plain /login.
+    return loggedOut ? (
       <Redirect href="/login" />
+    ) : (
+      <Redirect href={{ pathname: "/login", params: { redirect: pathname } }} />
     );
   }
 

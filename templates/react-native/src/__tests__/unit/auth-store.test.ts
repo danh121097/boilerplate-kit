@@ -35,7 +35,7 @@ function resetStore() {
     user: null,
     isAuthenticated: false,
     hydrated: false,
-    sessionExpired: false,
+    loggedOut: false,
   });
 }
 
@@ -119,11 +119,11 @@ describe("auth store", () => {
       expect(post).toHaveBeenCalledTimes(1);
       expect(ended).toHaveBeenCalledTimes(1);
       expect(ended).toHaveBeenCalledWith("expired", "MAIN");
-      // sessionExpired is what makes the (app) gate add a returnTo.
+      // Not an explicit logout, so the (app) gate adds a redirect.
       expect(useAuthStore.getState()).toMatchObject({
         isAuthenticated: false,
         hydrated: true,
-        sessionExpired: true,
+        loggedOut: false,
       });
     });
 

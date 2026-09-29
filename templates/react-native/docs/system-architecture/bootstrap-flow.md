@@ -29,6 +29,6 @@ app/_layout.tsx (root layout)
   (`endSession("expired", service)`). The root layout subscribes
   `watchSessionEnd()`, which resets the query cache to signed out and calls
   `expireSession()` for the auth service; the `(app)` gate then redirects to
-  `/(auth)/login` with a `returnTo` path.
+  `/(auth)/login` with a `redirect` path.
 - Expo Router generates typed route navigation automatically from the `app/`
   directory structure. No need for explicit route definitions.

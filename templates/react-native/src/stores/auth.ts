@@ -22,9 +22,9 @@ interface AuthState {
   /** False until the boot-time SecureStore check finishes — the auth gate shows a
    * splash while false so it never flashes `/login` before the token is read. */
   hydrated: boolean;
-  /** True after an involuntary sign-out (session expired): the auth gate then
-   * sends the user to /login with a `returnTo` of the screen they were on. */
-  sessionExpired: boolean;
+  /** True after an explicit logout, until the login screen shows: the auth gate
+   * then sends the user to a plain /login (any other guest gets `?redirect=`). */
+  loggedOut: boolean;
   /** Reset auth state after the refresh endpoint refused the session. */
   expireSession: () => void;
   setUser: (user: AuthUser | null) => void;
@@ -45,11 +45,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isAuthenticated: false,
   hydrated: false,
-  sessionExpired: false,
+  loggedOut: false,
 
-  expireSession: () => set({ user: null, isAuthenticated: false, sessionExpired: true }),
+  expireSession: () => set({ user: null, isAuthenticated: false }),
 
-  setUser: (user) => set({ user, isAuthenticated: Boolean(user), sessionExpired: false }),
+  setUser: (user) => set({ user, isAuthenticated: Boolean(user), loggedOut: false }),
 
   hydrate: async () => {
     const signedIn = await hasStoredSession(authContract.service).catch(() => false);
@@ -82,7 +82,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Ignore network errors — tokens are cleared by the model regardless.
     } finally {
       resetQueriesToSignedOut(queryClient, queryKeys.auth.me);
-      set({ user: null, isAuthenticated: false, sessionExpired: false });
+      set({ user: null, isAuthenticated: false, loggedOut: true });
     }
   },
 }));
@@ -103,15 +103,10 @@ async function loadUserOnce(epoch: number): Promise<void> {
     if (isStale()) return;
     if (isUnauthorizedError(error)) {
       // The session query itself was refused: the session is over. Revoke it as
-      // expired (the gate then adds a `returnTo`) — unless it already ended
-      // (logout in progress, refused refresh): then only reset local state.
-      const revoked =
-        !(error instanceof SessionEndedError) && (await AuthModel.revokeSession(epoch));
-      useAuthStore.setState({
-        user: null,
-        isAuthenticated: false,
-        ...(revoked && { sessionExpired: true }),
-      });
+      // expired — unless it already ended (logout in progress, refused refresh):
+      // then only reset local state.
+      if (!(error instanceof SessionEndedError)) await AuthModel.revokeSession(epoch);
+      useAuthStore.setState({ user: null, isAuthenticated: false });
       return;
     }
     // Offline / 5xx / 429 / timeout / an unavailable refresh keep the tokens:
@@ -128,7 +123,7 @@ async function loadUserOnce(epoch: number): Promise<void> {
  * React to the end of the app's session (auth service only — a secondary
  * backend's refused refresh ends just that backend's session): reset every
  * cached query to signed-out, and after an expiry mark the involuntary sign-out
- * so the `(app)` gate redirects to /login with a `returnTo`. Idempotent: a burst
+ * so the `(app)` gate redirects to /login with a `redirect`. Idempotent: a burst
  * of expiries resets state once. Subscribed by the root layout; returns the
  * unsubscribe.
  */

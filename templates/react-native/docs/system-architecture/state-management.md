@@ -24,9 +24,9 @@ interface AuthState {
   user: AuthUser | null;     // null when logged out, or signed in but not yet loaded
   isAuthenticated: boolean;  // tokens are stored and the session is live
   hydrated: boolean;         // boot-time SecureStore check finished
-  sessionExpired: boolean;   // last sign-out was involuntary → gate adds returnTo
-  expireSession(): void;     // session expired: logged out + sessionExpired
-  setUser(user): void;       // also resets sessionExpired
+  loggedOut: boolean;        // explicit logout → gate goes to a plain /login
+  expireSession(): void;     // session expired: user null, isAuthenticated false
+  setUser(user): void;       // also clears loggedOut
   hydrate(): Promise<void>;  // read token → loadUser(); marks hydrated
   loadUser(): Promise<void>; // getMe; safe to retry after a transient failure
   logout(): Promise<void>;   // revoke refresh token, clear tokens, reset queries
@@ -39,14 +39,15 @@ Auth state rules:
   when `getMe` fails for a non-auth reason (offline, 5xx, 429, timeout) and the
   tokens are still stored; only a session-ending failure logs out.
 - `loadUser()` on a 401 revokes the session through `AuthModel.revokeSession()`
-  (ended as `"expired"`, so `sessionExpired: true` and the gate adds
-  `returnTo`), unless it already ended; overlapping calls share one `getMe`.
+  (ended as `"expired"`, so the store signs out without `loggedOut` and the gate
+  adds `redirect`), unless it already ended; overlapping calls share one `getMe`.
 - `loadUser()` reads the session epoch before `getMe` and drops a late result
   (success or failure) if a logout/expiry happened meanwhile.
 - `expireSession()` is called by `watchSessionEnd()` (subscribed by the root
-  layout) when the auth service's session ends as `"expired"`; it sets
-  `sessionExpired: true` and the `(app)` gate redirects to `/login` with
-  `returnTo`. `logout()` and `setUser()` reset it. Session ends of other
+  layout) when the auth service's session ends as `"expired"`; it signs the store
+  out (`user: null`, `isAuthenticated: false`) and the `(app)` gate redirects to
+  `/login` with `redirect`. `logout()` sets `loggedOut: true` (plain `/login`);
+  `setUser()` and the login screen clear it. Session ends of other
   services are ignored.
 - `logout()` and `watchSessionEnd()` both call `resetQueriesToSignedOut` (the
   latter through `resetQueriesOnSessionEnd`): every cached query is reset and
