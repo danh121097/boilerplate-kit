@@ -43,6 +43,14 @@ describe("the session query fetcher (server function read)", () => {
     expect(redirected).toHaveBeenCalledTimes(1);
   });
 
+  it("no hint in the browser → no request → null", async () => {
+    installBrowser(""); // anonymous or logged out: no session hint cookie
+    installLocalStorage();
+
+    await expect(fetchSession()).resolves.toBeNull();
+    expect(getMe).not.toHaveBeenCalled();
+  });
+
   it("the server-side read never revokes", async () => {
     getMe.mockResolvedValue({ unauthorized: true, hasSession: false });
     const post = vi.spyOn(AuthModel.api, "post");

@@ -27,18 +27,27 @@ describe("readServerSession", () => {
 
   it("resolves the current user when the access cookie is valid", async () => {
     jar.set("accessToken", "AT");
+    jar.set(STORAGE_KEYS.SESSION, "1");
     respond(200, { success: true, data: { user: { _id: "u1" } } });
     await expect(readServerSession()).resolves.toEqual({ _id: "u1" });
   });
 
   it("resolves null when the backend knows no user", async () => {
     jar.set("accessToken", "AT");
+    jar.set(STORAGE_KEYS.SESSION, "1");
     respond(200, { success: true, data: {} });
     await expect(readServerSession()).resolves.toBeNull();
   });
 
   it("no access cookie and no hint → unauthorized without a session (anonymous)", async () => {
     const fetchSpy = respond(200);
+    await expect(readServerSession()).resolves.toEqual({ unauthorized: true, hasSession: false });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("no hint → no request, even with a live access cookie (a failed logout leaves it)", async () => {
+    jar.set("accessToken", "AT");
+    const fetchSpy = respond(200, { success: true, data: { user: { _id: "u1" } } });
     await expect(readServerSession()).resolves.toEqual({ unauthorized: true, hasSession: false });
     expect(fetchSpy).not.toHaveBeenCalled();
   });
@@ -56,9 +65,9 @@ describe("readServerSession", () => {
     await expect(readServerSession()).resolves.toEqual({ unauthorized: true, hasSession: true });
   });
 
-  it.each([true, false])("a 5xx rejects (retryable), hint present: %s", async (hinted) => {
+  it("a 5xx rejects (retryable) for a hinted session", async () => {
     jar.set("accessToken", "AT");
-    if (hinted) jar.set(STORAGE_KEYS.SESSION, "1");
+    jar.set(STORAGE_KEYS.SESSION, "1");
     respond(503);
     await expect(readServerSession()).rejects.toMatchObject({ error_code: 503, retryable: true });
   });

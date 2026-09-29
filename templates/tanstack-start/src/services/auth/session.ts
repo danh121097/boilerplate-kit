@@ -3,6 +3,7 @@ import { AuthModel } from "@/services/auth/auth";
 import {
   defineQuery,
   getSessionEpoch,
+  hasSessionHint,
   isUnauthorizedError,
   withSessionRefresh,
 } from "@/services/core";
@@ -13,8 +14,12 @@ import type { AuthUser } from "@/services/auth/types/auth";
  * an expired-but-refreshable session is refreshed in the browser first. In the
  * browser, a session that still 401s while live (hint set, not ended meanwhile)
  * is revoked (`AuthModel.revokeSession`, ends as "expired"); during SSR nothing
- * is revoked. */
+ * is revoked. Without the session hint (anonymous, or logged out) it resolves
+ * null with no request, so an unreachable backend never shows the
+ * session-unavailable banner to them and a lingering access cookie cannot
+ * contradict the hint-based route guards. */
 export async function fetchSession(): Promise<AuthUser | null> {
+  if (typeof document !== "undefined" && !hasSessionHint()) return null;
   const epoch = getSessionEpoch(AuthModel.service);
   try {
     return await withSessionRefresh(() => getMeServerFn());

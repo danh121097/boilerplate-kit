@@ -171,8 +171,12 @@ fetcher): hint set + 401 → reject so the browser refreshes; no hint + 401 →
 `null` (anonymous); other failures reject with an `ApiResponseError`
 (`error_code` = HTTP status, 0 when unreachable; `retryable` on 0/408/429/5xx).
 
-When the access cookie is missing or rejected it returns
-`ServerUnauthorized { hasSession }` instead of `null`. The query fetcher
+Without the session hint it makes no request and returns
+`ServerUnauthorized { hasSession: false }` (a logout whose request failed leaves the
+httpOnly access cookie alive, and it must not resurrect the session); in the
+browser `fetchSession` likewise resolves `null` with no request when
+`hasSessionHint()` is false. When the access cookie is missing or rejected it
+returns `ServerUnauthorized { hasSession }` instead of `null`. The query fetcher
 (`withSessionRefresh`, `core/server-session.ts`) maps "no hint" to signed-out,
 and in the browser refreshes through axios — passing when the call started, so a
 refresh another tab finished since is reused — and replays the server function once (a refused refresh → 401
