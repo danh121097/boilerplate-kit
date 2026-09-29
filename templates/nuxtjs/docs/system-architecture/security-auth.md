@@ -198,8 +198,9 @@ it also clears the hint and broadcasts `logout` to the other tabs
 …)` listeners. Reasons are `"logout"` (the user signed out — in this tab, or
 another tab's logout) and `"expired"` (every server-rejected session: a refused
 refresh, or a session revoked by `AuthModel.revokeSession()`). A remote logout
-does not go through `endSession`: a private helper bumps the epoch and notifies
-the listeners without touching the hint or broadcasting (see "Cross-tab session
+does not go through `endSession`'s broadcast: the private
+`finishSession(reason, service, announce)` runs with `announce` false — epoch
+bumped, listeners notified, the hint neither touched nor re-broadcast (see "Cross-tab session
 sync").
 
 `plugins/04.session-expiry.client.ts` registers once:
@@ -230,16 +231,24 @@ server rejects outside a refused refresh: a browser-side 401 on the session read
 (`AuthModel.getSession()` behind `useMeQuery`) that survived the refresh while
 the hint is set. It shares `logout`'s steps below (the private
 `endServerSession(reason, sinceEpoch?)`) but ends the session as `"expired"`, so
-`04.session-expiry.client.ts` routes to `/login?redirect=…`. When the session
-already ended while the request ran — the epoch moved since `sinceEpoch`, no
-hint (an anonymous visitor), or a logout is running — it posts nothing and
-resolves `false`. Otherwise it resolves `true`, also when the request failed.
-Concurrent callers share one in-flight revoke: one request, one session end.
+`04.session-expiry.client.ts` routes to `/login?redirect=…`. It backs out —
+posts nothing, ends nothing, resolves `false` — when a logout is already
+running, or when the session already ended: the epoch moved since `sinceEpoch`
+(else since the call started — e.g. a refused refresh that held the lock ended
+it) or the hint is gone (an anonymous visitor). That check runs on entry, before
+the logout flag is set or the lock requested (a session that already ended
+takes no lock), and again once the refresh lock is held (the in-lock re-check).
+Otherwise it
+resolves `true`, also when the request failed (best effort: the session is
+ended locally either way). Concurrent callers share one in-flight revoke: one
+request, one session end. A `logout()` during a revoke waits for it; if the
+revoke backed out, the logout then runs normally (one request, ending as
+`"logout"`).
 SSR never revokes (`readServerSession` keeps returning `null` or rejecting).
 
 ### Logout vs an in-flight refresh
 
-`AuthModel.logout` (and `revokeSession`, through the same helper):
+`AuthModel.logout` (and `revokeSession`, through the same helper, unless it backs out on entry):
 
 1. Synchronously, before any await, calls `const done = beginLogout(service)` (a
    counter, so overlapping logouts never clear each other's flag). From then until

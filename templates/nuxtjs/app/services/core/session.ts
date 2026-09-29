@@ -130,9 +130,22 @@ export function onSessionEnded(listener: SessionEndListener): () => void {
   };
 }
 
-/** Bump the epoch and notify listeners — no hint change, no broadcast. */
-function notifySessionEnded(reason: SessionEndReason, service: ApiService): void {
+/**
+ * End `service`'s session: bump its epoch; for the main session drop the hint
+ * and tell the other tabs when `announce` — a remote logout (`announce` false)
+ * only records that the hint is gone, never writing the shared cookie or
+ * re-broadcasting; then notify listeners.
+ */
+function finishSession(reason: SessionEndReason, service: ApiService, announce: boolean): void {
   bumpSessionEpoch(service);
+  if (service === "MAIN") {
+    if (announce) {
+      clearSessionHint();
+      broadcast("logout");
+    } else {
+      knownHint = false;
+    }
+  }
   for (const listener of listeners) listener(reason, service);
 }
 
@@ -141,11 +154,7 @@ function notifySessionEnded(reason: SessionEndReason, service: ApiService): void
  * also drop the hint and tell the other tabs; then notify listeners.
  */
 export function endSession(reason: SessionEndReason, service: ApiService = "MAIN"): void {
-  if (service === "MAIN") {
-    clearSessionHint();
-    broadcast("logout");
-  }
-  notifySessionEnded(reason, service);
+  finishSession(reason, service, true);
 }
 
 export interface AuthSyncHandlers {
@@ -176,8 +185,7 @@ export function syncAuthAcrossTabs(handlers: AuthSyncHandlers = {}): () => void 
   // once.
   const signedOut = () => {
     if (knownHint === false) return;
-    knownHint = false;
-    notifySessionEnded("logout", "MAIN");
+    finishSession("logout", "MAIN", false);
     handlers.onLogout?.();
   };
 

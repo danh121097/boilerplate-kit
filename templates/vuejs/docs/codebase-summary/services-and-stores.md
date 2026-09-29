@@ -64,6 +64,7 @@ const SERVICES: ServiceDefinition[] = [
 ### Auth & Users services
 
 - `auth/auth.ts` — `AuthModel` (`/auth`): `login`, `register`, `logout`,
+  `isLoggingOut` (true only while this tab's `logout` ends the session),
   `revokeSession` (`Promise<boolean>`; a server-rejected session is revoked and
   ended as `"expired"`, single-flight, no request when it already ended),
   `getMe` (`Promise<AuthUser>`), `getSession` (`Promise<AuthUser | null>`; a
@@ -91,7 +92,7 @@ Setup-style stores. Imported explicitly — never auto-imported.
   `resetQueriesToSignedOut` from `services/core/query-client.ts`, which resets
   queries in place so mounted views stay attached). `plugins/session-expiry.ts` routes to
   `/login?redirect=…` on session expiry and leaves a protected page for plain
-  `/login` on logout (this tab's or another's).
+  `/login` on another tab's logout (this tab's logout navigates itself).
 - `counter.ts` — `useCounterStore`: demo `count` + `increment/decrement/reset`.
 - `socket-io.ts` — `useSocketIOStore`: holds the live `Socket | null` and an
   `authenticated` flag; `setSocketIO(partial)` merges state.

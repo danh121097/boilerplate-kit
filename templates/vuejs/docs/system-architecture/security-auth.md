@@ -229,8 +229,12 @@ touches nothing. Nothing in the service layer reloads the page.
   `redirectOnSessionExpired(redirect, authContract.service)`: only an
   `"expired"` end of the auth service navigates, client-side, to
   `loginPathWithReturn(currentRoute.fullPath)` (`/login?redirect=<encoded
-  path>`), unless already on the login page. A `"logout"` end leaves a
-  protected route (`meta.requiresAuth`) for `/login` without a `redirect`.
+  path>`), unless already on the login page. Another tab's logout
+  leaves a protected route (`meta.requiresAuth`) for `/login` without a
+  `redirect`; this tab's own logout (`AuthModel.isLoggingOut()` is true while
+  `logout()` ends the session) is skipped, since the logout action navigates
+  itself. A revoke waiting for the refresh lock does not set it, so another
+  tab's logout during that wait still leaves the protected route.
 
 ## Boot Hydration and Logout (`stores/auth.ts`)
 
@@ -244,19 +248,6 @@ touches nothing. Nothing in the service layer reloads the page.
   fails. It ends the session as `"logout"`; `App.vue` navigates to `/login`
   without a `redirect`.
 
-### Revoking a rejected session
-
-`AuthModel.revokeSession(sinceEpoch?): Promise<boolean>` handles a session the
-server rejects outside a refused refresh — a 401 on the session read (`hydrate`,
-or `getSession` behind `useMeQuery`) that survived a successful refresh. It
-shares `logout`'s internals (the private `endServerSession(reason,
-sinceEpoch?)`: token capture, lock, epoch bump, `POST /auth/logout`, clear) but
-ends the session as `"expired"`, so the expiry redirect keeps a return path.
-When the session already ended while the request ran — the epoch moved since
-`sinceEpoch`, no token is stored, or a logout is running — it posts nothing and
-resolves `false`; the caller only resets local state. Otherwise it resolves
-`true`, also when the request failed (the session is ended locally either way).
-Concurrent callers share one in-flight revoke: one request, one session end.
 - The login view follows `?redirect=` after signing in, and the router guard
   (`router/auth-guard.ts`) does the same when a signed-in user opens `/login`.
   Both go through `safeRedirect(value)` (`services/core/session.ts`), which keeps
@@ -266,9 +257,30 @@ Concurrent callers share one in-flight revoke: one request, one session end.
   `/login/`, `/login?…`, `/login#…`; `/login/callback` is allowed); otherwise `/`.
   The view shows the server's error message (`getApiErrorMessage`) on failure.
 
+### Revoking a rejected session
+
+`AuthModel.revokeSession(sinceEpoch?): Promise<boolean>` handles a session the
+server rejects outside a refused refresh — a 401 on the session read (`hydrate`,
+or `getSession` behind `useMeQuery`) that survived a successful refresh. It
+shares `logout`'s internals (the private `endServerSession(reason,
+sinceEpoch?)`: token capture, lock, epoch bump, `POST /auth/logout`, clear) but
+ends the session as `"expired"`, so the expiry redirect keeps a return path.
+
+It backs out — posts nothing, ends nothing, resolves `false` — when a logout is
+already running, or when the session already ended: the epoch moved since
+`sinceEpoch` (else since the call started — e.g. a refused refresh that held the
+lock ended it) or no token is stored. That check runs on entry, before the
+logout flag is set or the lock requested (a session that already ended takes no
+lock), and again once the refresh lock is held (the in-lock re-check). The
+caller then only resets local state. Otherwise it resolves `true`, also when the request
+failed (best effort: the session is ended locally either way). Concurrent
+callers share one in-flight revoke: one request, one session end. A `logout()`
+during a revoke waits for it; if the revoke backed out, the logout then runs
+normally (one request, ending as `"logout"`).
+
 ### Logout vs an in-flight refresh
 
-`AuthModel.logout` (and `revokeSession`, through the same helper) marks a logout as running (`const done = beginLogout(service)`,
+`AuthModel.logout` (and `revokeSession`, through the same helper, unless it backs out on entry) marks a logout as running (`const done = beginLogout(service)`,
 a counter, so overlapping logouts never clear each other's flag) in its first
 tick, then runs through `withSessionLock(service, …)`: under the same
 `<APP_PREFIX>:auth-refresh:<service>` Web Lock as the refresh (or, without `navigator.locks`,

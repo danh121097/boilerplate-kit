@@ -1,49 +1,36 @@
+import { deferred, fakeLocks } from "@/__tests__/helpers/fake-locks";
 import { installLocalStorage } from "@/__tests__/helpers/fake-storage";
-import { STORAGE_KEYS } from "@/enums";
+import { loadAuthStore, makeRouter } from "@/__tests__/helpers/session-harness";
 import { AuthModel } from "@/services/auth/auth";
 import {
+  bumpSessionEpoch,
   clearServiceTokens,
   endSession,
   getAccessToken,
+  getRefreshToken,
   getSessionEpoch,
+  isLogoutPending,
   onSessionEnded,
   persistAccessToken,
   persistRefreshToken,
+  refreshLockName,
 } from "@/services/core";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import * as pinia from "pinia";
-import * as vue from "vue";
 
 /**
- * How a session ends: a server-rejected session is revoked and ends as
- * "expired" (the login redirect keeps a return path); only a voluntary logout
- * ends as "logout". A tab receiving another tab's logout writes nothing.
- * The store's auto-imported `defineStore` / `ref` / `computed` are provided as
- * globals before it is loaded.
+ * Revoking a server-rejected session: it is revoked once and ends as
+ * "expired" (the login redirect keeps a return path) — unless it already
+ * ended, before the call or while it waited for the refresh lock, in which
+ * case nothing is posted. A logout arriving meanwhile joins the revoke.
  */
-let useAuthStore: typeof import("@/stores/auth").useAuthStore;
-let setupSessionExpiry: typeof import("@/plugins/session-expiry").setupSessionExpiry;
-
-type TestRouter = Parameters<typeof setupSessionExpiry>[0];
-
-function makeRouter(route: { name: string; fullPath: string; requiresAuth?: boolean }) {
-  const replace = vi.fn().mockResolvedValue(undefined);
-  const router = {
-    currentRoute: {
-      value: {
-        name: route.name,
-        fullPath: route.fullPath,
-        meta: { requiresAuth: route.requiresAuth },
-      },
-    },
-    replace,
-  } as unknown as TestRouter;
-  return { router, replace };
-}
+type Store = Awaited<ReturnType<typeof loadAuthStore>>;
+let useAuthStore: Store["useAuthStore"];
+let setupSessionExpiry: Store["setupSessionExpiry"];
 
 const unauthorized = { error_code: 401, message: "expired" };
 
-describe("session end reasons", () => {
+describe("revoking a rejected session", () => {
   const stops: Array<() => void> = [];
 
   const watchEnds = () => {
@@ -53,11 +40,7 @@ describe("session end reasons", () => {
   };
 
   beforeAll(async () => {
-    vi.stubGlobal("defineStore", pinia.defineStore);
-    vi.stubGlobal("ref", vue.ref);
-    vi.stubGlobal("computed", vue.computed);
-    ({ useAuthStore } = await import("@/stores/auth"));
-    ({ setupSessionExpiry } = await import("@/plugins/session-expiry"));
+    ({ useAuthStore, setupSessionExpiry } = await loadAuthStore());
   });
 
   beforeEach(() => {
@@ -70,6 +53,7 @@ describe("session end reasons", () => {
   afterEach(() => {
     for (const stop of stops.splice(0)) stop();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("a boot 401 with a live session revokes it and ends it as expired with a return path", async () => {
@@ -156,6 +140,24 @@ describe("session end reasons", () => {
     expect(post).not.toHaveBeenCalled();
   });
 
+  it("a revoke of a session that already ended takes no lock and posts nothing", async () => {
+    const locks = fakeLocks();
+    const request = vi.spyOn(locks, "request");
+    vi.stubGlobal("navigator", { locks });
+    const post = vi.spyOn(AuthModel.api, "post");
+    const ended = watchEnds();
+    clearServiceTokens("MAIN"); // no stored session left to revoke
+
+    const revoke = AuthModel.revokeSession();
+    expect(isLogoutPending("MAIN")).toBe(false);
+
+    await expect(revoke).resolves.toBe(false);
+    expect(isLogoutPending("MAIN")).toBe(false);
+    expect(request).not.toHaveBeenCalled();
+    expect(post).not.toHaveBeenCalled();
+    expect(ended).not.toHaveBeenCalled();
+  });
+
   it("a logout during an in-flight revoke posts once and ends the session once", async () => {
     let finish!: () => void;
     const post = vi
@@ -176,71 +178,55 @@ describe("session end reasons", () => {
     expect(ended).toHaveBeenCalledExactlyOnceWith("expired", "MAIN");
   });
 
-  it("a voluntary logout ends as logout without a return path", async () => {
-    const activePinia = pinia.createPinia();
-    const { router, replace } = makeRouter({
-      name: "users",
-      fullPath: "/users?page=2",
-      requiresAuth: true,
-    });
-    setupSessionExpiry(router, activePinia);
-    vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
+  it("a revoke whose request fails still ends the session and resolves true", async () => {
+    vi.spyOn(AuthModel.api, "post").mockRejectedValue({ error_code: 0, message: "Network Error" });
     const ended = watchEnds();
 
-    await useAuthStore(activePinia).logout();
+    await expect(AuthModel.revokeSession(getSessionEpoch("MAIN"))).resolves.toBe(true);
+    expect(ended).toHaveBeenCalledExactlyOnceWith("expired", "MAIN");
+    expect(getAccessToken("MAIN")).toBeNull();
+  });
 
+  it("a logout joining a revoke that backs out still signs out", async () => {
+    const locks = fakeLocks();
+    vi.stubGlobal("navigator", { locks });
+    const holder = deferred<void>();
+    void locks.request(refreshLockName("MAIN"), () => holder.promise);
+    const post = vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
+    const ended = watchEnds();
+
+    const revoke = AuthModel.revokeSession(getSessionEpoch("MAIN"));
+    const logout = AuthModel.logout();
+    bumpSessionEpoch("MAIN"); // the revoke's view of the session is stale now
+    holder.resolve();
+
+    await expect(revoke).resolves.toBe(false);
+    await logout;
+    expect(post).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ url: "/auth/logout", data: { refreshToken: "RT" } }),
+    );
     expect(ended).toHaveBeenCalledExactlyOnceWith("logout", "MAIN");
-    expect(replace).toHaveBeenCalledExactlyOnceWith({ name: "login" });
+    expect(getAccessToken("MAIN")).toBeNull();
+    expect(getRefreshToken("MAIN")).toBeNull();
   });
 
-  it("a remote logout writes nothing to storage and leaves a protected page without a return path", () => {
-    const target = new EventTarget();
-    Object.assign(globalThis, { window: target });
-    try {
-      const activePinia = pinia.createPinia();
-      const { router, replace } = makeRouter({
-        name: "users",
-        fullPath: "/users",
-        requiresAuth: true,
-      });
-      setupSessionExpiry(router, activePinia);
-      const ended = watchEnds();
-      const store = useAuthStore(activePinia);
+  it("a revoke waiting for the lock does nothing when a refused refresh ends the session first", async () => {
+    const locks = fakeLocks();
+    vi.stubGlobal("navigator", { locks });
+    const holder = deferred<void>();
+    void locks.request(refreshLockName("MAIN"), () => holder.promise);
+    const post = vi.spyOn(AuthModel.api, "post");
+    const ended = watchEnds();
 
-      // Another tab logged out: its writes reach this tab as a storage event.
-      localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
-      localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-      const setItem = vi.spyOn(localStorage, "setItem");
-      const removeItem = vi.spyOn(localStorage, "removeItem");
-      const clear = vi.spyOn(localStorage, "clear");
-      target.dispatchEvent(new Event("storage"));
+    const revoke = AuthModel.revokeSession(getSessionEpoch("MAIN"));
+    // The refresh holding the lock is refused: it clears the tokens and ends
+    // the session before the revoke gets the lock.
+    clearServiceTokens("MAIN");
+    endSession("expired", "MAIN");
+    holder.resolve();
 
-      expect(ended).toHaveBeenCalledExactlyOnceWith("logout", "MAIN");
-      expect(setItem).not.toHaveBeenCalled();
-      expect(removeItem).not.toHaveBeenCalled();
-      expect(clear).not.toHaveBeenCalled();
-      expect(replace).toHaveBeenCalledExactlyOnceWith({ name: "login" });
-      expect(store.isAuthenticated).toBe(false);
-    } finally {
-      delete (globalThis as { window?: unknown }).window;
-    }
-  });
-
-  it("a remote logout on a public page stays there", () => {
-    const target = new EventTarget();
-    Object.assign(globalThis, { window: target });
-    try {
-      const activePinia = pinia.createPinia();
-      const { router, replace } = makeRouter({ name: "home", fullPath: "/" });
-      setupSessionExpiry(router, activePinia);
-      useAuthStore(activePinia);
-
-      localStorage.clear();
-      target.dispatchEvent(new Event("storage"));
-
-      expect(replace).not.toHaveBeenCalled();
-    } finally {
-      delete (globalThis as { window?: unknown }).window;
-    }
+    await expect(revoke).resolves.toBe(false);
+    expect(post).not.toHaveBeenCalled();
+    expect(ended).toHaveBeenCalledExactlyOnceWith("expired", "MAIN");
   });
 });

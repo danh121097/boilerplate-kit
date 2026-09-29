@@ -14,8 +14,11 @@ import type { AuthUser } from "@/services/auth/types/auth";
  *   swallows it): a failed query is not dehydrated, so the browser resolves it on
  *   hydration instead of the page rendering a stale "logged out".
  * - Browser: through the axios Model, which refreshes-and-retries on 401. A 401
- *   that survives the refresh means anonymous → null; any other error (network,
- *   5xx) surfaces to the query rather than looking like a logout.
+ *   that survives the refresh resolves null; while the hint is set it is a
+ *   session the server rejected, so it is first revoked
+ *   (`AuthModel.revokeSession` — ends it as "expired", unless it already
+ *   ended). Without the hint it is an anonymous visitor. Any other error
+ *   (network, 5xx) surfaces to the query rather than looking like a logout.
  */
 export function fetchSessionUser(): Promise<AuthUser | null> {
   return import.meta.server ? readServerSession() : AuthModel.getSession();
