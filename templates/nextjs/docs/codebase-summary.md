@@ -23,7 +23,7 @@ src/
 │   ├── users/page.tsx    # Server prefetch → users-list-client.tsx (React Query)
 │   └── form/page.tsx     # react-hook-form + zod ("use client")
 ├── proxy.ts              # Route guard (guest → /login?redirect=…)
-├── components/           # site-header, session-banner, mock-auth-badge
+├── components/           # site-header, socket-status, session-banner, mock-auth-badge
 │   └── ui/               # shadcn/ui primitives (button, badge, card, input, form-field, dialog)
 ├── stores/               # Zustand stores (counter, socket-io)
 ├── server/               # SSR helpers (RSC/async component only)

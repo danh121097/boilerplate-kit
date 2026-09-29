@@ -1,10 +1,14 @@
-import { SOCKET_EVENT, SOCKET_UNAUTHORIZED_MESSAGE } from "@/enums";
+import { SOCKET_EVENT } from "@/enums";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import { useSocketIOStore } from "@/stores/socket-io";
 import { useCallback, useEffect } from "react";
 
-/** Trailing delay before a failed handshake is retried. */
-const RECONNECT_THROTTLE_MS = 2000;
+/** First delay before a rejected handshake is retried; doubles per attempt. */
+const RECONNECT_BASE_MS = 2000;
+/** Ceiling for the retry delay. */
+const RECONNECT_MAX_MS = 30_000;
+/** Disconnect reason when the server closed the socket; socket.io does not reconnect on its own. */
+const SERVER_DISCONNECT = "io server disconnect";
 
 /** Handshake signature, built by the same signer as the HTTP requests. Empty when
  * no HMAC secret is configured. */
@@ -22,8 +26,6 @@ function buildAuth() {
 }
 
 export function useSocketIO() {
-  const { socket, authenticated, setSocketIO } = useSocketIOStore();
-
   const connectSocket = useCallback(() => {
     if (typeof window === "undefined") return;
 
@@ -31,13 +33,11 @@ export function useSocketIO() {
     if (!currentSocket) return;
 
     currentSocket.auth = buildAuth();
-    if (currentSocket.connected) {
-      setSocketIO({ authenticated: true });
-      return;
-    }
-    currentSocket.connect();
-    setSocketIO({ authenticated: true });
-  }, [setSocketIO]);
+    // `authenticated` flips only on the server's `authenticated` event.
+    if (!currentSocket.connected) currentSocket.connect();
+  }, []);
+
+  const { socket, authenticated, setSocketIO } = useSocketIOStore();
 
   const destroySocket = useCallback(() => {
     const currentSocket = useSocketIOStore.getState().socket;
@@ -71,23 +71,39 @@ export function useSocketIO() {
     if (!socket) return;
 
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let attempt = 0;
 
-    const handleAuthenticated = () => setSocketIO({ authenticated: true });
-    // Any failed handshake schedules ONE trailing retry that reconnects the same
-    // socket with a fresh signature (`connectSocket` rebuilds `auth`).
-    const handleConnectError = (e: Error) => {
-      if (e.message === SOCKET_UNAUTHORIZED_MESSAGE) {
-        setSocketIO({ authenticated: false });
-      }
+    const handleAuthenticated = () => {
+      attempt = 0;
+      setSocketIO({ authenticated: true });
+    };
+    // ONE manual retry at a time on the same socket (`connectSocket` rebuilds `auth`)
+    // with exponential backoff.
+    const scheduleRetry = () => {
       if (reconnectTimer) return;
+      const delay = Math.min(RECONNECT_BASE_MS * 2 ** attempt, RECONNECT_MAX_MS);
+      attempt++;
       reconnectTimer = setTimeout(() => {
         reconnectTimer = null;
         connectSocket();
-      }, RECONNECT_THROTTLE_MS);
+      }, delay);
+    };
+    const handleDisconnect = (reason: string) => {
+      setSocketIO({ authenticated: false });
+      // socket.io never reconnects after the server closes the socket itself (e.g. a
+      // graceful restart), so that case joins the same backoff as a rejected handshake.
+      if (reason === SERVER_DISCONNECT) scheduleRetry();
+    };
+    const handleConnectError = () => {
+      setSocketIO({ authenticated: false });
+      // `active` means socket.io is already auto-reconnecting (network error, server
+      // down). Otherwise the server rejected the handshake.
+      if (!socket.active) scheduleRetry();
     };
     const handleUnauthorized = () => destroySocket();
 
     socket.on(SOCKET_EVENT.AUTHENTICATED, handleAuthenticated);
+    socket.on(SOCKET_EVENT.DISCONNECT, handleDisconnect);
     socket.on(SOCKET_EVENT.CONNECT_ERROR, handleConnectError);
     socket.on(SOCKET_EVENT.UNAUTHORIZED, handleUnauthorized);
 
@@ -95,6 +111,7 @@ export function useSocketIO() {
 
     return () => {
       socket.off(SOCKET_EVENT.AUTHENTICATED, handleAuthenticated);
+      socket.off(SOCKET_EVENT.DISCONNECT, handleDisconnect);
       socket.off(SOCKET_EVENT.CONNECT_ERROR, handleConnectError);
       socket.off(SOCKET_EVENT.UNAUTHORIZED, handleUnauthorized);
       // Cancel a pending retry so nothing connects after unmount.

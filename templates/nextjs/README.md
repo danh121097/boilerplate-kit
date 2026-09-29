@@ -63,11 +63,11 @@ Copy `.env.example` to `.env.local` and fill in:
 src/
 ├── app/           # App Router: layout, providers, pages (/, /counter, /login, /users, /form), not-found
 ├── proxy.ts       # Route guard (guest → /login?redirect=…)
-├── components/    # site-header, session-banner, ui/ (shadcn primitives incl. dialog)
+├── components/    # site-header, socket-status, session-banner, ui/ (shadcn primitives incl. dialog)
 ├── server/        # SSR helpers (RSC only): server-api, session, hydrated queries
 ├── services/      # Axios service layer (client only): core, auth, users
 ├── stores/        # Zustand stores (counter, socket-io)
-├── hooks/         # useSocketIO
+├── hooks/         # useSocketIO (opened by SocketStatus while signed in)
 ├── i18n/          # react-i18next setup + en/ja locales
 ├── enums/         # storage keys, socket events
 ├── utils/         # cn, cookie storage, date format

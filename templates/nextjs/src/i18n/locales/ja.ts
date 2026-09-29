@@ -7,6 +7,10 @@ export default {
     login: "ログイン",
     logout: "ログアウト",
   },
+  socket: {
+    connected: "リアルタイム接続済み",
+    reconnecting: "リアルタイム再接続中",
+  },
   session: {
     unavailable: "サーバーに接続できませんでした。ログイン状態は維持されています。",
     retry: "再試行",

@@ -84,12 +84,26 @@ the SSR bundle.
 - **Handshake auth** is `{ role: "user", sig, ctime }`. `sig`/`ctime` come from the
   same `HMACSignatureGenerator.signRequest` the HTTP interceptor uses (method
   `GET`, path `/socket`); without `NEXT_PUBLIC_HMAC_SECRET` they are omitted.
-- **Reconnect** — any `connect_error` schedules one trailing
-  `RECONNECT_THROTTLE_MS` (2000 ms) timer that refreshes `auth` (fresh signature)
-  on the existing socket and calls `connect()`; the socket stays in the store.
-  Further errors inside that window do not reschedule, and the timer is cleared
-  on unmount so nothing connects afterwards. An `unauthorized` event destroys the
-  socket instead.
+- **Lifecycle** — the socket is opened only while signed in. `SocketStatus`
+  (`src/components/socket-status.tsx`) calls `useSocketIO()` and is rendered in the
+  header next to Logout only when `isAuthenticated`; signing out unmounts it, which
+  destroys the socket.
+- **`authenticated`** becomes `true` only on the server's `authenticated` event, and
+  `false` on `connect_error`, on the built-in `disconnect` event and on destroy.
+  `connectSocket()` never sets it.
+- **Reconnect** — on `connect_error`, if `socket.active` is true socket.io is already
+  auto-reconnecting (network error, server down) and nothing extra is scheduled.
+  If it is false the server rejected the handshake (`Unauthorized!`): one manual
+  retry is scheduled (errors while one is pending do not reschedule) after
+  `min(RECONNECT_BASE_MS * 2 ** attempt, RECONNECT_MAX_MS)` (2 s, 4 s, 8 s, 16 s,
+  30 s, 30 s, ...; `RECONNECT_BASE_MS = 2000`, `RECONNECT_MAX_MS = 30_000`). The
+  retry rebuilds `auth` (fresh HMAC `sig`/`ctime`) and calls `connect()` on the same
+  socket. A `disconnect` with reason `io server disconnect` (the server closed the socket, e.g. a graceful restart; socket.io does not reconnect on its own) schedules the same retry. `attempt` resets to 0 on `authenticated`. An `unauthorized` event destroys
+  the socket. Unmount clears a pending retry, so nothing connects afterwards.
+- **Header status** — `SocketStatus` renders a `role="status"` wrapper with a
+  `size-2 rounded-full` dot (`bg-emerald-500` when authenticated, otherwise
+  `bg-muted-foreground`), a `title`, and visually hidden text from the
+  `socket.connected` / `socket.reconnecting` keys (en / ja).
 - **State** lives in `stores/socket-io.ts` (`socket`, `authenticated`).
   `useSocketEvent(event, cb)` reads the socket through a selector
   (`useSocketIOStore((s) => s.socket)`), so it rebinds when the socket changes.

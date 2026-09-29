@@ -1,5 +1,6 @@
 "use client";
 
+import { SocketStatus } from "@/components/socket-status";
 import { Button } from "@/components/ui/button";
 import { setLocale } from "@/i18n/i18n";
 import { useLogoutMutation } from "@/services/auth";
@@ -63,16 +64,19 @@ export function SiteHeader() {
           </Link>
         ))}
         {isAuthenticated ? (
-          <Button
-            variant="unstyled"
-            className={navLinkClass(false, "ml-auto")}
-            // Signed out either way (the client session ends even when the
-            // request fails): go to plain /login, no return path.
-            onClick={() => logout.mutate(undefined, { onSettled: () => router.push("/login") })}
-            disabled={logout.isPending}
-          >
-            {t("nav.logout")}
-          </Button>
+          <div className="ml-auto flex items-center gap-3">
+            <SocketStatus />
+            <Button
+              variant="unstyled"
+              className={navLinkClass(false)}
+              // Signed out either way (the client session ends even when the
+              // request fails): go to plain /login, no return path.
+              onClick={() => logout.mutate(undefined, { onSettled: () => router.push("/login") })}
+              disabled={logout.isPending}
+            >
+              {t("nav.logout")}
+            </Button>
+          </div>
         ) : (
           <Link href="/login" className={navLinkClass(isActive(pathname, "/login"), "ml-auto")}>
             {t("nav.login")}

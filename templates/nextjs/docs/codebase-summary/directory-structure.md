@@ -33,6 +33,7 @@ templates/nextjs/
     ├── components/
     │   ├── site-header.tsx   # Nav, active link, locale toggle, logout
     │   ├── session-banner.tsx # Session-unavailable alert + retry
+    │   ├── socket-status.tsx  # Realtime connection dot (opens the socket)
     │   ├── mock-auth-badge.tsx
     │   └── ui/               # button, input, card, badge, form-field, dialog
     ├── enums/
