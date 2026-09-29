@@ -8,10 +8,12 @@ import {
   resetQueriesOnSessionEnd,
   resetQueriesToSignedOut,
   SessionEndedError,
+  toApiError,
 } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
 import { create } from "zustand";
 import type { AuthUser } from "@/services/auth/types/auth";
+import type { ApiResponseError } from "@/services/core";
 
 interface AuthState {
   /** Signed-in user, or null when logged out / not yet resolved. May be null
@@ -25,15 +27,22 @@ interface AuthState {
   /** True after an explicit logout, until the login screen shows: the auth gate
    * then sends the user to a plain /login (any other guest gets `?redirect=`). */
   loggedOut: boolean;
+  /** Set when restoring the session failed transiently (offline, timeout, 5xx):
+   * the session is kept and `retryHydrate()` can try again. Null otherwise. */
+  hydrateError: ApiResponseError | null;
   /** Reset auth state after the refresh endpoint refused the session. */
   expireSession: () => void;
   setUser: (user: AuthUser | null) => void;
   /** Boot-time restore: read the persisted token, resolve the user, mark hydrated. */
   hydrate: () => Promise<void>;
+  /** Re-run the restore after a transient failure (does not show the boot splash again). */
+  retryHydrate: () => Promise<void>;
   /** (Re)fetch the signed-in user. Safe to call again after a transient failure. */
   loadUser: () => Promise<void>;
-  /** Sign out: revoke server-side, clear SecureStore + query cache, reset state. */
-  logout: () => Promise<void>;
+  /** Local sign-out after the logout request settled (`useLogoutMutation`'s
+   * `onSettled`): reset state and the query cache, and mark an explicit logout so
+   * the gate goes to a plain /login. Does not call the API. */
+  clearSession: () => void;
 }
 
 /**
@@ -46,22 +55,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isAuthenticated: false,
   hydrated: false,
   loggedOut: false,
+  hydrateError: null,
 
-  expireSession: () => set({ user: null, isAuthenticated: false }),
+  expireSession: () => set({ user: null, isAuthenticated: false, hydrateError: null }),
 
-  setUser: (user) => set({ user, isAuthenticated: Boolean(user), loggedOut: false }),
+  setUser: (user) =>
+    set({ user, isAuthenticated: Boolean(user), loggedOut: false, hydrateError: null }),
 
   hydrate: async () => {
-    const signedIn = await hasStoredSession(authContract.service).catch(() => false);
-    if (!signedIn) {
-      set({ user: null, isAuthenticated: false, hydrated: true });
-      return;
-    }
-    // A session is stored — resolve the user. A stale token 401s here; the
-    // interceptor refreshes if it can. Only a 401 ends the session.
-    await get().loadUser();
+    await restoreSession(get);
     set({ hydrated: true });
   },
+
+  retryHydrate: () => restoreSession(get),
 
   loadUser: () => {
     // Overlapping calls in the same session share one getMe, so two callers
@@ -75,17 +81,47 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     return promise;
   },
 
-  logout: async () => {
-    try {
-      await AuthModel.logout();
-    } catch {
-      // Ignore network errors — tokens are cleared by the model regardless.
-    } finally {
-      resetQueriesToSignedOut(queryClient, queryKeys.auth.me);
-      set({ user: null, isAuthenticated: false, loggedOut: true });
-    }
+  clearSession: () => {
+    resetQueriesToSignedOut(queryClient, queryKeys.auth.me);
+    set({ user: null, isAuthenticated: false, loggedOut: true, hydrateError: null });
   },
 }));
+
+/** Read the persisted session and, if present, resolve the user. A stale token
+ * 401s in `loadUser`; the interceptor refreshes if it can. Only a 401 ends the
+ * session. */
+async function restoreSession(get: () => AuthState): Promise<void> {
+  const signedIn = await readStoredSession();
+  if (signedIn === null) return keepStateOnReadError();
+  if (!signedIn) {
+    useAuthStore.setState({ user: null, isAuthenticated: false, hydrateError: null });
+    return;
+  }
+  await get().loadUser();
+}
+
+/** Whether tokens are stored, or null when SecureStore could not be read (says
+ * nothing about the session: never treat it as signed out). */
+async function readStoredSession(): Promise<boolean | null> {
+  try {
+    return await hasStoredSession(authContract.service);
+  } catch {
+    return null;
+  }
+}
+
+/** A SecureStore read failed: keep the current state and flag it so the UI can retry. */
+function keepStateOnReadError(): void {
+  useAuthStore.setState({
+    hydrateError: { ...toApiError(new Error("storage_unavailable")), retryable: true },
+  });
+}
+
+/** Interceptor rejections already are `ApiResponseError`s; normalize the rest. */
+function asApiError(error: unknown): ApiResponseError {
+  const e = error as Partial<ApiResponseError> | null;
+  return typeof e?.error_code === "number" ? (e as ApiResponseError) : toApiError(error);
+}
 
 /** The getMe that `loadUser` shares with overlapping calls of the same session. */
 let inFlightLoad: { epoch: number; promise: Promise<void> } | null = null;
@@ -98,7 +134,7 @@ async function loadUserOnce(epoch: number): Promise<void> {
   try {
     const user = await AuthModel.getMe();
     if (isStale()) return;
-    useAuthStore.setState({ user, isAuthenticated: true });
+    useAuthStore.setState({ user, isAuthenticated: true, hydrateError: null });
   } catch (error) {
     if (isStale()) return;
     if (isUnauthorizedError(error)) {
@@ -106,15 +142,18 @@ async function loadUserOnce(epoch: number): Promise<void> {
       // expired — unless it already ended (logout in progress, refused refresh):
       // then only reset local state.
       if (!(error instanceof SessionEndedError)) await AuthModel.revokeSession(epoch);
-      useAuthStore.setState({ user: null, isAuthenticated: false });
+      useAuthStore.setState({ user: null, isAuthenticated: false, hydrateError: null });
       return;
     }
     // Offline / 5xx / 429 / timeout / an unavailable refresh keep the tokens:
     // stay signed in with an unknown user and let the UI retry.
-    const stillSignedIn = await hasStoredSession(authContract.service).catch(() => false);
+    const stillSignedIn = await readStoredSession();
     if (isStale()) return;
+    if (stillSignedIn === null) return keepStateOnReadError();
     useAuthStore.setState(
-      stillSignedIn ? { isAuthenticated: true } : { user: null, isAuthenticated: false },
+      stillSignedIn
+        ? { isAuthenticated: true, hydrateError: { ...asApiError(error), retryable: true } }
+        : { user: null, isAuthenticated: false, hydrateError: null },
     );
   }
 }

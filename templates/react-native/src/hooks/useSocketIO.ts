@@ -1,10 +1,12 @@
 import { SOCKET_EVENT, SOCKET_UNAUTHORIZED_MESSAGE } from "@/enums";
 import { getAccessToken } from "@/services/core/auth-token-storage";
+import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import { useSocketIOStore } from "@/stores/socket-io";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
-import Base64 from "crypto-js/enc-base64";
-import HmacSHA256 from "crypto-js/hmac-sha256";
+
+/** Minimum gap between automatic reconnect attempts after connect errors. */
+const RECONNECT_THROTTLE_MS = 2000;
 
 /**
  * Build the per-handshake `{ sig, ctime }` headers expected by HMAC-protected
@@ -14,12 +16,13 @@ import HmacSHA256 from "crypto-js/hmac-sha256";
  * apps should sign on the server (a BFF/proxy) and forward the headers.
  */
 function signHeader(): { sig: string; ctime: number } | Record<string, never> {
-  const secret = process.env.EXPO_PUBLIC_HMAC_SECRET;
-  if (!secret) return {};
-  const ctime = Date.now();
-  const stringToSign = ["GET", "application/json", ctime, "/socket", ""].join("\n");
-  const sig = Base64.stringify(HmacSHA256(stringToSign, secret));
-  return { sig, ctime };
+  const signed = HMACSignatureGenerator.signRequest({
+    method: "GET",
+    path: "/socket",
+    contentType: "application/json",
+  });
+  if (!signed) return {};
+  return { sig: signed.sig, ctime: signed.ctime };
 }
 
 /**
@@ -32,6 +35,11 @@ export async function buildSocketAuth() {
   return { token: `Bearer ${token ?? ""}`, role: "user", ...signHeader() };
 }
 
+/** Attach a fresh handshake payload (the token may have rotated since the last connect). */
+async function refreshAuth(socket: Socket): Promise<void> {
+  socket.auth = await buildSocketAuth();
+}
+
 /**
  * Initialize a socket.io connection scoped to the mounting component.
  *
@@ -42,30 +50,32 @@ export async function buildSocketAuth() {
  * - Exposes `socket`, `authenticated`, `connectSocket`, `destroySocket`.
  */
 export function useSocketIO() {
-  const socketRef = useRef<Socket | null>(null);
-
   const URL = process.env.EXPO_PUBLIC_APP_ENDPOINT ?? "";
+
+  // Throttle ref to prevent rapid reconnect storms.
+  const reConnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Bumped by every connect and destroy: a connect whose auth read finishes after a
+  // newer connect or a destroy (unmount, StrictMode remount) is stale and must not open the socket.
+  const connectEpochRef = useRef(0);
 
   const { authenticated, setSocketIO } = useSocketIOStore();
 
-  // Lazily create the socket instance once per hook mount (no auth yet — the
-  // token is attached asynchronously in connectSocket).
-  if (!socketRef.current) {
-    socketRef.current = io(URL, {
+  // One socket instance per hook mount (the lazy initializer runs once). No auth
+  // yet: the token is attached asynchronously in connectSocket.
+  const [socket] = useState(() =>
+    io(URL, {
       transports: ["websocket"],
       withCredentials: true,
       autoConnect: false,
       forceBase64: true,
-    });
-    if (!useSocketIOStore.getState().socket) {
-      setSocketIO({ socket: socketRef.current });
-    }
-  }
-
-  const socket = socketRef.current;
+    }),
+  );
 
   const connectSocket = useCallback(async () => {
-    socket.auth = await buildSocketAuth();
+    const epoch = ++connectEpochRef.current;
+    await refreshAuth(socket);
+    if (epoch !== connectEpochRef.current) return;
     if (socket.connected) {
       setSocketIO({ authenticated: true, socket });
       return;
@@ -75,21 +85,20 @@ export function useSocketIO() {
   }, [socket, setSocketIO]);
 
   const destroySocket = useCallback(() => {
+    connectEpochRef.current++;
     socket.disconnect();
     if (useSocketIOStore.getState().socket === socket) {
       setSocketIO({ authenticated: false, socket: null });
     }
   }, [socket, setSocketIO]);
 
-  // Throttle ref to prevent rapid reconnect storms.
-  const reConnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reConnect = useCallback(() => {
     if (reConnectTimerRef.current) return;
     reConnectTimerRef.current = setTimeout(() => {
       reConnectTimerRef.current = null;
       destroySocket();
       void connectSocket();
-    }, 2000);
+    }, RECONNECT_THROTTLE_MS);
   }, [connectSocket, destroySocket]);
 
   useEffect(() => {
@@ -133,7 +142,8 @@ export function useSocketIO() {
  * Subscribe to a socket event with automatic cleanup on unmount.
  */
 export function useSocketEvent(event: string, callback: (...args: unknown[]) => void) {
-  const { socket } = useSocketIOStore.getState();
+  const socket = useSocketIOStore((s) => s.socket);
+
   useEffect(() => {
     if (!socket) return;
     socket.on(event, callback);

@@ -4,6 +4,9 @@
 
 - `strict: true` — all strict checks enabled.
 - `noUncheckedIndexedAccess: true` — array/object index access returns `T | undefined`.
+- `noFallthroughCasesInSwitch: true` and `verbatimModuleSyntax: true` (type-only imports use `import type`).
+  `jest.config.ts` is loaded by ts-node as CommonJS, so tsconfig has a `ts-node` override
+  that turns `verbatimModuleSyntax` off for it. TypeScript stays on the Expo-pinned 5.8.
 - No `any` without an explicit justification comment.
 - Module resolution: `Node` (React Native / Metro-compatible).
 

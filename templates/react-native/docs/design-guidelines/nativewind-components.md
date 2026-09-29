@@ -68,4 +68,4 @@ import { cn } from "@/lib/utils";
   palette classes (`bg-white`, `text-blue-500`).
 - Avoid inline `StyleSheet.create()` — use NativeWind classes instead.
 - For complex animations, use React Native `Animated` API + NativeWind fallbacks.
-- Dark mode: check `useColorScheme()` and apply `dark:` prefixed classes conditionally.
+- Dark mode is not provided (light only); see [theming](./theming.md).

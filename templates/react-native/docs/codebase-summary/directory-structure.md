@@ -35,7 +35,7 @@ templates/react-native/
     │   ├── socket-events.ts   # Socket.IO event registry
     │   └── index.ts
     ├── i18n/
-    │   ├── i18n.ts            # initI18n() + setLocale()
+    │   ├── i18n.ts            # initI18n() + restoreSavedLanguage() + setLocale() (persisted)
     │   └── locales/en.ts, ja.ts
     ├── providers/
     │   └── query-client-provider.tsx

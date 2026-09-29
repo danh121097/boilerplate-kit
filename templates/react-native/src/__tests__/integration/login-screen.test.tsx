@@ -15,8 +15,9 @@ jest.mock("expo-router", () => ({
 }));
 
 const mockMutateAsync = jest.fn();
+let mockPending = false;
 jest.mock("@/services/auth", () => ({
-  useLoginMutation: () => ({ mutateAsync: mockMutateAsync, isPending: false }),
+  useLoginMutation: () => ({ mutateAsync: mockMutateAsync, isPending: mockPending }),
 }));
 
 // Return translation keys verbatim so assertions don't depend on i18n init.
@@ -46,6 +47,7 @@ describe("LoginScreen", () => {
     mockReplace.mockClear();
     mockParams = {};
     mockMutateAsync.mockReset();
+    mockPending = false;
   });
 
   it("validates with zod and does not call the auth service on invalid input", async () => {
@@ -54,7 +56,26 @@ describe("LoginScreen", () => {
     fireEvent.changeText(screen.getByTestId("login-password"), "short");
     fireEvent.press(screen.getByTestId("login-submit"));
 
-    await waitFor(() => expect(screen.getByText("Invalid email")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("validation.email")).toBeTruthy());
+    expect(screen.getByText("validation.password_min")).toBeTruthy();
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("labels and autofill-hints both fields", () => {
+    renderLogin();
+    const email = screen.getByLabelText("login.email");
+    const password = screen.getByLabelText("login.password");
+    expect(email.props.autoComplete).toBe("username");
+    expect(email.props.textContentType).toBe("username");
+    expect(password.props.autoComplete).toBe("current-password");
+    expect(password.props.textContentType).toBe("password");
+  });
+
+  it("shows the submitting label and blocks a second press while pending", () => {
+    mockPending = true;
+    renderLogin();
+    expect(screen.getByText("login.submitting")).toBeTruthy();
+    fireEvent.press(screen.getByTestId("login-submit"));
     expect(mockMutateAsync).not.toHaveBeenCalled();
   });
 
@@ -89,15 +110,45 @@ describe("LoginScreen", () => {
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith(expected));
   });
 
-  it("shows an error message when login fails", async () => {
-    mockMutateAsync.mockRejectedValue(new Error("401"));
+  it("shows the server message in an alert when login fails", async () => {
+    mockMutateAsync.mockRejectedValue({ error_code: 401, error_message: "Wrong password" });
     renderLogin();
 
     fireEvent.changeText(screen.getByTestId("login-email"), "a@b.com");
     fireEvent.changeText(screen.getByTestId("login-password"), "password123");
     fireEvent.press(screen.getByTestId("login-submit"));
 
-    await waitFor(() => expect(screen.getByTestId("login-error")).toBeTruthy());
+    const alert = await screen.findByTestId("login-error");
+    expect(alert.props.accessibilityRole).toBe("alert");
+    expect(screen.getByText("Wrong password")).toBeTruthy();
     expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it("falls back to login.error when the rejection has no message", async () => {
+    mockMutateAsync.mockRejectedValue({});
+    renderLogin();
+
+    fireEvent.changeText(screen.getByTestId("login-email"), "a@b.com");
+    fireEvent.changeText(screen.getByTestId("login-password"), "password123");
+    fireEvent.press(screen.getByTestId("login-submit"));
+
+    await waitFor(() => expect(screen.getByText("login.error")).toBeTruthy());
+  });
+
+  it("clears the previous server error when the next submit fails validation", async () => {
+    mockMutateAsync.mockRejectedValue({ error_code: 401, error_message: "Wrong password" });
+    renderLogin();
+
+    fireEvent.changeText(screen.getByTestId("login-email"), "a@b.com");
+    fireEvent.changeText(screen.getByTestId("login-password"), "password123");
+    fireEvent.press(screen.getByTestId("login-submit"));
+    await screen.findByTestId("login-error");
+
+    fireEvent.changeText(screen.getByTestId("login-email"), "not-an-email");
+    fireEvent.press(screen.getByTestId("login-submit"));
+
+    await screen.findByText("validation.email");
+    expect(screen.queryByTestId("login-error")).toBeNull();
+    expect(mockMutateAsync).toHaveBeenCalledTimes(1);
   });
 });

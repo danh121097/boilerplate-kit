@@ -7,11 +7,11 @@ src/services/
 ├── init-services.ts        # Wire baseURLs + register tokens + install interceptors with per-service refresh options
 ├── index.ts                # Barrel re-export
 ├── core/
-│   ├── api.ts              # Api class — multi-service axios wrapper
+│   ├── api.ts              # Api class — multi-service axios wrapper (get / paginate / cursorPaginate / post / …)
 │   ├── interceptors.ts     # ApiInterceptors — request (HMAC+Bearer) + response (refresh)
 │   ├── refresh-token-manager.ts  # Single-flight refresh + failure policy + withSessionLock
 │   ├── api-errors.ts             # toApiError, isRefreshRefused, refreshUnavailable, SessionEndedError
-│   ├── session.ts                # Session epoch, logout-pending, onSessionEnded/endSession, hasStoredSession, safeReturnPath
+│   ├── session.ts                # Session epoch, logout-pending, onSessionEnded/endSession, hasStoredSession, safeRedirect
 │   ├── query-client.ts           # resetQueriesToSignedOut / resetQueriesOnSessionEnd
 │   ├── app-prefix.ts             # getAppPrefix() — sanitized SecureStore key prefix
 │   ├── auth-refresh-client.ts    # Bare axios refresh call (no interceptors)
@@ -28,7 +28,7 @@ src/services/
 │   ├── types/auth.ts       # AuthUser, AuthResult, LoginPayload, RegisterPayload
 │   └── index.ts
 └── users/
-    ├── users.ts            # UsersModel + useUsersListQuery
+    ├── users.ts            # UsersModel (list → PaginatedResponse<User>, get/update → User) + useUsersListQuery
     ├── mock-users.ts       # Dev-only mock /users fixture (EXPO_PUBLIC_AUTH_MOCK)
     ├── types/user.ts       # User, UpdateUserPayload
     └── index.ts
@@ -46,7 +46,7 @@ src/services/
 
 ```
 src/stores/
-├── auth.ts       # useAuthStore (user / isAuthenticated / hydrated / hydrate / loadUser / logout) + watchSessionEnd
+├── auth.ts       # useAuthStore (user / isAuthenticated / hydrated / hydrateError / hydrate / retryHydrate / loadUser / clearSession) + watchSessionEnd
 └── socket-io.ts  # useSocketIOStore: socket connection state
 ```
 

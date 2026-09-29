@@ -1,5 +1,6 @@
 import { resetSecureStore } from "@/__tests__/helpers/fake-secure-store";
 import { bearerOf, httpError, makeClient, ok } from "@/__tests__/helpers/http-mocks";
+import { logoutAndClear } from "@/__tests__/helpers/logout";
 import { queryClient } from "@/providers/query-client-provider";
 import { AuthModel } from "@/services/auth";
 import { Api } from "@/services/core";
@@ -64,7 +65,7 @@ describe("logout during an in-flight refresh", () => {
 
     const loading = useAuthStore.getState().loadUser(); // refresh starts
     await flush();
-    const loggingOut = useAuthStore.getState().logout(); // logout runs mid-refresh
+    const loggingOut = logoutAndClear(); // logout runs mid-refresh
     await flush();
     expect(logoutPost).not.toHaveBeenCalled(); // waits for the refresh first
     releaseRefresh(); // refresh resolves

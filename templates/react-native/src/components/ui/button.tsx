@@ -12,7 +12,7 @@ interface ButtonProps extends Omit<PressableProps, "children"> {
   variant?: ButtonVariant;
   /** Size preset — sm | md (default) | lg. */
   size?: ButtonSize;
-  /** Shows a spinner and blocks interaction. */
+  /** Shows a spinner next to the label and blocks interaction. */
   loading?: boolean;
   /** Stretches the button to the full container width. */
   block?: boolean;
@@ -34,6 +34,15 @@ const labelVariants: Record<ButtonVariant, string> = {
   outline: "text-foreground",
   ghost: "text-foreground",
   danger: "text-destructive-foreground",
+};
+
+/** Spinner colour matching each variant's label (HSL values of the tailwind tokens). */
+const spinnerColors: Record<ButtonVariant, string> = {
+  primary: "hsl(0, 0%, 98%)",
+  secondary: "hsl(0, 0%, 9%)",
+  outline: "hsl(0, 0%, 3.9%)",
+  ghost: "hsl(0, 0%, 3.9%)",
+  danger: "hsl(0, 0%, 98%)",
 };
 
 const sizeContainer: Record<ButtonSize, string> = {
@@ -80,13 +89,10 @@ export const Button = forwardRef<ElementRef<typeof Pressable>, ButtonProps>(
         )}
         {...props}
       >
-        {loading ? (
-          <ActivityIndicator size="small" color="white" />
-        ) : (
-          <Text className={cn("font-medium", labelVariants[variant], sizeLabel[size])}>
-            {children}
-          </Text>
-        )}
+        {loading ? <ActivityIndicator size="small" color={spinnerColors[variant]} /> : null}
+        <Text className={cn("font-medium", labelVariants[variant], sizeLabel[size])}>
+          {children}
+        </Text>
       </Pressable>
     );
   },

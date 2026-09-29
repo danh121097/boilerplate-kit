@@ -25,7 +25,7 @@ equivalents. Kept lean enough to read in one sitting.
 | Testing         | jest-expo + `@testing-library/react-native`                        |
 | Lint / format   | ESLint flat config + Prettier                                      |
 
-## Setup
+## Quick start
 
 ```sh
 cp .env.example .env          # then edit values
@@ -37,27 +37,36 @@ Point `EXPO_PUBLIC_APP_ENDPOINT` at a running backend (the `express` or `nestjs`
 template in this kit works out of the box). Every `EXPO_PUBLIC_*` var is inlined
 into the JS bundle at build time — never put real secrets there.
 
-```sh
-# Optional, dev only — answer /auth/* and /users in the app before the backend exists
-# EXPO_PUBLIC_AUTH_MOCK=true
-# EXPO_PUBLIC_AUTH_MOCK_EMAIL=demo@example.com
-# EXPO_PUBLIC_AUTH_MOCK_PASSWORD=password
-```
-
-See [Mock auth](./docs/system-architecture/security-auth.md#mock-auth-before-backend-integration): mock mode answers auth and users; the flag is ignored in production builds.
-
 ## Scripts
 
-| Script           | Does                                            |
-| ---------------- | ----------------------------------------------- |
-| `pnpm dev`       | `expo start` (Metro dev server)                 |
-| `pnpm ios`       | open in the iOS simulator                       |
-| `pnpm android`   | open in an Android emulator                     |
-| `pnpm web`       | run in the browser (react-native-web)           |
-| `pnpm test`      | run the jest-expo suite                         |
-| `pnpm typecheck` | `tsc --noEmit`                                  |
-| `pnpm lint`      | ESLint                                          |
-| `pnpm format`    | Prettier write                                  |
+| Script           | Does                                                     |
+| ---------------- | -------------------------------------------------------- |
+| `pnpm dev`       | `expo start` (Metro dev server)                          |
+| `pnpm ios`       | open in the iOS simulator                                |
+| `pnpm android`   | open in an Android emulator                              |
+| `pnpm web`       | run in the browser (react-native-web)                    |
+| `pnpm test`      | run the jest-expo suite                                  |
+| `pnpm test:watch`| jest watch mode                                          |
+| `pnpm typecheck` | `tsc --noEmit`                                           |
+| `pnpm lint`      | ESLint + Prettier check (read-only)                      |
+| `pnpm lint:fix`  | ESLint `--fix` + Prettier write                          |
+| `pnpm format`    | Prettier write                                           |
+
+## Environment variables
+
+Copy `.env.example` → `.env` and fill in the values:
+
+| Variable                          | Purpose                                                                 |
+| --------------------------------- | ----------------------------------------------------------------------- |
+| `EXPO_PUBLIC_APP_ENDPOINT`        | Backend base URL (a device needs a reachable host, not `localhost`)     |
+| `EXPO_PUBLIC_API_PREFIX`          | API path prefix (e.g. `/api/v1`)                                        |
+| `EXPO_PUBLIC_APP_NAME`            | Prefix for SecureStore keys (sanitized to `[A-Za-z0-9._-]`)             |
+| `EXPO_PUBLIC_LANGUAGE_CODE`       | Fallback language (`en` / `ja`) when nothing is saved and the device locale is unsupported |
+| `EXPO_PUBLIC_HMAC_SECRET`         | Request signing secret; must match the backend `HMAC_SECRET`            |
+| `EXPO_PUBLIC_BUILD_VERSION`       | Sent as `x-version`; injected by CI                                     |
+| `EXPO_PUBLIC_AUTH_MOCK`           | Dev only: `true` answers `/auth/*` and `/users` in the app              |
+| `EXPO_PUBLIC_AUTH_MOCK_EMAIL`     | Dev only: demo login email (default `demo@example.com`)                 |
+| `EXPO_PUBLIC_AUTH_MOCK_PASSWORD`  | Dev only: demo login password (default `password`)                      |
 
 ## Structure
 
@@ -67,6 +76,7 @@ app/                     Expo Router file routes
   (auth)/                unauthenticated group (login)
   (app)/                 authenticated group (auth-gated: home, profile)
 src/
+  components/            session banner, mock-auth badge
   components/ui/         NativeWind primitives (Button, Input, Card, Text)
   enums/                 storage keys + socket event registry
   i18n/                  i18next setup + locales
@@ -106,7 +116,33 @@ Unlike the web templates there is no `window.location.reload()` — hard logout 
 a state reset through `watchSessionEnd` (an `onSessionEnded` listener), and the
 `(app)` auth gate redirects.
 
+## Behavior notes
+
+- **Users contract**: `UsersModel.list(params?)` returns `PaginatedResponse<User>`
+  (`{ data, meta }`, same as the backend); `get` / `update` return the unwrapped
+  `User`. The home screen reads `data.data` and shows `users.empty` for an empty list.
+- **Session unavailable banner**: when restoring the session fails transiently
+  (offline, timeout, 5xx) the user stays signed in and a bottom banner
+  (`session.unavailable` + `session.retry`) re-runs the restore. A 401 shows no banner.
+- **Language**: EN/JA toggle on the profile screen, saved under `STORAGE_KEYS.LANGUAGE`
+  (SecureStore). Resolution order: saved > device > `EXPO_PUBLIC_LANGUAGE_CODE` > `en`.
+- **Theme**: light only, same neutral palette tokens as the web templates; there is no
+  dark mode or dark toggle.
+- **Not found**: `app/+not-found.tsx` uses the shared `not_found.*` keys.
+
 ## Out of scope
 
 EAS Build / OTA updates / push notifications are intentionally not wired (no
 `eas.json`). Add them per the [Expo docs](https://docs.expo.dev) when you need them.
+
+## Mock auth (before backend integration)
+
+Set `EXPO_PUBLIC_AUTH_MOCK=true` (with optional `EXPO_PUBLIC_AUTH_MOCK_EMAIL` /
+`EXPO_PUBLIC_AUTH_MOCK_PASSWORD`) to answer `/auth/*` and `/users` inside the app
+before the backend exists. See
+[Mock auth](./docs/system-architecture/security-auth.md#mock-auth-before-backend-integration):
+mock mode answers auth and users; the flag is ignored in production builds.
+
+## Docs
+
+See [`docs/README.md`](./docs/README.md) for the full documentation map.

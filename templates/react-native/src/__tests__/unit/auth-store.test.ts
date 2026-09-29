@@ -1,4 +1,5 @@
 import { resetSecureStore } from "@/__tests__/helpers/fake-secure-store";
+import { logoutAndClear } from "@/__tests__/helpers/logout";
 import { queryClient } from "@/providers/query-client-provider";
 import { AuthModel } from "@/services/auth";
 import {
@@ -10,6 +11,7 @@ import {
 } from "@/services/core/auth-token-storage";
 import { onSessionEnded } from "@/services/core/session";
 import { useAuthStore } from "@/stores/auth";
+import * as SecureStore from "expo-secure-store";
 
 jest.mock("expo-secure-store", () =>
   require("@/__tests__/helpers/fake-secure-store").fakeSecureStore(),
@@ -36,6 +38,7 @@ function resetStore() {
     isAuthenticated: false,
     hydrated: false,
     loggedOut: false,
+    hydrateError: null,
   });
 }
 
@@ -84,6 +87,61 @@ describe("auth store", () => {
       });
       expect(await getAccessToken("MAIN")).toBe("AT");
       expect(await getRefreshToken("MAIN")).toBe("RT");
+    });
+
+    it("records a retryable hydrateError on a transient boot failure and clears it on retry", async () => {
+      await persistAccessToken("AT", "MAIN");
+      await persistRefreshToken("RT", "MAIN");
+      jest
+        .spyOn(AuthModel, "getMe")
+        .mockRejectedValueOnce(REFRESH_UNAVAILABLE)
+        .mockResolvedValueOnce(USER as never);
+
+      await useAuthStore.getState().hydrate();
+      expect(useAuthStore.getState().hydrateError).toMatchObject({ retryable: true });
+      expect(useAuthStore.getState()).toMatchObject({ isAuthenticated: true, hydrated: true });
+
+      await useAuthStore.getState().retryHydrate();
+      expect(useAuthStore.getState()).toMatchObject({
+        user: USER,
+        isAuthenticated: true,
+        hydrateError: null,
+      });
+    });
+
+    it("keeps the signed-in state and flags hydrateError when SecureStore cannot be read", async () => {
+      await persistAccessToken("AT", "MAIN");
+      useAuthStore.setState({ user: USER as never, isAuthenticated: true, hydrated: true });
+      const read = jest.spyOn(SecureStore, "getItemAsync").mockRejectedValue(new Error("keychain"));
+
+      await useAuthStore.getState().retryHydrate();
+
+      expect(useAuthStore.getState()).toMatchObject({ user: USER, isAuthenticated: true });
+      expect(useAuthStore.getState().hydrateError).toMatchObject({ retryable: true });
+
+      read.mockRestore();
+      jest.spyOn(AuthModel, "getMe").mockResolvedValue(USER as never);
+      await useAuthStore.getState().retryHydrate();
+      expect(useAuthStore.getState()).toMatchObject({ isAuthenticated: true, hydrateError: null });
+    });
+
+    it("signs out locally only when the read succeeds with no tokens", async () => {
+      useAuthStore.setState({ user: USER as never, isAuthenticated: true, hydrated: true });
+      await useAuthStore.getState().retryHydrate();
+      expect(useAuthStore.getState()).toMatchObject({ user: null, isAuthenticated: false });
+    });
+
+    it("sets no hydrateError when the boot 401 ends the session", async () => {
+      await persistAccessToken("AT", "MAIN");
+      await persistRefreshToken("RT", "MAIN");
+      jest
+        .spyOn(AuthModel, "getMe")
+        .mockRejectedValue({ status: "error", error_code: 401, message: "expired" });
+      jest.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
+
+      await useAuthStore.getState().hydrate();
+
+      expect(useAuthStore.getState()).toMatchObject({ isAuthenticated: false, hydrateError: null });
     });
 
     it("a boot 401 after the session already ended does not post logout", async () => {
@@ -159,7 +217,7 @@ describe("auth store", () => {
       queryClient.setQueryData(["users", "list"], [USER]);
       const post = jest.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
 
-      await useAuthStore.getState().logout();
+      await logoutAndClear();
 
       expect(post).toHaveBeenCalledWith(expect.objectContaining({ data: { refreshToken: "RT" } }));
       expect(queryClient.getQueryData(["users", "list"])).toBeUndefined();
@@ -174,7 +232,7 @@ describe("auth store", () => {
       queryClient.setQueryData(["users", "list"], [USER]);
       jest.spyOn(AuthModel.api, "post").mockRejectedValue(new Error("offline"));
 
-      await useAuthStore.getState().logout();
+      await logoutAndClear();
 
       expect(queryClient.getQueryData(["users", "list"])).toBeUndefined();
       expect(useAuthStore.getState().isAuthenticated).toBe(false);

@@ -6,7 +6,7 @@ import type { ViewProps } from "react-native";
 export function Card({ className, ...props }: ViewProps) {
   return (
     <View
-      className={cn("rounded-lg border border-border bg-background p-6 shadow-sm", className)}
+      className={cn("rounded-lg border border-border bg-card p-6 shadow-sm", className)}
       {...props}
     />
   );

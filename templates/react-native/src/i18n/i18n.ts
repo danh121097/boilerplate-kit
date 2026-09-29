@@ -1,23 +1,30 @@
+import { STORAGE_KEYS } from "@/enums";
 import { getLocales } from "expo-localization";
 import { initReactI18next } from "react-i18next";
 import en from "@/i18n/locales/en";
 import ja from "@/i18n/locales/ja";
 import i18next from "i18next";
+import * as SecureStore from "expo-secure-store";
 
 export type AppLocale = "en" | "ja";
 
 const SUPPORTED: readonly AppLocale[] = ["en", "ja"];
 
+function isAppLocale(code: unknown): code is AppLocale {
+  return SUPPORTED.includes(code as AppLocale);
+}
+
 /**
- * Detect the initial language from the device locale (via `expo-localization`,
- * replacing the web template's `i18next-browser-languagedetector`), falling back
- * to `EXPO_PUBLIC_LANGUAGE_CODE` then `en`.
+ * Startup language when nothing is saved yet: the device locale (via
+ * `expo-localization`, replacing the web template's browser language detector),
+ * then `EXPO_PUBLIC_LANGUAGE_CODE`, then `en`. A saved choice beats all of
+ * these (see `restoreSavedLanguage`).
  */
-function detectLanguage(): AppLocale {
-  const deviceCode = getLocales()[0]?.languageCode ?? "";
-  if (SUPPORTED.includes(deviceCode as AppLocale)) return deviceCode as AppLocale;
+export function detectLanguage(): AppLocale {
+  const deviceCode = getLocales()[0]?.languageCode;
+  if (isAppLocale(deviceCode)) return deviceCode;
   const envCode = process.env.EXPO_PUBLIC_LANGUAGE_CODE;
-  if (envCode && SUPPORTED.includes(envCode as AppLocale)) return envCode as AppLocale;
+  if (isAppLocale(envCode)) return envCode;
   return "en";
 }
 
@@ -29,13 +36,31 @@ export function initI18n(): typeof i18next {
     interpolation: { escapeValue: false },
     // Detection handled above via expo-localization; no browser detector plugin.
   });
+  // SecureStore reads are async: apply the saved choice once it resolves.
+  void restoreSavedLanguage();
   return i18next;
 }
 
-/** Switch locale at runtime. Persist to your own storage if you need it to stick
- * across launches (the starter re-detects from the device on each boot). */
-export function setLocale(locale: AppLocale): void {
-  void i18next.changeLanguage(locale);
+/** Apply the language saved by `setLocale`, if any. Storage failures are ignored
+ * (the device / env / `en` startup language stays). */
+export async function restoreSavedLanguage(): Promise<void> {
+  try {
+    const saved = await SecureStore.getItemAsync(STORAGE_KEYS.LANGUAGE);
+    if (isAppLocale(saved) && saved !== i18next.language) await i18next.changeLanguage(saved);
+  } catch {
+    // Keep the detected language.
+  }
+}
+
+/** Switch locale at runtime and persist it under `STORAGE_KEYS.LANGUAGE`, so it
+ * sticks across launches (saved > device > env > en). */
+export async function setLocale(locale: AppLocale): Promise<void> {
+  await i18next.changeLanguage(locale);
+  try {
+    await SecureStore.setItemAsync(STORAGE_KEYS.LANGUAGE, locale);
+  } catch {
+    // The switch applies for this session even if it cannot be saved.
+  }
 }
 
 export default i18next;

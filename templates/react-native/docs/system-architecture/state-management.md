@@ -12,6 +12,7 @@ const { data, isLoading, error } = useUsersListQuery();
 QueryClient is created in `src/providers/query-client-provider.tsx` with:
 - `retry: false`
 - `refetchOnWindowFocus: false` (mobile has no "focus" concept)
+- `staleTime: 60_000`
 - `placeholderData: keepPreviousData`
 
 ## Client state — Zustand
@@ -25,11 +26,13 @@ interface AuthState {
   isAuthenticated: boolean;  // tokens are stored and the session is live
   hydrated: boolean;         // boot-time SecureStore check finished
   loggedOut: boolean;        // explicit logout → gate goes to a plain /login
+  hydrateError: ApiResponseError | null; // transient restore failure (session kept)
   expireSession(): void;     // session expired: user null, isAuthenticated false
   setUser(user): void;       // also clears loggedOut
   hydrate(): Promise<void>;  // read token → loadUser(); marks hydrated
+  retryHydrate(): Promise<void>; // re-run the restore (no splash); clears hydrateError on success
   loadUser(): Promise<void>; // getMe; safe to retry after a transient failure
-  logout(): Promise<void>;   // revoke refresh token, clear tokens, reset queries
+  clearSession(): void;      // local sign-out: reset state + queries, loggedOut: true (no API call)
 }
 ```
 
@@ -46,22 +49,40 @@ Auth state rules:
 - `expireSession()` is called by `watchSessionEnd()` (subscribed by the root
   layout) when the auth service's session ends as `"expired"`; it signs the store
   out (`user: null`, `isAuthenticated: false`) and the `(app)` gate redirects to
-  `/login` with `redirect`. `logout()` sets `loggedOut: true` (plain `/login`);
+  `/login` with `redirect`. `clearSession()` sets `loggedOut: true` (plain `/login`);
   `setUser()` and the login screen clear it. Session ends of other
   services are ignored.
-- `logout()` and `watchSessionEnd()` both call `resetQueriesToSignedOut` (the
+- `clearSession()` and `watchSessionEnd()` both call `resetQueriesToSignedOut` (the
   latter through `resetQueriesOnSessionEnd`): every cached query is reset and
   `queryKeys.auth.me` is pinned to `null`, so no cached server data survives into
   the next session. Not `queryClient.clear()`, which orphans mounted observers.
+
+- A transient restore failure (offline, timeout, 5xx, unavailable refresh) with the
+  tokens still stored sets `hydrateError`; the `(app)` layout renders `SessionBanner`
+  (`accessibilityRole="alert"`, `session.unavailable` + a `session.retry` button that
+  calls `retryHydrate()`). Success, a 401 (session ended), `clearSession()`, `setUser()` and
+  `expireSession()` clear it, so a 401 never shows the banner.
+
+- Logout is not a store action. The profile screen calls `useLogoutMutation()`
+  (`AuthModel.logout()`: revoke, clear tokens, emit the `"logout"` session end); its
+  `isPending` disables the button, and `onSettled` (not `onSuccess`, so a failed
+  request still signs out) calls `clearSession()` and `router.replace("/login")`.
+- If SecureStore cannot be read while restoring, the current state is kept and
+  `hydrateError` is set; the user is signed out locally only when the read succeeds
+  and finds no tokens. At boot the user is still signed out at that point, so the
+  auth gate shows the login screen and the banner (rendered by the `(app)` layout)
+  does not appear; signing in again recovers.
 
 Stores are imported explicitly — no auto-import or global injection.
 
 ## Locale state
 
-Locale is tracked by i18next internally. `setLocale()` in `src/i18n/i18n.ts`
-calls `i18next.changeLanguage()`; it is not persisted — the starter re-detects
-the device locale on each boot. `STORAGE_KEYS.LANGUAGE` is reserved if you add
-persistence. The `useTranslation()` hook re-renders screens reactively on
+Locale is tracked by i18next. `setLocale()` in `src/i18n/i18n.ts` calls
+`i18next.changeLanguage()` and saves the choice under `STORAGE_KEYS.LANGUAGE`
+(SecureStore). At boot `initI18n()` starts from the device locale (then
+`EXPO_PUBLIC_LANGUAGE_CODE`, then `en`) and `restoreSavedLanguage()` applies the
+saved choice once SecureStore answers: saved > device > env > en. The profile screen
+has the EN/JA toggle. The `useTranslation()` hook re-renders screens reactively on
 language change.
 
 ## Secure storage keys

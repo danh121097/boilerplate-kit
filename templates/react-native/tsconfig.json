@@ -2,6 +2,9 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true,
+    "verbatimModuleSyntax": true,
     // Listed explicitly: TypeScript 6 (e.g. the editor's bundled TS) no longer
     // auto-includes every @types package, so jest globals would be missing.
     "types": ["jest", "node"],
@@ -9,5 +12,7 @@
       "@/*": ["./src/*"]
     }
   },
+  // jest.config.ts is loaded by ts-node as CommonJS, which verbatimModuleSyntax rejects.
+  "ts-node": { "compilerOptions": { "module": "commonjs", "verbatimModuleSyntax": false } },
   "include": ["app", "src", "expo-env.d.ts", "nativewind-env.d.ts", ".expo/types/**/*.ts"]
 }

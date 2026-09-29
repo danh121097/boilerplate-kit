@@ -1,4 +1,4 @@
-import { safeReturnPath } from "@/services/core";
+import { safeRedirect } from "@/services/core";
 import { useAuthStore } from "@/stores/auth";
 import { Redirect, Stack, useGlobalSearchParams } from "expo-router";
 import { useEffect } from "react";
@@ -17,7 +17,7 @@ export default function AuthLayout() {
     if (hydrated && !isAuthenticated) useAuthStore.setState({ loggedOut: false });
   }, [hydrated, isAuthenticated]);
 
-  if (hydrated && isAuthenticated) return <Redirect href={safeReturnPath(redirect) as Href} />;
+  if (hydrated && isAuthenticated) return <Redirect href={safeRedirect(redirect) as Href} />;
 
   return <Stack screenOptions={{ headerShown: false }} />;
 }

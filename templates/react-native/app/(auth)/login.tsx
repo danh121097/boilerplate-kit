@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 import { useLoginMutation } from "@/services/auth";
-import { safeReturnPath } from "@/services/core";
+import { getApiErrorMessage, safeRedirect } from "@/services/core";
 import { useAuthStore } from "@/stores/auth";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { router, useLocalSearchParams } from "expo-router";
@@ -15,9 +15,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { z } from "zod";
 import type { Href } from "expo-router";
 
+// Messages are i18n keys, translated where they are rendered.
 const schema = z.object({
-  email: z.string().email("Invalid email"),
-  password: z.string().min(8, "At least 8 characters"),
+  email: z.email("validation.email"),
+  password: z.string().min(8, "validation.password_min"),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -39,18 +40,25 @@ export default function LoginScreen() {
     defaultValues: { email: "", password: "" },
   });
 
-  const [failed, setFailed] = useState(false);
+  const [error, setError] = useState("");
 
-  const onSubmit = handleSubmit(async (values) => {
-    setFailed(false);
+  const submitValid = handleSubmit(async (values) => {
     try {
       const result = await mutateAsync(values);
       setUser(result.user);
-      router.replace(safeReturnPath(redirect) as Href);
-    } catch {
-      setFailed(true);
+      router.replace(safeRedirect(redirect) as Href);
+    } catch (err) {
+      // Rejections are `ApiResponseError` objects: show the server's message.
+      setError(getApiErrorMessage(err, t("login.error")));
     }
   });
+
+  // Clear the previous server error before validating, so it does not linger
+  // when the next attempt fails client-side validation.
+  const onSubmit = () => {
+    setError("");
+    return submitValid();
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -72,11 +80,13 @@ export default function LoginScreen() {
                 testID="login-email"
                 autoCapitalize="none"
                 keyboardType="email-address"
+                autoComplete="username"
+                textContentType="username"
                 placeholder="you@example.com"
                 value={value}
                 onChangeText={onChange}
                 onBlur={onBlur}
-                error={errors.email?.message}
+                error={errors.email?.message ? t(errors.email.message) : undefined}
               />
             )}
           />
@@ -89,22 +99,24 @@ export default function LoginScreen() {
                 label={t("login.password")}
                 testID="login-password"
                 secureTextEntry
+                autoComplete="current-password"
+                textContentType="password"
                 value={value}
                 onChangeText={onChange}
                 onBlur={onBlur}
-                error={errors.password?.message}
+                error={errors.password?.message ? t(errors.password.message) : undefined}
               />
             )}
           />
 
-          {failed ? (
-            <Text variant="error" testID="login-error">
-              {t("login.failed")}
+          {error ? (
+            <Text variant="error" accessibilityRole="alert" testID="login-error">
+              {error}
             </Text>
           ) : null}
 
           <Button block loading={isPending} onPress={onSubmit} testID="login-submit">
-            {t("login.submit")}
+            {isPending ? t("login.submitting") : t("login.submit")}
           </Button>
         </Card>
 

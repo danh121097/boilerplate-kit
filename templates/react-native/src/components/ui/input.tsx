@@ -30,6 +30,7 @@ export const Input = forwardRef<ElementRef<typeof TextInput>, InputProps>(
         ) : null}
         <TextInput
           ref={ref}
+          accessibilityLabel={label}
           placeholderTextColor="#9ca3af"
           className={cn(
             "h-11 w-full rounded-md border border-input bg-background px-3 text-base text-foreground",
@@ -38,7 +39,11 @@ export const Input = forwardRef<ElementRef<typeof TextInput>, InputProps>(
           )}
           {...props}
         />
-        {error ? <Text variant="error">{error}</Text> : null}
+        {error ? (
+          <Text variant="error" accessibilityRole="alert">
+            {error}
+          </Text>
+        ) : null}
       </View>
     );
   },

@@ -1,4 +1,3 @@
-import type { User } from "@/services/users";
 import type { AxiosRequestConfig } from "axios";
 
 /**
@@ -93,10 +92,7 @@ describe("mock users", () => {
     const app = boot();
     await app.AuthModel.login(DEMO);
 
-    const body = await app.UsersModel.api.get<User[]>({
-      url: "/users",
-      params: { page: 2, limit: 4 },
-    });
+    const body = await app.UsersModel.list({ page: 2, limit: 4 });
 
     expect(body.data.map((u) => u._id)).toEqual(["mock-user-2", "mock-user-1"]);
     expect(body).toMatchObject({
@@ -108,10 +104,9 @@ describe("mock users", () => {
     const app = boot();
     await app.AuthModel.login(DEMO);
 
-    const body = await app.UsersModel.get("mock-user-3");
+    const user = await app.UsersModel.get("mock-user-3");
 
-    expect(body).toMatchObject({ status: "success" });
-    expect(body.data).toMatchObject({
+    expect(user).toMatchObject({
       _id: "mock-user-3",
       name: "Carol Silva",
       email: "carol.silva@example.com",

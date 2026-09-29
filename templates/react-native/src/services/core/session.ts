@@ -89,30 +89,24 @@ export async function hasStoredSession(service: ApiService = "MAIN"): Promise<bo
   return Boolean(access || refresh);
 }
 
-/** Where sign-in lands when there is no (valid) return path. */
-export const DEFAULT_RETURN_PATH = "/";
-
-const MAX_RETURN_PATH_LENGTH = 512;
+const MAX_REDIRECT_LENGTH = 512;
 
 /**
  * Validate a `redirect` route param (untrusted: it can arrive via a deep link)
- * and fall back to home. Only in-app expo-router paths pass:
+ * and fall back to `fallback` (home by default). Only in-app expo-router paths pass:
  * - a single leading "/" (rejects "//host", "/\host" and anything with a scheme);
  * - no backslash anywhere;
  * - no control characters, bounded length;
  * - never the login screen itself (would loop).
+ * A repeated param (an array) uses its first value.
  */
-export function safeReturnPath(raw: unknown): string {
-  const value = Array.isArray(raw) ? raw[0] : raw;
-  if (typeof value !== "string" || value.length > MAX_RETURN_PATH_LENGTH) {
-    return DEFAULT_RETURN_PATH;
-  }
+export function safeRedirect(value: unknown, fallback = "/"): string {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (typeof raw !== "string" || raw.length > MAX_REDIRECT_LENGTH) return fallback;
   // eslint-disable-next-line no-control-regex
-  if (!/^\/(?![/\\])/.test(value) || /[\u0000-\u001f\u007f]/.test(value)) {
-    return DEFAULT_RETURN_PATH;
-  }
-  if (value.includes("\\") || value.includes("://")) return DEFAULT_RETURN_PATH;
-  const path = value.split(/[?#]/)[0] ?? "";
-  if (path === "/login" || path.startsWith("/login/")) return DEFAULT_RETURN_PATH;
-  return value;
+  if (!/^\/(?![/\\])/.test(raw) || /[\u0000-\u001f\u007f]/.test(raw)) return fallback;
+  if (raw.includes("\\") || raw.includes("://")) return fallback;
+  const path = raw.split(/[?#]/)[0] ?? "";
+  if (path === "/login" || path.startsWith("/login/")) return fallback;
+  return raw;
 }

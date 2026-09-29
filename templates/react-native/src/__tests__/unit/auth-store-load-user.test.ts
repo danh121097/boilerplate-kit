@@ -1,4 +1,5 @@
 import { resetSecureStore } from "@/__tests__/helpers/fake-secure-store";
+import { logoutAndClear } from "@/__tests__/helpers/logout";
 import { queryClient } from "@/providers/query-client-provider";
 import { AuthModel } from "@/services/auth";
 import {
@@ -133,7 +134,7 @@ describe("auth store loadUser", () => {
       jest.spyOn(AuthModel, "getMe").mockReturnValue(me.promise);
 
       const loading = useAuthStore.getState().loadUser();
-      await useAuthStore.getState().logout();
+      await logoutAndClear();
       me.resolve(USER as never);
       await loading;
 
@@ -146,7 +147,7 @@ describe("auth store loadUser", () => {
       jest.spyOn(AuthModel, "getMe").mockReturnValue(me.promise);
 
       const loading = useAuthStore.getState().loadUser();
-      await useAuthStore.getState().logout();
+      await logoutAndClear();
       me.reject(REFRESH_UNAVAILABLE);
       await loading;
 

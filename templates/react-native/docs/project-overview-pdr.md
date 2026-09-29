@@ -17,7 +17,7 @@ react-i18next (`expo-localization` detection), and a complete jest-expo suite.
 | Navigation | Expo Router (file-based, typed routes) | latest |
 | Data fetching | TanStack React Query | 5.x |
 | State | Zustand | 5 |
-| Forms | react-hook-form + zod | 7.x / 3.x |
+| Forms | react-hook-form + zod | 7.x / 4.x |
 | UI primitives | hand-written NativeWind components | — |
 | Styling | NativeWind v4 (Tailwind for RN) | v4 |
 | HTTP | axios | 1.x |
@@ -25,7 +25,7 @@ react-i18next (`expo-localization` detection), and a complete jest-expo suite.
 | Token storage | expo-secure-store (async, Keychain/Keystore) | — |
 | Tests | jest-expo + `@testing-library/react-native` | — |
 | Package manager | pnpm | 9+ |
-| Language | TypeScript | 5.x strict |
+| Language | TypeScript | 5.8 strict (Expo-pinned) |
 
 ## Scripts
 
@@ -36,14 +36,15 @@ pnpm android      # open Android emulator
 pnpm web          # run in browser (react-native-web)
 pnpm typecheck    # tsc --noEmit
 pnpm test         # jest-expo
-pnpm lint         # eslint (flat config, jiti)
+pnpm lint         # eslint + prettier --check (read-only)
+pnpm lint:fix     # eslint --fix + prettier --write
 pnpm format       # prettier --write
 ```
 
 ## Constraints
 
 - No `any` without explicit justification comment.
-- `strict: true` + `noUncheckedIndexedAccess: true` in tsconfig.
+- `strict`, `noUncheckedIndexedAccess`, `noFallthroughCasesInSwitch` and `verbatimModuleSyntax` in tsconfig.
 - Token storage is **async**—all SecureStore reads/writes return promises.
 - HMAC secret must match backend `HMAC_SECRET`; leave empty for backends without HMAC.
   It ships in the bundle — anti-casual-abuse only, not a security boundary.

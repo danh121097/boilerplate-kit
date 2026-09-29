@@ -27,14 +27,27 @@ errors, catch in `useEffect` and navigate to an error screen.
 
 ## Form validation
 
-`react-hook-form` + `zod` + `@hookform/resolvers` handle field-level errors.
-Custom `FormField` (built on React Native Pressable/Text) renders `error?.message`
-inline below the input. Schema validation runs on submit (or on change if
-`mode: "onChange"` is passed).
+`react-hook-form` (with `Controller`) + `zod` 4 + `@hookform/resolvers` handle
+field-level errors. The login schema is `email` (`z.email`) + `password` (min 8);
+its messages are i18n keys (`validation.email`, `validation.password_min`) that the
+screen translates when rendering the `Input` error. Validation runs on submit.
+
+A failed login shows `getApiErrorMessage(err, t("login.error"))` (the server message,
+else `login.error`) in a `Text` with `accessibilityRole="alert"`. While the request
+is pending the submit button is disabled, shows its spinner and the
+`login.submitting` label.
+
+## Session and lookup errors
+
+- Restoring the session failing transiently (offline, timeout, 5xx) shows the
+  session-unavailable banner with a retry; a 401 goes through the normal logged-out
+  flow (see [state-management](./state-management.md)).
+- The users list shows `users.error` with the server message, and `users.empty`
+  for an empty list.
+- An unmatched route renders `app/+not-found.tsx` (`not_found.*` keys).
 
 ## Test environment
 
 Jest-expo with `@testing-library/react-native` handles mocking. Token storage
-tests mock `expo-secure-store` via `jest.mock`. Axios mock adapter
-(`axios-mock-adapter`) intercepts requests in integration tests — no real HTTP.
-Both are cleaned up in `afterEach` / `afterAll`.
+tests mock `expo-secure-store` via `jest.mock`. Integration tests stub the
+network adapter — no real HTTP. See [testing](../code-standards/testing.md).

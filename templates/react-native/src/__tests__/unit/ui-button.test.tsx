@@ -25,14 +25,14 @@ describe("Button", () => {
     expect(onPress).not.toHaveBeenCalled();
   });
 
-  it("shows a spinner (hides the label) and blocks press when loading", () => {
+  it("keeps the label next to the spinner and blocks press when loading", () => {
     const onPress = jest.fn();
     render(
       <Button loading onPress={onPress} testID="btn">
         Submit
       </Button>,
     );
-    expect(screen.queryByText("Submit")).toBeNull();
+    expect(screen.getByText("Submit")).toBeTruthy();
     fireEvent.press(screen.getByTestId("btn"));
     expect(onPress).not.toHaveBeenCalled();
   });

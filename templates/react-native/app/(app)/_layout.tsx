@@ -1,3 +1,4 @@
+import { SessionBanner } from "@/components/session-banner";
 import { useAuthStore } from "@/stores/auth";
 import { Redirect, Stack, usePathname } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
@@ -32,5 +33,10 @@ export default function AppLayout() {
     );
   }
 
-  return <Stack screenOptions={{ headerShown: true }} />;
+  return (
+    <View className="flex-1">
+      <Stack screenOptions={{ headerShown: true }} />
+      <SessionBanner />
+    </View>
+  );
 }

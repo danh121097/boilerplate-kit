@@ -8,6 +8,7 @@ export const queryClient = new QueryClient({
       // React Native has no window focus; refetch on app foreground is handled by
       // Query's AppState integration if wired — off by default here.
       refetchOnWindowFocus: false,
+      staleTime: 60_000,
       placeholderData: keepPreviousData,
     },
   },

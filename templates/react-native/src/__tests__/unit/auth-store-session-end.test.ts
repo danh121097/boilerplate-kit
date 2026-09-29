@@ -1,3 +1,4 @@
+import { logoutAndClear } from "@/__tests__/helpers/logout";
 import { queryClient } from "@/providers/query-client-provider";
 import { AuthModel } from "@/services/auth";
 import { endSession } from "@/services/core/session";
@@ -33,7 +34,7 @@ describe("auth store explicit-logout flag", () => {
   it("logout marks an explicit logout; setUser clears it", async () => {
     useAuthStore.setState({ user: { _id: "u1" } as never, isAuthenticated: true });
     jest.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
-    await useAuthStore.getState().logout();
+    await logoutAndClear();
     expect(useAuthStore.getState().loggedOut).toBe(true);
 
     useAuthStore.getState().setUser({ _id: "u1" } as never);

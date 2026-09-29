@@ -188,7 +188,7 @@ are rolled back (compare-and-delete).
 
 - A guest on a protected route is sent to `/login?redirect=<original path>`.
 - A signed-in user on the guest-only login screen is sent to the validated return
-  path (in-app paths only, `safeReturnPath`), else home.
+  path (in-app paths only, `safeRedirect`), else home.
 - The decision uses the synchronous session signal (the auth store's
   `isAuthenticated`, restored from SecureStore at boot) before any profile fetch.
   There is no SSR. A guest arriving by deep link at boot goes to
@@ -239,7 +239,7 @@ reacts and redirects to `/login?redirect=<current path>` (`usePathname()`), so
 there is a single navigation. No `window.location.reload()`.
 
 After sign-in, the login screen and the `(auth)` gate both go to
-`safeReturnPath(redirect)` (from `@/services/core`) — only in-app paths: at most
+`safeRedirect(redirect)` (from `@/services/core`) — only in-app paths: at most
 512 chars, a single
 leading `/` (no `//host`, no `/\host`), no backslash anywhere, no control
 characters (`\u0000`–`\u001F`, `\u007F`), no `://`, and not `/login` (with or
@@ -256,8 +256,11 @@ token is stored) and calls `getMe`:
   logged out; unless the session already ended, the store runs
   `AuthModel.revokeSession()` (revoke, clear, end as `"expired"`, `redirect`);
 - any other failure (offline, 5xx, 429, timeout) with tokens still stored →
-  **stays authenticated with `user: null`**. `loadUser()` retries; the profile
-  screen calls it when it opens authenticated without a user (never after logout).
+  **stays authenticated with `user: null`** and sets `hydrateError`, which shows the
+  session-unavailable banner (`session.unavailable`, `session.retry`; `accessibilityRole="alert"`).
+  `retryHydrate()` re-runs the restore and clears the banner on success; `loadUser()`
+  also retries, and the profile screen calls it when it opens authenticated without a
+  user (never after logout). A 401 never sets `hydrateError`.
 
 `useMeQuery` (a TanStack query on `queryKeys.auth.me`) fetches through
 `AuthModel.getSession()`, which resolves `null` on a 401 instead of throwing, so

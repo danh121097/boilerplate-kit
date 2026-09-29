@@ -13,13 +13,13 @@ export default function HomeScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: t("home.welcome") }} />
+      <Stack.Screen options={{ title: t("nav.home") }} />
       <ScrollView className="flex-1 bg-background" contentContainerClassName="gap-4 p-6">
         <Text variant="heading">{t("home.welcome")} 👋</Text>
         <Text variant="muted">{t("home.description")}</Text>
 
         <Link href="/profile" asChild>
-          <Button variant="outline">{t("home.profile")}</Button>
+          <Button variant="outline">{t("nav.profile")}</Button>
         </Link>
 
         <Text variant="title" className="mt-2">
@@ -35,8 +35,8 @@ export default function HomeScreen() {
 
         {!isLoading && !error ? (
           <Card className="gap-3 p-4">
-            {data?.length ? (
-              data.map((user) => (
+            {data?.data.length ? (
+              data.data.map((user) => (
                 <View key={user._id} className="flex-row items-center justify-between">
                   <View>
                     <Text variant="body" className="font-medium">

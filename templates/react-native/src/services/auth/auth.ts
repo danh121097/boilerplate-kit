@@ -206,4 +206,7 @@ export const useRegisterMutation = defineMutation<AuthResult, RegisterPayload>({
 export const useLogoutMutation = defineMutation({
   key: queryKeys.auth.logout,
   mutator: () => AuthModel.logout(),
+  // Run even offline: a paused logout would never settle, leaving the user
+  // signed in with a spinning button. The client signs out on settle anyway.
+  options: { networkMode: "always" },
 });

@@ -1,46 +1,28 @@
 # Theming
 
-## Light / dark mode
+## Light only
 
-Dark mode is implemented via `useColorScheme()` from `react-native`. Conditionally
-apply dark-mode classes or theme the entire app based on system preference.
-
-Toggle example (stored in `STORAGE_KEYS.THEME`):
-
-```ts
-import { useColorScheme } from 'react-native';
-
-function ThemeToggle() {
-  const colorScheme = useColorScheme();
-  
-  function toggleTheme() {
-    // For simplicity, store preference and restart app or re-render root layout
-    const isDark = colorScheme === 'dark';
-    SecureStore.setItemAsync(STORAGE_KEYS.THEME, isDark ? 'light' : 'dark');
-    // Then reload or navigate to reset
-  }
-  
-  return <Pressable onPress={toggleTheme}><Text>Toggle Theme</Text></Pressable>;
-}
-```
-
-On app load (in `app/_layout.tsx`), read the stored preference and apply it
-before the first render to avoid flash.
+The app is light only: `app.json` sets `userInterfaceStyle` to `light`, and there is no
+dark palette or dark toggle (the web templates do not provide one either).
+`STORAGE_KEYS.THEME` is reserved if you add one.
 
 ## Color tokens in tailwind.config.ts
 
-All semantic colors are defined in `tailwind.config.ts` under `theme.extend.colors`:
+All semantic colors are defined in `tailwind.config.ts` under `theme.extend.colors` as
+literal `hsl(...)` values (NativeWind v4 on the Tailwind v3 engine has no `@theme`).
+They are the same values as the web templates' `@theme` tokens (neutral primary):
 
 ```js
 colors: {
-  background: 'hsl(var(--background) / <alpha-value>)',
-  foreground: 'hsl(var(--foreground) / <alpha-value>)',
-  primary: 'hsl(var(--primary) / <alpha-value>)',
-  // ... other semantic tokens
+  background: "hsl(0 0% 100%)",
+  foreground: "hsl(0 0% 3.9%)",
+  card: { DEFAULT: "hsl(0 0% 100%)", foreground: "hsl(0 0% 3.9%)" },
+  primary: { DEFAULT: "hsl(0 0% 9%)", foreground: "hsl(0 0% 98%)" },
+  // secondary, muted, accent, destructive, popover, border, input, ring
 }
 ```
 
-At runtime, Tailwind resolves these to CSS variable values (light or dark mode).
+When the web tokens change, change these values with them.
 
 ## Radius
 

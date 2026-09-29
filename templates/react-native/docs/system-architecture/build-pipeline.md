@@ -22,7 +22,8 @@ pnpm web         → expo start --web (run in browser via react-native-web)
 pnpm typecheck   → tsc --noEmit
 pnpm test        → jest-expo
 pnpm test:watch  → jest-expo --watch
-pnpm lint        → eslint .
+pnpm lint        → eslint . && prettier --check . (read-only)
+pnpm lint:fix    → eslint . --fix && prettier --write .
 pnpm format      → prettier --write .
 ```
 
