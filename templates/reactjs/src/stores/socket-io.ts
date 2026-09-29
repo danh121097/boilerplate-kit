@@ -14,7 +14,7 @@ interface SocketIOState {
  *
  * Mirrors the Pinia `useSocketIOStore` in the vuejs template:
  * - `socket`: the active Socket instance (null when disconnected)
- * - `authenticated`: set true on server `authenticated` event, false on error/disconnect
+ * - `authenticated`: set true only on the server `authenticated` event, false on connect_error/disconnect/destroy
  * - `setSocketIO`: partial-merge updater (matches Pinia store's API)
  */
 export const useSocketIOStore = create<SocketIOState>((set) => ({

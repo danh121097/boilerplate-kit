@@ -51,12 +51,30 @@ failure. `Api.paginate` / `Api.cursorPaginate` and the `OffsetMeta`, `CursorMeta
 
 ## Socket.IO
 
-`hooks/useSocketIO.ts` owns the connection for the mounting component:
+`hooks/useSocketIO.ts` owns the connection for the mounting component.
 
-- The handshake payload is `{ token: "Bearer <access token>", role, sig?, ctime? }`;
+- **Lifecycle.** The socket is opened only while signed in: `components/socket-status.tsx`
+  calls `useSocketIO()` and the root layout renders it next to the Logout control only when
+  `isAuthenticated`. Signing out unmounts it, which destroys the socket.
+- **Handshake.** The payload is `{ token: "Bearer <access token>", role, sig?, ctime? }`;
   `sig`/`ctime` come from `HMACSignatureGenerator.signRequest`, the same signer as the
-  HTTP requests (present only when `VITE_HMAC_SECRET` is set).
-- A failed handshake schedules one trailing reconnect after `RECONNECT_THROTTLE_MS`
-  (2 s); failures inside the window are dropped. The timer is cleared on unmount.
+  HTTP requests (present only when `VITE_HMAC_SECRET` is set). The server rejects a bad
+  handshake with `connect_error` "Unauthorized!" and emits `authenticated` on success.
+- **Connection state.** `authenticated` in the socket store becomes `true` only when the
+  server emits `authenticated`. It becomes `false` on `connect_error`, on `disconnect` and
+  on destroy. `connectSocket()` never sets it.
+- **Reconnect.** On `connect_error`, if `socket.active` is true socket.io is already
+  auto-reconnecting (network error, server down) and nothing extra is scheduled. If it is
+  false the server rejected the handshake: one manual retry is scheduled (errors while one
+  is pending do not reschedule) after `min(RECONNECT_BASE_MS * 2 ** attempt,
+  RECONNECT_MAX_MS)`, with `RECONNECT_BASE_MS = 2000` and `RECONNECT_MAX_MS = 30_000`
+  (2s, 4s, 8s, 16s, 30s, 30s, ...). The retry re-signs `socket.auth` (fresh token and
+  HMAC `sig`/`ctime`) and calls `connect()` on the same socket. A `disconnect` with reason `io server disconnect` (the server closed the socket, e.g. a graceful restart; socket.io does not reconnect on its own) schedules the same retry. `attempt` resets to 0 when
+  `authenticated` arrives. A server `unauthorized` event destroys the socket. Unmount
+  clears a pending retry.
+- **Status indicator.** `SocketStatus` renders a `role="status"` wrapper with a small dot
+  (`bg-emerald-500` when authenticated, `bg-muted-foreground` otherwise), a `title` and
+  visually hidden text from `socket.connected` ("Realtime connected") or
+  `socket.reconnecting` ("Realtime reconnecting").
 - `useSocketEvent(event, cb)` reads the socket from the store through a selector, so it
   rebinds when the socket changes.

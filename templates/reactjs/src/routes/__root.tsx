@@ -1,5 +1,6 @@
 import { LogoutButton } from "@/components/logout-button";
 import { NotFound } from "@/components/not-found";
+import { SocketStatus } from "@/components/socket-status";
 import { setLocale } from "@/i18n/i18n";
 import { setupSessionExpiry } from "@/services/session-expiry";
 import { syncAuthWithOtherTabs, useAuthStore } from "@/stores/auth";
@@ -76,7 +77,10 @@ function RootLayout() {
             {t("nav.form")}
           </Link>
           {isAuthenticated ? (
-            <LogoutButton />
+            <div className="ml-auto flex items-center gap-3">
+              <SocketStatus />
+              <LogoutButton />
+            </div>
           ) : (
             <Link to="/login" className={cn(navLink, "ml-auto")}>
               {t("nav.login")}

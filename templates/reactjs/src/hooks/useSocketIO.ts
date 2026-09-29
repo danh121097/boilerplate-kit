@@ -1,11 +1,15 @@
-import { SOCKET_EVENT, SOCKET_UNAUTHORIZED_MESSAGE } from "@/enums";
+import { SOCKET_EVENT } from "@/enums";
 import { getAccessToken } from "@/services/core/auth-token-storage";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import { useSocketIOStore } from "@/stores/socket-io";
 import { io, type Socket } from "socket.io-client";
 
-/** Trailing delay before a failed handshake is retried. */
-const RECONNECT_THROTTLE_MS = 2000;
+/** First retry delay after the server rejects a handshake; doubles per attempt. */
+const RECONNECT_BASE_MS = 2000;
+/** Ceiling of the retry delay. */
+const RECONNECT_MAX_MS = 30_000;
+/** Disconnect reason when the server closed the socket; socket.io does not reconnect on its own. */
+const SERVER_DISCONNECT = "io server disconnect";
 
 /**
  * Build the per-handshake `{ sig, ctime }` headers expected by HMAC-protected
@@ -38,18 +42,18 @@ function refreshAuth(socket: Socket) {
 /**
  * Initialize a socket.io connection scoped to the mounting component.
  *
- * Mirrors the vuejs `useSocketIO` composable:
  * - Connects on mount, disconnects on unmount.
  * - Auth payload: `{ token: 'Bearer <ACCESS_TOKEN>', role: 'user', ...HMACHeaders }`.
- * - Reconnect is throttled to avoid hammering the server on rapid errors.
+ * - `authenticated` turns true only when the server emits `authenticated`, and
+ *   false on `connect_error`, `disconnect` and destroy.
+ * - A handshake the server rejects (`socket.active` false) is retried on the same
+ *   socket with exponential backoff (`RECONNECT_BASE_MS` doubling up to
+ *   `RECONNECT_MAX_MS`) and a re-signed payload; while socket.io is already
+ *   auto-reconnecting (`socket.active` true) nothing extra is scheduled.
  * - Exposes `socket`, `authenticated`, `connectSocket`, `destroySocket`.
  */
 export function useSocketIO() {
   const URL = import.meta.env.VITE_APP_ENDPOINT ?? "";
-
-  // Trailing timer: the first failure schedules one reconnect, later failures
-  // inside the window are dropped, so rapid errors cannot cause a reconnect storm.
-  const reConnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { authenticated, setSocketIO } = useSocketIOStore();
 
@@ -64,36 +68,53 @@ export function useSocketIO() {
     }),
   );
 
+  // Pending manual retry (at most one); cleared by destroy so nothing reconnects after it.
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const connectSocket = useCallback(() => {
     refreshAuth(socket);
-    if (socket.connected) {
-      setSocketIO({ authenticated: true, socket });
-      return;
-    }
-    socket.connect();
-    setSocketIO({ authenticated: true, socket });
+    if (!socket.connected) socket.connect();
+    setSocketIO({ socket });
   }, [socket, setSocketIO]);
 
   const destroySocket = useCallback(() => {
+    if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+    retryTimerRef.current = null;
     socket.disconnect();
     if (useSocketIOStore.getState().socket === socket) {
       setSocketIO({ authenticated: false, socket: null });
     }
   }, [socket, setSocketIO]);
-  const reConnect = useCallback(() => {
-    if (reConnectTimerRef.current) return;
-    reConnectTimerRef.current = setTimeout(() => {
-      reConnectTimerRef.current = null;
-      destroySocket();
-      connectSocket();
-    }, RECONNECT_THROTTLE_MS);
-  }, [connectSocket, destroySocket]);
 
   useEffect(() => {
-    const handleAuthenticated = () => setSocketIO({ authenticated: true, socket });
-    const handleConnectError = (e: Error) => {
-      if (e.message === SOCKET_UNAUTHORIZED_MESSAGE) setSocketIO({ authenticated: false });
-      reConnect();
+    let attempt = 0;
+
+    const handleAuthenticated = () => {
+      attempt = 0;
+      setSocketIO({ authenticated: true, socket });
+    };
+    // One manual retry at a time, backing off, with a re-signed payload.
+    const scheduleRetry = () => {
+      if (retryTimerRef.current) return;
+      const delay = Math.min(RECONNECT_BASE_MS * 2 ** attempt, RECONNECT_MAX_MS);
+      attempt += 1;
+      retryTimerRef.current = setTimeout(() => {
+        retryTimerRef.current = null;
+        refreshAuth(socket);
+        socket.connect();
+      }, delay);
+    };
+    const handleDisconnect = (reason: string) => {
+      setSocketIO({ authenticated: false });
+      // socket.io never reconnects after the server closes the socket itself (e.g. a
+      // graceful restart), so that case joins the same backoff as a rejected handshake.
+      if (reason === SERVER_DISCONNECT) scheduleRetry();
+    };
+    const handleConnectError = () => {
+      setSocketIO({ authenticated: false });
+      // socket.io is already auto-reconnecting (network error, server down); otherwise
+      // the server rejected the handshake.
+      if (!socket.active) scheduleRetry();
     };
     const handleUnauthorized = () => destroySocket();
 
@@ -101,6 +122,7 @@ export function useSocketIO() {
     if (!useSocketIOStore.getState().socket) setSocketIO({ socket });
 
     socket.on(SOCKET_EVENT.AUTHENTICATED, handleAuthenticated);
+    socket.on(SOCKET_EVENT.DISCONNECT, handleDisconnect);
     socket.on(SOCKET_EVENT.CONNECT_ERROR, handleConnectError);
     socket.on(SOCKET_EVENT.UNAUTHORIZED, handleUnauthorized);
 
@@ -108,15 +130,12 @@ export function useSocketIO() {
 
     return () => {
       socket.off(SOCKET_EVENT.AUTHENTICATED, handleAuthenticated);
+      socket.off(SOCKET_EVENT.DISCONNECT, handleDisconnect);
       socket.off(SOCKET_EVENT.CONNECT_ERROR, handleConnectError);
       socket.off(SOCKET_EVENT.UNAUTHORIZED, handleUnauthorized);
       destroySocket();
-      if (reConnectTimerRef.current) {
-        clearTimeout(reConnectTimerRef.current);
-        reConnectTimerRef.current = null;
-      }
     };
-  }, [socket, setSocketIO, connectSocket, destroySocket, reConnect]);
+  }, [socket, setSocketIO, connectSocket, destroySocket]);
 
   return {
     socket,

@@ -17,7 +17,7 @@ export function LogoutButton() {
   return (
     <Button
       variant="unstyled"
-      className="ml-auto hover:text-primary"
+      className="hover:text-primary"
       disabled={logout.isPending}
       onClick={() => logout.mutate()}
     >

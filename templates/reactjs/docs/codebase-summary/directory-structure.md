@@ -29,7 +29,9 @@ templates/reactjs/
     │   └── query-client-provider.tsx
     ├── components/
     │   ├── mock-auth-badge.tsx
-    │   └── not-found.tsx  # root notFoundComponent
+    │   ├── logout-button.tsx
+    │   ├── not-found.tsx  # root notFoundComponent
+    │   └── socket-status.tsx  # header realtime dot; owns the socket while signed in
     ├── components/ui/
     │   ├── button.tsx
     │   ├── dialog.tsx

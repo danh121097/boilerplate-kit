@@ -68,7 +68,9 @@ src/
 ├── routes/                       # file-based TanStack Router routes (+ generated routeTree.gen.ts)
 ├── components/
 │   ├── ui/                       # auto-imported primitives (Button, Card, Dialog, …)
-│   └── not-found.tsx             # root notFoundComponent
+│   ├── logout-button.tsx         # nav logout (useLogoutMutation)
+│   ├── not-found.tsx             # root notFoundComponent
+│   └── socket-status.tsx         # header realtime dot; opens the socket while signed in
 ├── hooks/                        # auto-imported (useSocketIO)
 ├── enums/                        # STORAGE_KEYS (prefixed by VITE_APP_NAME) + socket events
 ├── i18n/
