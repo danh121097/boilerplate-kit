@@ -9,17 +9,29 @@ import {
   resetQueriesOnSessionEnd,
   resyncQueriesAfterLogin,
   syncAuthAcrossTabs,
+  toApiError,
 } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
 import type { AuthUser } from "@/services/auth/types/auth";
+import type { ApiResponseError } from "@/services/core";
 
 interface AuthState {
   user: AuthUser | null;
   isAuthenticated: boolean;
   hydrated: boolean;
+  /** Set when boot hydration failed transiently (offline, timeout, 5xx): the
+   * session is kept and `retryHydrate()` can try again. */
+  hydrateError: ApiResponseError | null;
   setUser: (user: AuthUser | null) => void;
   hydrate: () => Promise<void>;
-  logout: () => Promise<void>;
+  /** Re-run hydration after a transient failure. */
+  retryHydrate: () => Promise<void>;
+}
+
+/** Interceptor rejections already are `ApiResponseError`s; normalize the rest. */
+function asApiError(error: unknown): ApiResponseError {
+  const e = error as Partial<ApiResponseError> | null;
+  return typeof e?.error_code === "number" ? (e as ApiResponseError) : toApiError(error);
 }
 
 /**
@@ -28,15 +40,17 @@ interface AuthState {
  * decided before the async profile fetch resolves. `user` is loaded lazily by
  * `hydrate()` on boot and set directly on a successful login.
  */
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isAuthenticated: hasStoredSession(authContract.service),
   hydrated: false,
+  hydrateError: null,
 
   setUser: (user) =>
     set({ user, isAuthenticated: Boolean(user) || hasStoredSession(authContract.service) }),
 
   hydrate: async () => {
+    set({ hydrateError: null });
     if (!hasStoredSession(authContract.service)) {
       set({ hydrated: true });
       return;
@@ -54,14 +68,27 @@ export const useAuthStore = create<AuthState>((set) => ({
         set({ user: null, isAuthenticated: false, hydrated: true });
         return;
       }
-      // Network error / 5xx: the session may still be valid — keep the tokens.
-      set({ isAuthenticated: hasStoredSession(authContract.service), hydrated: true });
+      // The session ended while the request ran (logout here or in another tab).
+      if (
+        getSessionEpoch(authContract.service) !== epoch ||
+        !hasStoredSession(authContract.service)
+      ) {
+        set({ user: null, isAuthenticated: false, hydrated: true });
+        return;
+      }
+      // Network error / timeout / 5xx: the session may still be valid — keep the
+      // tokens and surface a retryable error instead of signing the user out.
+      set({
+        isAuthenticated: true,
+        hydrated: true,
+        hydrateError: { ...asApiError(error), retryable: true },
+      });
     }
   },
 
-  // AuthModel.logout ends the session → the listener below clears state + cache.
-  logout: async () => {
-    await AuthModel.logout().catch(() => {});
+  retryHydrate: () => {
+    set({ hydrated: false });
+    return get().hydrate();
   },
 }));
 
@@ -72,7 +99,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 resetQueriesOnSessionEnd(queryClient, queryKeys.auth.me, authContract.service);
 onSessionEnded((_reason, service) => {
   if (service !== authContract.service) return;
-  useAuthStore.setState({ user: null, isAuthenticated: false });
+  useAuthStore.setState({ user: null, isAuthenticated: false, hydrateError: null });
 });
 
 /**
@@ -86,7 +113,7 @@ onSessionEnded((_reason, service) => {
 export function syncAuthWithOtherTabs(onChange: () => void): () => void {
   return syncAuthAcrossTabs({
     onLogin: () => {
-      useAuthStore.setState({ user: null, isAuthenticated: true });
+      useAuthStore.setState({ user: null, isAuthenticated: true, hydrateError: null });
       resyncQueriesAfterLogin(queryClient, queryKeys.auth.me);
       void useAuthStore.getState().hydrate();
       onChange();

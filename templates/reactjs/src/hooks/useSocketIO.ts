@@ -1,30 +1,38 @@
 import { SOCKET_EVENT, SOCKET_UNAUTHORIZED_MESSAGE } from "@/enums";
 import { getAccessToken } from "@/services/core/auth-token-storage";
+import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import { useSocketIOStore } from "@/stores/socket-io";
 import { io, type Socket } from "socket.io-client";
-import Base64 from "crypto-js/enc-base64";
-import HmacSHA256 from "crypto-js/hmac-sha256";
+
+/** Trailing delay before a failed handshake is retried. */
+const RECONNECT_THROTTLE_MS = 2000;
 
 /**
  * Build the per-handshake `{ sig, ctime }` headers expected by HMAC-protected
- * backends. Returns an empty object when `VITE_HMAC_SECRET` is not set — the
- * server can then accept the bare bearer token alone (or reject).
+ * backends, signed by the same generator as the HTTP requests. Returns an empty
+ * object when `VITE_HMAC_SECRET` is not set — the server can then accept the
+ * bare bearer token alone (or reject).
  *
  * SECURITY: a `VITE_*` env var is exposed to every browser client. Production
  * deployments should sign on the server (a dedicated API route or a BFF
  * proxy) and forward the resulting headers to the socket handshake.
  */
 function signHeader(): { sig: string; ctime: number } | Record<string, never> {
-  const secret = import.meta.env.VITE_HMAC_SECRET;
-  if (!secret) return {};
-  const ctime = Date.now();
-  const stringToSign = ["GET", "application/json", ctime, "/socket", ""].join("\n");
-  const sig = Base64.stringify(HmacSHA256(stringToSign, secret));
-  return { sig, ctime };
+  const signed = HMACSignatureGenerator.signRequest({
+    method: "GET",
+    path: "/socket",
+    contentType: "application/json",
+  });
+  return signed ? { sig: signed.sig, ctime: signed.ctime } : {};
 }
 
 function buildAuth() {
   return { token: `Bearer ${getAccessToken() ?? ""}`, role: "user", ...signHeader() };
+}
+
+/** Re-sign the handshake payload so a (re)connect carries the current token. */
+function refreshAuth(socket: Socket) {
+  socket.auth = buildAuth();
 }
 
 /**
@@ -37,30 +45,27 @@ function buildAuth() {
  * - Exposes `socket`, `authenticated`, `connectSocket`, `destroySocket`.
  */
 export function useSocketIO() {
-  const socketRef = useRef<Socket | null>(null);
   const URL = import.meta.env.VITE_APP_ENDPOINT ?? "";
+
+  // Trailing timer: the first failure schedules one reconnect, later failures
+  // inside the window are dropped, so rapid errors cannot cause a reconnect storm.
+  const reConnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { authenticated, setSocketIO } = useSocketIOStore();
 
-  // Lazily create the socket instance once per hook mount.
-  if (!socketRef.current) {
-    socketRef.current = io(URL, {
+  // One socket instance per hook mount (the lazy initializer runs once).
+  const [socket] = useState(() =>
+    io(URL, {
       auth: buildAuth(),
       transports: ["websocket"],
       withCredentials: true,
       autoConnect: false,
       forceBase64: true,
-    });
-    // Register in the store only when the store slot is empty (first mount).
-    if (!useSocketIOStore.getState().socket) {
-      setSocketIO({ socket: socketRef.current });
-    }
-  }
-
-  const socket = socketRef.current;
+    }),
+  );
 
   const connectSocket = useCallback(() => {
-    socket.auth = buildAuth();
+    refreshAuth(socket);
     if (socket.connected) {
       setSocketIO({ authenticated: true, socket });
       return;
@@ -75,16 +80,13 @@ export function useSocketIO() {
       setSocketIO({ authenticated: false, socket: null });
     }
   }, [socket, setSocketIO]);
-
-  // Throttle ref to prevent rapid reconnect storms (mirrors vuejs useThrottleFn).
-  const reConnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reConnect = useCallback(() => {
     if (reConnectTimerRef.current) return;
     reConnectTimerRef.current = setTimeout(() => {
       reConnectTimerRef.current = null;
       destroySocket();
       connectSocket();
-    }, 2000);
+    }, RECONNECT_THROTTLE_MS);
   }, [connectSocket, destroySocket]);
 
   useEffect(() => {
@@ -94,6 +96,9 @@ export function useSocketIO() {
       reConnect();
     };
     const handleUnauthorized = () => destroySocket();
+
+    // Register in the store only when the slot is empty (first mount).
+    if (!useSocketIOStore.getState().socket) setSocketIO({ socket });
 
     socket.on(SOCKET_EVENT.AUTHENTICATED, handleAuthenticated);
     socket.on(SOCKET_EVENT.CONNECT_ERROR, handleConnectError);
@@ -111,10 +116,7 @@ export function useSocketIO() {
         reConnectTimerRef.current = null;
       }
     };
-    // connectSocket/destroySocket/reConnect are stable callbacks — safe to omit
-    // from the dep array to prevent reconnection on every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [socket, setSocketIO, connectSocket, destroySocket, reConnect]);
 
   return {
     socket,
@@ -126,10 +128,11 @@ export function useSocketIO() {
 
 /**
  * Subscribe to a socket event with automatic cleanup on unmount.
- * Mirrors the vuejs `useSocketEvent` composable.
+ * Reads the live socket reactively, so it rebinds when the socket changes.
  */
 export function useSocketEvent(event: string, callback: (...args: unknown[]) => void) {
-  const { socket } = useSocketIOStore.getState();
+  const socket = useSocketIOStore((s) => s.socket);
+
   useEffect(() => {
     if (!socket) return;
     socket.on(event, callback);

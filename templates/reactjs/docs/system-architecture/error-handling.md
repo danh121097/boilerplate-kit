@@ -24,6 +24,26 @@ Consumers decide whether to catch or let React Query handle it:
 const { data, error } = useUsersListQuery();
 ```
 
+## Login and users errors
+
+- Login shows `getApiErrorMessage(err, t("login.error"))` in a `role="alert"` paragraph;
+  the submit button is disabled and reads `login.submitting` while pending.
+- The users page shows `users.error` with the server's `error_message` (falling back to
+  `message`), and `users.empty` when the list is empty.
+
+## Session unavailable
+
+A transient failure while restoring the session (network, timeout, 5xx) is not an
+error page: the user stays signed in and the root layout shows the
+`session.unavailable` banner with a retry button (see
+[state-management](./state-management.md#session-state--auth-store)).
+
+## Not found
+
+The root route sets `notFoundComponent` (`components/not-found.tsx`), rendered inside the
+layout for any unmatched URL: `not_found.title`, `not_found.description` and a
+`not_found.back_home` link.
+
 ## Component error boundaries
 
 No global error boundary is wired by default. Add React's `<ErrorBoundary>` from
@@ -32,7 +52,10 @@ No global error boundary is wired by default. Add React's `<ErrorBoundary>` from
 ## Form validation
 
 `react-hook-form` + `zod` + `@hookform/resolvers` handle field-level errors.
-`FormField` renders `error?.message` inline below the input. Schema validation
+Schemas carry i18n keys as messages (`loginSchema` in `services/auth/login-schema.ts`:
+`validation.email`, `validation.password_min`); the page translates them with `t()`
+before passing them to `FormField`, which renders the message inline below the input
+and links it to the input with `aria-describedby`. Schema validation
 runs on submit (or on change if `mode: "onChange"` is passed).
 
 ## Test environment

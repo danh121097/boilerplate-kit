@@ -108,7 +108,11 @@ describe("session auth flows", () => {
 
     expect(logout).not.toHaveBeenCalled();
     expect(getRefreshToken()).toBe("RT");
-    expect(useAuthStore.getState()).toMatchObject({ hydrated: true, isAuthenticated: true });
+    expect(useAuthStore.getState()).toMatchObject({
+      hydrated: true,
+      isAuthenticated: true,
+      hydrateError: { retryable: true },
+    });
   });
 
   it("boot: a network error / 5xx keeps the tokens and the session", async () => {
@@ -122,7 +126,74 @@ describe("session auth flows", () => {
     expect(logout).not.toHaveBeenCalled();
     expect(getAccessToken()).toBe("AT");
     expect(getRefreshToken()).toBe("RT");
-    expect(useAuthStore.getState()).toMatchObject({ hydrated: true, isAuthenticated: true });
+    expect(useAuthStore.getState()).toMatchObject({
+      hydrated: true,
+      isAuthenticated: true,
+      hydrateError: { retryable: true },
+    });
+  });
+
+  it("boot: a transient failure raises hydrateError, retryHydrate clears it once the profile loads", async () => {
+    persistAccessToken("AT");
+    persistRefreshToken("RT");
+    const user = { _id: "u1", email: "a@b.co", name: "A", role: "user" };
+    const getMe = vi
+      .spyOn(AuthModel, "getMe")
+      .mockRejectedValueOnce({ message: "Network Error" })
+      .mockResolvedValueOnce(user);
+
+    await useAuthStore.getState().hydrate();
+    expect(useAuthStore.getState().hydrateError).not.toBeNull();
+    expect(useAuthStore.getState().isAuthenticated).toBe(true);
+
+    await useAuthStore.getState().retryHydrate();
+
+    expect(getMe).toHaveBeenCalledTimes(2);
+    expect(useAuthStore.getState()).toMatchObject({
+      user,
+      isAuthenticated: true,
+      hydrated: true,
+      hydrateError: null,
+    });
+  });
+
+  it("boot: a 401 is the normal signed-out flow, not a session-unavailable error", async () => {
+    persistAccessToken("AT");
+    persistRefreshToken("RT");
+    vi.spyOn(AuthModel, "getMe").mockRejectedValue({ status: "error", error_code: 401 });
+    vi.spyOn(AuthModel, "revokeSession").mockResolvedValue(true);
+
+    await useAuthStore.getState().hydrate();
+
+    expect(useAuthStore.getState()).toMatchObject({
+      user: null,
+      isAuthenticated: false,
+      hydrated: true,
+      hydrateError: null,
+    });
+  });
+
+  it("logout whose request fails still signs out locally: tokens, cache and store are cleared", async () => {
+    persistAccessToken("AT");
+    persistRefreshToken("RT");
+    useAuthStore.setState({
+      user: { _id: "u1" } as never,
+      isAuthenticated: true,
+      hydrateError: { retryable: true } as never,
+    });
+    queryClient.setQueryData(["users.list"], { data: [{ _id: "1" }] });
+    vi.spyOn(AuthModel.api, "post").mockRejectedValue({ message: "Network Error" });
+
+    await AuthModel.logout().catch(() => {});
+
+    expect(getAccessToken()).toBeNull();
+    expect(getRefreshToken()).toBeNull();
+    expect(queryClient.getQueryData(["users.list"])).toBeUndefined();
+    expect(useAuthStore.getState()).toMatchObject({
+      user: null,
+      isAuthenticated: false,
+      hydrateError: null,
+    });
   });
 
   it("logout sends the refresh token in the body, the access token as Bearer, and clears tokens + query cache", async () => {
@@ -132,7 +203,7 @@ describe("session auth flows", () => {
     queryClient.setQueryData(["users.list"], { data: [{ _id: "1" }] });
     const post = vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
 
-    await useAuthStore.getState().logout();
+    await AuthModel.logout();
 
     expect(post).toHaveBeenCalledWith({
       url: "/auth/logout",

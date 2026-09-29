@@ -10,7 +10,6 @@ type SessionExpiryRouter = Parameters<typeof setupSessionExpiry>[0];
  * `reasons` every session end. Listeners are removed when the test finishes. */
 export function watchNavigation(currentPath: string) {
   const expiredTo = vi.fn();
-  const reasons = vi.fn();
   const router = {
     navigate: ({ href }: { href?: string }) => expiredTo(href),
     state: {
@@ -18,6 +17,7 @@ export function watchNavigation(currentPath: string) {
       matches: [],
     },
   } as unknown as SessionExpiryRouter;
+  const reasons = vi.fn();
   const stopExpiry = setupSessionExpiry(router);
   const offEnded = onSessionEnded(reasons);
   onTestFinished(() => {

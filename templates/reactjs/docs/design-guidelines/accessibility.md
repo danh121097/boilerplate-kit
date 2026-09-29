@@ -21,7 +21,8 @@ a visible label is not desired:
 
 TanStack Router handles scroll restoration and focus management between route
 transitions automatically. For modals and dialogs, use Radix UI Dialog (ships
-with shadcn/ui) which traps focus and restores it on close.
+with shadcn/ui; see `components/ui/dialog.tsx` and the home page demo) which traps focus
+and restores it on close.
 
 ## Button loading state
 

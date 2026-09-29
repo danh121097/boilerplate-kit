@@ -12,6 +12,7 @@ const { data, isLoading, error } = useUsersListQuery();
 QueryClient is created in `src/providers/query-client-provider.tsx` with:
 - `retry: false`
 - `refetchOnWindowFocus: true`
+- `staleTime: 60_000`
 - `placeholderData: keepPreviousData`
 
 ## Client state — Zustand
@@ -29,6 +30,22 @@ export const useCounterStore = create<CounterState>((set) => ({
 ```
 
 Stores are imported explicitly — no auto-import or global injection.
+
+## Session state — auth store
+
+`useAuthStore` (`src/stores/auth.ts`) exposes `{ user, isAuthenticated, hydrated,
+hydrateError, setUser, hydrate, retryHydrate }`. `hydrate()` runs once on
+boot from the root layout:
+
+- No stored session → `hydrated: true`, signed out.
+- Profile loads → `user` set.
+- `401` (refused refresh) → the session is revoked and ends as expired: the normal
+  logged-out flow, **no** banner.
+- Network error, timeout or 5xx → the stored session is kept, the user stays
+  signed in and `hydrateError` is set. The root layout shows a `role="alert"`
+  banner (`session.unavailable`) with a `session.retry` button that calls
+  `retryHydrate()`; the banner disappears once the profile loads. A session end
+  or another tab's login clears `hydrateError`.
 
 ## Locale state
 

@@ -211,7 +211,7 @@ describe("navigation on session end", () => {
     onTestFinished(stop);
 
     // What the root layout's logout button does.
-    await useAuthStore.getState().logout();
+    await AuthModel.logout();
     await router.navigate({ to: "/login" });
 
     expect(router.navigate).toHaveBeenCalledExactlyOnceWith({ to: "/login" });

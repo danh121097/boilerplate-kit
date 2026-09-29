@@ -39,7 +39,8 @@ pnpm build        # tsc -b + vite build
 pnpm typecheck    # tsc -b
 pnpm test         # vitest run
 pnpm test:watch   # vitest
-pnpm lint         # eslint
+pnpm lint         # eslint + prettier --check (read-only)
+pnpm lint:fix     # eslint --fix + prettier --write
 pnpm format       # prettier --write
 ```
 

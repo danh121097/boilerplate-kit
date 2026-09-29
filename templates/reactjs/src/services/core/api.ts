@@ -2,7 +2,9 @@ import axios, { type AxiosInstance } from "axios";
 import type {
   ApiRequestConfig,
   ApiService,
+  CursorResponse,
   HttpInterceptorSetup,
+  PaginatedResponse,
   ServiceConfig,
 } from "@/services/core/types";
 
@@ -79,6 +81,14 @@ export class Api {
   get<T>(config: ApiRequestConfig = {}) {
     return this.makeRequest<T>("get", config);
   }
+  paginate<T>(config: ApiRequestConfig = {}) {
+    return this.makeRequest<T[]>("get", config) as unknown as Promise<PaginatedResponse<T>>;
+  }
+
+  cursorPaginate<T>(config: ApiRequestConfig = {}) {
+    return this.makeRequest<T[]>("get", config) as unknown as Promise<CursorResponse<T>>;
+  }
+
   post<T>(config: ApiRequestConfig = {}) {
     return this.makeRequest<T>("post", config);
   }

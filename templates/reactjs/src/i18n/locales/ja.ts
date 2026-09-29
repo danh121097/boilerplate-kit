@@ -7,6 +7,19 @@ export default {
     login: "ログイン",
     logout: "ログアウト",
   },
+  session: {
+    unavailable: "サーバーに接続できませんでした。ログイン状態は維持されています。",
+    retry: "再試行",
+  },
+  validation: {
+    email: "有効なメールアドレスを入力してください",
+    password_min: "パスワードは8文字以上で入力してください",
+  },
+  not_found: {
+    title: "ページが見つかりません",
+    description: "お探しのページは存在しません。",
+    back_home: "ホームに戻る",
+  },
   login: {
     title: "ログイン",
     email: "メールアドレス",
@@ -26,6 +39,7 @@ export default {
     title: "ユーザー (TanStack Query)",
     loading: "読み込み中…",
     error: "エラー: {{message}}",
+    empty: "ユーザーはまだいません。",
   },
   form: {
     title: "フォーム (react-hook-form + zod)",

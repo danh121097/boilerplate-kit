@@ -17,25 +17,31 @@ function UsersPage() {
   const { t } = useTranslation();
   const { data, isLoading, error } = useUsersListQuery();
 
+  const users = data?.data ?? [];
+
   return (
     <section>
       <h1 className="mb-4 text-3xl font-bold">{t("users.title")}</h1>
 
-      {isLoading && <p className="text-gray-500">{t("users.loading")}</p>}
+      {isLoading && <p className="text-muted-foreground">{t("users.loading")}</p>}
 
       {error && (
-        <p className="text-red-600">
+        <p className="text-destructive">
           {t("users.error", { message: error.error_message || error.message })}
         </p>
       )}
 
-      {!isLoading && !error && (
+      {!isLoading && !error && users.length === 0 && (
+        <p className="text-muted-foreground">{t("users.empty")}</p>
+      )}
+
+      {!isLoading && !error && users.length > 0 && (
         <ul className="divide-y">
-          {data?.map((user) => (
+          {users.map((user) => (
             <li key={user._id} className="flex items-center justify-between py-2">
               <div>
                 <span className="font-medium">{user.name}</span>
-                <span className="ml-2 text-sm text-gray-500">{user.email}</span>
+                <span className="ml-2 text-sm text-muted-foreground">{user.email}</span>
               </div>
               <Badge variant="secondary">#{user._id}</Badge>
             </li>

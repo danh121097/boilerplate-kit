@@ -1,6 +1,16 @@
 # Theming
 
+## Tokens in layouts
+
+Layouts and components use the tokens, never fixed grays or indigo: `bg-background`,
+`text-foreground`, `bg-card`, `border-border`, `text-muted-foreground`, `text-primary`
+(active and hover nav link), `bg-secondary`, `text-destructive`. The palette is neutral
+and shared with the other templates.
+
 ## Light / dark mode
+
+The template does not provide a dark toggle. The `.dark` token block exists so one can be
+added; nothing sets the class by default.
 
 Dark mode is implemented via the `.dark` class on `<html>`. When `.dark` is
 present, the `.dark { ... }` block in `src/styles/tailwind.css` overrides the

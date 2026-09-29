@@ -117,6 +117,13 @@ Per-service refresh options (`ServiceRefreshConfig` in `init-services.ts`):
 
 Implementation: `beforeLoad` in `routes/users.tsx` (protected, `staticData.requiresAuth`) and `routes/login.tsx` (guest only).
 
+## Boot hydration
+
+`useAuthStore.hydrate()` restores the profile once on boot. A `401` ends the session
+as expired (normal logged-out flow). A network error, timeout or 5xx keeps the session
+and sets `hydrateError`, which shows the `session.unavailable` banner with a retry
+button (`retryHydrate()`); see [state-management](./state-management.md#session-state--auth-store).
+
 ## Session end (no reload)
 
 A 401 never reloads the page. Only a **refused** refresh (HTTP 401/403 from the
@@ -186,6 +193,11 @@ revokes the same way and resolves `null` on a 401, and rejects on anything else.
 Both share one private helper, `endServerSession(reason, sinceEpoch?)`.
 
 ## Logout
+
+The nav button runs `useLogoutMutation` (disabled while `isPending`); `onSettled`
+navigates to plain `/login`, so the user is routed out even when the request fails.
+The auth store has no `logout` action: the "logout" session end below clears the
+user, `hydrateError` and the query cache.
 
 `AuthModel.logout()` (and a revoke that goes ahead):
 

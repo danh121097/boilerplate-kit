@@ -20,27 +20,33 @@ templates/reactjs/
     ├── main.tsx               # entry point
     ├── router.tsx             # createRouter + QueryClient context
     ├── routes/
-    │   ├── __root.tsx         # RootLayout: nav + locale toggle
-    │   ├── index.tsx          # / — home
+    │   ├── __root.tsx         # RootLayout: nav, locale toggle, session banner, notFoundComponent
+    │   ├── index.tsx          # / — home + dialog demo
     │   ├── counter.tsx        # /counter — Zustand
     │   ├── users.tsx          # /users — React Query
     │   └── form.tsx           # /form — react-hook-form + zod
     ├── providers/
     │   └── query-client-provider.tsx
+    ├── components/
+    │   ├── mock-auth-badge.tsx
+    │   └── not-found.tsx  # root notFoundComponent
     ├── components/ui/
     │   ├── button.tsx
+    │   ├── dialog.tsx
     │   ├── badge.tsx
     │   ├── card.tsx
     │   ├── input.tsx
     │   └── form-field.tsx
     ├── stores/
-    │   └── counter.ts
+    │   ├── auth.ts            # session store (user, hydrate, retryHydrate)
+    │   ├── counter.ts
+    │   └── socket-io.ts
     ├── services/
     │   ├── index.ts
     │   ├── init-services.ts
     │   ├── session-expiry.ts
     │   ├── core/              # api, interceptors, hmac, token-storage, model, tanstack, types
-    │   ├── auth/              # AuthModel + mutations/queries
+    │   ├── auth/              # AuthModel + mutations/queries + login-schema (zod)
     │   └── users/             # UsersModel + useUsersListQuery
     ├── i18n/
     │   ├── i18n.ts            # initI18n() + setLocale()

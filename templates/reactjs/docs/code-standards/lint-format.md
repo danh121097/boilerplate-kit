@@ -8,10 +8,12 @@ Active rule sets:
 - `@eslint/js` recommended
 - `typescript-eslint` recommended
 - `eslint-plugin-perfectionist` — import sort by kind (named → type → default → side-effect)
-- `eslint-plugin-react-hooks` recommended
+- `eslint-plugin-react-hooks` recommended (v7: includes the React Compiler rules — no ref
+  reads or mutation during render)
 - `eslint-config-prettier` — disables formatting rules that conflict with Prettier
 
-Run: `pnpm lint`
+Run: `pnpm lint` (read-only: `eslint . && prettier --check .`, safe for CI) or
+`pnpm lint:fix` (`eslint . --fix && prettier --write .`).
 
 ## Prettier
 

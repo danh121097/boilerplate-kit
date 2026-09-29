@@ -22,14 +22,15 @@ src/services/
 │   ├── hmac-signature.ts   # HMACSignatureGenerator.signRequest / generateSignature, resolveContentType
 │   ├── model.ts            # Model base class — subclass + Model.setup()
 │   ├── tanstack.ts         # defineQuery / defineMutation (React Query)
-│   ├── types.ts            # Shared TS types + axios module augmentation
+│   ├── types.ts            # Shared TS types (incl. pagination) + axios module augmentation
 │   └── index.ts
 ├── auth/
 │   ├── auth.ts             # AuthModel (getMe, getSession → AuthUser | null, logout, isLoggingOut, revokeSession) + useMeQuery, mutations
+│   ├── login-schema.ts     # loginSchema (zod; messages are i18n keys) + LoginFormValues
 │   ├── types/auth.ts       # AuthUser, AuthResult, LoginPayload, RegisterPayload
 │   └── index.ts
 └── users/
-    ├── users.ts            # UsersModel + useUsersListQuery
+    ├── users.ts            # UsersModel (list → PaginatedResponse<User>, get/update → User) + useUsersListQuery
     ├── types/user.ts       # User, UpdateUserPayload
     └── index.ts
 ```
@@ -45,7 +46,7 @@ src/services/
 
 ```
 src/stores/
-├── auth.ts       # useAuthStore (user, isAuthenticated, hydrate, logout) + syncAuthWithOtherTabs
+├── auth.ts       # useAuthStore (user, isAuthenticated, hydrated, hydrateError, setUser, hydrate, retryHydrate) + syncAuthWithOtherTabs
 ├── counter.ts    # useCounterStore: count / increment / decrement / reset
 └── socket-io.ts  # Socket.IO connection store
 ```

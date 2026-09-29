@@ -125,7 +125,7 @@ describe("session revoke and logout", () => {
     vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
     const nav = watchNavigation("/users");
 
-    await useAuthStore.getState().logout();
+    await AuthModel.logout();
 
     expect(nav.reasons).toHaveBeenCalledExactlyOnceWith("logout", "MAIN");
     expect(nav.expiredTo).not.toHaveBeenCalled();

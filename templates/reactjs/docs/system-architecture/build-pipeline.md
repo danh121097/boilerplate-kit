@@ -4,13 +4,13 @@
 
 | Tool | Version | Role |
 |------|---------|------|
-| Vite | 6 | Dev server + bundler |
-| `@vitejs/plugin-react` | latest | JSX transform + HMR |
+| Vite | 8 | Dev server + bundler |
+| `@vitejs/plugin-react` | 6 | JSX transform + HMR |
 | `@tanstack/router-plugin/vite` | latest | Route codegen (`routeTree.gen.ts`) |
 | `@tailwindcss/vite` | 4 | Tailwind CSS v4 via Vite plugin |
-| TypeScript | 5 | Type checking (separate from Vite) |
-| Vitest | 3 | Unit + integration tests |
-| ESLint | 9 flat config | Lint |
+| TypeScript | 6 | Type checking (separate from Vite) |
+| Vitest | 4 | Unit + integration tests |
+| ESLint | 10 flat config | Lint |
 | Prettier | 3 | Format |
 
 ## Scripts
@@ -22,7 +22,8 @@ pnpm preview   → vite preview
 pnpm typecheck → tsc -b (both project references; noEmit set in each)
 pnpm test      → vitest run
 pnpm test:watch→ vitest
-pnpm lint      → eslint .
+pnpm lint      → eslint . && prettier --check . (read-only)
+pnpm lint:fix  → eslint . --fix && prettier --write .
 pnpm format    → prettier --write .
 ```
 
@@ -49,9 +50,10 @@ and throw `ReferenceError` at runtime.
 
 ```
 tsconfig.json
-  ├── tsconfig.app.json   (src/ — jsx react-jsx, strict, noUncheckedIndexedAccess)
+  ├── tsconfig.app.json   (src/ — jsx react-jsx, strict, noUncheckedIndexedAccess,
+  │                        noFallthroughCasesInSwitch, verbatimModuleSyntax)
   └── tsconfig.node.json  (config files — no JSX, module: bundler)
 ```
 
-`tsc -b` builds both references. Vite uses `esbuild` for transpilation (no type
+`tsc -b` builds both references. Vite transpiles the code (no type
 check); TypeScript type checking is a separate step (`pnpm typecheck`).

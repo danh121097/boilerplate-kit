@@ -18,6 +18,7 @@ export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
   ({ label, error, wrapperClassName, className, id: idProp, ...props }, ref) => {
     const generatedId = useId();
     const id = idProp ?? generatedId;
+    const errorId = `${id}-error`;
 
     return (
       <div className={cn("space-y-1", wrapperClassName)}>
@@ -32,10 +33,16 @@ export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
         <Input
           ref={ref}
           id={id}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
           className={cn(error && "border-destructive focus-visible:ring-destructive", className)}
           {...props}
         />
-        {error && <p className="text-xs text-destructive">{error}</p>}
+        {error && (
+          <p id={errorId} className="text-xs text-destructive">
+            {error}
+          </p>
+        )}
       </div>
     );
   },
