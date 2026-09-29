@@ -26,6 +26,13 @@ list.
 - **Auth cookies** — register / login / refresh set `accessToken` and
   `refreshToken` as httpOnly cookies; logout clears them, and so does a refused
   refresh (today always `401`; a future `403` clears too; `5xx`/`429` do not).
+  Cookie `maxAge` follows `JWT_ACCESS_EXPIRY` / `JWT_REFRESH_EXPIRY` (defaults
+  `15m` / `7d`).
+- **Behind a proxy** — set `TRUST_PROXY` (a hop count, `true`, or a
+  comma-separated IP/subnet list) so `req.ip` and rate limits use the client
+  address; unset trusts no proxy. Prefer a hop count (e.g. `1`) over `true`,
+  which trusts every `X-Forwarded-For` entry and lets clients spoof their IP.
+  Token expiries must be `<positive int><s|m|h|d>`; anything else fails boot.
 
 ## Endpoints
 
@@ -33,9 +40,9 @@ list.
 | --- | --- | --- | --- | --- |
 | GET | `/api/v1/health` | HMAC, global rate-limit | — | `{ status: "ok", timestamp, uptime, database, redis }` |
 | POST | `/api/v1/auth/register` | HMAC, `authRateLimiter` (30/15m), `validate(registerSchema)` | `{ email: string (email), password: string (min 8), name: string (min 1) }` | `201` `{ success: true, message, data: { user, tokens: { accessToken, refreshToken } } }` + httpOnly cookies |
-| POST | `/api/v1/auth/login` | HMAC, `loginRateLimiter` (10/15m), `validate(loginSchema)` | `{ email: string (email), password: string (min 1) }` | `{ success: true, message, data: { user, tokens: { accessToken, refreshToken } } }` + httpOnly cookies |
-| POST | `/api/v1/auth/refresh` | HMAC, `authRateLimiter` (30/15m) | — (refresh token read from `refreshToken` cookie) | `{ success: true, message, data: { tokens: { accessToken, refreshToken } } }` + rotated cookies. `401` if cookie missing/invalid/expired/reused, with both token cookies cleared (`Set-Cookie` expired, `refreshToken` on its auth path); body unchanged |
-| POST | `/api/v1/auth/logout` | HMAC, `authRateLimiter` (30/15m) | — (refresh token read from `refreshToken` cookie) | `{ success: true, message }` + cleared cookies |
+| POST | `/api/v1/auth/login` | HMAC, `loginRateLimiter` (30/15m), `validate(loginSchema)` | `{ email: string (email), password: string (min 1) }` | `{ success: true, message, data: { user, tokens: { accessToken, refreshToken } } }` + httpOnly cookies |
+| POST | `/api/v1/auth/refresh` | HMAC, `authRateLimiter` (30/15m) | optional `{ refreshToken?: string }` (falls back to the `refreshToken` cookie when absent or `""`; a non-string value is `400 VALIDATION_ERROR`) | `{ success: true, message, data: { tokens: { accessToken, refreshToken } } }` + rotated cookies. A token rotated within the last 10s (retry / parallel tabs) is answered like a normal refresh with a fresh pair. `401 AUTHENTICATION_ERROR` if the token is missing/invalid/expired/reused after that window (reuse revokes every session of the user and disconnects their sockets), with both token cookies cleared (`Set-Cookie` expired, `refreshToken` on its auth path) |
+| POST | `/api/v1/auth/logout` | HMAC, `authRateLimiter` (30/15m) | optional `{ refreshToken?: string }` (same body/cookie rules as refresh) | `{ success: true, message }` + cleared cookies; the user's sockets are disconnected |
 | GET | `/api/v1/auth/me` | HMAC, `authenticate` | — | `{ success: true, data: { user } }` |
 | GET | `/api/v1/users` | HMAC, `authenticate`, `requireMinRole('admin')` | — (query: `page`≥1 def 1, `limit` 1–100 def 20) | `{ status: "success", data: User[], meta: OffsetMeta }` (passwords stripped). `403` if below admin |
 | GET | `/api/v1/users/:id` | HMAC, `authenticate`, `requireMinRole('admin')` | — | `{ status: "success", data: User }` (password stripped). `404` if not found |
@@ -46,11 +53,12 @@ Errors thrown as `AppError` are normalized by the global error handler
 (`src/middleware/error-handler.ts`) to:
 
 ```json
-{ "success": false, "status": <code>, "message": <string>, "error_code": <string>, "error_message": <string> }
+{ "success": false, "status": "error", "errorType": <string>, "message": <string>, "error_code": <number>, "error_message": <string> }
 ```
 
 Common codes: `400 VALIDATION_ERROR`, `401 AUTHENTICATION_ERROR`,
-`403 AUTHORIZATION_ERROR`, `404 NOT_FOUND`, `409 CONFLICT`.
+`403 AUTHORIZATION_ERROR`, `404 NOT_FOUND`, `409 CONFLICT`, `429 RATE_LIMIT`
+(every rate-limit response uses this envelope).
 
 Unmatched routes under any path fall through to `notFoundHandler`
 (`src/middleware/not-found-handler.ts`).

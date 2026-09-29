@@ -24,6 +24,12 @@ describe("socket emit helpers — not initialized", () => {
     expect(() => emitToUser("1", SOCKET_EVENT.PING, { a: 1 })).not.toThrow();
     expect(() => emitBroadcast(SOCKET_EVENT.PING, { a: 1 })).not.toThrow();
   });
+
+  it("disconnectUserSockets no-ops when getIO is null", async () => {
+    getIOMock.mockReturnValue(null);
+    const { disconnectUserSockets } = await import("@/utils/socket-emit");
+    expect(() => disconnectUserSockets("1")).not.toThrow();
+  });
 });
 
 describe("socket emit helpers — initialized", () => {
@@ -47,5 +53,19 @@ describe("socket emit helpers — initialized", () => {
     emitBroadcast(SOCKET_EVENT.PING, 1);
 
     expect(emit).toHaveBeenCalledWith(SOCKET_EVENT.PING, 1);
+  });
+});
+
+describe("disconnectUserSockets", () => {
+  it("force-disconnects every socket in the user room", async () => {
+    const disconnectSockets = vi.fn();
+    const inRoom = vi.fn(() => ({ disconnectSockets }));
+    getIOMock.mockReturnValue({ in: inRoom });
+    const { disconnectUserSockets } = await import("@/utils/socket-emit");
+
+    disconnectUserSockets("42");
+
+    expect(inRoom).toHaveBeenCalledWith("user:42");
+    expect(disconnectSockets).toHaveBeenCalledWith(true);
   });
 });

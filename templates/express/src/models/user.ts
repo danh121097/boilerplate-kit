@@ -1,4 +1,5 @@
 import { ROLES, UserDocument } from "@/types/auth";
+import { BCRYPT_ROUNDS } from "@/utils/password";
 import { Schema, model } from "mongoose";
 import bcrypt from "bcrypt";
 
@@ -36,7 +37,7 @@ const userSchema = new Schema<UserDocument>(
 /** Hash password with bcrypt before saving */
 userSchema.pre("save", async function () {
   if (!this.isModified("password")) return;
-  this.password = await bcrypt.hash(this.password, 12);
+  this.password = await bcrypt.hash(this.password, BCRYPT_ROUNDS);
 });
 
 /** Compare candidate password against stored hash */

@@ -20,3 +20,8 @@ export function emitToUser(userId: string, event: SocketEvent, payload?: unknown
 export function emitBroadcast(event: SocketEvent, payload?: unknown): void {
   getIO()?.emit(event, payload);
 }
+
+/** Force-disconnect every socket of a user (logout, session revoked); no-op when the socket server is off. */
+export function disconnectUserSockets(userId: string): void {
+  getIO()?.in(`user:${userId}`).disconnectSockets(true);
+}

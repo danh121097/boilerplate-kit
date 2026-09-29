@@ -1,4 +1,5 @@
 import { config } from "@/config/environment";
+import { accessTtlSeconds, refreshTtlSeconds } from "@/utils/token-lifetimes";
 import { CookieOptions, Response } from "express";
 
 /** Shared cookie options for secure HTTP-only cookies.
@@ -20,12 +21,12 @@ const refreshCookiePath = `${config.apiPrefix}/auth`;
 export function setTokenCookies(res: Response, accessToken: string, refreshToken: string): void {
   res.cookie("accessToken", accessToken, {
     ...baseCookieOptions,
-    maxAge: 15 * 60 * 1000, // 15 minutes
+    maxAge: accessTtlSeconds() * 1000, // JWT_ACCESS_EXPIRY
   });
 
   res.cookie("refreshToken", refreshToken, {
     ...baseCookieOptions,
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    maxAge: refreshTtlSeconds() * 1000, // JWT_REFRESH_EXPIRY
     path: refreshCookiePath, // only sent to auth routes
   });
 }

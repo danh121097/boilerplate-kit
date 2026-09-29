@@ -11,10 +11,8 @@ export async function connectDatabase(): Promise<void> {
     await mongoose.connect(config.mongodbUri);
     logger.info("MongoDB connected successfully");
   } catch (error) {
-    logger.error("MongoDB connection failed", {
-      err: error,
-      uri: config.mongodbUri,
-    });
+    // Never log the connection string: it carries credentials.
+    logger.error("MongoDB connection failed", { err: error });
     process.exit(1);
   }
 

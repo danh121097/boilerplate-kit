@@ -12,15 +12,6 @@ vi.mock("@/config/redis", () => ({ getRedis: () => getRedisMock() }));
 beforeEach(() => vi.clearAllMocks());
 afterEach(() => vi.resetModules());
 
-describe("accessTtlSeconds", () => {
-  it("parses minute/second/hour/day and numeric expiries", async () => {
-    getRedisMock.mockReturnValue(null);
-    const { accessTtlSeconds } = await import("@/utils/token-revocation");
-    // config.jwtAccessExpiry is '15m' under test env
-    expect(accessTtlSeconds()).toBe(15 * 60);
-  });
-});
-
 describe("revocation helpers — disabled", () => {
   it("revokeUserTokens is a no-op and getUserRevokedAt returns null", async () => {
     getRedisMock.mockReturnValue(null);

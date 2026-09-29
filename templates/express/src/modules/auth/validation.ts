@@ -30,3 +30,12 @@ export const loginSchema = z.object({
   email: z.email("Invalid email format").transform((v) => v.toLowerCase().trim()),
   password: z.string().min(1, "Password is required"),
 });
+
+/**
+ * Optional body for refresh/logout: the token may instead come from the cookie.
+ * A missing body is treated as `{}`; a non-string `refreshToken` is a 400.
+ */
+export const refreshBodySchema = z
+  .object({ refreshToken: z.string("refreshToken must be a string").optional() })
+  .optional()
+  .transform((body) => body ?? {});

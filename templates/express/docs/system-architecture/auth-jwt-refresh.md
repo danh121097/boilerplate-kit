@@ -14,6 +14,10 @@ tokens delivered as httpOnly cookies. Source:
 | --- | --- | --- |
 | Algorithm | **RS256** (RSA private/public keypair) | **HS256** (symmetric secret) |
 | Lifetime | `JWT_ACCESS_EXPIRY` (default `15m`) | `JWT_REFRESH_EXPIRY` (default `7d`) |
+
+Both expiries must match `<positive integer><s|m|h|d>` (`15m`, `7d`); anything
+else (`900`, `1w`, `0`, `-5m`) fails boot with a clear message.
+
 | Sent as | `Authorization: Bearer` **or** `accessToken` cookie | `refreshToken` httpOnly cookie |
 | Stored server-side | no | yes — SHA-256 hash in `RefreshToken` collection |
 | `token_use` claim | `access` | `refresh` |
@@ -25,10 +29,9 @@ be checked by many resource servers. Refresh tokens use **HS256** (symmetric),
 signed with `JWT_REFRESH_SECRET`, because they are **only ever verified by this
 auth server** and never handed to third parties; a symmetric secret is the
 correct, simpler choice there. This is an intentional separation of concerns, not
-an inconsistency. Refresh validity is established primarily by the DB hash lookup
-(`isRevoked` + `expiresAt`) on the hot path — the HS256 signature is a secondary
-check. The two types also differ by the `token_use` claim, expiry, and that
-refresh tokens are DB-tracked, delivered in an httpOnly cookie, rotated, and
+an inconsistency. Refresh validity is established by the DB hash lookup
+(`isRevoked` + `expiresAt`); the server does not re-verify the HS256 signature. The two types also
+differ by the `token_use` claim, expiry, and that refresh tokens are DB-tracked, delivered in an httpOnly cookie, rotated, and
 reuse-detected. The `token_use` claim and the `iss` (issuer) claim are defense in
 depth: a refresh token can never satisfy access verification, and a token minted
 for another origin/deployment is rejected.
@@ -62,10 +65,10 @@ export function signRefreshToken(payload: JwtPayload): string {
 ```
 
 `verifyAccessToken` pins `algorithms: ['RS256']` and verifies against
-`config.jwtAccessPublicKey`; `verifyRefreshToken` pins `algorithms: ['HS256']`
-and verifies against `config.jwtRefreshSecret`. Both enforce the `issuer` and
-assert the matching `token_use` — throwing otherwise. Verification order:
-signature → algorithm → issuer → `token_use`.
+`config.jwtAccessPublicKey`, enforces the `issuer` and asserts
+`token_use=access` — throwing otherwise. Verification order: signature →
+algorithm → issuer → `token_use`. Refresh tokens have no verify helper: validity
+comes from the DB lookup of their SHA-256 hash.
 
 The RSA keypair is loaded at startup by [`config/keys.ts`](../../src/config/keys.ts):
 it reads `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH`, runs a sign/verify
@@ -85,7 +88,9 @@ The `JwtPayload` carries `{ userId, email, role }` only — never `exp`/`iat`
   token:     { type: String, required: true, unique: true },       // SHA-256 hash, NOT the raw JWT
   userId:    { type: ObjectId, ref: 'User', required: true, index: true },
   expiresAt: { type: Date, required: true, index: { expires: 0 } },// TTL index → Mongo auto-purges
+  familyId:  { type: String, index: true },                         // one per login/register chain
   isRevoked: { type: Boolean, default: false },
+  rotatedAt: { type: Date },                                        // set by rotation only (not logout)
 }
 ```
 
@@ -108,9 +113,14 @@ const baseCookieOptions = {
   sameSite: config.isProduction ? 'strict' : 'lax',
   path: '/',
 };
-// accessToken  → path '/',          maxAge 15 min
-// refreshToken → path `${apiPrefix}/auth`, maxAge 7 days  (only sent to auth routes)
+// accessToken  → path '/',          maxAge = JWT_ACCESS_EXPIRY  (default 15m)
+// refreshToken → path `${apiPrefix}/auth`, maxAge = JWT_REFRESH_EXPIRY (default 7d)
+//                (only sent to auth routes)
 ```
+
+Cookie `maxAge`, the refresh token's DB `expiresAt` and the JWT `expiresIn` all
+derive from the same two env vars ([`utils/token-lifetimes.ts`](../../src/utils/token-lifetimes.ts)
+parses `15m` / `7d` / plain seconds).
 
 The refresh cookie is **path-scoped to `/api/v1/auth`** so the browser only sends
 it to the auth endpoints, shrinking its exposure. `clearTokenCookies` clears both
@@ -126,11 +136,19 @@ All flows live in [`modules/auth/service.ts`](../../src/modules/auth/service.ts)
   pre-save hook), sign access + create hashed refresh token, set cookies, `201`.
 - **login** (`POST /auth/login`) — find user `+password` select, reject inactive
   or bad credentials (401 `AUTHENTICATION_ERROR`, same message either way),
-  `comparePassword` (bcrypt), sign tokens, set cookies.
-- **refresh** (`POST /auth/refresh`) — read raw token from the `refreshToken`
-  cookie; controller 401s if absent. See rotation below.
-- **logout** (`POST /auth/logout`) — mark the stored refresh token `isRevoked`,
-  call `revokeUserTokens(userId)` (Redis access-token cutoff), clear cookies.
+  `comparePassword` (bcrypt), sign tokens, set cookies. An unknown or inactive
+  user still costs one bcrypt compare against a fixed dummy hash, so timing does
+  not reveal whether the account exists.
+- **refresh** (`POST /auth/refresh`) — read the raw token from the optional body
+  `refreshToken` (string; non-string is a 400) or, when absent/empty, the
+  `refreshToken` cookie; controller 401s if neither exists. See rotation below.
+- **logout** (`POST /auth/logout`) — same token sources; revoke every refresh
+  token of the presented token's `familyId` (clearing their `rotatedAt`, so a
+  graced predecessor cannot resurrect the session), call
+  `revokeUserTokens(userId)` (Redis access-token cutoff), disconnect the user's
+  sockets, clear cookies. The user's other families (other devices) keep their
+  sessions. Tokens issued before `familyId` existed fall back to revoking just
+  the presented token.
 - **getMe** (`GET /auth/me`) — `authenticate` middleware required; returns the
   user resolved from `req.user.userId`.
 
@@ -144,11 +162,13 @@ concurrent refreshes with the same token produce exactly one `200`:
 const hashedToken = hashToken(rawRefreshToken);
 const stored = await RefreshToken.findOneAndUpdate(      // 1. atomic claim = revoke OLD
   { token: hashedToken, isRevoked: false, expiresAt: { $gt: new Date() } },
-  { isRevoked: true },
+  { isRevoked: true, rotatedAt: new Date() },
 );
-if (!stored) return rejectUnclaimableToken(hashedToken);  // 2. re-lookup + classify:
-//   unknown → 401 · already revoked → REUSE: revoke every refresh token of the user
-//   + revokeUserTokens → 401 · expired → deleteOne → 401
+const token = stored ?? (await classifyUnclaimableToken(hashedToken)); // 2. re-lookup + classify:
+//   unknown → 401 · revoked by rotation ≤ REFRESH_REUSE_GRACE_MS ago and unexpired
+//   → benign retry, continue and issue a fresh pair · any other revoked token → REUSE:
+//   revoke every refresh token of the user (clearing rotatedAt), revokeUserTokens,
+//   disconnect their sockets → 401 · expired → deleteOne → 401
 // ...resolve user, then:
 const accessToken = signAccessToken(payload);
 const newRefreshToken = await createRefreshTokenInDb(user._id, payload); // issue NEW
@@ -160,10 +180,24 @@ expired, reused or revoked; a `403` from a future guard is handled the same)
 clears both token cookies with the options they were set with, then returns the
 unchanged error; `5xx`/`429` leave cookies alone.
 Clients must single-flight refreshes (the frontend templates lock across tabs).
-A parallel refresh with the same token is treated as reuse, but detection is
-best-effort under true concurrency: the winning request's new refresh token
-(and its access token) can be issued after the reuse branch revoked the family,
-and so survive it.
+
+**Reuse grace window.** A rotated token presented again within
+`REFRESH_REUSE_GRACE_MS` (10 s, `modules/auth/service.ts`) is a retry or a race
+between tabs, not theft: it gets a fresh access + refresh pair exactly like a
+normal refresh and nothing is revoked. This matters in a browser, where the
+first response already set new cookies — refusing the second request would clear
+them and kill the winning session. Outside the window, or for a token revoked by
+logout (which never sets `rotatedAt`), reuse revokes the user's whole family
+and disconnects their sockets. That revocation also clears `rotatedAt` on every
+token, so replaying a recently rotated token after a family revoke stays a `401`.
+A graced retry adds a further live token to the family (same `familyId`); each is
+rotated or revoked like any other.
+
+Limits of the grace window: a stolen token replayed within it is
+indistinguishable from a retry and mints another live token for that family
+(bounded by the window, and the next rotation or logout ends the chain). A graced
+retry racing a family revoke may leave one token alive; revocation is best
+effort under true concurrency.
 
 ## Verifying Requests: `authenticate`
 

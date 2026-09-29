@@ -46,6 +46,10 @@ Notes:
 - **Per-user rooms** — each connection joins `user:<userId>`, enabling targeted
   emits.
 - **Heartbeat + payload cap** drop dead connections and bound memory abuse.
+- **Sessions end sockets.** Logout (when the refresh token is known) and a
+  detected refresh-token reuse call `disconnectUserSockets(userId)`, which
+  force-disconnects every socket in that user's room (across instances with the
+  Redis adapter); it no-ops when the socket server is not initialised.
 - `closeSocket()` force-disconnects live sockets (`io.disconnectSockets(true)`)
   before `io.close()`, since `close()` alone does not drop active websockets.
 
@@ -111,6 +115,7 @@ the Redis adapter is on:
 ```ts
 emitToUser(userId, event, payload);   // getIO()?.to(`user:${userId}`).emit(...)
 emitBroadcast(event, payload);        // getIO()?.emit(...)
+disconnectUserSockets(userId);        // getIO()?.in(`user:${userId}`).disconnectSockets(true)
 ```
 
 `emitToUser` targets the per-user room joined on connection.

@@ -7,7 +7,7 @@ Back to [Code Standards](../code-standards.md). Filenames are covered in
 
 - `camelCase` for variables and functions: `accessToken`, `hashedToken`,
   `requiredRank`, `extractAccessToken`.
-- Functions read as verbs: `signAccessToken`, `verifyRefreshToken`,
+- Functions read as verbs: `signAccessToken`, `verifyAccessToken`,
   `createRefreshTokenInDb`, `revokeUserTokens`, `buildPayload`.
 - Exported handlers are named for the action: `register`, `login`, `refresh`,
   `logout`, `getMe`.

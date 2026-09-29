@@ -48,8 +48,8 @@ limiters via `express-rate-limit`:
 | Limiter | Window | Max | Applied to |
 | --- | --- | --- | --- |
 | `globalRateLimiter` | 1 min | 100 | all API routes (`app.use(apiPrefix, ...)`) |
-| `authRateLimiter` | 15 min | 20 | `/auth/register`, `/auth/refresh`, `/auth/logout` |
-| `loginRateLimiter` | 15 min | 10 | `/auth/login` (brute-force protection) |
+| `authRateLimiter` | 15 min | 30 | `/auth/register`, `/auth/refresh`, `/auth/logout` |
+| `loginRateLimiter` | 15 min | 30 | `/auth/login` (own bucket, brute-force protection) |
 
 Stricter auth/login limiters layer **on top of** the global one via the route
 `middleware` chain. All limiters:
@@ -58,7 +58,9 @@ Stricter auth/login limiters layer **on top of** the global one via the route
 - **`skip: () => isTest`** — disabled under `NODE_ENV=test`.
 - **`passOnStoreError: true`** — fail-open: a Redis-store outage must not 500 the
   endpoint.
-- Return `{ success: false, message: "Too many ..." }` when tripped.
+- Answer a tripped limit with status `429` through the global error handler, so it uses the
+  standard error envelope (`errorType: "RATE_LIMIT"`, `error_code: 429`, `message` /
+  `error_message`: "Too many ...").
 
 ### Redis-Backed Store (optional)
 

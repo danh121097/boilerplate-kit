@@ -1,6 +1,6 @@
-import { config } from "@/config/environment";
 import { getRedis } from "@/config/redis";
 import { logger } from "@/utils/logger";
+import { accessTtlSeconds } from "@/utils/token-lifetimes";
 
 /**
  * User-level access-token revocation. Access tokens are short-lived and cannot be
@@ -13,19 +13,6 @@ import { logger } from "@/utils/logger";
  */
 
 const key = (userId: string): string => `revoked:user:${userId}`;
-
-/** Parse a jwt-style expiry ('15m', '900s', '1h', '7d', or seconds) to seconds. */
-export function accessTtlSeconds(): number {
-  const raw = config.jwtAccessExpiry?.trim();
-  if (!raw) return 900;
-  const num = Number(raw);
-  if (!Number.isNaN(num)) return num;
-  const match = /^(\d+)\s*([smhd])$/.exec(raw);
-  if (!match) return 900;
-  const value = parseInt(match[1], 10);
-  const unit = { s: 1, m: 60, h: 3600, d: 86400 }[match[2]] ?? 1;
-  return value * unit;
-}
 
 /** Mark all of a user's access tokens issued before now as revoked. */
 export async function revokeUserTokens(userId: string): Promise<void> {

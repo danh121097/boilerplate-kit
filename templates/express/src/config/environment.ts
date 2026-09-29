@@ -1,10 +1,19 @@
+import { parseDurationSeconds } from "@/config/duration";
 import { loadRsaKeyPair } from "@/config/keys";
+import { parseTrustProxy } from "@/config/trust-proxy";
 import { EnvironmentConfig } from "@/types";
 import dotenv from "dotenv";
 
 dotenv.config();
 
 const { privateKey: jwtAccessPrivateKey, publicKey: jwtAccessPublicKey } = loadRsaKeyPair();
+
+/** Read a duration env var, failing boot on anything but `<positive int><s|m|h|d>`. */
+function getDurationEnvVar(key: string, fallback: string): string {
+  const value = process.env[key] || fallback;
+  parseDurationSeconds(value, key);
+  return value;
+}
 
 /** Retrieve required env var or throw */
 function getRequiredEnvVar(key: string): string {
@@ -41,8 +50,8 @@ export const config: EnvironmentConfig = {
   mongodbUri: getRequiredEnvVar("MONGODB_URI"),
   hmacSecret: getRequiredEnvVar("HMAC_SECRET"),
   jwtRefreshSecret: getRequiredEnvVar("JWT_REFRESH_SECRET"),
-  jwtAccessExpiry: process.env.JWT_ACCESS_EXPIRY || "15m",
-  jwtRefreshExpiry: process.env.JWT_REFRESH_EXPIRY || "7d",
+  jwtAccessExpiry: getDurationEnvVar("JWT_ACCESS_EXPIRY", "15m"),
+  jwtRefreshExpiry: getDurationEnvVar("JWT_REFRESH_EXPIRY", "7d"),
   jwtAccessPrivateKey,
   jwtAccessPublicKey,
   corsOrigins,
@@ -50,6 +59,8 @@ export const config: EnvironmentConfig = {
   enableCsrf: process.env.ENABLE_CSRF === "true",
   // Unset = host-only cookie; set for split-domain deploys (e.g. ".example.com").
   cookieDomain: process.env.COOKIE_DOMAIN || undefined,
+  // Unset = trust no proxy; set behind a reverse proxy/LB so req.ip and rate limits use the client IP.
+  trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
   apiPrefix: process.env.API_PREFIX || "/api/v1",
   // Redis is optional: not read via getRequiredEnvVar so the app boots fine when off.
   redisEnabled: process.env.REDIS_ENABLED === "true",

@@ -38,11 +38,11 @@ export async function refresh(req: Request, res: Response): Promise<void> {
   if (!refreshToken) {
     // Drop any stale access cookie so cookie-forwarding clients stop sending it.
     clearTokenCookies(res);
-    res.status(401).json({
-      success: false,
+    throw new AppError({
       message: "Refresh token not found in request body or cookies!",
+      statusCode: 401,
+      errorType: "AUTHENTICATION_ERROR",
     });
-    return;
   }
 
   let tokens: Awaited<ReturnType<typeof AuthService.refresh>>;

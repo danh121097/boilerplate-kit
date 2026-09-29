@@ -1,7 +1,9 @@
 import { config } from "@/config/environment";
 import { getRedis } from "@/config/redis";
+import { AppError } from "@/types";
 import rateLimit, { type RateLimitRequestHandler, type Store } from "express-rate-limit";
 import { RedisStore } from "rate-limit-redis";
+import type { NextFunction, Request, Response } from "express";
 
 const isTest = config.isTest;
 
@@ -21,50 +23,44 @@ export function makeStore(prefix: string): Store | undefined {
   });
 }
 
+/** Forward a tripped limit to the global error handler so 429s use the standard envelope. */
+export function rateLimitHandler(message: string) {
+  return (_req: Request, _res: Response, next: NextFunction): void => {
+    next(new AppError({ message, statusCode: 429, errorType: "RATE_LIMIT" }));
+  };
+}
+
+function buildLimiter(
+  windowMs: number,
+  max: number,
+  prefix: string,
+  message: string,
+): RateLimitRequestHandler {
+  return rateLimit({
+    windowMs,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: () => isTest,
+    store: makeStore(prefix),
+    // Fail-open: a Redis outage must not 500 the endpoint.
+    passOnStoreError: true,
+    handler: rateLimitHandler(message),
+  });
+}
+
+const TOO_MANY_REQUESTS = "Too many requests, please try again later!";
+
 /** Default limit for all API routes: 100 requests per minute */
-export const globalRateLimiter: RateLimitRequestHandler = rateLimit({
-  windowMs: 60 * 1000,
-  max: 100,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => isTest,
-  store: makeStore("rl:global:"),
-  // Fail-open: a Redis outage must not 500 the endpoint.
-  passOnStoreError: true,
-  message: {
-    success: false,
-    message: "Too many requests, please try again later!",
-  },
-});
+export const globalRateLimiter = buildLimiter(60 * 1000, 100, "rl:global:", TOO_MANY_REQUESTS);
 
 /** General rate limit for auth endpoints: 30 requests per 15 minutes */
-export const authRateLimiter: RateLimitRequestHandler = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 30,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => isTest,
-  store: makeStore("rl:auth:"),
-  // Fail-open: a Redis outage must not 500 the endpoint.
-  passOnStoreError: true,
-  message: {
-    success: false,
-    message: "Too many requests, please try again later!",
-  },
-});
+export const authRateLimiter = buildLimiter(15 * 60 * 1000, 30, "rl:auth:", TOO_MANY_REQUESTS);
 
-/** Stricter limit for login: 30 requests per 15 minutes (brute force protection) */
-export const loginRateLimiter: RateLimitRequestHandler = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 30,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => isTest,
-  store: makeStore("rl:login:"),
-  // Fail-open: a Redis outage must not 500 the endpoint.
-  passOnStoreError: true,
-  message: {
-    success: false,
-    message: "Too many login attempts, please try again later!",
-  },
-});
+/** Login limit: 30 requests per 15 minutes in its own bucket (brute force protection) */
+export const loginRateLimiter = buildLimiter(
+  15 * 60 * 1000,
+  30,
+  "rl:login:",
+  "Too many login attempts, please try again later!",
+);

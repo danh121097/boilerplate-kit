@@ -1,0 +1,209 @@
+import { RefreshToken } from "@/models/refresh-token";
+import { User } from "@/models/user";
+import { REFRESH_REUSE_GRACE_MS, login, logout, refresh, register } from "@/modules/auth/service";
+import { AppError } from "@/types";
+import { hashToken } from "@/utils/jwt";
+import { disconnectUserSockets } from "@/utils/socket-emit";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import bcrypt from "bcrypt";
+import mongoose from "mongoose";
+
+vi.mock("@/utils/socket-emit", () => ({ disconnectUserSockets: vi.fn() }));
+
+const creds = { email: "grace@example.com", password: "Password1!", name: "Grace" };
+
+async function signUp() {
+  const { user, tokens } = await register(creds.email, creds.password, creds.name);
+  return { userId: String((user as { _id: unknown })._id), tokens };
+}
+
+const activeCount = (userId: string) =>
+  RefreshToken.countDocuments({ userId: new mongoose.Types.ObjectId(userId), isRevoked: false });
+
+const rotatedAgo = (rawToken: string, ms: number) =>
+  RefreshToken.updateOne({ token: hashToken(rawToken) }, { rotatedAt: new Date(Date.now() - ms) });
+
+beforeEach(() => vi.mocked(disconnectUserSockets).mockClear());
+afterEach(() => vi.useRealTimers());
+
+describe("refresh reuse grace window", () => {
+  it("serves a sequential retry inside the window and the first successor still refreshes", async () => {
+    const { userId, tokens } = await signUp();
+    const first = await refresh(tokens.refreshToken);
+    const retry = await refresh(tokens.refreshToken);
+
+    expect(retry.refreshToken).not.toBe(first.refreshToken);
+    await expect(refresh(first.refreshToken)).resolves.toBeDefined();
+    expect(disconnectUserSockets).not.toHaveBeenCalled();
+    expect(await activeCount(userId)).toBeGreaterThan(0);
+  });
+
+  it("lets parallel refreshes with one token all succeed without revoking the family", async () => {
+    const { userId, tokens } = await signUp();
+    const results = await Promise.allSettled(
+      Array.from({ length: 5 }, () => refresh(tokens.refreshToken)),
+    );
+
+    expect(results.every((r) => r.status === "fulfilled")).toBe(true);
+    expect(await activeCount(userId)).toBe(5);
+    expect(disconnectUserSockets).not.toHaveBeenCalled();
+  });
+
+  it("treats reuse after the window as theft: revokes all tokens and drops sockets", async () => {
+    const { userId, tokens } = await signUp();
+    const rotated = await refresh(tokens.refreshToken);
+    await rotatedAgo(tokens.refreshToken, REFRESH_REUSE_GRACE_MS + 1_000);
+
+    await expect(refresh(tokens.refreshToken)).rejects.toMatchObject({ statusCode: 401 });
+    expect(await activeCount(userId)).toBe(0);
+    expect(disconnectUserSockets).toHaveBeenCalledWith(userId);
+    await expect(refresh(rotated.refreshToken)).rejects.toBeInstanceOf(AppError);
+  });
+
+  it("honors the window with fake timers", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const { tokens } = await signUp();
+    await refresh(tokens.refreshToken);
+
+    vi.setSystemTime(Date.now() + REFRESH_REUSE_GRACE_MS - 1);
+    await expect(refresh(tokens.refreshToken)).resolves.toBeDefined();
+
+    vi.setSystemTime(Date.now() + REFRESH_REUSE_GRACE_MS + 1);
+    await expect(refresh(tokens.refreshToken)).rejects.toMatchObject({ statusCode: 401 });
+  });
+
+  it("does not resurrect a nuked family when a recently rotated token is replayed", async () => {
+    const { userId, tokens } = await signUp();
+    const second = await refresh(tokens.refreshToken);
+    const third = await refresh(second.refreshToken);
+    // Old token replayed after the window nukes the family...
+    await rotatedAgo(tokens.refreshToken, REFRESH_REUSE_GRACE_MS + 1_000);
+    await expect(refresh(tokens.refreshToken)).rejects.toMatchObject({ statusCode: 401 });
+
+    // ...and `second` was rotated moments ago, but its rotatedAt was cleared.
+    await expect(refresh(second.refreshToken)).rejects.toMatchObject({ statusCode: 401 });
+    await expect(refresh(third.refreshToken)).rejects.toMatchObject({ statusCode: 401 });
+    expect(await activeCount(userId)).toBe(0);
+    expect(await RefreshToken.countDocuments({ rotatedAt: { $exists: true } })).toBe(0);
+  });
+
+  it("does not grace a token revoked by logout", async () => {
+    const { userId, tokens } = await signUp();
+    await logout(tokens.refreshToken);
+    expect(disconnectUserSockets).toHaveBeenCalledWith(userId);
+    vi.mocked(disconnectUserSockets).mockClear();
+
+    await expect(refresh(tokens.refreshToken)).rejects.toMatchObject({ statusCode: 401 });
+    expect(disconnectUserSockets).toHaveBeenCalledWith(userId);
+  });
+
+  it("does not grace a rotated token that has since expired", async () => {
+    const { tokens } = await signUp();
+    await refresh(tokens.refreshToken);
+    await RefreshToken.updateOne(
+      { token: hashToken(tokens.refreshToken) },
+      { expiresAt: new Date(Date.now() - 1_000) },
+    );
+    await expect(refresh(tokens.refreshToken)).rejects.toMatchObject({ statusCode: 401 });
+  });
+
+  it("refuses a graced retry when the user was deactivated", async () => {
+    const { userId, tokens } = await signUp();
+    await refresh(tokens.refreshToken);
+    await User.findByIdAndUpdate(userId, { isActive: false });
+    await expect(refresh(tokens.refreshToken)).rejects.toMatchObject({ statusCode: 401 });
+  });
+});
+
+describe("logout ends the whole session chain", () => {
+  it("a graced predecessor cannot resurrect a session after logout", async () => {
+    const { tokens: a } = await signUp();
+    const b = await refresh(a.refreshToken);
+    await logout(b.refreshToken);
+
+    // A was rotated moments ago, but logout revoked its family and cleared rotatedAt.
+    await expect(refresh(a.refreshToken)).rejects.toMatchObject({ statusCode: 401 });
+    expect(await RefreshToken.countDocuments({ isRevoked: false })).toBe(0);
+  });
+
+  it("keeps the user's other device (family) logged in", async () => {
+    const { tokens: a } = await signUp();
+    const other = await login(creds.email, creds.password);
+    const b = await refresh(a.refreshToken);
+    await logout(b.refreshToken);
+
+    await expect(refresh(other.tokens.refreshToken)).resolves.toBeDefined();
+  });
+
+  it("inherits the familyId across rotations and graced re-issues", async () => {
+    const { tokens } = await signUp();
+    const first = await refresh(tokens.refreshToken);
+    const retry = await refresh(tokens.refreshToken);
+    const ids = await Promise.all(
+      [tokens.refreshToken, first.refreshToken, retry.refreshToken].map(
+        async (t) => (await RefreshToken.findOne({ token: hashToken(t) }))!.familyId,
+      ),
+    );
+    expect(ids[0]).toBeTruthy();
+    expect(new Set(ids).size).toBe(1);
+  });
+
+  it("legacy tokens without familyId: logout revokes only the presented token", async () => {
+    const { tokens } = await signUp();
+    await RefreshToken.collection.updateMany({}, { $unset: { familyId: 1 } });
+    const other = await login(creds.email, creds.password);
+    await logout(tokens.refreshToken);
+
+    const stored = await RefreshToken.findOne({ token: hashToken(tokens.refreshToken) });
+    expect(stored!.isRevoked).toBe(true);
+    await expect(refresh(other.tokens.refreshToken)).resolves.toBeDefined();
+  });
+});
+
+describe("logout without a known token", () => {
+  it("does not touch sockets for an unknown refresh token", async () => {
+    await logout("not-a-stored-token");
+    expect(disconnectUserSockets).not.toHaveBeenCalled();
+  });
+});
+
+describe("refresh token lifetime", () => {
+  it("sets expiresAt from JWT_REFRESH_EXPIRY", async () => {
+    const { config } = await import("@/config/environment");
+    const original = config.jwtRefreshExpiry;
+    config.jwtRefreshExpiry = "1h";
+    try {
+      const { tokens } = await signUp();
+      const stored = await RefreshToken.findOne({ token: hashToken(tokens.refreshToken) });
+      const ttlMs = stored!.expiresAt.getTime() - Date.now();
+      expect(ttlMs).toBeGreaterThan(3_500_000);
+      expect(ttlMs).toBeLessThanOrEqual(3_600_000);
+    } finally {
+      config.jwtRefreshExpiry = original;
+    }
+  });
+});
+
+describe("login timing equalization", () => {
+  it("runs a bcrypt compare for unknown and inactive users before the 401", async () => {
+    const compare = vi.spyOn(bcrypt, "compare");
+    try {
+      await expect(login("nobody@example.com", "Password1!")).rejects.toMatchObject({
+        statusCode: 401,
+        message: "Invalid email or password!",
+      });
+      expect(compare).toHaveBeenCalledTimes(1);
+
+      const { userId } = await signUp();
+      await User.findByIdAndUpdate(userId, { isActive: false });
+      compare.mockClear();
+      await expect(login(creds.email, creds.password)).rejects.toMatchObject({
+        statusCode: 401,
+        message: "Invalid email or password!",
+      });
+      expect(compare).toHaveBeenCalledTimes(1);
+    } finally {
+      compare.mockRestore();
+    }
+  });
+});

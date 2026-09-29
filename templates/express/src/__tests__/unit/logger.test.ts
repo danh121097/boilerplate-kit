@@ -21,6 +21,23 @@ describe("logger.serializeMeta", () => {
     expect(out.userId).toBe("u1"); // passthrough
   });
 
+  it("redacts connection strings (uri / url / dsn / connectionString) but not lookalike keys", () => {
+    const out = serializeMeta({
+      uri: "mongodb://u:p@h/db",
+      mongodbUri: "mongodb://u:p@h/db",
+      connectionString: "mongodb://u:p@h/db",
+      redisUrl: "redis://:pw@h",
+      sentryDsn: "https://k@o/1",
+      security: "high",
+    });
+    expect(out.redisUrl).toBe("[REDACTED]");
+    expect(out.sentryDsn).toBe("[REDACTED]");
+    expect(out.uri).toBe("[REDACTED]");
+    expect(out.mongodbUri).toBe("[REDACTED]");
+    expect(out.connectionString).toBe("[REDACTED]");
+    expect(out.security).toBe("high");
+  });
+
   it("serializes Error values (message + stack survive JSON)", () => {
     const out = serializeMeta({ err: new TypeError("boom") });
     const err = out.err as { name: string; message: string; stack?: string };

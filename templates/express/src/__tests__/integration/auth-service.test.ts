@@ -1,9 +1,27 @@
 import { RefreshToken } from "@/models/refresh-token";
 import { User } from "@/models/user";
-import { register, login, refresh, logout, getMe } from "@/modules/auth/service";
+import {
+  register,
+  login,
+  refresh,
+  logout,
+  getMe,
+  REFRESH_REUSE_GRACE_MS,
+} from "@/modules/auth/service";
 import { AppError } from "@/types";
 import { hashToken } from "@/utils/jwt";
 import { describe, it, expect } from "vitest";
+
+/** Pretend a token was rotated `ms` ago (default: just past the reuse grace window). */
+async function backdateRotation(
+  rawToken: string,
+  ms = REFRESH_REUSE_GRACE_MS + 1_000,
+): Promise<void> {
+  await RefreshToken.updateOne(
+    { token: hashToken(rawToken) },
+    { rotatedAt: new Date(Date.now() - ms) },
+  );
+}
 
 describe("AuthService", () => {
   const validUser = {
@@ -82,9 +100,10 @@ describe("AuthService", () => {
       expect(found).toBeNull();
     });
 
-    it("rejects reused (revoked) refresh token", async () => {
+    it("rejects reused (revoked) refresh token after the grace window", async () => {
       const { tokens } = await register(validUser.email, validUser.password, validUser.name);
       await refresh(tokens.refreshToken);
+      await backdateRotation(tokens.refreshToken);
       await expect(refresh(tokens.refreshToken)).rejects.toThrow(AppError);
     });
 
@@ -93,7 +112,8 @@ describe("AuthService", () => {
       // Legit rotation → `tokens.refreshToken` is now revoked, `rotated` is valid.
       const rotated = await refresh(tokens.refreshToken);
 
-      // Replaying the OLD (revoked) token signals theft → reuse detected.
+      // Replaying the OLD (revoked) token after the grace window signals theft.
+      await backdateRotation(tokens.refreshToken);
       await expect(refresh(tokens.refreshToken)).rejects.toThrow(AppError);
 
       // The still-"valid" rotated token is ALSO revoked now (whole family nuked),
@@ -104,25 +124,6 @@ describe("AuthService", () => {
         isRevoked: false,
       });
       expect(active).toBe(0);
-    });
-
-    it("concurrent refreshes with one token: exactly one wins, the rest are reuse", async () => {
-      const { user, tokens } = await register(validUser.email, validUser.password, validUser.name);
-      const results = await Promise.allSettled(
-        Array.from({ length: 5 }, () => refresh(tokens.refreshToken)),
-      );
-      const fulfilled = results.filter((r) => r.status === "fulfilled");
-      const rejected = results.filter((r) => r.status === "rejected");
-      expect(fulfilled).toHaveLength(1);
-      expect(rejected).toHaveLength(4);
-      for (const r of rejected) {
-        expect((r as PromiseRejectedResult).reason).toBeInstanceOf(AppError);
-        expect((r as PromiseRejectedResult).reason.statusCode).toBe(401);
-      }
-      // The claimed token is revoked exactly once and stays revoked.
-      const stored = await RefreshToken.findOne({ token: hashToken(tokens.refreshToken) });
-      expect(stored?.isRevoked).toBe(true);
-      expect(await RefreshToken.countDocuments({ userId: (user as any)._id })).toBe(2);
     });
 
     it("rejects a duplicate refresh-token hash (unique index)", async () => {

@@ -55,18 +55,6 @@ export function signRefreshToken(payload: JwtPayload): string {
   });
 }
 
-/** Verify refresh token with the symmetric secret; pin HS256 + issuer + token_use=refresh */
-export function verifyRefreshToken(token: string): JwtPayload {
-  const decoded = jwt.verify(token, config.jwtRefreshSecret, {
-    algorithms: ["HS256"],
-    issuer: TOKEN_ISSUER,
-  }) as JwtPayload & { token_use?: TokenUse };
-  if (decoded.token_use !== "refresh") {
-    throw new Error("Invalid token_use claim");
-  }
-  return decoded;
-}
-
 /** SHA-256 hash a token for secure DB storage */
 export function hashToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");

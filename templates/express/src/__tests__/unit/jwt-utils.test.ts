@@ -1,11 +1,5 @@
 import { config } from "@/config/environment";
-import {
-  signAccessToken,
-  verifyAccessToken,
-  signRefreshToken,
-  verifyRefreshToken,
-  hashToken,
-} from "@/utils/jwt";
+import { signAccessToken, verifyAccessToken, signRefreshToken, hashToken } from "@/utils/jwt";
 import { describe, it, expect } from "vitest";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
@@ -95,20 +89,11 @@ describe("JWT Utils", () => {
     });
   });
 
-  it("verifyRefreshToken rejects a token whose token_use is not refresh", () => {
-    // valid HS256 signature + issuer, but token_use=access → token_use guard fires
-    const token = jwt.sign({ ...payload, token_use: "access" }, config.jwtRefreshSecret, {
-      algorithm: "HS256",
-      issuer: Array.isArray(config.corsOrigins) ? config.corsOrigins[0] : config.corsOrigins,
-    });
-    expect(() => verifyRefreshToken(token)).toThrow(/token_use/i);
-  });
-
   it("signRefreshToken returns a verifiable JWT string", () => {
     const token = signRefreshToken(payload);
     expect(token.split(".")).toHaveLength(3);
-    const decoded = verifyRefreshToken(token);
-    expect(decoded.userId).toBe("123");
+    const decoded = jwt.verify(token, config.jwtRefreshSecret, { algorithms: ["HS256"] });
+    expect((decoded as jwt.JwtPayload).userId).toBe("123");
   });
 
   it("signRefreshToken produces a unique token on each call", () => {

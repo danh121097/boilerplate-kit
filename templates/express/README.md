@@ -51,6 +51,7 @@ All variables are documented in [`.env.example`](.env.example). Key ones:
 | `JWT_ACCESS_EXPIRY` / `JWT_REFRESH_EXPIRY` | Token lifetimes                         |
 | `HMAC_SECRET`           | Secret for HMAC request signing                            |
 | `REDIS_ENABLED` / `REDIS_URL` | Toggle + connection for Redis features               |
+| `TRUST_PROXY`           | Optional. Behind a reverse proxy/LB: a hop count (`1`, preferred over `true`), or a comma-separated IP/subnet list. Unset = trust nothing |
 | `POSTMAN_API_KEY` / `POSTMAN_COLLECTION_UID` | For `postman:generate` sync          |
 
 ## Routes

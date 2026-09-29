@@ -30,7 +30,8 @@ const threshold = (): number => {
   return IS_PRODUCTION ? WEIGHT.info : WEIGHT.debug;
 };
 
-const SENSITIVE = /pass(word)?|token|secret|cookie|authorization|credential/i;
+const SENSITIVE =
+  /pass(word)?|token|secret|cookie|authorization|credential|uri$|url$|dsn$|connection.?string/i;
 
 /** Redact sensitive keys and serialize Error values. Exported for tests. */
 export function serializeMeta(meta: LogMeta): LogMeta {

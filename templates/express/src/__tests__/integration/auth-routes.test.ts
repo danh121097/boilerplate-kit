@@ -1,4 +1,5 @@
 import { signHmac } from "@/__tests__/helpers/hmac-sign";
+import { RefreshToken } from "@/models/refresh-token";
 import { describe, it, expect } from "vitest";
 import app from "@/app";
 import request from "supertest";
@@ -29,6 +30,14 @@ describe("Auth Routes", () => {
     expect(refreshC).toMatch(/^refreshToken=;/);
     expect(refreshC).toMatch(/Expires=Thu, 01 Jan 1970/i);
     expect(refreshC).toMatch(/Path=\/api\/v1\/auth(;|$)/);
+  };
+
+  /** Move every rotation timestamp past the reuse grace window. */
+  const backdateAllRotations = async (): Promise<void> => {
+    await RefreshToken.updateMany(
+      { rotatedAt: { $exists: true } },
+      { rotatedAt: new Date(Date.now() - 60_000) },
+    );
   };
 
   /** Register a fresh user and return its Set-Cookie array */
@@ -117,7 +126,7 @@ describe("Auth Routes", () => {
     );
   });
 
-  it("POST /api/v1/auth/refresh — 401 when reusing a rotated cookie", async () => {
+  it("POST /api/v1/auth/refresh — 401 when reusing a rotated cookie after the grace window", async () => {
     const regCookies = await registerUser();
     const url = "/api/v1/auth/refresh";
     // First refresh rotates (revokes) the original token
@@ -125,6 +134,7 @@ describe("Auth Routes", () => {
       .post(url)
       .set(signHmac("POST", url))
       .set("Cookie", toCookieHeader(regCookies));
+    await backdateAllRotations();
     // Reusing the now-revoked original cookie must be rejected
     const res = await request(app)
       .post(url)
@@ -133,7 +143,7 @@ describe("Auth Routes", () => {
     expect(res.status).toBe(401);
   });
 
-  it("POST /api/v1/auth/refresh — parallel refreshes with one token yield exactly one 200", async () => {
+  it("POST /api/v1/auth/refresh — parallel refreshes with one token all succeed within the grace window", async () => {
     const regCookies = await registerUser();
     const url = "/api/v1/auth/refresh";
     const responses = await Promise.all(
@@ -141,15 +151,19 @@ describe("Auth Routes", () => {
         request(app).post(url).set(signHmac("POST", url)).set("Cookie", toCookieHeader(regCookies)),
       ),
     );
-    const statuses = responses.map((r) => r.status);
-    expect(statuses.filter((s) => s === 200)).toHaveLength(1);
-    expect(statuses.filter((s) => s === 401)).toHaveLength(4);
+    expect(responses.map((r) => r.status)).toEqual([200, 200, 200, 200, 200]);
   });
 
   it("POST /api/v1/auth/refresh — 401 without cookie", async () => {
     const url = "/api/v1/auth/refresh";
     const res = await request(app).post(url).set(signHmac("POST", url));
     expect(res.status).toBe(401);
+    expect(res.body).toMatchObject({
+      success: false,
+      errorType: "AUTHENTICATION_ERROR",
+      error_code: 401,
+      error_message: "Refresh token not found in request body or cookies!",
+    });
     expectTokenCookiesCleared(res.headers["set-cookie"] as unknown as string[]);
   });
 
@@ -172,6 +186,7 @@ describe("Auth Routes", () => {
       .post(url)
       .set(signHmac("POST", url))
       .set("Cookie", toCookieHeader(regCookies));
+    await backdateAllRotations();
     const res = await request(app)
       .post(url)
       .set(signHmac("POST", url))
@@ -224,6 +239,51 @@ describe("Auth Routes", () => {
       .set(signHmac("POST", logoutUrl, body))
       .send(body); // body only, NO cookie
     expect(res.status).toBe(200);
+  });
+
+  it.each(["refresh", "logout"])(
+    "POST /api/v1/auth/%s — 400 VALIDATION_ERROR when body refreshToken is not a string",
+    async (action) => {
+      const url = `/api/v1/auth/${action}`;
+      for (const refreshToken of [123, { a: 1 }, null, ["x"]]) {
+        const body = { refreshToken };
+        const res = await request(app)
+          .post(url)
+          .set(signHmac("POST", url, body))
+          .send(body);
+        expect(res.status).toBe(400);
+        expect(res.body).toMatchObject({
+          errorType: "VALIDATION_ERROR",
+          error_code: 400,
+          message: expect.stringContaining("refreshToken"),
+        });
+      }
+    },
+  );
+
+  it("POST /api/v1/auth/refresh — empty body refreshToken falls back to the cookie", async () => {
+    const regCookies = await registerUser();
+    const url = "/api/v1/auth/refresh";
+    const body = { refreshToken: "" };
+    const res = await request(app)
+      .post(url)
+      .set(signHmac("POST", url, body))
+      .set("Cookie", toCookieHeader(regCookies))
+      .send(body);
+    expect(res.status).toBe(200);
+  });
+
+  it("POST /api/v1/auth/logout — empty body refreshToken falls back to the cookie and revokes it", async () => {
+    const regCookies = await registerUser();
+    const url = "/api/v1/auth/logout";
+    const body = { refreshToken: "" };
+    const res = await request(app)
+      .post(url)
+      .set(signHmac("POST", url, body))
+      .set("Cookie", toCookieHeader(regCookies))
+      .send(body);
+    expect(res.status).toBe(200);
+    expect(await RefreshToken.countDocuments({ isRevoked: false })).toBe(0);
   });
 
   it("GET /api/v1/auth/me — 200 with cookie auth", async () => {

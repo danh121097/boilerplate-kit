@@ -15,6 +15,9 @@ import morgan from "morgan";
 
 const app: Express = express();
 
+// Only trust X-Forwarded-* when TRUST_PROXY is set (reverse proxy / load balancer).
+if (config.trustProxy !== undefined) app.set("trust proxy", config.trustProxy);
+
 // Security headers
 app.use(helmet());
 

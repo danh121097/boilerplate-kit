@@ -14,7 +14,11 @@ const refreshTokenSchema = new Schema<RefreshTokenDocument>(
       index: true,
     },
     expiresAt: { type: Date, required: true, index: { expires: 0 } },
+    // One per login/register session chain; inherited by rotations. Logout revokes the whole family.
+    familyId: { type: String, index: true },
     isRevoked: { type: Boolean, default: false },
+    // Set when the token is consumed by a rotation (not by logout); drives the reuse grace window.
+    rotatedAt: { type: Date },
   },
   { timestamps: true },
 );

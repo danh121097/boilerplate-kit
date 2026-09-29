@@ -1,4 +1,9 @@
-import { loginSchema, registerSchema, validate } from "@/modules/auth/validation";
+import {
+  loginSchema,
+  refreshBodySchema,
+  registerSchema,
+  validate,
+} from "@/modules/auth/validation";
 import { authenticate } from "@/middleware/auth";
 import { authRateLimiter, loginRateLimiter } from "@/middleware/rate-limit";
 import type { RouteGroup } from "@/types/routing";
@@ -24,13 +29,13 @@ const authGroup: RouteGroup = {
     {
       method: "post",
       path: "/refresh",
-      middleware: [authRateLimiter],
+      middleware: [authRateLimiter, validate(refreshBodySchema)],
       handler: AuthController.refresh,
     },
     {
       method: "post",
       path: "/logout",
-      middleware: [authRateLimiter],
+      middleware: [authRateLimiter, validate(refreshBodySchema)],
       handler: AuthController.logout,
     },
     {

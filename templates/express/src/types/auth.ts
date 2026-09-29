@@ -28,7 +28,11 @@ export interface RefreshTokenDocument extends Document {
   token: string;
   userId: Types.ObjectId;
   expiresAt: Date;
+  /** Session chain id; unset on tokens issued before families existed. */
+  familyId?: string;
   isRevoked: boolean;
+  /** When rotation consumed this token; unset for logout/nuke revocations. */
+  rotatedAt?: Date;
 }
 
 /** JWT access token payload */

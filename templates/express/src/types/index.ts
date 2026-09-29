@@ -47,6 +47,8 @@ export interface EnvironmentConfig {
   enableCsrf: boolean;
   /** Cookie `Domain` attribute; unset = host-only (same-origin proxy deploy). */
   cookieDomain?: string;
+  /** Express `trust proxy` setting from TRUST_PROXY; undefined = trust nothing. */
+  trustProxy?: boolean | number | string;
   apiPrefix: string;
   redisEnabled: boolean;
   redisUrl: string;
