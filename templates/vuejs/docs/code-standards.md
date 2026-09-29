@@ -16,6 +16,7 @@ Read the relevant nested doc before writing the matching kind of file.
 | [Commit Convention](./code-standards/commit-convention.md) | Conventional Commits with optional emoji, header rules, examples |
 | [Vue + TypeScript](./code-standards/vue-typescript.md) | `<script setup>` section order, `interface Props`/`Emits`, explicit store imports, strict TS |
 | [Lint & Format](./code-standards/lint-format.md) | ESLint (perfectionist + vue), Prettier, scripts, generated `*.d.ts` files |
+| [Testing](./code-standards/testing.md) | Vitest teardown: `afterEach` by default, `beforeEach` + `onTestFinished` when cleanups need stubbed globals |
 
 ## Core Principles
 
