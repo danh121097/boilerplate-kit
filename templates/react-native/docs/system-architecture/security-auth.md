@@ -192,21 +192,28 @@ Every session the server rejects ends as `"expired"`:
 - the session query (`getMe`) itself gets a 401 — at boot, or on the profile
   screen's retry mid-session: `loadUser()` calls `AuthModel.revokeSession()`.
 
-`revokeSession()` runs the logout steps above (early token capture, lock,
-epoch bump, best-effort `POST /auth/logout`, clear) but ends with
-`endSession("expired", service)` and resolves `true`. `revokeSession(sinceEpoch?)`
-takes the epoch the caller read before its request (`loadUser` passes the one
-it read before `getMe`). It posts nothing and resolves `false` when the session
-already ended — the epoch moved since `sinceEpoch`, a logout is pending, or no
-token is stored — and the store then only resets its state.
-Concurrent callers share one in-flight revoke (one POST, one event); a
-`logout()` called during it awaits that revoke instead of posting again, and
-overlapping `loadUser()` calls of the same session share one `getMe`. When the
-revoke ended the session, `loadUser()` sets `sessionExpired: true` itself, so a
-boot 401 (not yet authenticated) also gets a `returnTo`.
+`revokeSession(sinceEpoch?)` runs the logout steps above (early token capture,
+lock, epoch bump, best-effort `POST /auth/logout`, clear) but ends with
+`endSession("expired", service)` and resolves `true`. `sinceEpoch` is the epoch
+the caller read before its request (`loadUser` passes the one it read before
+`getMe`). The revoke **backs out** — resolves `false`, posts nothing, ends
+nothing — when the session already ended:
+- the epoch moved since `sinceEpoch` (checked before joining an in-flight
+  revoke), or a logout is already running;
+- re-checked once the lock is held, since a refresh the revoke waited for may
+  have been refused and ended the session meanwhile: the epoch moved (since
+  `sinceEpoch`, else since the call started) or no token is stored.
 
-`endSession` notifies `onSessionEnded` listeners. The root layout subscribes `watchSessionEnd()` (in `stores/auth.ts`),
-which reacts only to the auth service: it resets every cached query to signed
+The store then only resets its state. Concurrent callers share one in-flight
+revoke (one POST, one event). A `logout()` called during it awaits that revoke
+and posts nothing; if the revoke backed out, logout then signs out normally (one
+POST, ended as `"logout"`). Logout itself never backs out. Overlapping
+`loadUser()` calls of the same session share one `getMe`. When the revoke ended
+the session, `loadUser()` sets `sessionExpired: true` itself, so a boot 401 (not
+yet authenticated) also gets a `returnTo`.
+
+`endSession` notifies `onSessionEnded` listeners. The root layout subscribes
+`watchSessionEnd()` (in `stores/auth.ts`), which reacts only to the auth service: it resets every cached query to signed
 out (`resetQueriesOnSessionEnd`) and, when the session expired while
 authenticated, calls `useAuthStore.expireSession()` (`isAuthenticated: false`,
 `sessionExpired: true`) once. It does not navigate itself: the `(app)` gate
