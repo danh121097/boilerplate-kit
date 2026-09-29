@@ -34,6 +34,10 @@ export default {
     password_min: "Password must be at least 8 characters",
   },
   input: { toggle_password: "Toggle password visibility" },
+  socket: {
+    connected: "Realtime connected",
+    reconnecting: "Realtime reconnecting",
+  },
   counter: { title: "Pinia counter", count: "Count" },
   users: {
     title: "TanStack Query users",

@@ -99,15 +99,15 @@ Setup-style stores. Imported explicitly — never auto-imported.
   `/login` on another tab's logout (this tab's logout navigates itself). The store has no `logout` or `clearSession` action: `App.vue` runs `useLogoutMutation`, whose `onSettled` only routes to `/login` (`AuthModel.logout()` and the session-end listener already cleared everything).
 - `counter.ts` — `useCounterStore`: demo `count` + `increment/decrement/reset`.
 - `socket-io.ts` — `useSocketIOStore`: holds the live `Socket | null` and an
-  `authenticated` flag; `setSocketIO(partial)` merges state.
+  `authenticated` flag (true only after the server's `authenticated` event); `setSocketIO(partial)` merges state.
 
 ## Socket.IO Composable (`src/composables/useSocketIO.ts`)
 
 `useSocketIO()` builds a websocket connection scoped to the component tree. Auth
 payload defaults to `{ token: 'Bearer <access token>', role: 'user' }` plus
 optional HMAC `{ sig, ctime }` when `VITE_HMAC_SECRET` is set. Connects on
-mount, throttled reconnect on auth errors, and cleans up listeners +
-disconnects on scope dispose. Also exports `useIo()` (get/lazy-init the live
+mount, retries a server-rejected handshake with backoff (`RECONNECT_BASE_MS` 2 s doubling to `RECONNECT_MAX_MS` 30 s), and cleans up listeners, the pending retry and the
+connection on scope dispose. `components/socket-status.vue` mounts it in the header while signed in. Also exports `useIo()` (get/lazy-init the live
 socket) and `useSocketEvent(event, cb)` (subscribe with auto cleanup). Event
 names come from `SOCKET_EVENT` in `src/enums/socket-events.ts`.
 

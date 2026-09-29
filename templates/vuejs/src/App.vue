@@ -2,6 +2,7 @@
 import { setLocale } from "@/plugins/i18n";
 import { useLogoutMutation } from "@/services/auth";
 import { useAuthStore } from "@/stores/auth";
+import SocketStatus from "@/components/socket-status.vue";
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -63,15 +64,17 @@ const { mutate: doLogout, isPending: logoutPending } = useLogoutMutation({
         >
           {{ t("nav.login") }}
         </RouterLink>
-        <Button
-          v-else
-          variant="unstyled"
-          class="ml-auto text-muted-foreground hover:text-primary"
-          :disabled="logoutPending"
-          @click="doLogout()"
-        >
-          {{ t("nav.logout") }}
-        </Button>
+        <div v-else class="ml-auto flex items-center gap-3">
+          <SocketStatus />
+          <Button
+            variant="unstyled"
+            class="text-muted-foreground hover:text-primary"
+            :disabled="logoutPending"
+            @click="doLogout()"
+          >
+            {{ t("nav.logout") }}
+          </Button>
+        </div>
         <Button
           variant="unstyled"
           class="rounded-md border border-border px-2 py-0.5 text-xs hover:bg-accent"

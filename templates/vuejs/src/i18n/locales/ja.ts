@@ -34,6 +34,10 @@ export default {
     password_min: "パスワードは8文字以上で入力してください",
   },
   input: { toggle_password: "パスワードの表示を切り替える" },
+  socket: {
+    connected: "リアルタイム接続済み",
+    reconnecting: "リアルタイム再接続中",
+  },
   counter: { title: "Pinia カウンター", count: "カウント" },
   users: {
     title: "ユーザー (TanStack Query)",

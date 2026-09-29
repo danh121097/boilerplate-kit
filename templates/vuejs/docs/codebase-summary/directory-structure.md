@@ -8,6 +8,7 @@ src/
 ├── main.ts                      App entry: initServices() → registerPlugins() → mount
 ├── App.vue                      Root layout: nav + <RouterView> + locale toggle
 ├── components/
+│   ├── socket-status.vue        Header realtime dot; mounts useSocketIO while signed in
 │   └── ui/                      Auto-registered UI primitives (only this dir)
 │       ├── Button.vue           CVA-styled button
 │       ├── Input.vue            Base input (floating label, mask, clearable)
@@ -17,7 +18,7 @@ src/
 │       ├── badge.variants.ts    CVA variant map for Badge
 │       └── input.props.ts       Shared BaseInputProps for Input + VeeInput
 ├── composables/
-│   └── useSocketIO.ts           Socket.IO connection + useIo()/useSocketEvent()
+│   └── useSocketIO.ts           Socket.IO connection, backoff retry, useIo()/useSocketEvent()
 ├── directives/
 │   ├── index.ts                 Barrel: re-exports vTrack
 │   └── v-track.ts               Demo v-track click-tracking directive

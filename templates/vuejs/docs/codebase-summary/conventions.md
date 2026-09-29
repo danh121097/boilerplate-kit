@@ -37,7 +37,7 @@ Constant maps with `as const` plus a derived union type, referenced instead of
 string literals so names stay consistent across the codebase.
 
 - `socket-events.ts` — `SOCKET_EVENT` (e.g. `AUTHENTICATED`, `UNAUTHORIZED`,
-  `CONNECT_ERROR`) + `SOCKET_UNAUTHORIZED_MESSAGE` + `SocketEvent` type.
+  `CONNECT_ERROR`, `DISCONNECT`) + `SocketEvent` type.
 - `storage-keys.ts` — `STORAGE_KEYS` (`AUTH_TOKEN`, `LANGUAGE`, `THEME`) prefixed
   by `VITE_APP_NAME`, so one rename ripples cleanly:
 
