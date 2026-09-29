@@ -69,7 +69,7 @@ src/
 ├── components/
 │   ├── ui/                       # auto-imported primitives (Button, Card, Dialog, …)
 │   └── not-found.tsx             # root notFoundComponent
-├── hooks/                        # auto-imported (useSocketIO, useAppVersion)
+├── hooks/                        # auto-imported (useSocketIO)
 ├── enums/                        # STORAGE_KEYS (prefixed by VITE_APP_NAME) + socket events
 ├── i18n/
 │   └── locales/                  # en.ts, ja.ts

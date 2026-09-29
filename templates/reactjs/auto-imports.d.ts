@@ -42,7 +42,6 @@ declare global {
   const startTransition: typeof import('react').startTransition
   const use: typeof import('react').use
   const useActionState: typeof import('react').useActionState
-  const useAppVersion: typeof import('./src/hooks/useAppVersion').useAppVersion
   const useCallback: typeof import('react').useCallback
   const useContext: typeof import('react').useContext
   const useDebugValue: typeof import('react').useDebugValue

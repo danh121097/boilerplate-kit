@@ -56,7 +56,7 @@ templates/tanstack-start/
     ├── lib/
     │   └── utils.ts           # cn()
     ├── hooks/
-    │   └── useAppVersion.ts
+    │   └── useSocketIO.ts
     ├── styles/
     │   ├── tailwind.css       # @import + @theme tokens + .dark
     │   └── main.css           # baseline resets

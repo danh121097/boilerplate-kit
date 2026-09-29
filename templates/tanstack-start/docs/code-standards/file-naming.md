@@ -6,7 +6,7 @@
 |------|-----------|---------|
 | TypeScript modules | kebab-case | `auth-token-storage.ts` |
 | React components | kebab-case file, PascalCase export | `form-field.tsx` → `export function FormField` |
-| React hooks | camelCase (`useXxx.ts`) | `useAppVersion.ts` |
+| React hooks | camelCase (`useXxx.ts`) | `useSocketIO.ts` |
 | Test files | `kebab-case.test.ts` | `hmac-signature.test.ts` |
 | Route files | kebab-case under `src/routes/` | `counter.tsx`, `__root.tsx` |
 | Store files | `kebab-case.ts` | `counter.ts` |

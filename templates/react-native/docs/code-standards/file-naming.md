@@ -7,7 +7,7 @@
 | TypeScript modules | kebab-case | `auth-token-storage.ts` |
 | React Native screens | kebab-case file, PascalCase export | `profile-screen.tsx` → `export function ProfileScreen` |
 | UI primitives | kebab-case file, PascalCase export | `form-field.tsx` → `export const FormField` |
-| React hooks | camelCase (`useXxx.ts`) | `useAppVersion.ts` |
+| React hooks | camelCase (`useXxx.ts`) | `useSocketIO.ts` |
 | Test files | `kebab-case.test.ts` | `hmac-signature.test.ts` |
 | Expo Router files | kebab-case under `app/` | `home.tsx`, `_layout.tsx`, `login.tsx` |
 | Route groups | parentheses around group name | `(auth)`, `(app)` |
