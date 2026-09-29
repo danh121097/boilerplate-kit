@@ -262,10 +262,17 @@ Implementation: `router/auth-guard.ts` (`authGuard`, a global `beforeEach`) read
 - Logout is `useLogoutMutation` in `App.vue` (the button is disabled while it is
   pending). `AuthModel.logout()` posts `{ refreshToken }` to `/auth/logout` (so
   the backend revokes it), clears tokens and ends the session as `"logout"`,
-  even if the request fails. `onSettled` (not `onSuccess`, so a failed call
-  still signs out) runs the store's local-only `clearSession()` (user, tokens,
-  every query's data) and navigates to `/login` without a `redirect`. The store
-  has no `logout` action.
+  even if the request fails; the store's `onSessionEnded` listener then resets
+  the profile, `hydrateError` and every query's data. `onSettled` (not
+  `onSuccess`, so a failed call still signs out) only navigates to `/login`
+  without a `redirect`; nothing clears a second time, so tokens another tab just
+  wrote are never wiped. The store has no `logout` or `clearSession` action.
+- A profile read that returns after the session ended (for example a Retry that
+  was in flight when the user logged out) is dropped: `hydrate()` captures the
+  session epoch first and applies the result only if the epoch is unchanged and
+  a session is still stored. The banner's Retry button is disabled while a retry
+  runs (`retrying`); concurrent `retryHydrate()` calls share one run, while a
+  login in another tab always starts its own profile read.
 
 - The login view follows `?redirect=` after signing in, and the router guard
   (`router/auth-guard.ts`) does the same when a signed-in user opens `/login`.

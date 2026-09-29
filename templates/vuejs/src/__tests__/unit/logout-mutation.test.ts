@@ -1,8 +1,13 @@
 import { installLocalStorage } from "@/__tests__/helpers/fake-storage";
 import { AuthModel } from "@/services/auth/auth";
-import { getAccessToken, persistAccessToken, persistRefreshToken } from "@/services/core";
+import {
+  getAccessToken,
+  onSessionEnded,
+  persistAccessToken,
+  persistRefreshToken,
+} from "@/services/core";
 import { VueQueryPlugin } from "@tanstack/vue-query";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import * as pinia from "pinia";
 import * as vue from "vue";
 
@@ -26,7 +31,6 @@ function mountLogout() {
     scope.run(() =>
       useLogoutMutation({
         onSettled: async () => {
-          store.clearSession();
           await push({ name: "login" });
         },
       }),
@@ -55,9 +59,13 @@ describe("logout mutation", () => {
 
   afterEach(() => vi.restoreAllMocks());
 
-  it("is pending while the request runs, then signs out and routes to /login", async () => {
+  it("is pending while the request runs, then signs out once and routes to /login", async () => {
     let finish!: () => void;
-    vi.spyOn(AuthModel, "logout").mockReturnValue(new Promise<void>((r) => (finish = r)));
+    vi.spyOn(AuthModel.api, "post").mockReturnValue(
+      new Promise((r) => (finish = () => r({ success: true } as never))),
+    );
+    const ended = vi.fn();
+    onTestFinished(onSessionEnded(ended));
     const { mutation, push, store, stop } = mountLogout();
     store.setUser({ _id: "u1", email: "a@b.com", name: "A", role: "user" } as never);
 
@@ -69,11 +77,16 @@ describe("logout mutation", () => {
     await vi.waitFor(() => expect(push).toHaveBeenCalledExactlyOnceWith({ name: "login" }));
     expect(mutation.isPending.value).toBe(false);
     expect(store.user).toBeNull();
+    expect(store.isAuthenticated).toBe(false);
+    expect(getAccessToken("MAIN")).toBeNull();
+    expect(ended).toHaveBeenCalledExactlyOnceWith("logout", "MAIN");
     stop();
   });
 
-  it("still signs out locally and routes to /login when the request fails", async () => {
+  it("still signs out and routes to /login when the request fails", async () => {
     vi.spyOn(AuthModel.api, "post").mockRejectedValue({ error_code: 0, message: "Network Error" });
+    const ended = vi.fn();
+    onTestFinished(onSessionEnded(ended));
     const { mutation, push, store, stop } = mountLogout();
     store.setUser({ _id: "u1", email: "a@b.com", name: "A", role: "user" } as never);
 
@@ -83,6 +96,7 @@ describe("logout mutation", () => {
     expect(store.user).toBeNull();
     expect(store.isAuthenticated).toBe(false);
     expect(getAccessToken("MAIN")).toBeNull();
+    expect(ended).toHaveBeenCalledExactlyOnceWith("logout", "MAIN");
     stop();
   });
 });

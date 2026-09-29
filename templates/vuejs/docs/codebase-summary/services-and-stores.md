@@ -94,11 +94,9 @@ Setup-style stores. Imported explicitly — never auto-imported.
 
 - `auth.ts` — `useAuthStore`: `user`, `isAuthenticated` (profile or a token, via
   a `hasToken` ref synced by `onTokensChanged` and by other tabs' `storage` events), `hydrate()` (on a 401 calls
-  `AuthModel.revokeSession()`; keeps the session on network errors), `hydrateError` / `retryHydrate()`, and a local-only `clearSession()` (user + tokens +
-  `resetQueriesToSignedOut` from `services/core/query-client.ts`, which resets
-  queries in place so mounted views stay attached). `plugins/session-expiry.ts` routes to
+  `AuthModel.revokeSession()`; keeps the session on network errors), `hydrateError` / `retrying` / `retryHydrate()`. On session end the store's listener resets the profile and, via `resetQueriesToSignedOut` (`services/core/query-client.ts`), the queries in place so mounted views stay attached. `plugins/session-expiry.ts` routes to
   `/login?redirect=…` on session expiry and leaves a protected page for plain
-  `/login` on another tab's logout (this tab's logout navigates itself). The store has no `logout` action: `App.vue` runs `useLogoutMutation`, whose `onSettled` calls `clearSession()` and routes to `/login`.
+  `/login` on another tab's logout (this tab's logout navigates itself). The store has no `logout` or `clearSession` action: `App.vue` runs `useLogoutMutation`, whose `onSettled` only routes to `/login` (`AuthModel.logout()` and the session-end listener already cleared everything).
 - `counter.ts` — `useCounterStore`: demo `count` + `increment/decrement/reset`.
 - `socket-io.ts` — `useSocketIOStore`: holds the live `Socket | null` and an
   `authenticated` flag; `setSocketIO(partial)` merges state.

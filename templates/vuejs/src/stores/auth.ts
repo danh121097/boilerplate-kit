@@ -2,7 +2,6 @@ import { queryClient } from "@/plugins/vue-query";
 import { AuthModel } from "@/services/auth/auth";
 import { authContract } from "@/services/auth/contract";
 import {
-  clearAuthTokens,
   getAccessToken,
   getSessionEpoch,
   hasStoredSession,
@@ -37,12 +36,16 @@ function asApiError(error: unknown): ApiResponseError {
 }
 
 export const useAuthStore = defineStore("auth", () => {
+  let retryInFlight: Promise<void> | null = null;
+
   const user = ref<AuthUser | null>(null);
   const hydrated = ref(false);
   const hasToken = ref(Boolean(getAccessToken(authContract.service)));
   /** Set when boot hydration failed transiently (offline, timeout, 5xx): the
    * session is kept and `retryHydrate()` can try again. */
   const hydrateError = ref<ApiResponseError | null>(null);
+  /** True while a `retryHydrate()` is in flight (the banner's Retry disables). */
+  const retrying = ref(false);
 
   const isAuthenticated = computed(() => Boolean(user.value) || hasToken.value);
 
@@ -50,19 +53,10 @@ export const useAuthStore = defineStore("auth", () => {
     user.value = next;
   }
 
-  /** Local sign-out, run after `useLogoutMutation` settles (success or failure):
-   * drop the session client-side: profile, tokens and every cached query's
-   * data (so the next user never sees the previous user's data). Mounted views
-   * keep their observers, so the next login's refetch reaches them. */
-  function clearSession() {
-    user.value = null;
-    clearAuthTokens();
-    resetQueriesToSignedOut(queryClient, queryKeys.auth.me);
-  }
-
   /** Drop the profile and cached data only — the stored tokens are not touched. */
   function resetSignedOut() {
     user.value = null;
+    hydrateError.value = null;
     resetQueriesToSignedOut(queryClient, queryKeys.auth.me);
   }
 
@@ -76,30 +70,49 @@ export const useAuthStore = defineStore("auth", () => {
    */
   async function hydrate() {
     if (hydrated.value) return;
-    hydrateError.value = null;
+    // hydrateError is cleared on completion, not here, so the banner (and its
+    // disabled Retry button) stays up while a retry runs.
     const service = authContract.service;
     if (hasStoredSession(service)) {
       const sinceEpoch = getSessionEpoch(service);
       try {
-        user.value = await AuthModel.getMe();
+        const me = await AuthModel.getMe();
+        // The session ended while the read was in flight (logout, another tab):
+        // the session-end path already reset state, so a late success is dropped.
+        if (getSessionEpoch(service) === sinceEpoch && hasStoredSession(service)) {
+          user.value = me;
+          hydrateError.value = null;
+        }
       } catch (error) {
-        if (isUnauthorizedError(error)) {
+        if (getSessionEpoch(service) !== sinceEpoch) {
+          // The session changed while the read ran (logout, or a login elsewhere
+          // with its own read): that path owns the state, so the failure is dropped.
+        } else if (isUnauthorizedError(error)) {
           await AuthModel.revokeSession(sinceEpoch);
           resetSignedOut();
-        } else if (getSessionEpoch(service) !== sinceEpoch || !hasStoredSession(service)) {
+        } else if (!hasStoredSession(service)) {
           resetSignedOut();
         } else {
           hydrateError.value = { ...asApiError(error), retryable: true };
         }
       }
+    } else {
+      hydrateError.value = null;
     }
     hydrated.value = true;
   }
 
-  /** Re-run hydration after a transient failure. */
+  /** Re-run hydration after a transient failure (the banner's Retry). Clicks
+   * share one in-flight run; a login elsewhere starts its own read instead. */
   function retryHydrate() {
+    if (retryInFlight) return retryInFlight;
     hydrated.value = false;
-    return hydrate();
+    retrying.value = true;
+    retryInFlight = hydrate().finally(() => {
+      retrying.value = false;
+      retryInFlight = null;
+    });
+    return retryInFlight;
   }
 
   function syncHasToken() {
@@ -129,7 +142,10 @@ export const useAuthStore = defineStore("auth", () => {
       user.value = null;
       hydrateError.value = null;
       resyncQueriesAfterLogin(queryClient, queryKeys.auth.me);
-      void retryHydrate();
+      // A fresh read, not retryHydrate(): a Retry still in flight belongs to the
+      // ended session and its result is dropped.
+      hydrated.value = false;
+      void hydrate();
     },
   });
 
@@ -137,9 +153,9 @@ export const useAuthStore = defineStore("auth", () => {
     user,
     hydrated,
     hydrateError,
+    retrying,
     isAuthenticated,
     setUser,
-    clearSession,
     hydrate,
     retryHydrate,
   };

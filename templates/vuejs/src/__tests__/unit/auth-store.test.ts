@@ -1,6 +1,7 @@
 import { installLocalStorage } from "@/__tests__/helpers/fake-storage";
 import { AuthModel } from "@/services/auth/auth";
 import {
+  clearAuthTokens,
   clearServiceTokens,
   endSession,
   getAccessToken,
@@ -91,24 +92,55 @@ describe("auth store", () => {
     expect(store.user).toBeNull();
   });
 
+  it("a late hydrate success after logout does not resurrect the user", async () => {
+    let resolveMe!: (user: never) => void;
+    vi.spyOn(AuthModel, "getMe").mockReturnValue(new Promise((r) => (resolveMe = r)));
+    vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
+    const store = useAuthStore();
+
+    const pending = store.hydrate();
+    await AuthModel.logout();
+    resolveMe({ _id: "u1", email: "a@b.com", name: "A", role: "user" } as never);
+    await pending;
+
+    expect(store.user).toBeNull();
+    expect(store.isAuthenticated).toBe(false);
+  });
+
+  it("retryHydrate shares one in-flight run and flags retrying", async () => {
+    const store = useAuthStore();
+
+    let resolveMe!: (user: never) => void;
+    const getMe = vi.spyOn(AuthModel, "getMe").mockReturnValue(new Promise((r) => (resolveMe = r)));
+
+    const first = store.retryHydrate();
+    const second = store.retryHydrate();
+    expect(store.retrying).toBe(true);
+
+    resolveMe({ _id: "u1", email: "a@b.com", name: "A", role: "user" } as never);
+    await Promise.all([first, second]);
+
+    expect(getMe).toHaveBeenCalledTimes(1);
+    expect(store.retrying).toBe(false);
+  });
+
   it("isAuthenticated reacts to token writes and clears (localStorage is not reactive)", () => {
     const store = useAuthStore();
     expect(store.isAuthenticated).toBe(true);
 
-    store.clearSession();
+    clearAuthTokens();
     expect(store.isAuthenticated).toBe(false);
 
     persistAccessToken("AT2", "MAIN");
     expect(store.isAuthenticated).toBe(true);
   });
 
-  it("logout + clearSession sends the refresh token in the body and clears tokens + query cache", async () => {
+  it("logout sends the refresh token in the body and clears tokens + query cache", async () => {
     const post = vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
     queryClient.setQueryData(["users.list"], ["someone"]);
     const store = useAuthStore();
 
     await AuthModel.logout();
-    store.clearSession();
 
     expect(post).toHaveBeenCalledWith(
       expect.objectContaining({ url: "/auth/logout", data: { refreshToken: "RT" } }),
@@ -128,7 +160,6 @@ describe("auth store", () => {
     store.setUser({ _id: "u1", email: "a@b.com", name: "A", role: "user" } as never);
 
     await AuthModel.logout().catch(() => {});
-    store.clearSession();
 
     expect(ended).toHaveBeenCalledExactlyOnceWith("logout", "MAIN");
     expect(store.user).toBeNull();

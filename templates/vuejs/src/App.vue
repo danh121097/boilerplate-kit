@@ -7,7 +7,7 @@ const router = useRouter();
 const authStore = useAuthStore();
 const { locale, t } = useI18n();
 
-const { isAuthenticated, hydrateError } = storeToRefs(authStore);
+const { isAuthenticated, hydrateError, retrying } = storeToRefs(authStore);
 // The import itself is gated on the production constant: a production build has no
 // badge code at all, not even an inert branch.
 const MockAuthBadge = import.meta.env.PROD
@@ -21,10 +21,11 @@ function toggleLocale() {
   setLocale(next);
 }
 
-// Settled, not success: the client signs out locally even when the server call fails.
+// Settled, not success: navigate even when the server call fails. `AuthModel.logout()`
+// already cleared the tokens and ended the session, and the store's session-end
+// listener reset the profile and queries, so nothing is cleared again here.
 const { mutate: doLogout, isPending: logoutPending } = useLogoutMutation({
   onSettled: async () => {
-    authStore.clearSession();
     await router.push({ name: "login" });
   },
 });
@@ -87,7 +88,12 @@ const { mutate: doLogout, isPending: logoutPending } = useLogoutMutation({
         class="mb-4 flex items-center gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm"
       >
         {{ t("session.unavailable") }}
-        <Button variant="unstyled" class="ml-auto underline" @click="authStore.retryHydrate()">
+        <Button
+          variant="unstyled"
+          class="ml-auto underline"
+          :disabled="retrying"
+          @click="authStore.retryHydrate()"
+        >
           {{ t("session.retry") }}
         </Button>
       </p>

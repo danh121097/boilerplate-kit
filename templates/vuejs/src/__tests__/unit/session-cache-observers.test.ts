@@ -1,7 +1,7 @@
 import { installLocalStorage } from "@/__tests__/helpers/fake-storage";
 import { STORAGE_KEYS } from "@/enums";
 import { AuthModel } from "@/services/auth/auth";
-import { persistAccessToken, persistRefreshToken } from "@/services/core";
+import { endSession, persistAccessToken, persistRefreshToken } from "@/services/core";
 import { QueryObserver } from "@tanstack/vue-query";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import * as pinia from "pinia";
@@ -97,8 +97,8 @@ describe("mounted observers across session end and login", () => {
   });
 
   it("logout then login in the same tab refetches the mounted view", async () => {
-    vi.spyOn(AuthModel, "logout").mockResolvedValue();
-    const store = useAuthStore();
+    vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
+    useAuthStore(); // registers the session-end listener
     let rows: unknown = [{ _id: "u1-row" }];
     const fetchUsers = vi.fn(async () => rows);
     const view = mountUsersView(fetchUsers);
@@ -106,7 +106,6 @@ describe("mounted observers across session end and login", () => {
     await flush();
 
     await AuthModel.logout();
-    store.clearSession();
     expect(view.list.getCurrentResult().data).toBeUndefined();
 
     rows = [{ _id: "u2-row" }]; // login succeeds → the mutation invalidates the list
@@ -119,7 +118,8 @@ describe("mounted observers across session end and login", () => {
   it("session end removes unobserved queries and pins auth.me to null", () => {
     queryClient.setQueryData(["users.detail", "1"], { _id: "1" });
 
-    useAuthStore().clearSession();
+    useAuthStore();
+    endSession("logout", "MAIN");
 
     expect(queryClient.getQueryCache().find({ queryKey: ["users.detail", "1"] })).toBeUndefined();
     expect(queryClient.getQueryData(["auth.me"])).toBeNull();

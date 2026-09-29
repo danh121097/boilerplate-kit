@@ -2,7 +2,13 @@ import { installLocalStorage } from "@/__tests__/helpers/fake-storage";
 import { loadAuthStore } from "@/__tests__/helpers/session-harness";
 import { STORAGE_KEYS } from "@/enums";
 import { AuthModel } from "@/services/auth/auth";
-import { onSessionEnded, persistAccessToken, persistRefreshToken } from "@/services/core";
+import {
+  clearAuthTokens,
+  endSession,
+  onSessionEnded,
+  persistAccessToken,
+  persistRefreshToken,
+} from "@/services/core";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import * as pinia from "pinia";
 
@@ -75,6 +81,73 @@ describe("auth store across tabs", () => {
     }
   });
 
+  it("a remote login during a pending Retry loads the new profile", async () => {
+    const target = new EventTarget();
+    Object.assign(globalThis, { window: target });
+    try {
+      const store = useAuthStore();
+      const oldMe = { _id: "u1", email: "a@b.com", name: "A", role: "user" };
+      const newMe = { _id: "u4", email: "d@b.com", name: "D", role: "user" };
+      let releaseOld: (value: unknown) => void = () => {};
+      const getMe = vi
+        .spyOn(AuthModel, "getMe")
+        .mockImplementationOnce(() => new Promise((resolve) => (releaseOld = resolve)) as never)
+        .mockResolvedValueOnce(newMe as never);
+
+      const retry = store.retryHydrate();
+
+      // Another tab signs out, then signs in, while this tab's Retry still runs.
+      localStorage.clear();
+      target.dispatchEvent(new Event("storage"));
+      localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, "AT5");
+      target.dispatchEvent(new Event("storage"));
+
+      releaseOld(oldMe);
+      await retry;
+
+      await vi.waitFor(() => expect(store.user).toEqual(newMe));
+      expect(getMe).toHaveBeenCalledTimes(2);
+    } finally {
+      delete (globalThis as { window?: unknown }).window;
+    }
+  });
+
+  it.each([
+    ["a network error", { error_code: 0, error_message: "Network Error" }],
+    ["a 401", { error_code: 401, error_message: "Unauthorized" }],
+  ])(
+    "a pending Retry that fails with %s after a remote login keeps the new profile",
+    async (_label, failure) => {
+      const target = new EventTarget();
+      Object.assign(globalThis, { window: target });
+      try {
+        const store = useAuthStore();
+        const newMe = { _id: "u5", email: "e@b.com", name: "E", role: "user" };
+        let rejectOld: (error: unknown) => void = () => {};
+        vi.spyOn(AuthModel, "getMe")
+          .mockImplementationOnce(() => new Promise((_, reject) => (rejectOld = reject)) as never)
+          .mockResolvedValueOnce(newMe as never);
+
+        const retry = store.retryHydrate();
+
+        localStorage.clear();
+        target.dispatchEvent(new Event("storage"));
+        localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, "AT6");
+        target.dispatchEvent(new Event("storage"));
+        await vi.waitFor(() => expect(store.user).toEqual(newMe));
+
+        // The old read fails only after the new profile loaded.
+        rejectOld(failure);
+        await retry;
+
+        expect(store.user).toEqual(newMe);
+        expect(store.hydrateError).toBeNull();
+      } finally {
+        delete (globalThis as { window?: unknown }).window;
+      }
+    },
+  );
+
   it("remote logout after a same-tab login is applied", () => {
     localStorage.clear(); // signed out when the store starts
     const target = new EventTarget();
@@ -107,7 +180,8 @@ describe("auth store across tabs", () => {
     try {
       const store = useAuthStore();
       // This tab signs out.
-      store.clearSession();
+      clearAuthTokens();
+      endSession("logout", "MAIN");
       expect(store.isAuthenticated).toBe(false);
       const me = { _id: "u3", email: "c@b.com", name: "C", role: "user" };
       const getMe = vi.spyOn(AuthModel, "getMe").mockResolvedValue(me as never);
