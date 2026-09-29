@@ -7,7 +7,7 @@ import { Injectable } from "@nestjs/common";
  * User-level access-token revocation — ported from express utils/token-revocation.ts.
  *
  * Records a "revoked at" epoch-seconds timestamp per user in Redis. Any access token
- * whose `iat` predates that timestamp is rejected by JwtAuthGuard (Phase 3).
+ * whose `iat` predates that timestamp is rejected by SecurityGuard.
  * The key auto-expires after one access-token lifetime (accessTtlSeconds), by which
  * point all older tokens have expired anyway.
  *
@@ -30,20 +30,9 @@ export class TokenRevocationService {
     private readonly logger: AppLogger,
   ) {}
 
-  /**
-   * Parse a jwt-style expiry string ('15m', '900s', '1h', '7d', or plain seconds)
-   * to seconds. Mirrors express accessTtlSeconds exactly.
-   */
+  /** Access-token lifetime in seconds, from JWT_ACCESS_EXPIRY. */
   accessTtlSeconds(): number {
-    const raw = this.config.jwtAccessExpiry?.trim();
-    if (!raw) return 900;
-    const num = Number(raw);
-    if (!Number.isNaN(num)) return num;
-    const match = /^(\d+)\s*([smhd])$/.exec(raw);
-    if (!match) return 900;
-    const value = parseInt(match[1], 10);
-    const unit: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400 };
-    return value * (unit[match[2]] ?? 1);
+    return this.config.jwtAccessTtlSeconds;
   }
 
   /** Mark all of a user's access tokens issued before now as revoked. */

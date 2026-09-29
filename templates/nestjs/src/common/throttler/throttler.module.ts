@@ -22,7 +22,7 @@ import {
  * Registered as APP_GUARD so it applies globally to all routes. Throttle limits
  * are configured per-throttler-name on the ThrottlerModule (see below).
  *
- * Controller-level layering (used in Phase 4):
+ * Controller-level layering (used on the auth routes):
  *   Auth routes need BOTH the global 100/min cap AND the per-route auth/login cap.
  *   @Throttle({ default: { limit: 100, ttl: 60000 }, login: { limit: 30, ttl: 900000 } })
  *   Listing the 'default' tier explicitly keeps both counters running — omitting it
@@ -96,7 +96,7 @@ export function skipUnlessOptedIn(name: string): (context: ExecutionContext) => 
 
 /**
  * ThrottlerConfigModule — configures @nestjs/throttler v6 with:
- *   - Redis-backed storage reusing the Phase-2 ioredis client (no new connection).
+ *   - Redis-backed storage reusing the shared ioredis client (no new connection).
  *   - Named throttlers matching express rate-limit.ts exactly:
  *       default  → 100 req / 60 s   (global API cap)
  *       auth     → 30 req / 900 s   (auth endpoints; opt-in via @Throttle)

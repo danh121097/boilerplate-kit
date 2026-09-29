@@ -10,7 +10,7 @@ import { Controller, Get, HttpCode, Param, Query } from "@nestjs/common";
  *   GET /users       → { status:"success", data: UserDocument[], meta: OffsetMeta }
  *   GET /users/:id   → { status:"success", data: UserDocument }
  *
- * @Roles("admin") sets the minimum role; RolesGuard inside SecurityGuard enforces it.
+ * @Roles("admin") sets the minimum role; SecurityGuard enforces it.
  * No @Public() — JWT is required on both routes.
  */
 @Controller("users")

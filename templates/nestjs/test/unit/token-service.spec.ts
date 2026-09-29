@@ -69,21 +69,7 @@ describe("TokenService", () => {
 
   // ── Refresh tokens ─────────────────────────────────────────────────────────
 
-  describe("signRefreshToken / verifyRefreshToken", () => {
-    it("round-trips a valid refresh token", () => {
-      const token = tokenService.signRefreshToken(SAMPLE_PAYLOAD);
-      expect(token).toBeTypeOf("string");
-
-      const decoded = tokenService.verifyRefreshToken(token);
-      expect(decoded.userId).toBe(SAMPLE_PAYLOAD.userId);
-      expect(decoded.role).toBe(SAMPLE_PAYLOAD.role);
-    });
-
-    it("throws when an access token is passed to verifyRefreshToken (token_use mismatch)", () => {
-      const accessToken = tokenService.signAccessToken(SAMPLE_PAYLOAD);
-      expect(() => tokenService.verifyRefreshToken(accessToken)).toThrow();
-    });
-
+  describe("signRefreshToken", () => {
     it("two refresh tokens for same payload differ (jti randomness)", () => {
       const t1 = tokenService.signRefreshToken(SAMPLE_PAYLOAD);
       const t2 = tokenService.signRefreshToken(SAMPLE_PAYLOAD);

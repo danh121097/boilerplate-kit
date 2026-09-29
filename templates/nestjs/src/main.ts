@@ -1,16 +1,12 @@
+import { configureApp } from "@/app-setup";
 import { AppModule } from "@/app.module";
 import { buildHmacBootstrapJs, hmacRequestInterceptor } from "@/common/swagger/hmac-interceptor";
 import { AppConfigService } from "@/config/app-config.service";
-import { RedisIoAdapter } from "@/modules/realtime/redis-io.adapter";
-import { RedisService } from "@/redis/redis.service";
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { cleanupOpenApiDoc } from "nestjs-zod";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import type { Express } from "express";
-import compression from "compression";
-import cookieParser from "cookie-parser";
-import helmet from "helmet";
 
 /**
  * Mount Swagger UI at /docs (OpenAPI JSON at /docs-json). `cleanupOpenApiDoc`
@@ -65,33 +61,12 @@ async function bootstrap(): Promise<void> {
 
   const config = app.get(AppConfigService);
 
-  // Security + perf middleware (runs before routing).
-  app.use(helmet());
-  app.use(compression());
-  app.use(cookieParser());
-
-  app.setGlobalPrefix(config.apiPrefix);
-  app.enableCors({ origin: config.corsOrigins, credentials: true });
+  configureApp(app);
   app.enableShutdownHooks();
 
   // Global ZodValidationPipe + HttpExceptionFilter are registered as APP_PIPE/
   // APP_FILTER in CommonModule; the global SecurityGuard + throttler in their modules.
   setupSwagger(app, config);
-
-  // --- WebSocket adapter (must be before app.listen()) ----------------------
-  // When Redis is enabled, use RedisIoAdapter for multi-instance pub/sub
-  // fan-out. The shared Redis client (owned by RedisModule) is passed as the
-  // pub connection; the adapter creates its own sub duplicate internally.
-  // When Redis is disabled, the default IoAdapter handles single-instance WS.
-  // CRITICAL: useWebSocketAdapter must be called before listen() — calling it
-  // after listen() silently no-ops and the adapter is never applied.
-  // --------------------------------------------------------------------------
-  if (config.redisEnabled) {
-    const redisClient = app.get(RedisService).getClient();
-    if (redisClient) {
-      app.useWebSocketAdapter(new RedisIoAdapter(app, redisClient));
-    }
-  }
 
   await app.listen(config.port);
 }

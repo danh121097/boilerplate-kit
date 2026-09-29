@@ -5,7 +5,8 @@ The real `src/` tree, one-line purpose per file. All tests live under `test/`
 
 ```text
 src/
-├── main.ts                    # Bootstrap: Nest app, helmet/compression/cookie-parser, global prefix, CORS, Swagger /docs, Redis WS adapter, listen
+├── app-setup.ts               # configureApp: trust proxy, helmet/compression/cookie-parser, prefix, CORS, socket adapter (shared with e2e)
+├── main.ts                    # Bootstrap: Nest app, configureApp, Swagger /docs, listen
 ├── app.module.ts             # Root module: imports every feature module; registers SecurityGuard + throttler guard as APP_GUARD
 │
 ├── config/
@@ -21,7 +22,7 @@ src/
 ├── common/                    # @Global CommonModule — shared providers, guards, pipes, filters
 │   ├── common.module.ts       # Registers HttpExceptionFilter (APP_FILTER) + ZodValidationPipe (APP_PIPE) + LoggerMiddleware; exports services
 │   ├── services/
-│   │   ├── token.service.ts            # sign/verify access (RS256, RSA keypair) + refresh (HS256, symmetric secret), hashToken
+│   │   ├── token.service.ts            # sign/verify access (RS256, RSA keypair), sign refresh (HS256, symmetric secret), hashToken
 │   │   ├── token-revocation.service.ts # per-user revoked-at in Redis (no-op + fail-open when off)
 │   │   ├── hmac.service.ts             # canonical string-to-sign, computeSignature, verifyHmac, constants (MAX age, SOCKET path)
 │   │   └── cache.service.ts            # cache-aside get/set/del helpers (no-op when Redis off)
@@ -63,7 +64,8 @@ src/
 │   ├── auth/
 │   │   ├── auth.module.ts      # forFeature([User, RefreshToken]); AuthController + AuthService
 │   │   ├── auth.controller.ts  # @Controller('auth'): register/login/refresh/logout/me; throttler + @Public
-│   │   ├── auth.service.ts     # register/login/refresh-rotate+reuse-detect/logout/getMe; throws AppException
+│   │   ├── auth.service.ts     # register/login/getMe; delegates refresh/logout; throws AppException
+│   │   ├── refresh-session.service.ts # issue/rotate refresh tokens: atomic claim, reuse grace window, reuse detection, logout
 │   │   ├── password.service.ts # validatePasswordStrength (length + complexity)
 │   │   ├── cookie.util.ts      # set/clear httpOnly access + refresh token cookies
 │   │   └── dto/
@@ -80,8 +82,8 @@ src/
 │   └── realtime/
 │       ├── realtime.module.ts  # EventsGateway + SocketEmitService
 │       ├── events.gateway.ts   # @WebSocketGateway: handleConnection HMAC→JWT, per-user room, AUTHENTICATED
-│       ├── redis-io.adapter.ts # RedisIoAdapter: pub/sub fan-out + CORS/heartbeat/payload cap
-│       ├── socket-emit.service.ts # emitToUser / emitBroadcast service-facing helpers
+│       ├── socket-io.adapter.ts # SocketIoAdapter: CORS/heartbeat/payload cap (always) + Redis pub/sub fan-out (when enabled)
+│       ├── socket-emit.service.ts # emitToUser / emitBroadcast / disconnectUser service-facing helpers
 │       └── events.ts           # SOCKET_EVENT registry + SOCKET_UNAUTHORIZED
 │
 └── redis/

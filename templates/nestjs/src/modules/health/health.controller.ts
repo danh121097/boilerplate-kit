@@ -7,8 +7,8 @@ import { Connection } from "mongoose";
 /**
  * Health controller — ported from express routes/health-check.ts.
  *
- * @Public: no JWT required. HMAC is still applied by SecurityGuard (HmacGuard
- * runs before JwtAuthGuard inside the composite guard; @Public only skips JWT).
+ * @Public: no JWT required. HMAC is still applied by SecurityGuard (its HMAC
+ * step runs before the JWT step; @Public only skips JWT).
  * This matches express behavior where health is under the HMAC-protected apiPrefix.
  *
  * Response shape mirrors express exactly:

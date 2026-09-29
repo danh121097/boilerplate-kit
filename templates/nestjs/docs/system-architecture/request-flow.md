@@ -10,7 +10,7 @@ Source: [`src/main.ts`](../../src/main.ts),
 NestJS runs a fixed sequence around every handler. For this template:
 
 ```text
-1. Express middleware (main.ts):  helmet → compression → cookieParser
+1. Express middleware (configureApp): [trust proxy] → helmet → compression → cookieParser
 2. Global prefix + CORS:          setGlobalPrefix(apiPrefix), enableCors(credentials)
 3. Guards (APP_GUARD):            SecurityGuard  +  AppThrottlerGuard
 4. Pipes (APP_PIPE):              ZodValidationPipe   (validates @Body DTOs)

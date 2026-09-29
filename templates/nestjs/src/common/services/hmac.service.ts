@@ -40,7 +40,7 @@ export class HmacService {
 
   /**
    * Compute the HMAC-SHA256 Base64 signature for the given parts.
-   * Used by HmacGuard (Phase 3) and the socket adapter (Phase 5) to verify requests.
+   * Used by SecurityGuard and the socket gateway to verify requests.
    */
   computeSignature(p: Omit<HmacParts, "sig">): string {
     const stringToSign = buildStringToSign(p);

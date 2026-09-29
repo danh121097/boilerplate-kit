@@ -14,8 +14,8 @@ import type { CookieOptions, Response } from "express";
 
 /**
  * Set access + refresh token cookies on the response.
- * Access cookie: 15 min, path=/ (available to all routes for silent refresh).
- * Refresh cookie: 7 days, path=/{apiPrefix}/auth (scoped to auth routes only).
+ * Access cookie: JWT_ACCESS_EXPIRY, path=/ (available to all routes for silent refresh).
+ * Refresh cookie: JWT_REFRESH_EXPIRY, path=/{apiPrefix}/auth (scoped to auth routes only).
  */
 export function setTokenCookies(
   res: Response,
@@ -28,12 +28,12 @@ export function setTokenCookies(
 
   res.cookie("accessToken", accessToken, {
     ...base,
-    maxAge: 15 * 60 * 1000, // 15 minutes
+    maxAge: config.jwtAccessTtlSeconds * 1000,
   });
 
   res.cookie("refreshToken", refreshToken, {
     ...base,
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    maxAge: config.jwtRefreshTtlSeconds * 1000,
     path: refreshPath,
   });
 }

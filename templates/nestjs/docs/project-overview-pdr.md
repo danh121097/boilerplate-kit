@@ -62,7 +62,7 @@ and `src/common/guards/security.guard.ts`.
 `REDIS_ENABLED=false` runs the app fully without Redis. Turning it on activates
 features that each fail open / no-op when off: distributed throttler storage, the
 `cache` helper (`src/common/services/cache.service.ts`), access-token revocation, and the
-cross-instance Socket.IO adapter (`RedisIoAdapter`).
+cross-instance Socket.IO fan-out (`SocketIoAdapter` wires the Redis adapter; without Redis it still applies the shared socket options).
 
 ## Scripts (`package.json`)
 
@@ -83,7 +83,7 @@ pnpm keys           # node scripts/ensure-keys.mjs  (generate/rotate RSA keypair
 ## Environment (`.env.example`)
 
 `APP_NAME`, `NODE_ENV`, `PORT`, `MONGODB_URI`, `API_PREFIX`, `ENABLE_CSRF`,
-`COOKIE_DOMAIN`, `JWT_PRIVATE_KEY_PATH`, `JWT_PUBLIC_KEY_PATH`,
+`COOKIE_DOMAIN`, `TRUST_PROXY` (optional), `JWT_PRIVATE_KEY_PATH`, `JWT_PUBLIC_KEY_PATH`,
 `JWT_REFRESH_SECRET`, `JWT_ACCESS_EXPIRY`, `JWT_REFRESH_EXPIRY`, `HMAC_SECRET`,
 `REDIS_ENABLED`, `REDIS_URL`, `LOG_LEVEL`.
 

@@ -1,4 +1,4 @@
-import { derivePath } from "@/common/guards/security.guard";
+import { derivePath } from "@/common/guards/derive-path";
 import { HmacService } from "@/common/services/hmac.service";
 import { Test } from "@nestjs/testing";
 import { describe, expect, it } from "vitest";

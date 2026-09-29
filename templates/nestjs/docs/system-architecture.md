@@ -27,13 +27,15 @@ focused page under [`system-architecture/`](./system-architecture/).
    — builds the DI container, instantiates every module/provider. The env Zod
    schema validates required vars and `AppConfigService` loads + self-tests the
    RSA keypair during this phase; a bad config or key pair fails the boot.
-2. Apply Express-level middleware: `helmet()`, `compression()`, `cookieParser()`.
-3. `setGlobalPrefix(apiPrefix)`, `enableCors({ origin, credentials: true })`,
-   `enableShutdownHooks()`.
+2. `configureApp(app)` (`src/app-setup.ts`, also used by the e2e test app):
+   `trust proxy` when `TRUST_PROXY` is set, `helmet()`, `compression()`,
+   `cookieParser()`, `setGlobalPrefix(apiPrefix)`,
+   `enableCors({ origin, credentials: true })`, and `SocketIoAdapter` (Redis
+   pub/sub only when `REDIS_ENABLED`; must run before `listen()`, or it silently
+   no-ops).
+3. `enableShutdownHooks()`.
 4. Mount Swagger at `/docs` (JSON at `/docs-json`).
-5. **If `REDIS_ENABLED`** — install `RedisIoAdapter` (must run before
-   `listen()`, or it silently no-ops).
-6. `app.listen(port)`.
+5. `app.listen(port)`.
 
 The global `SecurityGuard` + throttler guard (`APP_GUARD`), `ZodValidationPipe`
 (`APP_PIPE`), and `HttpExceptionFilter` (`APP_FILTER`) are registered inside the
@@ -49,7 +51,7 @@ close Mongo, Redis, and the WS server gracefully.
 | [hmac-verification.md](./system-architecture/hmac-verification.md) | The canonical signing string, `derivePath`, freshness + timing-safe compare, the client invariant |
 | [error-handling.md](./system-architecture/error-handling.md) | `AppException`, the `HttpExceptionFilter` envelope, 404 handling, validation errors |
 | [database-mongoose.md](./system-architecture/database-mongoose.md) | Mongoose schemas, `toJSON` transform, indexes, connection config |
-| [realtime-socket.md](./system-architecture/realtime-socket.md) | `@WebSocketGateway` setup, handshake gates, events, emit helpers, `RedisIoAdapter` |
+| [realtime-socket.md](./system-architecture/realtime-socket.md) | `@WebSocketGateway` setup, handshake gates, events, emit helpers, `SocketIoAdapter` |
 | [security-rate-limit.md](./system-architecture/security-rate-limit.md) | helmet, CORS-with-credentials, RBAC, named throttlers, Redis-backed store |
 
 ## Cross-Cutting Invariants

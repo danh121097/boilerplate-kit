@@ -23,7 +23,7 @@ import type { Request, Response } from "express";
  *
  * Cookie dual-mode (refresh/logout):
  *   Body field takes precedence; falls back to httpOnly cookie.
- *   Mirrors express: `req.body?.refreshToken || req.cookies?.refreshToken`.
+ *   An empty body field falls through to the cookie, like express.
  *
  * Envelope shapes (match express exactly):
  *   register  → 201 { success:true, message, data:{ user, tokens } }
@@ -89,7 +89,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<{ success: boolean; message: string; data?: { tokens: unknown } }> {
     const rawToken: string | undefined =
-      dto.refreshToken ?? (req.cookies as Record<string, string> | undefined)?.["refreshToken"];
+      dto.refreshToken || (req.cookies as Record<string, string> | undefined)?.["refreshToken"];
 
     if (!rawToken) {
       // Drop any stale access cookie so cookie-forwarding clients stop sending it.
@@ -135,7 +135,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<{ success: boolean; message: string }> {
     const rawToken: string | undefined =
-      dto.refreshToken ?? (req.cookies as Record<string, string> | undefined)?.["refreshToken"];
+      dto.refreshToken || (req.cookies as Record<string, string> | undefined)?.["refreshToken"];
 
     if (rawToken) {
       await this.authService.logout(rawToken);

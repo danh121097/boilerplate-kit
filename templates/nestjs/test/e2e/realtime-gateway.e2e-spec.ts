@@ -5,6 +5,8 @@
  *   - Authenticated + HMAC-signed handshake → connects and receives "authenticated" event.
  *   - Unsigned handshake → server disconnects the socket.
  *   - HMAC signed but no Bearer token → server disconnects the socket.
+ *   - Polling handshake from an allowed Origin carries CORS headers (Redis off).
+ *   - Logout and a reuse-detected family revoke disconnect the user's sockets.
  *
  * The socket test boots its own app instance and calls app.listen() so the
  * HTTP server is actually bound to a port (required for Socket.IO to work).
@@ -21,6 +23,8 @@ import supertest from "supertest";
 import { INestApplication } from "@nestjs/common";
 import { buildHmacHeaders, signSocketHandshake } from "../helpers/sign-request";
 import { createTestApp } from "../helpers/create-test-app";
+import { backdateRotation } from "../helpers/refresh-token-db";
+import { REFRESH_REUSE_GRACE_MS } from "@/modules/auth/refresh-session.service";
 
 const SKIP = process.env.SKIP_SOCKET_TESTS === "true";
 
@@ -48,8 +52,8 @@ afterAll(async () => {
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
-/** Register a user via HTTP and return a valid access token. */
-async function getAccessToken(): Promise<string> {
+/** Register a user via HTTP and return a valid access + refresh token. */
+async function getTokens(): Promise<{ accessToken: string; refreshToken: string }> {
   const req = supertest(app.getHttpServer());
   const email = `socket-${Date.now()}@example.com`;
   const password = "Socket1!@#";
@@ -71,7 +75,39 @@ async function getAccessToken(): Promise<string> {
     .set("Content-Type", "application/json")
     .send(body);
 
-  return res.body.data.tokens.accessToken as string;
+  return res.body.data.tokens as { accessToken: string; refreshToken: string };
+}
+
+async function getAccessToken(): Promise<string> {
+  return (await getTokens()).accessToken;
+}
+
+function signedPost(path: string, body: unknown) {
+  const h = buildHmacHeaders("POST", path, body);
+  return supertest(app.getHttpServer())
+    .post(`/api/v1${path}`)
+    .set("sig", h.sig)
+    .set("ctime", h.ctime)
+    .set("Content-Type", "application/json")
+    .send(body as object);
+}
+
+/** Resolve once the socket has been authenticated, then when it disconnects. */
+async function connectAuthenticated(accessToken: string): Promise<Socket> {
+  const { sig, ctime } = signSocketHandshake();
+  const { socket, event } = await connectAndWait({ sig, ctime, token: accessToken });
+  expect(event).toBe("authenticated");
+  return socket;
+}
+
+function waitForDisconnect(socket: Socket): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("socket was not disconnected")), 4_000);
+    socket.on("disconnect", (reason: string) => {
+      clearTimeout(timer);
+      resolve(reason);
+    });
+  });
 }
 
 /**
@@ -151,6 +187,49 @@ describe("Socket.IO gateway handshake", () => {
       openSockets.push(socket);
 
       expect(["disconnect", "connect_error"]).toContain(event);
+    },
+    10_000,
+  );
+
+  it.skipIf(SKIP)(
+    "polling handshake from an allowed origin returns CORS headers",
+    async () => {
+      const res = await fetch(`http://localhost:${port}/socket.io/?EIO=4&transport=polling`, {
+        headers: { Origin: "http://localhost:5173" },
+      });
+      expect(res.headers.get("access-control-allow-origin")).toBe("http://localhost:5173");
+      expect(res.headers.get("access-control-allow-credentials")).toBe("true");
+    },
+    10_000,
+  );
+
+  it.skipIf(SKIP)(
+    "logout disconnects the user's sockets",
+    async () => {
+      const { accessToken, refreshToken } = await getTokens();
+      const socket = await connectAuthenticated(accessToken);
+      openSockets.push(socket);
+
+      const disconnected = waitForDisconnect(socket);
+      expect((await signedPost("/auth/logout", { refreshToken })).status).toBe(200);
+      await expect(disconnected).resolves.toBe("io server disconnect");
+    },
+    10_000,
+  );
+
+  it.skipIf(SKIP)(
+    "a reuse-detected family revoke disconnects the user's sockets",
+    async () => {
+      const { accessToken, refreshToken } = await getTokens();
+      const socket = await connectAuthenticated(accessToken);
+      openSockets.push(socket);
+
+      expect((await signedPost("/auth/refresh", { refreshToken })).status).toBe(200);
+      await backdateRotation(app, refreshToken, REFRESH_REUSE_GRACE_MS + 1_000);
+
+      const disconnected = waitForDisconnect(socket);
+      expect((await signedPost("/auth/refresh", { refreshToken })).status).toBe(401);
+      await expect(disconnected).resolves.toBe("io server disconnect");
     },
     10_000,
   );

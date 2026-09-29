@@ -7,7 +7,7 @@ Back to [Code Standards](../code-standards.md). Filenames are covered in
 
 - `camelCase` for variables and functions: `accessToken`, `hashedToken`,
   `requiredRank`, `rawRefreshToken`.
-- Functions / methods read as verbs: `signAccessToken`, `verifyRefreshToken`,
+- Functions / methods read as verbs: `signAccessToken`, `verifyAccessToken`,
   `hashToken`, `revokeUserTokens`, `validatePasswordStrength`.
 - Controller handlers are named for the action: `register`, `login`, `refresh`,
   `logout`, `getMe`, `listUsers`, `getUserById`.

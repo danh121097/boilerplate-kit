@@ -85,19 +85,11 @@ describe("TokenRevocationService — Redis disabled (no-op)", () => {
 // ── TokenRevocationService.accessTtlSeconds ────────────────────────────────
 
 describe("TokenRevocationService.accessTtlSeconds", () => {
-  function make(expiry: string) {
-    const redis = makeNullRedisService();
-    const logger = makeLoggerStub();
-    const config = makeConfigStub(expiry);
-    return new TokenRevocationService(redis, config, logger);
-  }
-
   it.each([
     ["15m", 15 * 60],
     ["900s", 900],
     ["1h", 3600],
     ["7d", 7 * 86400],
-    ["900", 900],
   ])("expiry %s → %i seconds", (raw, expected) => {
     // We can't easily override the getter on the real service, so test the
     // parsing by patching the config accessor indirectly via env. Instead,
@@ -114,15 +106,18 @@ describe("TokenRevocationService.accessTtlSeconds", () => {
     process.env.JWT_ACCESS_EXPIRY = "15m";
   });
 
-  it("invalid string → 900 (default fallback)", () => {
+  it("invalid expiry throws instead of falling back", () => {
     process.env.JWT_ACCESS_EXPIRY = "invalid";
     const inner = {
       get: (key: string) => process.env[key],
     } as unknown as ConfigService<EnvVars, true>;
     const appConfig = new AppConfigService(inner);
     const svc = new TokenRevocationService(makeNullRedisService(), appConfig, makeLoggerStub());
-    expect(svc.accessTtlSeconds()).toBe(900);
-    process.env.JWT_ACCESS_EXPIRY = "15m";
+    try {
+      expect(() => svc.accessTtlSeconds()).toThrow(/JWT_ACCESS_EXPIRY/);
+    } finally {
+      process.env.JWT_ACCESS_EXPIRY = "15m";
+    }
   });
 });
 

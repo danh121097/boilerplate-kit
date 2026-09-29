@@ -1,6 +1,6 @@
 /**
  * Auth types — ported from express types/auth.ts.
- * ROLES rank map is the single source of truth for role ordering used by RolesGuard.
+ * ROLES rank map is the single source of truth for role ordering used by the SecurityGuard role step.
  */
 
 /** Single source of truth for user roles — used by the User schema enum and the Role type. */
@@ -10,7 +10,7 @@ export const ROLES = {
   SUPER_ADMIN: "super_admin",
 } as const;
 
-/** Numeric rank per role — higher = more privileged. Used by RolesGuard min-role check. */
+/** Numeric rank per role — higher = more privileged. Used by the SecurityGuard min-role check. */
 export const ROLE_RANK: Record<Role, number> = {
   user: 1,
   admin: 2,

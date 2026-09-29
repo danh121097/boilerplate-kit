@@ -1,6 +1,8 @@
 import { IS_PUBLIC_KEY } from "@/common/decorators/public.decorator";
 import { ROLES_KEY } from "@/common/decorators/roles.decorator";
 import { AppException } from "@/common/exceptions/app.exception";
+import { derivePath } from "@/common/guards/derive-path";
+import { assertAllowedOrigin } from "@/common/guards/origin-check";
 import { HmacService } from "@/common/services/hmac.service";
 import { TokenRevocationService } from "@/common/services/token-revocation.service";
 import { TokenService } from "@/common/services/token.service";
@@ -14,33 +16,6 @@ import {
 import { Reflector } from "@nestjs/core";
 import type { JwtPayload } from "@/common/types/auth.types";
 import type { Request } from "express";
-
-/**
- * Derive the path the client signed from the raw request URL.
- *
- * Nest setGlobalPrefix does NOT strip the API prefix from req.originalUrl in
- * a guard (unlike Express app.use(prefix, ...) which pre-strips it). We must
- * manually strip the prefix so the signed path matches what the client sends:
- *   req.originalUrl = "/api/v1/auth/login?foo=bar"  →  "/auth/login"
- *
- * Exported for unit testing.
- */
-export function derivePath(originalUrl: string, apiPrefix: string): string {
-  // Ensure prefix starts with "/" for consistent stripping.
-  const prefix = apiPrefix.startsWith("/") ? apiPrefix : `/${apiPrefix}`;
-  // Strip query string first, then strip the prefix.
-  const withoutQuery = originalUrl.split("?")[0];
-  if (withoutQuery.startsWith(prefix)) {
-    const stripped = withoutQuery.slice(prefix.length);
-    // Ensure result always starts with "/".
-    return stripped.startsWith("/") ? stripped : `/${stripped}`;
-  }
-  // Fallback: return as-is without query string.
-  return withoutQuery;
-}
-
-/** Methods that carry a body and can trigger CSRF. */
-const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 /**
  * Composite security guard — runs a fixed sequence:
@@ -148,35 +123,11 @@ export class SecurityGuard implements CanActivate {
   }
 
   /**
-   * Origin/CSRF step: mirrors express createVerifyOrigin.
-   * Gated by config.enableCsrf; only applied to mutating methods.
-   * Resolves Origin header, falling back to Referer host.
+   * Origin/CSRF step: mirrors express createVerifyOrigin. Gated by config.enableCsrf;
+   * only applied to mutating methods (see origin-check.ts).
    */
   private checkOrigin(req: Request): void {
-    if (!this.config.enableCsrf) return;
-    if (!MUTATING_METHODS.has(req.method)) return;
-
-    const origin = this.resolveOrigin(req);
-    if (!origin || !this.config.corsOrigins.includes(origin)) {
-      throw new AppException({
-        message: "CSRF: request origin is not allowed!",
-        statusCode: 403,
-        errorType: "AUTHORIZATION_ERROR",
-      });
-    }
-  }
-
-  /** Resolve Origin header, falling back to the origin part of Referer. */
-  private resolveOrigin(req: Request): string | undefined {
-    const origin = req.headers.origin as string | undefined;
-    if (origin) return origin;
-    const referer = req.headers.referer as string | undefined;
-    if (!referer) return undefined;
-    try {
-      return new URL(referer).origin;
-    } catch {
-      return undefined;
-    }
+    assertAllowedOrigin(req, this.config);
   }
 
   /**

@@ -3,7 +3,7 @@
 A WebSocket layer attached to the same HTTP server via `@nestjs/websockets`,
 gated by the same security model as the REST API (HMAC then JWT). Source:
 [`realtime/events.gateway.ts`](../../src/modules/realtime/events.gateway.ts),
-[`realtime/redis-io.adapter.ts`](../../src/modules/realtime/redis-io.adapter.ts),
+[`realtime/socket-io.adapter.ts`](../../src/modules/realtime/socket-io.adapter.ts),
 [`realtime/socket-emit.service.ts`](../../src/modules/realtime/socket-emit.service.ts),
 [`realtime/events.ts`](../../src/modules/realtime/events.ts).
 
@@ -14,38 +14,36 @@ gives access to the Socket.IO `Server`. The socket server **options** (CORS,
 heartbeat, payload cap) are not on the decorator — they live in the adapter so
 there is a single source of truth.
 
-When `REDIS_ENABLED=true`, `main.ts` installs `RedisIoAdapter` **before**
-`app.listen()`:
+`configureApp` (called by `main.ts` and the e2e test app) installs
+`SocketIoAdapter` **before** `app.listen()`, whether Redis is on or off:
 
 ```ts
-// main.ts
-if (config.redisEnabled) {
-  const redisClient = app.get(RedisService).getClient();
-  if (redisClient) app.useWebSocketAdapter(new RedisIoAdapter(app, redisClient));
-}
+// app-setup.ts
+const redisClient = config.redisEnabled ? app.get(RedisService).getClient() : null;
+app.useWebSocketAdapter(new SocketIoAdapter(app, redisClient));
 // CRITICAL: useWebSocketAdapter must run before listen() — after it silently no-ops.
 ```
 
-`RedisIoAdapter.createIOServer` merges the socket options and wires the pub/sub
+`SocketIoAdapter.createIOServer` applies the shared socket options
+(`buildSocketServerOptions`) and, when a Redis client is given, wires the pub/sub
 adapter:
 
 ```ts
-const mergedOptions = {
+const server = super.createIOServer(port, {
   ...options,
-  cors: { origin: this.corsOrigins, credentials: true },
-  pingInterval: 25000,
-  pingTimeout: 20000,
-  maxHttpBufferSize: 1e6,        // 1 MB cap on inbound payloads
-};
-const server = super.createIOServer(port, mergedOptions);
-const subClient = this.pubClient.duplicate();      // sub owned by the redis-adapter
-server.adapter(createAdapter(this.pubClient, subClient));   // cross-instance delivery
+  ...buildSocketServerOptions(this.corsOrigins),
+  // cors: { origin: corsOrigins, credentials: true }, pingInterval: 25000,
+  // pingTimeout: 20000, maxHttpBufferSize: 1e6 (1 MB cap on inbound payloads)
+});
+if (this.pubClient) {
+  server.adapter(createAdapter(this.pubClient, this.pubClient.duplicate())); // cross-instance delivery
+}
 ```
 
 Notes:
 
 - **Optional, like the rest of the Redis stack.** Without Redis it runs
-  single-instance (the default `IoAdapter`); with Redis, `@socket.io/redis-adapter`
+  single-instance (CORS and the other options still apply); with Redis, `@socket.io/redis-adapter`
   makes emits reach clients on every instance.
 - **Ownership** — `pubClient` is the shared client owned by `RedisModule` (never
   quit in the adapter); the `subClient` duplicate is owned by the redis-adapter
@@ -122,6 +120,9 @@ emitBroadcast(event, payload);        // gateway.server?.emit(...)
 
 `emitToUser` targets the per-user room joined on connection. Inject
 `SocketEmitService` anywhere it is needed (it is exported from `RealtimeModule`).
+`disconnectUser(userId)` force-disconnects all of a user's sockets (across instances
+with Redis); auth calls it on logout and when reuse detection revokes a session
+family. It is a no-op when the socket server is not initialised.
 
 ## See Also
 

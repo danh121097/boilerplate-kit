@@ -49,8 +49,8 @@ automatically — treat it as source of truth and this page as the stable summar
 | GET | `/api/v1/health` | HMAC, `@Public`, global rate-limit | — | `{ status: "ok", timestamp, uptime, database, redis }` |
 | POST | `/api/v1/auth/register` | HMAC, `@Public`, `auth` throttler (30/15m), `RegisterDto` | `{ email: string (email), password: string (min 8), name: string (min 1) }` | `201` `{ success: true, message, data: { user, tokens: { accessToken, refreshToken } } }` + httpOnly cookies |
 | POST | `/api/v1/auth/login` | HMAC, `@Public`, `login` throttler (30/15m), `LoginDto` | `{ email: string (email), password: string (min 1) }` | `{ success: true, message, data: { user, tokens } }` + httpOnly cookies |
-| POST | `/api/v1/auth/refresh` | HMAC, `@Public`, `auth` throttler (30/15m), `RefreshDto` | `{ refreshToken?: string }` (or `refreshToken` cookie) | `{ success: true, message, data: { tokens } }` + rotated cookies. `401` if missing/invalid/expired/reused, with both token cookies cleared (`Set-Cookie` expired, `refreshToken` on its auth path); body unchanged |
-| POST | `/api/v1/auth/logout` | HMAC, `@Public`, `auth` throttler (30/15m), `RefreshDto` | `{ refreshToken?: string }` (or cookie) | `{ success: true, message }` + cleared cookies |
+| POST | `/api/v1/auth/refresh` | HMAC, `@Public`, `auth` throttler (30/15m), `RefreshDto` | `{ refreshToken?: string }` (or `refreshToken` cookie; an empty string or a bodyless request falls back to the cookie) | `{ success: true, message, data: { tokens } }` + rotated cookies. `401` if missing/invalid/expired/reused after the grace window, with both token cookies cleared (`Set-Cookie` expired, `refreshToken` on its auth path); body unchanged |
+| POST | `/api/v1/auth/logout` | HMAC, `@Public`, `auth` throttler (30/15m), `RefreshDto` | `{ refreshToken?: string }` (or cookie; bodyless allowed) | `{ success: true, message }` + cleared cookies; the user's sockets are disconnected |
 | GET | `/api/v1/auth/me` | HMAC, JWT | — | `{ success: true, data: { user } }` |
 | GET | `/api/v1/users` | HMAC, JWT, `@Roles('admin')` | — (query: `page`≥1 def 1, `limit` 1–100 def 20) | `{ status: "success", data: User[], meta: OffsetMeta }` (passwords stripped). `403` if below admin |
 | GET | `/api/v1/users/:id` | HMAC, JWT, `@Roles('admin')` | — | `{ status: "success", data: User }` (password stripped). `404` if not found |
@@ -67,6 +67,9 @@ Errors thrown as `AppException` (and any framework error) are normalized by
 
 Common codes: `400 VALIDATION_ERROR`, `401 AUTHENTICATION_ERROR`,
 `403 AUTHORIZATION_ERROR`, `404 NOT_FOUND`, `409 CONFLICT`, `429 RATE_LIMIT`.
+Validation failures carry the Zod issue messages joined with `", "` (e.g.
+`Invalid email format, Name is required`). Body-parser failures use the same
+envelope: `413` for an oversized body (100 kb default), `400` for malformed JSON.
 Unmatched routes produce Nest's `NotFoundException`, rendered with the same
 envelope (`NOT_FOUND`). See
 [system-architecture/error-handling.md](./system-architecture/error-handling.md).
@@ -121,5 +124,12 @@ return { status: "success", data: items, meta };  // meta: { limit, nextCursor, 
   can rely on the httpOnly cookies.
 - Refresh uses rotation with reuse detection: the old refresh token is revoked
   and a new pair issued on every `/auth/refresh`; replaying a revoked token
-  revokes all of that user's sessions
-  (`src/modules/auth/auth.service.ts`).
+  revokes all of that user's sessions and disconnects their sockets. A rotated
+  token replayed within a 10 s grace window (`REFRESH_REUSE_GRACE_MS`) is treated
+  as a benign retry and answered `200` with a fresh pair
+  (`src/modules/auth/refresh-session.service.ts`).
+- Lifetimes come from config: `JWT_ACCESS_EXPIRY` sets the access cookie
+  `maxAge`; `JWT_REFRESH_EXPIRY` sets the refresh cookie `maxAge` and the stored
+  `expiresAt`.
+- Login answers unknown, inactive and wrong-password identically (same `401`
+  message, one bcrypt compare each).

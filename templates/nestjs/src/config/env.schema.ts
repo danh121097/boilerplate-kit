@@ -1,8 +1,20 @@
+import { DURATION_PATTERN, parseDurationSeconds } from "@/common/utils/duration.util";
+import { parseTrustProxy } from "@/config/trust-proxy.util";
 import { z } from "zod";
 
 // Validated shape of `process.env`. `@nestjs/config` runs `validate` at boot, so a
 // missing/invalid var fails loudly on startup rather than at first use. Coercions
 // keep the raw string env compatible with typed getters in AppConfigService.
+// `<positive int><s|m|h|d>` only (e.g. 15m, 7d); anything else fails boot.
+function duration(name: string, fallback: string): z.ZodDefault<z.ZodString> {
+  return z
+    .string()
+    .default(fallback)
+    .refine((v) => DURATION_PATTERN.test(v.trim()) && parseDurationSeconds(v, name) > 0, {
+      message: `${name} must be a positive number followed by s, m, h or d (e.g. 15m, 7d)`,
+    });
+}
+
 export const envSchema = z.object({
   APP_NAME: z.string().default(""),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
@@ -22,11 +34,29 @@ export const envSchema = z.object({
     .optional()
     .transform((v) => (v && v.length > 0 ? v : undefined)),
 
+  // Trust X-Forwarded-* from a reverse proxy: `true`/`false`, a hop count, or a
+  // comma-separated list of IPs/subnets. Unset = do not trust.
+  TRUST_PROXY: z
+    .string()
+    .optional()
+    .transform((v, ctx) => {
+      const parsed = parseTrustProxy(v);
+      if (parsed === null) {
+        ctx.addIssue({
+          code: "custom",
+          message:
+            "TRUST_PROXY must be true, false, a hop count, or a comma-separated list of IPs/subnets",
+        });
+        return z.NEVER;
+      }
+      return parsed;
+    }),
+
   JWT_PRIVATE_KEY_PATH: z.string().default("src/keys/rsa.private"),
   JWT_PUBLIC_KEY_PATH: z.string().default("src/keys/rsa.public"),
   JWT_REFRESH_SECRET: z.string().min(32, "JWT_REFRESH_SECRET must be at least 32 chars"),
-  JWT_ACCESS_EXPIRY: z.string().default("15m"),
-  JWT_REFRESH_EXPIRY: z.string().default("7d"),
+  JWT_ACCESS_EXPIRY: duration("JWT_ACCESS_EXPIRY", "15m"),
+  JWT_REFRESH_EXPIRY: duration("JWT_REFRESH_EXPIRY", "7d"),
 
   HMAC_SECRET: z.string().min(1, "HMAC_SECRET is required"),
 

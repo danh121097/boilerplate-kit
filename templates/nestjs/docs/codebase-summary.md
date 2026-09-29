@@ -14,9 +14,10 @@ This is a thin hub — each topic links to a focused page under
 
 ## At A Glance
 
-- **Entry point**: `src/main.ts` creates the Nest app, applies helmet /
-  compression / cookie-parser, sets the global prefix, enables CORS, mounts
-  Swagger at `/docs`, installs the `RedisIoAdapter` when Redis is on, and listens.
+- **Entry point**: `src/main.ts` creates the Nest app, applies
+  `configureApp` (`src/app-setup.ts`: trust proxy, helmet / compression /
+  cookie-parser, global prefix, CORS, `SocketIoAdapter`), mounts Swagger at
+  `/docs`, and listens. The e2e test app calls the same `configureApp`.
 - **Root module**: `src/app.module.ts` wires every feature module and registers
   the composite `SecurityGuard` (and the throttler guard) as global `APP_GUARD`s.
 - **Request guarding**: one composite `SecurityGuard` runs HMAC → origin/CSRF →

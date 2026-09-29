@@ -24,11 +24,11 @@ The two token classes use different algorithms by design. **Access tokens are
 RS256** (asymmetric): the RSA private key signs, the public key verifies — so any
 resource server can validate an access token with the distributable public key
 without ever holding signing power. **Refresh tokens are HS256** (symmetric),
-signed and verified with `this.config.jwtRefreshSecret` (`JWT_REFRESH_SECRET`),
-because a refresh token is only ever verified by this auth server — it is never
+signed with `this.config.jwtRefreshSecret` (`JWT_REFRESH_SECRET`),
+because a refresh token is only ever handled by this auth server — it is never
 handed to a third party, so a symmetric secret is the right tool. This is an
 intentional separation of concerns, not an inconsistency: distributable
-verification for access, issuer-only verification for refresh.
+verification for access, issuer-only handling for refresh.
 
 The `token_use` claim and the `iss` claim are defense in depth on top of the
 differing algorithms: a refresh token can never satisfy access verification, and
@@ -53,9 +53,9 @@ signRefreshToken(payload: JwtPayload): string {
 ```
 
 `verifyAccessToken` pins `algorithms: ['RS256']` and verifies with
-`jwtAccessPublicKey`; `verifyRefreshToken` pins `algorithms: ['HS256']` and
-verifies with `this.config.jwtRefreshSecret`. Both enforce the `issuer` and
-assert the matching `token_use` — throwing otherwise.
+`jwtAccessPublicKey`, enforces the `issuer` and asserts `token_use` is `access` —
+throwing otherwise. Refresh tokens are signed with `this.config.jwtRefreshSecret`
+but never signature-verified on refresh: validity comes from the DB hash lookup.
 
 > **Note:** refresh tokens are signed with **HS256** using the symmetric secret
 > `JWT_REFRESH_SECRET`, while access tokens are signed with **RS256** using the
@@ -83,6 +83,8 @@ class RefreshToken {
   @Prop({ type: Types.ObjectId, ref: "User", required: true, index: true }) userId: Types.ObjectId;
   @Prop({ required: true, index: { expires: 0 } }) expiresAt: Date; // TTL index → Mongo auto-purges
   @Prop({ default: false }) isRevoked: boolean;
+  @Prop({ index: true }) familyId?: string;   // device session chain; absent on legacy tokens
+  @Prop() rotatedAt?: Date;   // set only when consumed by a rotation (drives the reuse grace window)
 }
 ```
 
@@ -106,9 +108,14 @@ const baseCookieOptions = {
   sameSite: config.isProduction ? "strict" : "lax",
   domain: config.cookieDomain,                        // optional, host-only when unset
 };
-// accessToken  → maxAge 15 min
-// refreshToken → maxAge 7 days
+// accessToken  → maxAge from JWT_ACCESS_EXPIRY  (default 15m)
+// refreshToken → maxAge from JWT_REFRESH_EXPIRY (default 7d)
 ```
+
+Cookie `maxAge` and the refresh token's stored `expiresAt` are derived from the
+same env values by one duration parser (`common/utils/duration.util.ts`). Both
+variables accept only a positive integer followed by `s`, `m`, `h` or `d`
+(`15m`, `900s`, `7d`); anything else (`900`, `1w`, `0`, `-5m`) fails boot.
 
 `clearTokenCookies` clears both. Because `refresh` and `logout` accept the token
 from the request body too, non-browser / SSR clients work without cookies.
@@ -125,14 +132,20 @@ All flows live in
 - **login** (`POST /auth/login`, `@Public`) — find user `+password`, reject
   inactive or bad credentials (401 `AUTHENTICATION_ERROR`, **same message either
   way** — no enumeration), `comparePassword` (bcrypt), sign tokens, set cookies.
+  An unknown or inactive user still pays one bcrypt compare against a fixed dummy
+  hash (same cost as real hashes), so response time does not reveal the account.
 - **refresh** (`POST /auth/refresh`, `@Public`) — read raw token from body or
   the `refreshToken` cookie; controller 401s if absent. A refused refresh
   (today always 401; a 403 from a future guard is handled the same) clears both
   token cookies (same options as set) before the unchanged error is returned;
   5xx/429 do not. See rotation below.
-- **logout** (`POST /auth/logout`, `@Public`) — mark the stored refresh token
-  `isRevoked`, call `revokeUserTokens(userId)` (Redis access-token cutoff), clear
-  cookies. Graceful when no token is present.
+- **logout** (`POST /auth/logout`, `@Public`) — revoke every token of the
+  presented token's `familyId` (the device session chain) and clear their
+  `rotatedAt`, so a graced predecessor cannot resurrect it; other families
+  (devices) stay logged in, and a legacy token without `familyId` revokes only
+  itself. Then call `revokeUserTokens(userId)` (Redis
+  access-token cutoff), disconnect the user's sockets, clear cookies. Graceful
+  when no token is present. A bodyless request works like `{}`.
 - **getMe** (`GET /auth/me`) — JWT required; returns the user resolved from
   `req.user.userId` via `@CurrentUser()`.
 
@@ -146,25 +159,40 @@ token produce exactly one `200`:
 const hashedToken = this.tokenService.hashToken(rawRefreshToken);
 const claimed = await this.refreshTokenModel.findOneAndUpdate(   // 1. atomic claim = revoke old
   { token: hashedToken, isRevoked: false, expiresAt: { $gt: new Date() } },
-  { isRevoked: true },
+  { isRevoked: true, rotatedAt: new Date() },
 );
-if (!claimed) return this.rejectUnclaimableToken(hashedToken);  // 2. re-lookup + classify:
+if (!claimed) return this.resolveUnclaimableToken(hashedToken);  // 2. re-lookup + classify:
 //   unknown → 401
-//   isRevoked → REUSE DETECTED: updateMany({ userId }, { isRevoked: true })
-//               + revokeUserTokens(userId) → 401 "Refresh token reuse detected — …"
+//   revoked by a rotation ≤ REFRESH_REUSE_GRACE_MS ago, unexpired → benign retry:
+//               issue a fresh pair (200), revoke nothing
+//   otherwise revoked → REUSE DETECTED: updateMany({ userId },
+//               { $set: { isRevoked: true }, $unset: { rotatedAt: 1 } })
+//               + revokeUserTokens(userId) + disconnect sockets → 401 "Refresh token reuse detected — …"
 //   expired → deleteOne → 401
 // 3. resolve active user, then issue a fresh access + refresh pair
 ```
 
 Each refresh **revokes the old token and issues a fresh pair**. If an already
--rotated (revoked) token is replayed — the classic stolen-token signal — every
-refresh token for that user is revoked and a user-level access cutoff is set,
-forcing both the attacker and the legitimate user to log in again. This is proven
-by `test/e2e/refresh-token-reuse-detection.e2e-spec.ts`. Clients must single-flight refreshes (the frontend
-templates lock across tabs). A parallel refresh with the same token is treated as
-reuse, but detection is best-effort under true concurrency: the winning
-request's new refresh token (and its access token) can be issued after the
-reuse branch revoked the family, and so survive it.
+-rotated (revoked) token is replayed after the grace window — the classic
+stolen-token signal — every refresh token for that user is revoked, a user-level
+access cutoff is set and the user's sockets are disconnected, forcing both the
+attacker and the legitimate user to log in again. This is proven by
+`test/e2e/refresh-token-reuse-detection.e2e-spec.ts`.
+
+**Reuse grace window.** `REFRESH_REUSE_GRACE_MS` (10 s, in
+`modules/auth/refresh-session.service.ts`) separates a benign retry (lost
+response, parallel tabs) from theft. A token consumed by a rotation records
+`rotatedAt`; replayed within the window it is served like a normal refresh (`200`,
+fresh cookies, same body) without revoking anything — a refused refresh would
+clear the cookies the first response just set and kill the winner's session.
+`familyId` is new on register/login and inherited by every rotation and graced
+re-issue. Logout revokes the family and clears `rotatedAt`, so replaying a
+logged-out chain is always reuse. A reuse-detected revoke clears `rotatedAt` on
+every token of the user, so a graced replay cannot resurrect it. See
+`test/e2e/refresh-token-reuse-grace.e2e-spec.ts`. A stolen token replayed within the window is
+indistinguishable from a retry: it mints another live token for that family. A graced
+retry racing a family revoke may also leave one token alive (best effort). Clients should still
+single-flight refreshes (the frontend templates lock across tabs).
 
 ## Verifying Requests: the JWT step of `SecurityGuard`
 
@@ -188,7 +216,7 @@ Any access token with `iat < revokedAt` is rejected by the guard's JWT step and
 the socket auth gate. The key auto-expires after one access-token lifetime
 (`accessTtlSeconds()`). When Redis is disabled, `revokeUserTokens` and
 `getUserRevokedAt` are no-ops (fail-open) — logout still works (the refresh token
-is revoked in Mongo) but outstanding access tokens simply live out their ≤15 min.
+is revoked in Mongo) but outstanding access tokens simply live out their remaining `JWT_ACCESS_EXPIRY`.
 
 ## See Also
 

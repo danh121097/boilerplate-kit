@@ -31,4 +31,13 @@ export class SocketEmitService {
   emitBroadcast(event: SocketEvent, payload?: unknown): void {
     this.gateway.server?.emit(event, payload);
   }
+
+  /**
+   * Force-disconnect every socket of a user (all instances with the Redis adapter),
+   * e.g. after logout or a revoked session family. No-op when the server is not
+   * initialized.
+   */
+  disconnectUser(userId: string): void {
+    this.gateway.server?.in(`user:${userId}`).disconnectSockets(true);
+  }
 }

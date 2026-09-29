@@ -68,9 +68,10 @@ All variables are documented in [`.env.example`](.env.example). Key ones:
 | `API_PREFIX`            | Base path all routes mount under (default `/api/v1`)       |
 | `ENABLE_CSRF`           | Toggle the origin/CSRF guard step (default false)          |
 | `COOKIE_DOMAIN`         | Cookie domain for split-domain deploys (empty = host-only) |
+| `TRUST_PROXY`           | Behind a reverse proxy: `true`/`false`, a hop count, or a comma-separated list of IPs/subnets (unset = do not trust) |
 | `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH` | RS256 keypair file paths (access)        |
 | `JWT_REFRESH_SECRET`    | HS256 symmetric secret for refresh tokens (≥32 chars, required) |
-| `JWT_ACCESS_EXPIRY` / `JWT_REFRESH_EXPIRY` | Token lifetimes                         |
+| `JWT_ACCESS_EXPIRY` / `JWT_REFRESH_EXPIRY` | Token lifetimes; also the cookie `maxAge` and refresh `expiresAt` |
 | `HMAC_SECRET`           | Secret for HMAC request signing (required)                 |
 | `REDIS_ENABLED` / `REDIS_URL` | Toggle + connection for Redis features               |
 | `LOG_LEVEL`             | `debug` / `info` / `warn` / `error` (defaults by env)      |
@@ -109,7 +110,8 @@ Mounted under `API_PREFIX` (default `/api/v1`). The live reference is Swagger at
 
 ```
 src/
-├── main.ts             # Bootstrap: middleware, global prefix, CORS, Swagger, WS adapter
+├── main.ts             # Bootstrap: configureApp (app-setup.ts) + Swagger + listen
+├── app-setup.ts        # configureApp: trust proxy, helmet, cookies, prefix, CORS, socket adapter (shared with e2e tests)
 ├── app.module.ts       # Root module: wires every feature module + global guards
 ├── config/             # ConfigModule + Zod env schema + AppConfigService + key loader
 ├── common/             # @Global: SecurityGuard, services/, utils/, pipe, filter, decorators, throttler/, swagger/
@@ -119,7 +121,7 @@ src/
 │   ├── auth/           # + password.service + cookie.util (auth-domain helpers)
 │   ├── user/
 │   ├── health/         # GET /health
-│   └── realtime/       # @WebSocketGateway + RedisIoAdapter + emit helpers
+│   └── realtime/       # @WebSocketGateway + SocketIoAdapter + emit helpers
 ├── redis/              # @Global shared ioredis client (optional)
 └── keys/               # setup.sh + generated RSA keys (gitignored)
 

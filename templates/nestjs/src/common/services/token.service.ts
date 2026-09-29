@@ -13,9 +13,9 @@ import jwt from "jsonwebtoken";
  * Access tokens:  RS256 (RSA keypair in src/keys/) — asymmetric so resource servers
  *                  can verify with the public key without holding signing power.
  * Refresh tokens: HS256 with the JWT_REFRESH_SECRET — symmetric is appropriate because
- *                  refresh tokens are only ever verified by this auth server (never sent
- *                  to third parties). Validity is also established by a DB hash lookup on
- *                  the hot path; the signature is a secondary check.
+ *                  refresh tokens are only ever handled by this auth server (never sent
+ *                  to third parties). Validity is established by the DB hash lookup on
+ *                  refresh; the signature is not re-verified on that path.
  * token_use claim: distinguishes access vs refresh so a refresh token can never
  *                  satisfy access verification and vice-versa.
  * jti:            random UUID per refresh token so two tokens for the same user
@@ -70,22 +70,6 @@ export class TokenService {
       expiresIn: this.config.jwtRefreshExpiry as jwt.SignOptions["expiresIn"],
       jwtid: crypto.randomUUID(),
     });
-  }
-
-  /**
-   * Verify a refresh token. Pins HS256 + issuer + token_use=refresh.
-   * Algorithm matches signRefreshToken (HS256, symmetric secret).
-   */
-  verifyRefreshToken(token: string): JwtPayload {
-    const decoded = jwt.verify(token, this.config.jwtRefreshSecret, {
-      algorithms: ["HS256"],
-      issuer: this.tokenIssuer,
-    }) as JwtPayload & { token_use?: TokenUse };
-
-    if (decoded.token_use !== "refresh") {
-      throw new Error("Invalid token_use claim");
-    }
-    return decoded;
   }
 
   /** SHA-256 hash a token for secure DB storage (matches express hashToken). */

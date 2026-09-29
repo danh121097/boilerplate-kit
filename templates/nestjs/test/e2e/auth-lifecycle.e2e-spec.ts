@@ -7,12 +7,18 @@
  *   - Token rotation: new tokens differ from originals
  *   - Password not leaked in any response
  */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import bcrypt from "bcrypt";
 import supertest from "supertest";
 
+import { User, UserDocument } from "@/schemas/user.schema";
 import { INestApplication } from "@nestjs/common";
+import { getModelToken } from "@nestjs/mongoose";
+import type { Model } from "mongoose";
 import { addBearerToken, buildHmacHeaders } from "../helpers/sign-request";
 import { createTestApp } from "../helpers/create-test-app";
+import { backdateRotation } from "../helpers/refresh-token-db";
+import { REFRESH_REUSE_GRACE_MS } from "@/modules/auth/refresh-session.service";
 
 // ── App bootstrap ──────────────────────────────────────────────────────────
 
@@ -146,6 +152,31 @@ describe("POST /auth/login", () => {
     expect(res.status).toBe(401);
     expect(res.body.message).toMatch(/invalid email or password/i);
   });
+
+  it("runs one bcrypt compare for an unknown user and for an inactive user (timing equalization)", async () => {
+    const inactive = { email: "inactive-login@example.com", password: "Inactive1!", name: "Off" };
+    await signedPost("/auth/register", inactive);
+    await app
+      .get<Model<UserDocument>>(getModelToken(User.name))
+      .updateOne({ email: inactive.email }, { isActive: false });
+
+    const compare = vi.spyOn(bcrypt, "compare");
+    try {
+      const unknown = await signedPost("/auth/login", {
+        email: "ghost@example.com",
+        password: "Whatever1!",
+      });
+      const off = await signedPost("/auth/login", {
+        email: inactive.email,
+        password: inactive.password,
+      });
+      expect([unknown.status, off.status]).toEqual([401, 401]);
+      expect(unknown.body.message).toBe(off.body.message);
+      expect(compare).toHaveBeenCalledTimes(2);
+    } finally {
+      compare.mockRestore();
+    }
+  });
 });
 
 // ── me ─────────────────────────────────────────────────────────────────────
@@ -252,16 +283,22 @@ describe("POST /auth/refresh — token rotation", () => {
   it("returns 401 and clears token cookies when no refresh token provided", async () => {
     const res = await signedPost("/auth/refresh", {});
     expect(res.status).toBe(401);
+    expect(res.body).toMatchObject({
+      success: false,
+      errorType: "AUTHENTICATION_ERROR",
+      error_code: 401,
+    });
     expectTokenCookiesCleared(res.headers["set-cookie"] as unknown as string[]);
   });
 
-  it("returns 401 and clears token cookies when a rotated token is reused", async () => {
+  it("returns 401 and clears token cookies when a rotated token is reused after the grace window", async () => {
     const loginRes = await signedPost("/auth/login", {
       email: USER.email,
       password: USER.password,
     });
     const refreshToken = loginRes.body.data.tokens.refreshToken as string;
     await signedPost("/auth/refresh", { refreshToken });
+    await backdateRotation(app, refreshToken, REFRESH_REUSE_GRACE_MS + 1_000);
     const res = await signedPost("/auth/refresh", { refreshToken });
     expect(res.status).toBe(401);
     expectTokenCookiesCleared(res.headers["set-cookie"] as unknown as string[]);

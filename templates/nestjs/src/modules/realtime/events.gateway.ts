@@ -15,14 +15,9 @@ import type { Server, Socket } from "socket.io";
 /**
  * WebSocket gateway — authenticates handshakes and manages user rooms.
  *
- * CORS + socket options are intentionally NOT set in the decorator: when
- * RedisIoAdapter is active, it constructs the Socket.IO Server directly in
- * createIOServer() and passes the full options there. When the default IoAdapter
- * is used (Redis disabled), the gateway decorator options would apply, but to
- * keep a single source of truth for all options we rely on the adapter path in
- * main.ts setting a thin default adapter wrapper. The decorator is kept minimal
- * (no cors/transport opts) — all socket server options live in RedisIoAdapter
- * or the DefaultSocketAdapter used in main.ts.
+ * CORS + socket options are intentionally NOT set in the decorator: SocketIoAdapter
+ * (installed by configureApp, Redis on or off) constructs the Socket.IO Server in
+ * createIOServer() with the full options, so they live in exactly one place.
  *
  * Handshake security — HMAC first, then JWT (mirrors express middleware chain):
  *   1. HMAC: sig + ctime from handshake.auth verify the signed socket contract.

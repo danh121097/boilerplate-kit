@@ -44,6 +44,8 @@ registered as `APP_FILTER` (in `CommonModule`) with `@Catch()` — it catches
 | `AppException` | `statusCode` + `message` + its `errorType`, verbatim |
 | any other `HttpException` (e.g. Nest's `NotFoundException` for unmatched routes) | status + unwrapped message; `errorType` mapped from status via `mapHttpStatusToErrorType` |
 | Mongoose `CastError` / `ValidationError` | `400` `VALIDATION_ERROR`, names the field(s) only (`map-database-error.ts`) |
+| Zod validation failure (`ZodValidationException`) | `400` `VALIDATION_ERROR`, issue messages joined with `", "` — same text as the express validator |
+| body-parser error (too large, malformed JSON, bad encoding) | `413` / `400` / `415` `VALIDATION_ERROR`, fixed client-safe message (`map-body-parser-error.ts`); logged as `warn`, never `error` |
 | MongoDB duplicate key (`code 11000`) | `409` `CONFLICT`, names the field(s) only |
 | any other non-HTTP error | `500` `INTERNAL_ERROR`, generic message |
 
@@ -91,8 +93,9 @@ For framework `HttpException`s that lack an `errorType`,
 
 Body validation is the global `ZodValidationPipe` (from `nestjs-zod`, registered
 as `APP_PIPE`). DTOs built with `createZodDto(schema)` are validated and
-transformed automatically; a failure becomes a `VALIDATION_ERROR` (400) flowing
-through the same filter envelope. On success the **parsed** data (with transforms
+transformed automatically; a failure becomes a `VALIDATION_ERROR` (400) whose
+`message` is the issue messages joined with `", "`, flowing through the same
+filter envelope. On success the **parsed** data (with transforms
 such as `email.toLowerCase().trim()`) is what the handler receives.
 
 ## Example Responses

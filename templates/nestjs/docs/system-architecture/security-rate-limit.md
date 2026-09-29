@@ -22,7 +22,7 @@ app.enableCors({ origin: config.corsOrigins, credentials: true });
 - **`credentials: true`** is required for the browser to send/receive the httpOnly
   auth cookies — without it cookie-based auth breaks cross-origin.
 - **`origin`** comes from the configured CORS origins; the Socket.IO server
-  (`RedisIoAdapter`) uses the same origins + `credentials: true`.
+  (`SocketIoAdapter`, Redis on or off) uses the same origins + `credentials: true`.
 
 ## Authentication & Authorization
 
@@ -63,6 +63,14 @@ origins, else `403 AUTHORIZATION_ERROR`. Disabled by default.
 | `default` | 60 s | 100 | all routes (global cap) |
 | `auth` | 15 min | 30 | `/auth/register`, `/auth/refresh`, `/auth/logout` |
 | `login` | 15 min | 30 | `/auth/login` (brute-force protection) |
+
+Rate limits key on the client IP. Behind a reverse proxy set `TRUST_PROXY`
+(`true`/`false`, a hop count such as `1`, or a comma-separated list of
+IPs/subnets) so Express reads the real client address from `X-Forwarded-For`;
+unset (default) ignores forwarded headers. Applied in `configureApp` via
+`app.set("trust proxy", value)`; an invalid value fails the boot. Prefer a hop
+count (e.g. `1`) over `true`: `true` trusts the leftmost `X-Forwarded-For` entry,
+which a client can forge.
 
 `@nestjs/throttler` v6 runs every named throttler on every route, so `auth` and
 `login` carry a `skipIf` (`skipUnlessOptedIn`) and only count on routes that name
@@ -118,7 +126,8 @@ cross-instance Socket.IO adapter.
   (`src/modules/auth/password.service.ts`) requires ≥8 chars with lowercase, uppercase,
   digit, and special char on register.
 - **bcrypt** (cost 12) for password storage; `select: false` keeps the hash out
-  of query results.
+  of query results. Login compares against a fixed dummy hash for unknown or
+  inactive users, so those cost the same as a wrong password.
 - **HMAC** request signing on every route — see
   [hmac-verification.md](./hmac-verification.md).
 - **Secrets via env** — `HMAC_SECRET`, `JWT_REFRESH_SECRET` (≥32 chars), and the

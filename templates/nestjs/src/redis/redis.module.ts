@@ -11,7 +11,7 @@ import IORedis, { Redis } from "ioredis";
  * null as "disabled" and fail-open.
  *
  * Single shutdown owner: this module's onModuleDestroy quits the shared pub client.
- * The socket adapter (Phase 5) owns + quits ONLY its own sub duplicate — never quits here.
+ * The socket adapter owns + quits ONLY its own sub duplicate — never quits here.
  */
 @Global()
 @Module({

@@ -1,4 +1,5 @@
 import { AppException, ErrorType } from "@/common/exceptions/app.exception";
+import { mapBodyParserError } from "@/common/filters/map-body-parser-error";
 import { mapDatabaseError } from "@/common/filters/map-database-error";
 import { AppLogger } from "@/common/logger/app-logger.service";
 import {
@@ -9,6 +10,7 @@ import {
   HttpStatus,
   Injectable,
 } from "@nestjs/common";
+import { ZodValidationException } from "nestjs-zod";
 import type { Request, Response } from "express";
 
 /**
@@ -20,7 +22,9 @@ import type { Request, Response } from "express";
  *     error_code, error_message, stack? (dev only) }
  *
  * Known Mongoose/MongoDB errors (CastError, ValidationError, duplicate key) are
- * mapped to 400/409 first; any other non-HTTP error is a generic 500.
+ * mapped to 400/409 first, body-parser errors (too large, malformed JSON) to
+ * 413/400; any other non-HTTP error is a generic 500. Zod validation failures
+ * render the issue messages joined with ", ", like the express validator.
  * 5xx → logger.error with stack; 4xx → logger.warn.
  * Unmatched routes produce Nest's default NotFoundException (404) which is
  * caught here and rendered with NOT_FOUND errorType — matching not-found-handler.ts.
@@ -31,7 +35,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
   constructor(private readonly logger: AppLogger) {}
 
   catch(rawException: unknown, host: ArgumentsHost): void {
-    const exception = mapDatabaseError(rawException) ?? rawException;
+    const exception =
+      mapDatabaseError(rawException) ?? mapBodyParserError(rawException) ?? rawException;
     const ctx = host.switchToHttp();
     const res = ctx.getResponse<Response>();
     const req = ctx.getRequest<Request>();
@@ -47,6 +52,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
       statusCode = exception.getStatus();
       message = exception.message;
       errorType = exception.errorType;
+      stack = exception.stack;
+    } else if (exception instanceof ZodValidationException) {
+      statusCode = exception.getStatus();
+      message = zodIssueMessage(exception);
+      errorType = "VALIDATION_ERROR";
       stack = exception.stack;
     } else if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
@@ -89,6 +99,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
       ...(isDev && stack ? { stack } : {}),
     });
   }
+}
+
+/** Issue messages joined with ", " — same text as the express validation middleware. */
+function zodIssueMessage(exception: ZodValidationException): string {
+  const issues = (exception.getZodError() as { issues?: { message: string }[] }).issues;
+  const joined = Array.isArray(issues) ? issues.map((i) => i.message).join(", ") : "";
+  return joined || "Validation failed";
 }
 
 /** Map HTTP status codes to express-style ErrorType strings. */

@@ -7,7 +7,7 @@ import { Injectable, LoggerService } from "@nestjs/common";
  * Default threshold: debug in dev/test, info in prod (matches express behavior).
  * Silent when NODE_ENV=test (keeps test output clean).
  * Dev: colored single-line to TTY. Prod: one-line JSON per record.
- * Sensitive keys in meta are redacted (password/token/secret/cookie/authorization/credential).
+ * Sensitive keys in meta are redacted (password/token/secret/cookie/authorization/credential, keys ending in url/dsn).
  * warn + error → stderr; debug + info → stdout.
  *
  * Reads NODE_ENV/LOG_LEVEL directly from process.env — no AppConfigService dependency
@@ -30,7 +30,7 @@ function threshold(): number {
   return IS_PRODUCTION ? WEIGHT.info : WEIGHT.debug;
 }
 
-const SENSITIVE = /pass(word)?|token|secret|cookie|authorization|credential/i;
+const SENSITIVE = /pass(word)?|token|secret|cookie|authorization|credential|(url|dsn)$/i;
 
 /** Redact sensitive keys and serialize Error values. */
 export function serializeMeta(meta: LogMeta): LogMeta {

@@ -4,7 +4,7 @@ import type { Request } from "express";
 
 /**
  * Parameter decorator that extracts the authenticated user from the request.
- * JwtAuthGuard (Phase 3) sets request.user after verifying the access token.
+ * SecurityGuard sets request.user after verifying the access token.
  * Usage: `@CurrentUser() user: JwtPayload`
  */
 export const CurrentUser = createParamDecorator(

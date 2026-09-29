@@ -6,9 +6,13 @@ import { z } from "zod";
  * also accepts the token from the httpOnly cookie (dual-mode: CSR localStorage
  * clients send the body field; SSR/cookie clients rely on the cookie).
  * Missing token from BOTH sources is caught in the controller.
+ * A bodyless request (no body, no content-type) is treated as `{}`.
  */
-const refreshSchema = z.object({
-  refreshToken: z.string().optional(),
-});
+const refreshSchema = z.preprocess(
+  (body) => body ?? {},
+  z.object({
+    refreshToken: z.string().optional(),
+  }),
+);
 
 export class RefreshDto extends createZodDto(refreshSchema) {}

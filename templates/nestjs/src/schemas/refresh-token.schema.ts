@@ -26,8 +26,16 @@ export class RefreshToken {
   @Prop({ type: Date, required: true, index: { expires: 0 } })
   expiresAt!: Date;
 
+  /** Device session chain: new on register/login, inherited by rotations; logout revokes the chain. Absent on legacy tokens. */
+  @Prop({ type: String, index: true })
+  familyId?: string;
+
   @Prop({ type: Boolean, default: false })
   isRevoked!: boolean;
+
+  /** Set when the token is consumed by a rotation (not by logout); drives the reuse grace window. */
+  @Prop({ type: Date })
+  rotatedAt?: Date;
 }
 
 export const RefreshTokenSchema = SchemaFactory.createForClass(RefreshToken);

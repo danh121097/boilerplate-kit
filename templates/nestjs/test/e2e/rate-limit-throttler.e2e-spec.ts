@@ -52,6 +52,7 @@ function signedGet(path: string) {
 }
 
 describe("Throttler (enabled)", () => {
+  // 30 unknown-user logins each pay one bcrypt compare (timing equalization).
   it("blocks the 31st login in the window with a 429 RATE_LIMIT envelope", async () => {
     const body = { email: "nobody@example.com", password: "WrongPass1!" };
     for (let i = 0; i < 30; i++) {
@@ -65,8 +66,9 @@ describe("Throttler (enabled)", () => {
       success: false,
       errorType: "RATE_LIMIT",
       error_code: 429,
+      error_message: expect.any(String),
     });
-  });
+  }, 60_000);
 
   it("does not apply the auth/login caps to non-auth routes", async () => {
     // 40 > the 30-request auth/login cap, < the 100/min default cap.

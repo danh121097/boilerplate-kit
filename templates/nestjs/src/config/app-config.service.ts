@@ -1,7 +1,9 @@
+import { parseDurationSeconds } from "@/common/utils/duration.util";
 import { loadRsaKeyPair } from "@/config/keys";
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { EnvVars } from "@/config/env.schema";
+import type { TrustProxyValue } from "@/config/trust-proxy.util";
 
 /**
  * Typed, immutable view over validated env vars + derived config. Inject this
@@ -57,6 +59,9 @@ export class AppConfigService {
   get cookieDomain(): string | undefined {
     return this.get("COOKIE_DOMAIN");
   }
+  get trustProxy(): TrustProxyValue | undefined {
+    return this.get("TRUST_PROXY");
+  }
   get jwtRefreshSecret(): string {
     return this.get("JWT_REFRESH_SECRET");
   }
@@ -65,6 +70,14 @@ export class AppConfigService {
   }
   get jwtRefreshExpiry(): string {
     return this.get("JWT_REFRESH_EXPIRY");
+  }
+  /** Access lifetime in seconds — drives the access cookie maxAge. */
+  get jwtAccessTtlSeconds(): number {
+    return parseDurationSeconds(this.jwtAccessExpiry, "JWT_ACCESS_EXPIRY");
+  }
+  /** Refresh lifetime in seconds — drives the refresh cookie maxAge and DB expiresAt. */
+  get jwtRefreshTtlSeconds(): number {
+    return parseDurationSeconds(this.jwtRefreshExpiry, "JWT_REFRESH_EXPIRY");
   }
   get jwtAccessPrivateKey(): string {
     return this.accessPrivateKey;
