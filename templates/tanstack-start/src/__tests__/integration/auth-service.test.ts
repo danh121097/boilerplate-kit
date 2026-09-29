@@ -18,21 +18,21 @@ describe("AuthModel", () => {
   afterEach(() => vi.restoreAllMocks());
 
   it("login posts to /auth/login and returns the result", async () => {
-    const post = vi
-      .spyOn(AuthModel.api, "post")
-      .mockResolvedValue({ success: true, data: RESULT } as never);
+    vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true, data: RESULT } as never);
     const res = await AuthModel.login({ email: "a@b.com", password: "x" });
     expect(res).toEqual(RESULT);
-    expect(post).toHaveBeenCalledWith(expect.objectContaining({ url: "/auth/login" }));
+    expect(AuthModel.api.post).toHaveBeenCalledWith(
+      expect.objectContaining({ url: "/auth/login" }),
+    );
   });
 
   it("register posts to /auth/register and returns the result", async () => {
-    const post = vi
-      .spyOn(AuthModel.api, "post")
-      .mockResolvedValue({ success: true, data: RESULT } as never);
+    vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true, data: RESULT } as never);
     const res = await AuthModel.register({ email: "a@b.com", password: "x", name: "A" });
     expect(res.user._id).toBe("u1");
-    expect(post).toHaveBeenCalledWith(expect.objectContaining({ url: "/auth/register" }));
+    expect(AuthModel.api.post).toHaveBeenCalledWith(
+      expect.objectContaining({ url: "/auth/register" }),
+    );
   });
 
   it("logout posts to /auth/logout (backend clears the cookies)", async () => {

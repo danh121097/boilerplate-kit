@@ -180,6 +180,14 @@ signed-out; a transient one → retryable error, session kept). During SSR a
 hinted session throws (not cached as signed-out), so the browser refetches and
 refreshes on mount.
 
+### Session unavailable banner
+
+A transient failure of the session query (network error, timeout, 5xx, refresh
+unavailable — `retryable: true`) does not sign the user out. `useAuth()` exposes
+`sessionUnavailable` and `retrySession`; the root layout renders a
+`role="alert"` banner with a retry button until a refetch succeeds. A 401 (or a
+refused refresh) resolves to signed out with no banner.
+
 ## Logout
 
 `AuthModel.logout()` — the user's own sign-out in this tab; it ends as

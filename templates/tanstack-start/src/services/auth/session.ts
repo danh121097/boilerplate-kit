@@ -35,6 +35,13 @@ export const useMeQuery = defineQuery<AuthUser | null>({
   fetcher: fetchSession,
 });
 
+/** A transient failure (offline, timeout, 5xx, refresh unavailable) restoring the
+ * session: the user keeps their current state and may retry. A 401 never reaches
+ * here — `fetchSession` resolves it to signed out. */
+export function isSessionUnavailable(error: unknown): boolean {
+  return (error as { retryable?: unknown } | null)?.retryable === true;
+}
+
 /**
  * Derived auth state: `const { isAuthenticated } = useAuth()`. Derived from the
  * session query (not stored), so it can never drift from the real cookie session.
@@ -45,5 +52,9 @@ export function useAuth() {
     user: session.data ?? null,
     isAuthenticated: Boolean(session.data),
     isLoading: session.isPending,
+    /** Restoring the session failed transiently — show the retry banner. */
+    sessionUnavailable: isSessionUnavailable(session.error),
+    /** Re-run the session restore (the banner's retry). */
+    retrySession: () => void session.refetch(),
   };
 }

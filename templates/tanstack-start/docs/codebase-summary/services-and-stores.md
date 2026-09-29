@@ -24,7 +24,8 @@ src/services/
 │   └── index.ts
 ├── auth/
 │   ├── auth.ts             # AuthModel (login/register/logout/revokeSession/getMe/getSession) + mutations
-│   ├── session.ts          # fetchSession (SSR server fn) + useMeQuery + useAuth
+│   ├── session.ts          # fetchSession (SSR server fn) + useMeQuery + useAuth (sessionUnavailable, retrySession) + isSessionUnavailable
+│   ├── login-schema.ts     # zod loginSchema (i18n-key messages) shared by the login and demo forms
 │   ├── types/auth.ts       # AuthUser, AuthResult, LoginPayload, RegisterPayload
 │   └── index.ts
 └── users/

@@ -25,7 +25,8 @@ pnpm start     → srvx --prod --static ../client dist/server/server.js (Node se
 pnpm typecheck → tsc --noEmit
 pnpm test      → vitest run
 pnpm test:watch→ vitest
-pnpm lint      → eslint .
+pnpm lint      → eslint . && prettier --check . (read-only)
+pnpm lint:fix  → eslint . --fix && prettier --write .
 pnpm format    → prettier --write .
 ```
 

@@ -1,18 +1,11 @@
+import { loginSchema, type LoginFormValues } from "@/services/auth/login-schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createFileRoute } from "@tanstack/react-router";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 
 export const Route = createFileRoute("/form")({
   component: FormPage,
 });
-
-const schema = z.object({
-  email: z.string().email("Invalid email"),
-  password: z.string().min(8, "At least 8 characters"),
-});
-
-type FormValues = z.infer<typeof schema>;
 
 function FormPage() {
   const { t } = useTranslation();
@@ -21,8 +14,8 @@ function FormPage() {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
   });
 
@@ -37,19 +30,19 @@ function FormPage() {
       <h1 className="mb-4 text-3xl font-bold">{t("form.title")}</h1>
 
       <Card className="max-w-md">
-        <form className="space-y-4" onSubmit={onSubmit}>
+        <form className="space-y-4" onSubmit={onSubmit} noValidate>
           <FormField
             label={t("form.email")}
             type="email"
             placeholder="you@example.com"
-            error={errors.email?.message}
+            error={errors.email?.message && t(errors.email.message)}
             {...register("email")}
           />
 
           <FormField
             label={t("form.password")}
             type="password"
-            error={errors.password?.message}
+            error={errors.password?.message && t(errors.password.message)}
             {...register("password")}
           />
 

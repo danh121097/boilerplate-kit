@@ -27,9 +27,9 @@ definition's `.queryOptions()` so loader and component share one key + fetcher:
 
 ```ts
 // src/routes/users.tsx
-const useUsersList = defineQuery<User[]>({
+const useUsersList = defineQuery<PaginatedResponse<User>>({
   key: "users.list",
-  fetcher: () => getUsersServerFn(),
+  fetcher: () => withSessionRefresh(() => getUsersServerFn()),
 });
 
 export const Route = createFileRoute("/users")({
@@ -59,7 +59,9 @@ so keys stay unique and greppable. A unit test asserts the registry has no dupli
 resolves on the server during SSR and via RPC on the client, returning the
 `PaginatedResponse<User>` envelope (keeps `meta`). The route loader prefetches
 `useUsersListQuery.queryOptions()` and the component reads the same hook, so the
-SSR-hydrated cache renders with no refetch. Avoid defining a second query (e.g. an
+SSR-hydrated cache renders with no refetch. The page reads `data.data` (the user
+array), shows `users.empty` when it is empty, and formats a failure as
+`t("users.error", { message: error.error_message || error.message })`. Avoid defining a second query (e.g. an
 axios client variant) for the same resource — one key, one fetcher, one shape.
 
 ## Client state — Zustand

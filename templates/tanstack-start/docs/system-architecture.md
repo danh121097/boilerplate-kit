@@ -10,6 +10,7 @@ Detailed sub-topics:
 - [State management](./system-architecture/state-management.md)
 - [Build pipeline](./system-architecture/build-pipeline.md)
 - [Error handling](./system-architecture/error-handling.md)
+- [SSR & runtime config](./system-architecture/ssr-and-runtime-config.md)
 
 ## TanStack Start vs reactjs Template
 

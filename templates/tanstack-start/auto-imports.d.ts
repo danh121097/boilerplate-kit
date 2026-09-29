@@ -10,6 +10,16 @@ declare global {
   const Badge: typeof import('./src/components/ui/badge').Badge
   const Button: typeof import('./src/components/ui/button').Button
   const Card: typeof import('./src/components/ui/card').Card
+  const Dialog: typeof import('./src/components/ui/dialog').Dialog
+  const DialogClose: typeof import('./src/components/ui/dialog').DialogClose
+  const DialogContent: typeof import('./src/components/ui/dialog').DialogContent
+  const DialogDescription: typeof import('./src/components/ui/dialog').DialogDescription
+  const DialogFooter: typeof import('./src/components/ui/dialog').DialogFooter
+  const DialogHeader: typeof import('./src/components/ui/dialog').DialogHeader
+  const DialogOverlay: typeof import('./src/components/ui/dialog').DialogOverlay
+  const DialogPortal: typeof import('./src/components/ui/dialog').DialogPortal
+  const DialogTitle: typeof import('./src/components/ui/dialog').DialogTitle
+  const DialogTrigger: typeof import('./src/components/ui/dialog').DialogTrigger
   const FormField: typeof import('./src/components/ui/form-field').FormField
   const Fragment: typeof import('react').Fragment
   const Input: typeof import('./src/components/ui/input').Input

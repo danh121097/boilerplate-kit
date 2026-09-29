@@ -1,7 +1,11 @@
 import { useAuth, useLoginMutation } from "@/services/auth";
+import { loginSchema, type LoginFormValues } from "@/services/auth/login-schema";
+import { getApiErrorMessage } from "@/services/core/api-errors";
 import { redirectIfSignedIn } from "@/services/core/route-guard";
 import { safeRedirect } from "@/services/core/session";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { createFileRoute } from "@tanstack/react-router";
+import { useForm } from "react-hook-form";
 import type { FormEvent } from "react";
 
 export const Route = createFileRoute("/login")({
@@ -34,51 +38,61 @@ function LoginPage() {
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: "", password: "" },
+  });
 
   // Already signed in → no reason to show the form.
   useEffect(() => {
     if (isAuthenticated) void navigate({ href: returnTo });
   }, [isAuthenticated, navigate, returnTo]);
 
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    login.mutate({ email, password });
-  }
+  const submit = handleSubmit((values) => login.mutate(values));
+
+  // Clear the previous server error first: a submit that fails client validation
+  // never reaches the mutation, so its stale alert would otherwise stay visible.
+  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    login.reset();
+    return submit(event);
+  };
 
   return (
     <section>
       <h1 className="mb-4 text-3xl font-bold">{t("login.title")}</h1>
 
       <Card className="max-w-md">
-        <form onSubmit={onSubmit} className="space-y-4">
-          <div className="space-y-1">
-            <label className="text-sm font-medium">{t("login.email")}</label>
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              autoComplete="username"
-            />
-          </div>
+        <form onSubmit={onSubmit} className="space-y-4" noValidate>
+          <FormField
+            label={t("login.email")}
+            type="email"
+            placeholder="you@example.com"
+            autoComplete="username"
+            error={errors.email?.message && t(errors.email.message)}
+            {...register("email")}
+          />
 
-          <div className="space-y-1">
-            <label className="text-sm font-medium">{t("login.password")}</label>
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-            />
-          </div>
+          <FormField
+            label={t("login.password")}
+            type="password"
+            autoComplete="current-password"
+            error={errors.password?.message && t(errors.password.message)}
+            {...register("password")}
+          />
 
           <Button type="submit" block disabled={login.isPending}>
             {login.isPending ? t("login.submitting") : t("login.submit")}
           </Button>
 
-          {login.isError && <p className="text-sm text-red-600">{login.error.message}</p>}
+          {login.isError && (
+            <p role="alert" className="text-sm text-destructive">
+              {getApiErrorMessage(login.error, t("login.error"))}
+            </p>
+          )}
         </form>
       </Card>
     </section>

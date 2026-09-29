@@ -1,15 +1,18 @@
 import { SOCKET_EVENT, SOCKET_UNAUTHORIZED_MESSAGE } from "@/enums";
+import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import { useSocketIOStore } from "@/stores/socket-io";
-import Base64 from "crypto-js/enc-base64";
-import HmacSHA256 from "crypto-js/hmac-sha256";
+
+/** Delay before a failed connection is retried; errors inside it share one retry. */
+const RECONNECT_THROTTLE_MS = 2000;
 
 function signHeader(): { sig: string; ctime: number } | Record<string, never> {
-  const secret = import.meta.env.VITE_HMAC_SECRET;
-  if (!secret) return {};
-  const ctime = Date.now();
-  const stringToSign = ["GET", "application/json", ctime, "/socket", ""].join("\n");
-  const sig = Base64.stringify(HmacSHA256(stringToSign, secret));
-  return { sig, ctime };
+  const signed = HMACSignatureGenerator.signRequest({
+    method: "GET",
+    path: "/socket",
+    contentType: "application/json",
+  });
+  if (!signed) return {};
+  return { sig: signed.sig, ctime: signed.ctime };
 }
 
 function buildAuth() {
@@ -50,6 +53,9 @@ export function useSocketIO() {
 
     // Lazy-import keeps socket.io-client out of the SSR bundle entirely.
     let cancelled = false;
+    // Trailing timer: the first error schedules one reconnect, later errors inside
+    // the window share it, so a burst of errors cannot cause a reconnect storm.
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     import("socket.io-client").then(({ io }) => {
       if (cancelled) return;
 
@@ -75,9 +81,11 @@ export function useSocketIO() {
         }
         // Reconnect after a short delay — socket.io autoReconnect handles most
         // cases but explicit reconnect is needed for auth-rejected handshakes.
-        setTimeout(() => {
+        if (reconnectTimer) return;
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null;
           if (!cancelled) connectSocket();
-        }, 2000);
+        }, RECONNECT_THROTTLE_MS);
       };
       const handleUnauthorized = () => destroySocket();
 
@@ -96,6 +104,8 @@ export function useSocketIO() {
 
     return () => {
       cancelled = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      reconnectTimer = null;
       destroySocket();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

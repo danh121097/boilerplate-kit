@@ -17,14 +17,14 @@ suite.
 | Router | TanStack Router (file-based) | 1.x |
 | Data fetching | TanStack React Query | 5.x |
 | State | Zustand | 5 |
-| Forms | react-hook-form + zod | 7.x / 3.x |
+| Forms | react-hook-form + zod | 7.x / 4.x |
 | UI primitives | shadcn/ui (Radix) | new-york style |
 | Styling | Tailwind CSS | v4 |
 | HTTP | axios | 1.x |
 | i18n | react-i18next + i18next | 15.x / 24.x |
-| Tests | Vitest | 3.x |
+| Tests | Vitest | 4.x |
 | Package manager | pnpm | 9+ |
-| Language | TypeScript | 5.x strict |
+| Language | TypeScript | 6.x strict |
 
 ## Scripts
 
@@ -34,7 +34,8 @@ pnpm build        # tsc --noEmit + vite build
 pnpm typecheck    # tsc --noEmit
 pnpm test         # vitest run (node env)
 pnpm test:watch   # vitest watch
-pnpm lint         # eslint (flat config, jiti)
+pnpm lint         # eslint + prettier --check (read-only)
+pnpm lint:fix     # eslint --fix + prettier --write
 pnpm format       # prettier --write
 ```
 

@@ -13,6 +13,7 @@
 | Badge | `src/components/ui/badge.tsx` | cva variants: default / secondary / success / warning / danger |
 | Card | `src/components/ui/card.tsx` | thin `div` wrapper with `rounded-lg border bg-card` |
 | Input | `src/components/ui/input.tsx` | forwardRef native `<input>` with token classes |
+| Dialog | `src/components/ui/dialog.tsx` | `@radix-ui/react-dialog` primitives (Dialog, DialogTrigger, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription, DialogClose); the home page demo opens one |
 | FormField | `src/components/ui/form-field.tsx` | label + input + error message, `useId()` for a11y |
 
 ## Extending components

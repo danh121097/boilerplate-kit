@@ -29,10 +29,14 @@ templates/tanstack-start/
     │   └── form.tsx           # /form — react-hook-form + zod
     ├── server/
     │   └── get-users.ts       # createServerFn handler (server-only, no axios)
+    ├── components/
+    │   ├── not-found.tsx      # root notFoundComponent
+    │   └── mock-auth-badge.tsx
     ├── components/ui/
     │   ├── button.tsx
     │   ├── badge.tsx
     │   ├── card.tsx
+    │   ├── dialog.tsx         # Radix dialog primitives
     │   ├── input.tsx
     │   └── form-field.tsx
     ├── stores/

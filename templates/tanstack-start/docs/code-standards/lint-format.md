@@ -11,7 +11,8 @@ Active rule sets:
 - `eslint-plugin-react-hooks` recommended
 - `eslint-config-prettier` — disables formatting rules that conflict with Prettier
 
-Run: `pnpm lint`
+Run: `pnpm lint` (ESLint plus `prettier --check`, read-only — what CI runs) or
+`pnpm lint:fix` (ESLint `--fix` plus `prettier --write`).
 
 ## Prettier
 

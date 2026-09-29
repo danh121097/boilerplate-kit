@@ -1,4 +1,4 @@
-import { autoImportOptions } from "./vite.config";
+import { autoImportOptions } from "./vite.config.ts";
 import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vitest/config";
 import AutoImport from "unplugin-auto-import/vite";

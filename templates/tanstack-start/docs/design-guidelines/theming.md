@@ -2,6 +2,11 @@
 
 ## Light / dark mode
 
+The starter ships light tokens only and provides no dark-mode toggle; layouts and
+components use the tokens (`bg-background`, `text-foreground`, `bg-card`,
+`text-primary`, `border-border`) rather than fixed grays. The section below is a
+recipe for adding one.
+
 Dark mode is implemented via the `.dark` class on `<html>`. When `.dark` is
 present, the `.dark { ... }` block in `src/styles/tailwind.css` overrides the
 `:root` CSS variable values. Tailwind's `dark:` utility classes pick up the
