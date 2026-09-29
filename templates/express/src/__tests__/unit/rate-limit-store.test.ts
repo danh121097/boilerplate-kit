@@ -28,4 +28,25 @@ describe("makeStore", () => {
 
     expect(makeStore("rl:test:")).toBeInstanceOf(RedisStore);
   });
+
+  it("fails open at once when the client is not ready", async () => {
+    const call = vi.fn();
+    getRedisMock.mockReturnValue({ status: "reconnecting", call });
+    const { makeStore } = await import("@/middleware/rate-limit");
+    const { default: rateLimit } = await import("express-rate-limit");
+    const { default: express } = await import("express");
+    const { default: request } = await import("supertest");
+
+    const app = express();
+    app.use(rateLimit({ limit: 1, store: makeStore("rl:down:"), passOnStoreError: true }));
+    app.get("/", (_req, res) => {
+      res.json({ ok: true });
+    });
+
+    const started = Date.now();
+    expect((await request(app).get("/")).status).toBe(200);
+    expect((await request(app).get("/")).status).toBe(200);
+    expect(Date.now() - started).toBeLessThan(500);
+    expect(call).not.toHaveBeenCalled();
+  });
 });

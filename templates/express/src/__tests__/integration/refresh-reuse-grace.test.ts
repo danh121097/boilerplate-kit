@@ -160,6 +160,79 @@ describe("logout ends the whole session chain", () => {
   });
 });
 
+describe("revoke racing a refresh", () => {
+  /** Run `revoke` after the claim/grace check but before the new token is inserted. */
+  const interleave = (revoke: () => Promise<unknown>) => {
+    const original = RefreshToken.create.bind(RefreshToken);
+    return vi.spyOn(RefreshToken, "create").mockImplementationOnce((async (...args: unknown[]) => {
+      await revoke();
+      return (original as (...a: unknown[]) => unknown)(...args);
+    }) as never);
+  };
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it("normal rotation: a logout landing before the insert leaves no live token", async () => {
+    const { tokens: a } = await signUp();
+    interleave(() => logout(a.refreshToken));
+
+    await expect(refresh(a.refreshToken)).rejects.toMatchObject({ statusCode: 401 });
+    expect(await RefreshToken.countDocuments({ isRevoked: false })).toBe(0);
+  });
+
+  it("graced retry: a logout landing before the insert leaves no live token", async () => {
+    const { tokens: a } = await signUp();
+    const b = await refresh(a.refreshToken);
+    interleave(() => logout(b.refreshToken));
+
+    await expect(refresh(a.refreshToken)).rejects.toMatchObject({ statusCode: 401 });
+    expect(await RefreshToken.countDocuments({ isRevoked: false })).toBe(0);
+  });
+
+  it("graced retry: a user-wide reuse revoke before the insert leaves no live token", async () => {
+    const { userId, tokens: a } = await signUp();
+    await refresh(a.refreshToken);
+    interleave(() =>
+      RefreshToken.updateMany(
+        { userId: new mongoose.Types.ObjectId(userId) },
+        { $set: { isRevoked: true }, $unset: { rotatedAt: 1 } },
+      ),
+    );
+
+    await expect(refresh(a.refreshToken)).rejects.toMatchObject({ statusCode: 401 });
+    expect(await activeCount(userId)).toBe(0);
+  });
+
+  it("a revoke landing between the insert and the re-check leaves no live token", async () => {
+    const { tokens: a } = await signUp();
+    const b = await refresh(a.refreshToken);
+    const original = RefreshToken.exists.bind(RefreshToken);
+    vi.spyOn(RefreshToken, "exists").mockImplementationOnce((async (...args: unknown[]) => {
+      await logout(b.refreshToken);
+      return (original as (...x: unknown[]) => unknown)(...args);
+    }) as never);
+
+    await expect(refresh(a.refreshToken)).rejects.toMatchObject({ statusCode: 401 });
+    expect(await RefreshToken.countDocuments({ isRevoked: false })).toBe(0);
+  });
+
+  it("a revoke landing after the re-check still covers the new token", async () => {
+    const { tokens: a } = await signUp();
+    const b = await refresh(a.refreshToken);
+    await logout(b.refreshToken);
+    expect(await RefreshToken.countDocuments({ isRevoked: false })).toBe(0);
+  });
+
+  it("does not disturb another family when only one is revoked mid-refresh", async () => {
+    const { tokens: a } = await signUp();
+    const other = await login(creds.email, creds.password);
+    interleave(() => logout(a.refreshToken));
+
+    await expect(refresh(a.refreshToken)).rejects.toMatchObject({ statusCode: 401 });
+    await expect(refresh(other.tokens.refreshToken)).resolves.toBeDefined();
+  });
+});
+
 describe("logout without a known token", () => {
   it("does not touch sockets for an unknown refresh token", async () => {
     await logout("not-a-stored-token");

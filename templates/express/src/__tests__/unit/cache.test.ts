@@ -26,6 +26,7 @@ describe("cache helpers — enabled", () => {
   it("round-trips an object through set/get and deletes it", async () => {
     const store = new Map<string, string>();
     getRedisMock.mockReturnValue({
+      status: "ready",
       get: vi.fn(async (k: string) => store.get(k) ?? null),
       set: vi.fn(async (k: string, v: string) => {
         store.set(k, v);
@@ -46,7 +47,7 @@ describe("cache helpers — enabled", () => {
   });
 
   it("cacheGet returns null on malformed JSON instead of throwing", async () => {
-    getRedisMock.mockReturnValue({ get: vi.fn(async () => "not-json{") });
+    getRedisMock.mockReturnValue({ status: "ready", get: vi.fn(async () => "not-json{") });
     const { cacheGet } = await import("@/utils/cache");
 
     expect(await cacheGet("bad")).toBeNull();
@@ -54,6 +55,7 @@ describe("cache helpers — enabled", () => {
 
   it("fails open when the client throws", async () => {
     getRedisMock.mockReturnValue({
+      status: "ready",
       get: vi.fn(async () => {
         throw new Error("conn refused");
       }),
@@ -69,5 +71,22 @@ describe("cache helpers — enabled", () => {
     expect(await cacheGet("k")).toBeNull();
     await expect(cacheSet("k", 1, 60)).resolves.toBeUndefined();
     await expect(cacheDel("k")).resolves.toBeUndefined();
+  });
+});
+
+describe("cache helpers — Redis not ready", () => {
+  it("fails open at once without touching the client", async () => {
+    const get = vi.fn();
+    const set = vi.fn();
+    const del = vi.fn();
+    getRedisMock.mockReturnValue({ status: "reconnecting", get, set, del });
+    const { cacheGet, cacheSet, cacheDel } = await import("@/utils/cache");
+
+    expect(await cacheGet("k")).toBeNull();
+    await cacheSet("k", 1, 60);
+    await cacheDel("k");
+    expect(get).not.toHaveBeenCalled();
+    expect(set).not.toHaveBeenCalled();
+    expect(del).not.toHaveBeenCalled();
   });
 });

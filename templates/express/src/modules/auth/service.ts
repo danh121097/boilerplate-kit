@@ -179,6 +179,23 @@ export async function refresh(rawRefreshToken: string): Promise<AuthTokens> {
     storedToken.familyId,
   );
 
+  // A family/user revoke that ran between the claim (or grace check) and the insert
+  // above missed the new token, but it always $unsets the predecessor's `rotatedAt`
+  // (both claim and graced retry require it to be set). Predecessor no longer
+  // carrying it => revoked meanwhile: kill the new token and refuse.
+  const stillValid = await RefreshToken.exists({
+    _id: storedToken._id,
+    rotatedAt: { $exists: true },
+  });
+  if (!stillValid) {
+    await RefreshToken.updateOne({ token: hashToken(newRefreshToken) }, { isRevoked: true });
+    throw new AppError({
+      message: "Refresh token revoked!",
+      statusCode: 401,
+      errorType: "AUTHENTICATION_ERROR",
+    });
+  }
+
   return { accessToken, refreshToken: newRefreshToken };
 }
 

@@ -19,9 +19,12 @@ export function connectRedis(): void {
   }
 
   client = new Redis(config.redisUrl, {
-    // Bound the retry-per-command so a dead Redis fails fast and consumers can
-    // fall back (fail-open) instead of hanging requests.
+    // Fail fast so a dead Redis never stalls requests: commands issued while the
+    // client is not connected reject immediately (no offline queue), and a command
+    // on a live connection gives up after 1s. Consumers fail open on the rejection.
     maxRetriesPerRequest: 2,
+    enableOfflineQueue: false,
+    commandTimeout: 1000,
   });
 
   client.on("connect", () => logger.info("Redis connected"));

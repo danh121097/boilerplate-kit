@@ -31,7 +31,7 @@ limiting, and an optional Redis tier — all behind a declarative module pattern
   Stored SHA-256-hashed in MongoDB; rotated on every `/auth/refresh` (old revoked,
   new issued). Delivered as an httpOnly cookie scoped to `{API_PREFIX}/auth`.
 - **Revocation** — logout / ban records a per-user "revoked at" timestamp in Redis;
-  any access token with an earlier `iat` is rejected (no-op when Redis is off).
+  any access token issued earlier (by `iat_ms`) is rejected (no-op when Redis is off).
 
 ## HMAC Verification
 

@@ -76,7 +76,7 @@ self-test, and only `test`/`development` may fall back to an ephemeral in-memory
 keypair — any other env throws (fail-closed, never forge tokens silently). The
 keypair signs and verifies **access** tokens. Refresh tokens are signed and
 verified with `JWT_REFRESH_SECRET` — a symmetric secret (≥32 chars, required).
-The `JwtPayload` carries `{ userId, email, role }` only — never `exp`/`iat`
+The `JwtPayload` carries `{ userId, email, role }` only — never `exp`/`iat`/`iat_ms`
 (owned by `expiresIn`).
 
 ## RefreshToken Model
@@ -193,11 +193,15 @@ token, so replaying a recently rotated token after a family revoke stays a `401`
 A graced retry adds a further live token to the family (same `familyId`); each is
 rotated or revoked like any other.
 
-Limits of the grace window: a stolen token replayed within it is
+After inserting the new token, `refresh` re-checks (one `exists` query) that the
+predecessor still carries `rotatedAt`. Every family or user-wide revoke `$unset`s
+it, so if one ran between the claim/grace check and the insert, the new token is
+revoked and the request gets `401` (cookies cleared) instead of surviving the
+revoke.
+
+Limit of the grace window: a stolen token replayed within it is
 indistinguishable from a retry and mints another live token for that family
-(bounded by the window, and the next rotation or logout ends the chain). A graced
-retry racing a family revoke may leave one token alive; revocation is best
-effort under true concurrency.
+(bounded by the window, and the next rotation or logout ends the chain).
 
 ## Verifying Requests: `authenticate`
 
@@ -206,20 +210,27 @@ effort under true concurrency.
 1. Extract token from `Authorization: Bearer <t>` or the `accessToken` cookie.
 2. `verifyAccessToken` (throws → 401 "Invalid or expired access token!").
 3. **User-level revocation check** — `getUserRevokedAt(userId)`: if a cutoff
-   exists and the token's `iat` predates it, reject (401 "Token revoked!").
-   No-op when Redis is off.
+   exists and the token was issued before it, reject (401 "Token revoked!").
+   No-op when Redis is off, and fails open at once when the client is not ready.
 4. Attach `req.user = decoded` and `next()`.
 
 ## Access-Token Revocation
 
 Access tokens are short-lived and can't be individually unsigned, so logout/ban
-records a per-user "revoked at" epoch in Redis
-([`utils/token-revocation.ts`](../../src/utils/token-revocation.ts)). Any access
-token with `iat < revokedAt` is rejected by `authenticate` and the socket auth
-gate. The key auto-expires after one access-token lifetime
+records a per-user "revoked at" cutoff in Redis, in epoch **milliseconds**
+([`utils/token-revocation.ts`](../../src/utils/token-revocation.ts)). Access tokens
+carry an `iat_ms` claim (issue time in ms, next to the standard second-resolution
+`iat`); a token with `iat_ms < cutoff` is rejected by `authenticate` and the socket
+auth gate. Tokens without `iat_ms` fall back to `iat * 1000`, and cutoffs stored
+as seconds by older versions are scaled up, so a token issued in the same second
+as a logout is judged correctly (rejected if issued before it, valid if issued
+after, e.g. a re-login). With several instances this relies on their clocks agreeing
+(NTP); skew shifts the boundary by that much. The key auto-expires after one access-token lifetime
 (`accessTtlSeconds()`). When Redis is disabled, `revokeUserTokens` and
 `getUserRevokedAt` are no-ops — logout still works (the refresh token is revoked
-in Mongo) but outstanding access tokens simply live out their ≤15 min.
+in Mongo) but outstanding access tokens simply live out their ≤15 min. The same
+fail-open applies while Redis is down: `revokeUserTokens` skips the write with a
+warning and `getUserRevokedAt` returns `null` immediately.
 
 ## See Also
 

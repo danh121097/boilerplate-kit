@@ -1,11 +1,28 @@
 import { config } from "@/config/environment";
 import { getRedis } from "@/config/redis";
 import { AppError } from "@/types";
+import { logger } from "@/utils/logger";
+import { isRedisReady } from "@/utils/redis-ready";
 import rateLimit, { type RateLimitRequestHandler, type Store } from "express-rate-limit";
 import { RedisStore } from "rate-limit-redis";
 import type { NextFunction, Request, Response } from "express";
 
 const isTest = config.isTest;
+
+/**
+ * RedisStore loads its Lua scripts in `init()`, which express-rate-limit calls at
+ * startup, before Redis is ready (or while it is down). A failure there must not be an
+ * unhandled rejection; the store reloads the scripts on the first real increment.
+ */
+class ResilientRedisStore extends RedisStore {
+  override async init(options: Parameters<RedisStore["init"]>[0]): Promise<void> {
+    try {
+      await super.init(options);
+    } catch (err) {
+      logger.warn("Rate-limit store init failed; scripts load on first use", { err });
+    }
+  }
+}
 
 /**
  * Build a Redis-backed store when Redis is enabled so rate-limit counters are
@@ -16,10 +33,14 @@ const isTest = config.isTest;
 export function makeStore(prefix: string): Store | undefined {
   const client = getRedis();
   if (!client) return undefined;
-  return new RedisStore({
+  return new ResilientRedisStore({
     prefix,
+    // Not ready (outage/reconnecting): reject at once so the limiter fails open
+    // (passOnStoreError) instead of waiting on a client that cannot answer.
     sendCommand: (command: string, ...args: string[]) =>
-      client.call(command, ...args) as Promise<never>,
+      isRedisReady(client)
+        ? (client.call(command, ...args) as Promise<never>)
+        : Promise.reject(new Error("Redis not ready")),
   });
 }
 

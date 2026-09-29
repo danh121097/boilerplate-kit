@@ -1,11 +1,11 @@
+import { authenticate } from "@/middleware/auth";
+import { authRateLimiter, loginRateLimiter } from "@/middleware/rate-limit";
 import {
   loginSchema,
   refreshBodySchema,
   registerSchema,
   validate,
 } from "@/modules/auth/validation";
-import { authenticate } from "@/middleware/auth";
-import { authRateLimiter, loginRateLimiter } from "@/middleware/rate-limit";
 import type { RouteGroup } from "@/types/routing";
 import * as AuthController from "@/modules/auth/controller";
 

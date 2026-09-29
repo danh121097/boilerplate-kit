@@ -57,15 +57,51 @@ describe("socket emit helpers — initialized", () => {
 });
 
 describe("disconnectUserSockets", () => {
-  it("force-disconnects every socket in the user room", async () => {
+  it("drops local sockets first, then every socket in the user room cluster-wide", async () => {
+    const localDisconnect = vi.fn();
+    const localIn = vi.fn(() => ({ disconnectSockets: localDisconnect }));
     const disconnectSockets = vi.fn();
     const inRoom = vi.fn(() => ({ disconnectSockets }));
-    getIOMock.mockReturnValue({ in: inRoom });
+    getIOMock.mockReturnValue({ in: inRoom, local: { in: localIn } });
     const { disconnectUserSockets } = await import("@/utils/socket-emit");
 
     disconnectUserSockets("42");
 
+    expect(localIn).toHaveBeenCalledWith("user:42");
+    expect(localDisconnect).toHaveBeenCalledWith(true);
     expect(inRoom).toHaveBeenCalledWith("user:42");
     expect(disconnectSockets).toHaveBeenCalledWith(true);
+  });
+
+  it("still drops local sockets when the cluster-wide disconnect throws or rejects", async () => {
+    const localDisconnect = vi.fn();
+    getIOMock.mockReturnValue({
+      local: { in: () => ({ disconnectSockets: localDisconnect }) },
+      in: () => ({ disconnectSockets: () => Promise.reject(new Error("publish failed")) }),
+    });
+    const { disconnectUserSockets } = await import("@/utils/socket-emit");
+    expect(() => disconnectUserSockets("1")).not.toThrow();
+    expect(localDisconnect).toHaveBeenCalledWith(true);
+
+    getIOMock.mockReturnValue({
+      local: { in: () => ({ disconnectSockets: localDisconnect }) },
+      in: () => {
+        throw new Error("sync failure");
+      },
+    });
+    expect(() => disconnectUserSockets("1")).not.toThrow();
+  });
+
+  it("emit helpers swallow throws and rejections", async () => {
+    getIOMock.mockReturnValue({
+      to: () => ({ emit: () => Promise.reject(new Error("publish failed")) }),
+      emit: () => {
+        throw new Error("boom");
+      },
+    });
+    const { emitToUser, emitBroadcast } = await import("@/utils/socket-emit");
+    expect(() => emitToUser("1", SOCKET_EVENT.PING, {})).not.toThrow();
+    expect(() => emitBroadcast(SOCKET_EVENT.PING, {})).not.toThrow();
+    await new Promise((r) => setTimeout(r, 10));
   });
 });

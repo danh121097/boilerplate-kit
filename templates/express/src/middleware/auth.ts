@@ -1,7 +1,7 @@
 import { AppError } from "@/types";
 import { JwtPayload } from "@/types/auth";
 import { verifyAccessToken } from "@/utils/jwt";
-import { getUserRevokedAt } from "@/utils/token-revocation";
+import { getUserRevokedAt, isAccessTokenRevoked } from "@/utils/token-revocation";
 import { NextFunction, Request, Response } from "express";
 
 /** Extend Express Request to include authenticated user */
@@ -29,7 +29,7 @@ export async function authenticate(
   _res: Response,
   next: NextFunction,
 ): Promise<void> {
-  let decoded: JwtPayload & { iat?: number };
+  let decoded: JwtPayload & { iat?: number; iat_ms?: number };
   try {
     const token = extractAccessToken(req);
     if (!token) {
@@ -53,7 +53,7 @@ export async function authenticate(
   // User-level revocation: reject tokens issued before a logout/ban cutoff.
   // No-op when Redis is disabled (getUserRevokedAt returns null).
   const revokedAt = await getUserRevokedAt(decoded.userId);
-  if (revokedAt && decoded.iat && decoded.iat < revokedAt) {
+  if (isAccessTokenRevoked(decoded, revokedAt)) {
     throw new AppError({
       message: "Token revoked! Please log in again!",
       statusCode: 401,

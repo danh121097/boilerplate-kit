@@ -62,7 +62,11 @@ describe("redis client — enabled", () => {
     expect(ctorSpy).toHaveBeenCalledTimes(1);
     expect(ctorSpy).toHaveBeenCalledWith(
       "redis://localhost:6379",
-      expect.objectContaining({ maxRetriesPerRequest: 2 }),
+      expect.objectContaining({
+        maxRetriesPerRequest: 2,
+        enableOfflineQueue: false,
+        commandTimeout: 1000,
+      }),
     );
     expect(getRedis()).not.toBeNull();
   });

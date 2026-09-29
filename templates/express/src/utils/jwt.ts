@@ -20,11 +20,16 @@ const TOKEN_ISSUER = Array.isArray(config.corsOrigins) ? config.corsOrigins[0] :
 
 /** Sign a short-lived access token (RS256, 15min default) */
 export function signAccessToken(payload: JwtPayload): string {
-  return jwt.sign({ ...payload, token_use: "access" }, config.jwtAccessPrivateKey, {
-    algorithm: "RS256",
-    issuer: TOKEN_ISSUER,
-    expiresIn: config.jwtAccessExpiry as string & jwt.SignOptions["expiresIn"],
-  });
+  // iat_ms: issue time in ms, so revocation can tell same-second tokens apart (iat is seconds).
+  return jwt.sign(
+    { ...payload, token_use: "access", iat_ms: Date.now() },
+    config.jwtAccessPrivateKey,
+    {
+      algorithm: "RS256",
+      issuer: TOKEN_ISSUER,
+      expiresIn: config.jwtAccessExpiry as string & jwt.SignOptions["expiresIn"],
+    },
+  );
 }
 
 /** Verify access token with the public key; pin RS256 + issuer + token_use=access */

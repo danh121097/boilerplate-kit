@@ -86,7 +86,7 @@ to the `accessToken` cookie, then:
 ```ts
 const decoded = verifyAccessToken(token);
 const revokedAt = await getUserRevokedAt(decoded.userId);
-if (revokedAt && decoded.iat && decoded.iat < revokedAt) return next(new Error(SOCKET_UNAUTHORIZED));
+if (isAccessTokenRevoked(decoded, revokedAt)) return next(new Error(SOCKET_UNAUTHORIZED)); // iat_ms vs cutoff (ms)
 socket.data.user = decoded;
 ```
 
@@ -119,6 +119,18 @@ disconnectUserSockets(userId);        // getIO()?.in(`user:${userId}`).disconnec
 ```
 
 `emitToUser` targets the per-user room joined on connection.
+
+All three helpers catch synchronous throws and promise rejections and log them at
+`warn`; `disconnectUserSockets` drops this instance's sockets first, then the
+cluster-wide ones. The adapter is handed a client view whose `publish` failures are
+logged (the adapter fires publishes without catching them), and its duplicated
+subscriber has an `error` listener plus an offline queue with no retry cap, so a
+Redis outage never produces an unhandled rejection or exits the process.
+
+During an outage the cross-instance publish cannot go out: a logout disconnects the
+user's sockets on the instance that handled it, but sockets on other instances stay
+connected, and emits reach only local sockets. Those sockets are not re-authenticated
+until they reconnect.
 
 ## See Also
 

@@ -85,8 +85,11 @@ token revocation, and the socket adapter. It is intentionally optional:
 
 - Disabled unless `REDIS_ENABLED=true`; otherwise `getRedis()` returns `null` and
   every consumer degrades to its no-Redis behavior.
-- `maxRetriesPerRequest: 2` bounds retries so a dead Redis fails fast and consumers
-  fall back instead of hanging requests.
+- The client uses `enableOfflineQueue: false` and `commandTimeout: 1000`, and
+  consumers (rate-limit store, cache, revocation, health) short-circuit when the
+  client's `status` is not `ready`, so a dead Redis fails open immediately instead of
+  hanging requests (the adapter's subscriber is the exception; see
+  [realtime-socket.md](./realtime-socket.md)).
 - A Redis failure **never exits the process** (unlike MongoDB) — the app is
   designed to run fully without it.
 

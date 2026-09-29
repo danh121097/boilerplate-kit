@@ -48,6 +48,7 @@ describe("socket core — enabled Redis", () => {
       subscribe: vi.fn(ack),
       psubscribe: vi.fn(ack),
       on: vi.fn(),
+      status: "ready",
       quit: vi.fn().mockResolvedValue("OK"),
     };
     const pub = {
@@ -63,6 +64,11 @@ describe("socket core — enabled Redis", () => {
     initSocket(httpServer);
 
     expect(pub.duplicate).toHaveBeenCalledTimes(1);
+    // The subscriber keeps a queue, has no retry cap/timeout, and has an error listener.
+    expect(pub.duplicate).toHaveBeenCalledWith(
+      expect.objectContaining({ enableOfflineQueue: true, maxRetriesPerRequest: null }),
+    );
+    expect(sub.on).toHaveBeenCalledWith("error", expect.any(Function));
 
     await closeSocket();
     expect(sub.quit).toHaveBeenCalledTimes(1);

@@ -1,4 +1,5 @@
 import { getRedis } from "@/config/redis";
+import { isRedisReady } from "@/utils/redis-ready";
 import { Request, Response } from "express";
 import type { RouteGroup } from "@/types/routing";
 import mongoose from "mongoose";
@@ -7,6 +8,7 @@ import mongoose from "mongoose";
 async function getRedisStatus(): Promise<string> {
   const client = getRedis();
   if (!client) return "disabled";
+  if (!isRedisReady(client)) return "down";
   try {
     await client.ping();
     return "up";

@@ -3,6 +3,7 @@ import { getRedis } from "@/config/redis";
 import { socketAuth } from "@/socket/auth-middleware";
 import { SOCKET_EVENT } from "@/socket/events";
 import { socketHmac } from "@/socket/hmac-middleware";
+import { logger } from "@/utils/logger";
 import { createAdapter } from "@socket.io/redis-adapter";
 import { Server, type Socket } from "socket.io";
 import type { Server as HttpServer } from "http";
@@ -16,6 +17,27 @@ import type { Redis } from "ioredis";
  */
 let io: Server | null = null;
 let subClient: Redis | null = null;
+
+/**
+ * The adapter fires `publish` without awaiting or catching it, so a rejection during
+ * a Redis outage would be an unhandled rejection. Hand it a view of the client whose
+ * publish failures are logged instead.
+ */
+function withSafePublish(client: Redis): Redis {
+  return new Proxy(client, {
+    get(target, prop): unknown {
+      if (prop === "publish") {
+        return (...args: Parameters<Redis["publish"]>): Promise<number> =>
+          Promise.resolve(target.publish(...args)).catch((err: unknown) => {
+            logger.warn("Socket.IO Redis publish failed", { err });
+            return 0;
+          });
+      }
+      const value = Reflect.get(target, prop, target);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+}
 
 /** Create the Socket.IO server, wire auth + (optional) Redis adapter, return it. */
 export function initSocket(httpServer: HttpServer): Server {
@@ -33,8 +55,17 @@ export function initSocket(httpServer: HttpServer): Server {
   if (pub) {
     // sub is owned here (quit in closeSocket); pub is the shared app client,
     // quit by disconnectRedis. Never quit pub here — would double-close it.
-    subClient = pub.duplicate();
-    io.adapter(createAdapter(pub, subClient));
+    // The adapter subscribes without awaiting, before the socket is connected: the
+    // subscriber must queue those commands and wait for the connection (no retry cap,
+    // no timeout) rather than reject unhandled. The shared client's fail-fast options
+    // are for request-path commands only.
+    subClient = pub.duplicate({
+      enableOfflineQueue: true,
+      commandTimeout: undefined,
+      maxRetriesPerRequest: null,
+    });
+    subClient.on("error", (err) => logger.warn("Socket.IO Redis subscriber error", { err }));
+    io.adapter(createAdapter(withSafePublish(pub), subClient));
   }
 
   // Reject unauthenticated handshakes before any connection is established.
@@ -68,7 +99,9 @@ export async function closeSocket(): Promise<void> {
     io = null;
   }
   if (subClient) {
-    await subClient.quit();
+    // quit() needs a live connection; drop a dead subscriber instead of hanging.
+    if (subClient.status === "ready") await subClient.quit();
+    else subClient.disconnect();
     subClient = null;
   }
 }

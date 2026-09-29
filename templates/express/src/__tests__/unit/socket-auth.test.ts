@@ -83,8 +83,8 @@ describe("socketAuth", () => {
   });
 
   it("rejects a token issued before the revoke cutoff (Redis on)", async () => {
-    const future = Math.floor(Date.now() / 1000) + 3600;
-    getRedisMock.mockReturnValue({ get: vi.fn(async () => String(future)) });
+    const future = Date.now() + 3_600_000;
+    getRedisMock.mockReturnValue({ status: "ready", get: vi.fn(async () => String(future)) });
     const { socketAuth, signAccessToken } = await load();
     const next = vi.fn();
 

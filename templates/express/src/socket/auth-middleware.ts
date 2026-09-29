@@ -1,7 +1,7 @@
 import { SOCKET_UNAUTHORIZED } from "@/socket/events";
 import { JwtPayload } from "@/types/auth";
 import { verifyAccessToken } from "@/utils/jwt";
-import { getUserRevokedAt } from "@/utils/token-revocation";
+import { getUserRevokedAt, isAccessTokenRevoked } from "@/utils/token-revocation";
 import type { Socket } from "socket.io";
 
 /** Read a single cookie value from a raw Cookie header. */
@@ -36,10 +36,10 @@ export async function socketAuth(socket: Socket, next: (err?: Error) => void): P
       return next(new Error(SOCKET_UNAUTHORIZED));
     }
 
-    const decoded = verifyAccessToken(token) as JwtPayload & { iat?: number };
+    const decoded = verifyAccessToken(token) as JwtPayload & { iat?: number; iat_ms?: number };
 
     const revokedAt = await getUserRevokedAt(decoded.userId);
-    if (revokedAt && decoded.iat && decoded.iat < revokedAt) {
+    if (isAccessTokenRevoked(decoded, revokedAt)) {
       return next(new Error(SOCKET_UNAUTHORIZED));
     }
 

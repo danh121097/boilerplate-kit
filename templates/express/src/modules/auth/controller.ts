@@ -1,7 +1,7 @@
+import { AppError } from "@/types";
 import { clearTokenCookies, setTokenCookies } from "@/utils/cookie";
 import { Request, Response } from "express";
 import * as AuthService from "@/modules/auth/service";
-import { AppError } from "@/types";
 
 /** POST /api/auth/register */
 export async function register(req: Request, res: Response): Promise<void> {
