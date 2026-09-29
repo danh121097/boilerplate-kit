@@ -52,4 +52,21 @@ describe("Redis adapter during an outage", () => {
     await new Promise((r) => setTimeout(r, 500));
     expect(unhandled).toEqual([]);
   });
+
+  it("closing the adapter while the subscriber is still connecting raises no unhandled rejection", async () => {
+    const client = new IORedis("redis://127.0.0.1:1", {
+      maxRetriesPerRequest: 2,
+      enableOfflineQueue: false,
+      commandTimeout: 1000,
+      lazyConnect: true,
+    });
+    client.on("error", () => undefined);
+    const closing = new SocketIoAdapter(app, client);
+    const server = closing.createIOServer(0) as Server;
+    // The adapter queued (p)subscribe on the duplicate, which has not connected yet.
+    await closing.close(server);
+    await new Promise((r) => setTimeout(r, 500));
+    client.disconnect();
+    expect(unhandled).toEqual([]);
+  });
 });

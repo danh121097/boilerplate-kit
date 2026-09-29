@@ -5,13 +5,15 @@
  *     standard error envelope, not 500, and are not logged at error level
  *   - Zod validation failures carry the issue messages joined with ", "
  *   - bodyless refresh/logout behave like `{}`; an empty body token falls back to the cookie
+ *   - the test server is bound to loopback, so supertest never opens a wildcard
+ *     port per request that a foreign 127.0.0.1 listener could shadow
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import supertest from "supertest";
 
 import { AppLogger } from "@/common/logger/app-logger.service";
 import { INestApplication } from "@nestjs/common";
-import { createTestApp } from "../helpers/create-test-app";
+import { createTestApp, TEST_HOST } from "../helpers/create-test-app";
 import { buildHmacHeaders } from "../helpers/sign-request";
 
 let app: INestApplication;
@@ -35,6 +37,13 @@ function signedPost(path: string, body?: unknown) {
 }
 
 const ENVELOPE = { success: false, status: "error" };
+
+describe("Test server binding", () => {
+  it("listens on a loopback port before any request is made", () => {
+    const addr = (app.getHttpServer() as import("http").Server).address();
+    expect(addr).toMatchObject({ address: TEST_HOST });
+  });
+});
 
 describe("CORS preflight", () => {
   it("allows the sig and ctime request headers for an allowed origin", async () => {

@@ -26,3 +26,36 @@ export function createSafePubClient(pub: Redis, warn: (message: string) => void)
     },
   });
 }
+
+const SUBSCRIPTION_METHODS = new Set<PropertyKey>([
+  "subscribe",
+  "psubscribe",
+  "unsubscribe",
+  "punsubscribe",
+]);
+
+/**
+ * Wrap the duplicated subscriber for @socket.io/redis-adapter, which calls
+ * (p)subscribe and (p)unsubscribe without awaiting or catching them. Commands
+ * queued while the client is still connecting reject with "Connection is closed"
+ * when it is disconnected (e.g. shutdown with Redis down) and would be unhandled
+ * rejections. The proxy logs those at warn and resolves 0; the raw client stays
+ * with the owner for quit()/disconnect().
+ */
+export function createSafeSubClient(sub: Redis, warn: (message: string) => void): Redis {
+  return new Proxy(sub, {
+    get(target, prop): unknown {
+      const value = Reflect.get(target, prop, target) as unknown;
+      if (typeof value !== "function") return value;
+      const fn = (value as (...a: unknown[]) => unknown).bind(target);
+      if (!SUBSCRIPTION_METHODS.has(prop)) return fn;
+      return (...args: unknown[]): Promise<unknown> =>
+        Promise.resolve(fn(...args)).catch((err: unknown) => {
+          warn(
+            `socket adapter ${String(prop)} failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+          return 0;
+        });
+    },
+  });
+}

@@ -66,9 +66,10 @@ export class RedisModule implements OnModuleDestroy {
     // Single shutdown owner for the shared pub client.
     const client = this.redisService.getClient();
     if (client) {
-      client.quit().catch(() => {
-        // Ignore quit errors on shutdown — process is exiting anyway.
-      });
+      // QUIT needs a live connection; drop a client that is not ready instead, and
+      // fall back to disconnect if QUIT fails — process is exiting anyway.
+      if (client.status === "ready") client.quit().catch(() => client.disconnect());
+      else client.disconnect();
     }
   }
 }

@@ -8,9 +8,8 @@
  *   - Polling handshake from an allowed Origin carries CORS headers (Redis off).
  *   - Logout and a reuse-detected family revoke disconnect the user's sockets.
  *
- * The socket test boots its own app instance and calls app.listen() so the
- * HTTP server is actually bound to a port (required for Socket.IO to work).
- * supertest works without listen() but Socket.IO needs a real TCP port.
+ * The socket test boots its own app instance; createTestApp binds its HTTP
+ * server to a loopback port, which Socket.IO needs (supertest alone would not).
  *
  * If SKIP_SOCKET_TESTS=true these tests are skipped (useful in CI without
  * a stable network interface). All critical security paths are also covered
@@ -22,7 +21,7 @@ import supertest from "supertest";
 
 import { INestApplication } from "@nestjs/common";
 import { buildHmacHeaders, signSocketHandshake } from "../helpers/sign-request";
-import { createTestApp } from "../helpers/create-test-app";
+import { createTestApp, TEST_HOST } from "../helpers/create-test-app";
 import { backdateRotation } from "../helpers/refresh-token-db";
 import { REFRESH_REUSE_GRACE_MS } from "@/modules/auth/refresh-session.service";
 
@@ -36,10 +35,7 @@ let port: number;
 beforeAll(async () => {
   if (SKIP) return;
   app = await createTestApp();
-  // Must call listen() so the underlying HTTP server binds to a TCP port —
-  // Socket.IO requires a real port (supertest.getHttpServer() alone isn't enough).
-  await app.listen(0); // OS assigns a free port
-  // Retrieve assigned port from the bound HTTP server.
+  // createTestApp binds the HTTP server to a loopback port, which Socket.IO needs.
   const httpServer = app.getHttpServer() as import("http").Server;
   const addr = httpServer.address();
   port = typeof addr === "object" && addr !== null ? addr.port : 0;
@@ -119,7 +115,7 @@ function connectAndWait(
   extraHeaders: Record<string, string> = {},
 ): Promise<{ socket: Socket; event: string; data?: unknown }> {
   return new Promise((resolve, reject) => {
-    const socket = io(`http://localhost:${port}`, {
+    const socket = io(`http://${TEST_HOST}:${port}`, {
       transports: ["websocket"],
       auth: authPayload,
       extraHeaders,
@@ -194,7 +190,7 @@ describe("Socket.IO gateway handshake", () => {
   it.skipIf(SKIP)(
     "polling handshake from an allowed origin returns CORS headers",
     async () => {
-      const res = await fetch(`http://localhost:${port}/socket.io/?EIO=4&transport=polling`, {
+      const res = await fetch(`http://${TEST_HOST}:${port}/socket.io/?EIO=4&transport=polling`, {
         headers: { Origin: "http://localhost:5173" },
       });
       expect(res.headers.get("access-control-allow-origin")).toBe("http://localhost:5173");

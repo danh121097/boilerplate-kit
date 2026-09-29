@@ -1,6 +1,6 @@
 import { AppLogger } from "@/common/logger/app-logger.service";
 import { AppConfigService } from "@/config/app-config.service";
-import { createSafePubClient } from "@/redis/safe-pub-client";
+import { createSafePubClient, createSafeSubClient } from "@/redis/safe-pub-client";
 import { INestApplication } from "@nestjs/common";
 import { IoAdapter } from "@nestjs/platform-socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
@@ -65,7 +65,12 @@ export class SocketIoAdapter extends IoAdapter {
         maxRetriesPerRequest: null,
       });
       this.subClient.on("error", (err: Error) => warn(`Redis subscriber error: ${err.message}`));
-      server.adapter(createAdapter(createSafePubClient(this.pubClient, warn), this.subClient));
+      server.adapter(
+        createAdapter(
+          createSafePubClient(this.pubClient, warn),
+          createSafeSubClient(this.subClient, warn),
+        ),
+      );
     }
     return server;
   }

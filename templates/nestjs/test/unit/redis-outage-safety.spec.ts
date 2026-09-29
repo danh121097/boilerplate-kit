@@ -14,7 +14,7 @@ import { CacheService } from "@/common/services/cache.service";
 import { SocketEmitService } from "@/modules/realtime/socket-emit.service";
 import { HealthController } from "@/modules/health/health.controller";
 import { RedisService } from "@/redis/redis.service";
-import { createSafePubClient } from "@/redis/safe-pub-client";
+import { createSafePubClient, createSafeSubClient } from "@/redis/safe-pub-client";
 import type { Redis } from "ioredis";
 
 const notReady = () => {
@@ -120,5 +120,32 @@ describe("rate-limit storage with a not-ready client", () => {
     });
     expect(allowed).toBe(true);
     expect(client.call).not.toHaveBeenCalled();
+  });
+});
+
+describe("createSafeSubClient", () => {
+  it("logs rejected (p)subscribe/(p)unsubscribe and leaves other calls untouched", async () => {
+    const reject = () => vi.fn().mockRejectedValue(new Error("Connection is closed."));
+    const sub = {
+      subscribe: reject(),
+      psubscribe: reject(),
+      unsubscribe: reject(),
+      punsubscribe: reject(),
+      quit: vi.fn().mockResolvedValue("OK"),
+      status: "connecting",
+    };
+    const warn = vi.fn();
+    const safe = createSafeSubClient(sub as unknown as Redis, warn);
+
+    const results = await Promise.all([
+      safe.subscribe("a"),
+      safe.psubscribe("b*"),
+      safe.unsubscribe("a"),
+      safe.punsubscribe("b*"),
+    ]);
+    expect(results).toEqual([0, 0, 0, 0]);
+    expect(warn).toHaveBeenCalledTimes(4);
+    expect(await safe.quit()).toBe("OK");
+    expect(safe.status).toBe("connecting");
   });
 });
