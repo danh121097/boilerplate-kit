@@ -1,12 +1,16 @@
-import { SOCKET_EVENT, SOCKET_UNAUTHORIZED_MESSAGE } from "@/enums";
+import { SOCKET_EVENT } from "@/enums";
 import { getAccessToken } from "@/services/core/auth-token-storage";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import { useSocketIOStore } from "@/stores/socket-io";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 
-/** Minimum gap between automatic reconnect attempts after connect errors. */
-const RECONNECT_THROTTLE_MS = 2000;
+/** First delay before retrying a handshake the server rejected; doubles per attempt. */
+const RECONNECT_BASE_MS = 2000;
+/** Upper bound of the retry delay. */
+const RECONNECT_MAX_MS = 30_000;
+/** Disconnect reason when the server closed the socket; socket.io does not reconnect on its own. */
+const SERVER_DISCONNECT = "io server disconnect";
 
 /**
  * Build the per-handshake `{ sig, ctime }` headers expected by HMAC-protected
@@ -46,18 +50,31 @@ async function refreshAuth(socket: Socket): Promise<void> {
  * - Connects on mount, disconnects on unmount.
  * - Auth payload: `{ token: 'Bearer <ACCESS_TOKEN>', role: 'user', ...HMACHeaders }`
  *   (the token is resolved asynchronously from SecureStore).
- * - Reconnect is throttled to avoid hammering the server on rapid errors.
+ * - `authenticated` becomes true only when the server emits `authenticated`; it is
+ *   false after `connect_error`, `disconnect` and destroy.
+ * - A rejected handshake (`socket.active` false) is retried on the same socket with
+ *   exponential backoff (`RECONNECT_BASE_MS` doubling up to `RECONNECT_MAX_MS`), one
+ *   pending retry at a time, with fresh auth. While socket.io is auto-reconnecting
+ *   (`socket.active` true, e.g. server down) nothing extra is scheduled.
  * - Exposes `socket`, `authenticated`, `connectSocket`, `destroySocket`.
  */
 export function useSocketIO() {
   const URL = process.env.EXPO_PUBLIC_APP_ENDPOINT ?? "";
 
-  // Throttle ref to prevent rapid reconnect storms.
+  // Pending manual retry (at most one) and how many retries were scheduled since the last success.
   const reConnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const attemptRef = useRef(0);
 
   // Bumped by every connect and destroy: a connect whose auth read finishes after a
   // newer connect or a destroy (unmount, StrictMode remount) is stale and must not open the socket.
   const connectEpochRef = useRef(0);
+
+  const clearRetry = useCallback(() => {
+    if (reConnectTimerRef.current) {
+      clearTimeout(reConnectTimerRef.current);
+      reConnectTimerRef.current = null;
+    }
+  }, []);
 
   const { authenticated, setSocketIO } = useSocketIOStore();
 
@@ -76,42 +93,54 @@ export function useSocketIO() {
     const epoch = ++connectEpochRef.current;
     await refreshAuth(socket);
     if (epoch !== connectEpochRef.current) return;
-    if (socket.connected) {
-      setSocketIO({ authenticated: true, socket });
-      return;
-    }
-    socket.connect();
-    setSocketIO({ authenticated: true, socket });
+    // `authenticated` stays false until the server confirms it.
+    setSocketIO({ socket });
+    if (!socket.connected) socket.connect();
   }, [socket, setSocketIO]);
 
   const destroySocket = useCallback(() => {
     connectEpochRef.current++;
+    clearRetry();
+    attemptRef.current = 0;
     socket.disconnect();
     if (useSocketIOStore.getState().socket === socket) {
       setSocketIO({ authenticated: false, socket: null });
     }
-  }, [socket, setSocketIO]);
+  }, [socket, setSocketIO, clearRetry]);
 
-  const reConnect = useCallback(() => {
+  // The server rejected the handshake: retry once after an exponentially growing delay.
+  const scheduleRetry = useCallback(() => {
     if (reConnectTimerRef.current) return;
+    const delay = Math.min(RECONNECT_BASE_MS * 2 ** attemptRef.current, RECONNECT_MAX_MS);
+    attemptRef.current++;
     reConnectTimerRef.current = setTimeout(() => {
       reConnectTimerRef.current = null;
-      destroySocket();
       void connectSocket();
-    }, RECONNECT_THROTTLE_MS);
-  }, [connectSocket, destroySocket]);
+    }, delay);
+  }, [connectSocket]);
 
   useEffect(() => {
-    const handleAuthenticated = () => setSocketIO({ authenticated: true, socket });
-    const handleConnectError = (e: Error) => {
-      if (e.message === SOCKET_UNAUTHORIZED_MESSAGE) setSocketIO({ authenticated: false });
-      reConnect();
+    const handleAuthenticated = () => {
+      attemptRef.current = 0;
+      setSocketIO({ authenticated: true, socket });
+    };
+    const handleConnectError = () => {
+      setSocketIO({ authenticated: false });
+      // socket.io is already retrying by itself while `active`; only a rejected handshake needs us.
+      if (!socket.active) scheduleRetry();
+    };
+    const handleDisconnect = (reason: string) => {
+      setSocketIO({ authenticated: false });
+      // socket.io never reconnects after the server closes the socket itself (e.g. a
+      // graceful restart), so that case joins the same backoff as a rejected handshake.
+      if (reason === SERVER_DISCONNECT) scheduleRetry();
     };
     const handleUnauthorized = () => destroySocket();
 
     socket.on(SOCKET_EVENT.AUTHENTICATED, handleAuthenticated);
     socket.on(SOCKET_EVENT.CONNECT_ERROR, handleConnectError);
     socket.on(SOCKET_EVENT.UNAUTHORIZED, handleUnauthorized);
+    socket.on(SOCKET_EVENT.DISCONNECT, handleDisconnect);
 
     void connectSocket();
 
@@ -119,13 +148,10 @@ export function useSocketIO() {
       socket.off(SOCKET_EVENT.AUTHENTICATED, handleAuthenticated);
       socket.off(SOCKET_EVENT.CONNECT_ERROR, handleConnectError);
       socket.off(SOCKET_EVENT.UNAUTHORIZED, handleUnauthorized);
+      socket.off(SOCKET_EVENT.DISCONNECT, handleDisconnect);
       destroySocket();
-      if (reConnectTimerRef.current) {
-        clearTimeout(reConnectTimerRef.current);
-        reConnectTimerRef.current = null;
-      }
     };
-    // connectSocket/destroySocket/reConnect are stable callbacks — safe to omit
+    // connectSocket/destroySocket/scheduleRetry are stable callbacks — safe to omit
     // from the dep array to prevent reconnection on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

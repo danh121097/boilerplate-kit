@@ -9,6 +9,10 @@ export default {
     unavailable: "Could not reach the server. You are still signed in.",
     retry: "Retry",
   },
+  socket: {
+    connected: "Realtime connected",
+    reconnecting: "Realtime reconnecting",
+  },
   validation: {
     email: "Enter a valid email address",
     password_min: "Password must be at least 8 characters",

@@ -25,6 +25,7 @@ templates/react-native/
 ├── AGENTS.md / CLAUDE.md / README.md
 ├── docs/                      # technical docs
 └── src/
+    ├── components/            # SessionBanner, SocketStatus
     ├── components/ui/         # NativeWind primitives
     │   ├── button.tsx
     │   ├── card.tsx

@@ -1,4 +1,6 @@
 import { SessionBanner } from "@/components/session-banner";
+import { SocketStatus } from "@/components/socket-status";
+import { useSocketIO } from "@/hooks/useSocketIO";
 import { useAuthStore } from "@/stores/auth";
 import { Redirect, Stack, usePathname } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
@@ -33,9 +35,19 @@ export default function AppLayout() {
     );
   }
 
+  return <SignedInLayout />;
+}
+
+/**
+ * Mounted only while signed in: owns the socket (opened on mount, closed on
+ * logout) and shows its status dot in every screen's native header.
+ */
+function SignedInLayout() {
+  useSocketIO();
+
   return (
     <View className="flex-1">
-      <Stack screenOptions={{ headerShown: true }} />
+      <Stack screenOptions={{ headerShown: true, headerRight: () => <SocketStatus /> }} />
       <SessionBanner />
     </View>
   );
