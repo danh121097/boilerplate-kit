@@ -29,6 +29,7 @@ src/services/
 │   └── index.ts
 └── users/
     ├── users.ts            # UsersModel + useUsersListQuery
+    ├── mock-users.ts       # Dev-only mock /users fixture (EXPO_PUBLIC_AUTH_MOCK)
     ├── types/user.ts       # User, UpdateUserPayload
     └── index.ts
 ```

@@ -38,13 +38,13 @@ template in this kit works out of the box). Every `EXPO_PUBLIC_*` var is inlined
 into the JS bundle at build time — never put real secrets there.
 
 ```sh
-# Optional, dev only — answer /auth/* in the app before the backend auth exists
+# Optional, dev only — answer /auth/* and /users in the app before the backend exists
 # EXPO_PUBLIC_AUTH_MOCK=true
 # EXPO_PUBLIC_AUTH_MOCK_EMAIL=demo@example.com
 # EXPO_PUBLIC_AUTH_MOCK_PASSWORD=password
 ```
 
-See [Mock auth](./docs/system-architecture/security-auth.md#mock-auth-before-backend-integration): the flag is ignored in production builds.
+See [Mock auth](./docs/system-architecture/security-auth.md#mock-auth-before-backend-integration): mock mode answers auth and users; the flag is ignored in production builds.
 
 ## Scripts
 

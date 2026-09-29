@@ -72,7 +72,7 @@ describe("mock auth", () => {
     const app = boot();
     const result = await app.AuthModel.login(DEMO);
 
-    expect(result.user).toMatchObject({ email: DEMO.email, role: "user" });
+    expect(result.user).toMatchObject({ email: DEMO.email, role: "admin" });
     await expect(app.getAccessToken("MAIN")).resolves.toBe(result.tokens.accessToken);
     await expect(app.getRefreshToken("MAIN")).resolves.toBe(result.tokens.refreshToken);
     await expect(app.AuthModel.getMe()).resolves.toEqual(result.user);
@@ -94,7 +94,7 @@ describe("mock auth", () => {
     const app = boot();
 
     const result = await app.AuthModel.login(DEMO);
-    expect(result.user).toMatchObject({ email: DEMO.email, role: "user" });
+    expect(result.user).toMatchObject({ email: DEMO.email, role: "admin" });
     expect(backend).not.toHaveBeenCalled();
   });
 
