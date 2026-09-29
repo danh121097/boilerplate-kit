@@ -73,7 +73,7 @@ export class RefreshSessionService {
     );
 
     if (!claimedToken) return this.resolveUnclaimableToken(hashedToken);
-    return this.issueForActiveUser(claimedToken.userId, claimedToken.familyId);
+    return this.issueSuccessor(claimedToken);
   }
 
   /**
@@ -121,7 +121,7 @@ export class RefreshSessionService {
 
     if (storedToken.isRevoked) {
       if (this.isWithinReuseGrace(storedToken)) {
-        return this.issueForActiveUser(storedToken.userId, storedToken.familyId);
+        return this.issueSuccessor(storedToken);
       }
       await this.revokeFamily(storedToken.userId);
       throw new AppException({
@@ -161,8 +161,20 @@ export class RefreshSessionService {
     this.socketEmit.disconnectUser(String(userId));
   }
 
-  private async issueForActiveUser(userId: Types.ObjectId, familyId?: string): Promise<AuthTokens> {
-    const user = await this.userModel.findById(userId);
+  /**
+   * Issue the successor N of a consumed token P (the one just claimed, or the
+   * graced one). N is inserted first, then P is re-read: every revoke path
+   * (family logout, user-wide reuse) $unsets P's rotatedAt, so a missing rotatedAt
+   * means a revoke landed before N existed and could not cover it. N is then
+   * revoked and the refresh refused. A revoke after N's insert already covers N
+   * through its updateMany.
+   */
+  private async issueSuccessor(predecessor: {
+    _id: Types.ObjectId;
+    userId: Types.ObjectId;
+    familyId?: string;
+  }): Promise<AuthTokens> {
+    const user = await this.userModel.findById(predecessor.userId);
     if (!user || !user.isActive) {
       throw new AppException({
         message: "User not found or inactive!",
@@ -170,6 +182,21 @@ export class RefreshSessionService {
         errorType: "AUTHENTICATION_ERROR",
       });
     }
-    return this.issueTokens(user, familyId);
+
+    const tokens = await this.issueTokens(user, predecessor.familyId);
+
+    const current = await this.refreshTokenModel.findById(predecessor._id).select("rotatedAt");
+    if (!current?.rotatedAt) {
+      await this.refreshTokenModel.updateOne(
+        { token: this.tokenService.hashToken(tokens.refreshToken) },
+        { isRevoked: true },
+      );
+      throw new AppException({
+        message: "Refresh token revoked!",
+        statusCode: 401,
+        errorType: "AUTHENTICATION_ERROR",
+      });
+    }
+    return tokens;
   }
 }

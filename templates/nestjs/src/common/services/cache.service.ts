@@ -1,4 +1,5 @@
 import { AppLogger } from "@/common/logger/app-logger.service";
+import { isRedisReady } from "@/redis/redis-ready.util";
 import { RedisService } from "@/redis/redis.service";
 import { Injectable } from "@nestjs/common";
 
@@ -7,7 +8,7 @@ import { Injectable } from "@nestjs/common";
  *
  * Transparent no-ops when Redis is off so callers never branch on enabled/disabled.
  * Fail-open on Redis errors (return null / swallow) so a cache outage never breaks
- * the request path. Values are JSON-serialized automatically.
+ * the request path, and short-circuit at once when the client is not ready. Values are JSON-serialized automatically.
  */
 @Injectable()
 export class CacheService {
@@ -19,7 +20,7 @@ export class CacheService {
   /** Get and JSON-parse a cached value; null when missing, disabled, or on error. */
   async get<T>(key: string): Promise<T | null> {
     const client = this.redis.getClient();
-    if (!client) return null;
+    if (!isRedisReady(client)) return null;
     try {
       const raw = await client.get(key);
       return raw ? (JSON.parse(raw) as T) : null;
@@ -32,7 +33,7 @@ export class CacheService {
   /** JSON-serialize and store a value with a TTL in seconds; no-op when disabled. */
   async set(key: string, value: unknown, ttlSeconds: number): Promise<void> {
     const client = this.redis.getClient();
-    if (!client) return;
+    if (!isRedisReady(client)) return;
     try {
       await client.set(key, JSON.stringify(value), "EX", ttlSeconds);
     } catch (err) {
@@ -43,7 +44,7 @@ export class CacheService {
   /** Delete a cached key; no-op when disabled. */
   async del(key: string): Promise<void> {
     const client = this.redis.getClient();
-    if (!client) return;
+    if (!isRedisReady(client)) return;
     try {
       await client.del(key);
     } catch (err) {

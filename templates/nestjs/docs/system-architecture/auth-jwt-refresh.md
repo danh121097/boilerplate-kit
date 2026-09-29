@@ -189,10 +189,17 @@ clear the cookies the first response just set and kill the winner's session.
 re-issue. Logout revokes the family and clears `rotatedAt`, so replaying a
 logged-out chain is always reuse. A reuse-detected revoke clears `rotatedAt` on
 every token of the user, so a graced replay cannot resurrect it. See
-`test/e2e/refresh-token-reuse-grace.e2e-spec.ts`. A stolen token replayed within the window is
-indistinguishable from a retry: it mints another live token for that family. A graced
-retry racing a family revoke may also leave one token alive (best effort). Clients should still
-single-flight refreshes (the frontend templates lock across tabs).
+`test/e2e/refresh-token-reuse-grace.e2e-spec.ts`.
+
+**Revoke racing a rotation.** Both the normal and the graced path insert the
+successor N first, then re-read the predecessor P by `_id`. Every revoke path
+(family logout, user-wide reuse) `$unset`s `rotatedAt`, so a missing `rotatedAt`
+means a revoke landed before N existed and could not cover it: N is revoked and
+the refresh is refused with the normal 401 (cookies cleared). A revoke after N's
+insert already covers N through its `updateMany`. Either ordering leaves no live
+token; see `test/e2e/refresh-rotation-revoke-race.e2e-spec.ts`. A stolen token replayed within the window is
+indistinguishable from a retry: it mints another live token for that family.
+Clients should still single-flight refreshes (the frontend templates lock across tabs).
 
 ## Verifying Requests: the JWT step of `SecurityGuard`
 
@@ -203,17 +210,23 @@ protects every non-`@Public` route:
 2. `tokenService.verifyAccessToken` (throws → 401 "Invalid or expired access
    token!").
 3. **User-level revocation check** — `getUserRevokedAt(userId)`: if a cutoff
-   exists and the token's `iat` predates it, reject (401 "Token revoked!").
+   exists and the token was issued before it (`iat_ms`, else `iat * 1000`),
+   reject (401 "Token revoked!").
    Fail-open / no-op when Redis is off.
 4. Attach `req.user = decoded`.
 
 ## Access-Token Revocation
 
 Access tokens are short-lived and can't be individually unsigned, so logout /
-refresh-reuse records a per-user "revoked at" epoch in Redis
+refresh-reuse records a per-user "revoked at" cutoff (epoch milliseconds) in Redis
 ([`token-revocation.service.ts`](../../src/common/services/token-revocation.service.ts)).
-Any access token with `iat < revokedAt` is rejected by the guard's JWT step and
-the socket auth gate. The key auto-expires after one access-token lifetime
+Access tokens carry an `iat_ms` claim (millisecond issue time); a token with
+`iat_ms < cutoffMs` (tokens without the claim use `iat * 1000`) is rejected by the
+guard's JWT step and the socket auth gate. Millisecond precision closes the
+same-second gap: a token issued in the same second as a logout but before it is
+revoked, while one issued after it (re-login, graced re-issue) still works. Legacy
+epoch-second values already in Redis are scaled to ms on read. The cutoff is stored in ms, so during a rolling upgrade from a version that stored seconds, older instances would reject that user's access tokens until the key expires (one access-token lifetime): drain or upgrade all instances together. When the Redis client
+is not `ready` the read fails open and the write is skipped with a warn. The key auto-expires after one access-token lifetime
 (`accessTtlSeconds()`). When Redis is disabled, `revokeUserTokens` and
 `getUserRevokedAt` are no-ops (fail-open) — logout still works (the refresh token
 is revoked in Mongo) but outstanding access tokens simply live out their remaining `JWT_ACCESS_EXPIRY`.

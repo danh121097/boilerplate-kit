@@ -73,7 +73,8 @@ opening a PR.
 - **Test files** — `src/**/*.spec.ts` (co-located unit specs),
   `test/**/*.spec.ts` (unit), `test/**/*.e2e-spec.ts` (e2e).
 - **In-memory MongoDB** — `test/global-setup.ts` starts `mongodb-memory-server`
-  once and writes the URI to a temp file; `test/setup.ts` reads it, sets env
+  once and hands its URI to workers through vitest `provide`/`inject` (per run, so
+  concurrent `pnpm test` runs never share a database); `test/setup.ts` injects it, sets env
   vars, and wires mongoose lifecycle hooks. E2E specs boot a real Nest app and
   drive it with `supertest` (HTTP) and `socket.io-client` (WebSocket). No
   external services required.

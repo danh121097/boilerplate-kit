@@ -5,6 +5,9 @@ import { RedisService } from "@/redis/redis.service";
 import { Global, Module, OnModuleDestroy, Provider } from "@nestjs/common";
 import IORedis, { Redis } from "ioredis";
 
+/** Upper bound for any single Redis command on the shared client. */
+export const REDIS_COMMAND_TIMEOUT_MS = 1000;
+
 /**
  * Global Redis module — provides a single shared ioredis client under REDIS_CLIENT.
  * When REDIS_ENABLED=false the provider resolves to null; all consumers must treat
@@ -25,8 +28,13 @@ import IORedis, { Redis } from "ioredis";
           return null;
         }
 
+        // Bounded latency during an outage: with the offline queue off, commands sent
+        // while the client is not connected reject immediately; commandTimeout caps a
+        // command sent on a connection that has gone silent.
         const client = new IORedis(config.redisUrl, {
           maxRetriesPerRequest: 2,
+          enableOfflineQueue: false,
+          commandTimeout: REDIS_COMMAND_TIMEOUT_MS,
           lazyConnect: true,
         });
 

@@ -35,7 +35,7 @@ module / controller / service / provider model with a single composite
   a revoked token triggers **reuse detection** (all user sessions revoked).
   Delivered as an httpOnly cookie.
 - **Revocation** — logout / refresh-reuse records a per-user "revoked at"
-  timestamp in Redis; any access token with an earlier `iat` is rejected
+  cutoff (epoch ms) in Redis; any access token issued earlier (`iat_ms`, else `iat`) is rejected
   (no-op + fail-open when Redis is off).
 
 > Access tokens use **RS256** signed with the RSA keypair in `src/keys/` (the

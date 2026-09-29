@@ -1,3 +1,4 @@
+import { AppLogger } from "@/common/logger/app-logger.service";
 import { SocketEvent } from "@/modules/realtime/events";
 import { EventsGateway } from "@/modules/realtime/events.gateway";
 import { Injectable } from "@nestjs/common";
@@ -14,14 +15,32 @@ import { Injectable } from "@nestjs/common";
  */
 @Injectable()
 export class SocketEmitService {
-  constructor(private readonly gateway: EventsGateway) {}
+  constructor(
+    private readonly gateway: EventsGateway,
+    private readonly logger: AppLogger,
+  ) {}
+
+  /**
+   * Run a socket operation without ever throwing or leaving a rejection unhandled:
+   * with the Redis adapter, emits and disconnects publish over Redis and can fail
+   * during an outage. Failures are logged at warn.
+   */
+  private safely(what: string, op: () => unknown): void {
+    const warn = (err: unknown): void =>
+      this.logger.warn(`${what} failed: ${err instanceof Error ? err.message : String(err)}`);
+    try {
+      Promise.resolve(op()).catch(warn);
+    } catch (err) {
+      warn(err);
+    }
+  }
 
   /**
    * Emit an event to a single user's room (all their connected sockets).
    * No-op when the gateway server is not initialized.
    */
   emitToUser(userId: string, event: SocketEvent, payload?: unknown): void {
-    this.gateway.server?.to(`user:${userId}`).emit(event, payload);
+    this.safely("emitToUser", () => this.gateway.server?.to(`user:${userId}`).emit(event, payload));
   }
 
   /**
@@ -29,15 +48,20 @@ export class SocketEmitService {
    * No-op when the gateway server is not initialized.
    */
   emitBroadcast(event: SocketEvent, payload?: unknown): void {
-    this.gateway.server?.emit(event, payload);
+    this.safely("emitBroadcast", () => this.gateway.server?.emit(event, payload));
   }
 
   /**
-   * Force-disconnect every socket of a user (all instances with the Redis adapter),
-   * e.g. after logout or a revoked session family. No-op when the server is not
-   * initialized.
+   * Force-disconnect every socket of a user, e.g. after logout or a revoked session
+   * family. Local sockets go first so this instance honors the revoke even when the
+   * Redis adapter is down; the cluster-wide call then reaches other instances.
+   * No-op when the server is not initialized.
    */
   disconnectUser(userId: string): void {
-    this.gateway.server?.in(`user:${userId}`).disconnectSockets(true);
+    const room = `user:${userId}`;
+    this.safely("disconnectUser(local)", () =>
+      this.gateway.server?.local.in(room).disconnectSockets(true),
+    );
+    this.safely("disconnectUser", () => this.gateway.server?.in(room).disconnectSockets(true));
   }
 }

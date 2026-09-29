@@ -11,9 +11,10 @@ export default defineConfig({
     globals: true,
     root: "./",
     // globalSetup runs ONCE in the main process before any worker starts —
-    // starts MongoMemoryServer and writes the URI to a temp file.
+    // starts MongoMemoryServer and provides its URI to workers (`provide`/`inject`,
+    // per run — concurrent runs never share a database).
     globalSetup: ["./test/global-setup.ts"],
-    // setupFiles run in each worker before any test file — reads the temp-file
+    // setupFiles run in each worker before any test file — injects the provided
     // URI, sets all process.env vars, and registers mongoose lifecycle hooks.
     // Vars must be set here (not globalSetup) because workers have isolated env.
     setupFiles: ["./test/setup.ts"],

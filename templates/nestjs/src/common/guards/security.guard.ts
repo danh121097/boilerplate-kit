@@ -4,15 +4,11 @@ import { AppException } from "@/common/exceptions/app.exception";
 import { derivePath } from "@/common/guards/derive-path";
 import { assertAllowedOrigin } from "@/common/guards/origin-check";
 import { HmacService } from "@/common/services/hmac.service";
-import { TokenRevocationService } from "@/common/services/token-revocation.service";
+import { TokenRevocationService, isTokenRevoked } from "@/common/services/token-revocation.service";
 import { TokenService } from "@/common/services/token.service";
 import { ROLE_RANK, Role } from "@/common/types/auth.types";
 import { AppConfigService } from "@/config/app-config.service";
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-} from "@nestjs/common";
+import { CanActivate, ExecutionContext, Injectable } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import type { JwtPayload } from "@/common/types/auth.types";
 import type { Request } from "express";
@@ -147,9 +143,12 @@ export class SecurityGuard implements CanActivate {
       });
     }
 
-    let payload: JwtPayload & { iat?: number };
+    let payload: JwtPayload & { iat?: number; iat_ms?: number };
     try {
-      payload = this.tokenService.verifyAccessToken(token) as JwtPayload & { iat?: number };
+      payload = this.tokenService.verifyAccessToken(token) as JwtPayload & {
+        iat?: number;
+        iat_ms?: number;
+      };
     } catch {
       throw new AppException({
         message: "Invalid or expired access token!",
@@ -160,7 +159,7 @@ export class SecurityGuard implements CanActivate {
 
     // Revocation check — fail-open: null when Redis disabled or on error.
     const revokedAt = await this.tokenRevocationService.getUserRevokedAt(payload.userId);
-    if (revokedAt && payload.iat && payload.iat < revokedAt) {
+    if (isTokenRevoked(payload, revokedAt)) {
       throw new AppException({
         message: "Token revoked! Please log in again!",
         statusCode: 401,

@@ -1,5 +1,5 @@
 import { HmacService, DEFAULT_CONTENT_TYPE, SOCKET_HMAC_PATH } from "@/common/services/hmac.service";
-import { TokenRevocationService } from "@/common/services/token-revocation.service";
+import { TokenRevocationService, isTokenRevoked } from "@/common/services/token-revocation.service";
 import { TokenService } from "@/common/services/token.service";
 import { JwtPayload } from "@/common/types/auth.types";
 import { SOCKET_EVENT, SOCKET_UNAUTHORIZED } from "@/modules/realtime/events";
@@ -73,10 +73,11 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       const payload = this.tokenService.verifyAccessToken(token) as JwtPayload & {
         iat?: number;
+        iat_ms?: number;
       };
 
       const revokedAt = await this.tokenRevocationService.getUserRevokedAt(payload.userId);
-      if (revokedAt && payload.iat && payload.iat < revokedAt) {
+      if (isTokenRevoked(payload, revokedAt)) {
         this.rejectClient(client);
         return;
       }

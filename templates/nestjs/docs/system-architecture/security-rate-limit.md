@@ -111,8 +111,11 @@ socket adapter. It is intentionally optional:
 
 - Disabled unless `REDIS_ENABLED=true`; otherwise `getClient()` returns `null`
   and every consumer degrades to its no-Redis behavior.
-- The client uses `lazyConnect` + `maxRetriesPerRequest: 2` so a dead Redis fails
-  fast and consumers fall back instead of hanging requests.
+- The shared client uses `lazyConnect`, `maxRetriesPerRequest: 2`,
+  `enableOfflineQueue: false` and `commandTimeout: 1000`, and every consumer
+  short-circuits when `client.status !== "ready"` (`isRedisReady`): rate-limit
+  storage, revocation, cache and health fail open immediately (health reports
+  `down` without a PING) instead of hanging requests during an outage.
 - A Redis failure **never exits the process** (unlike MongoDB) — the app runs
   fully without it.
 

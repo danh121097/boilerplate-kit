@@ -1,4 +1,5 @@
 import { Public } from "@/common/decorators/public.decorator";
+import { isRedisReady } from "@/redis/redis-ready.util";
 import { RedisService } from "@/redis/redis.service";
 import { Controller, Get } from "@nestjs/common";
 import { InjectConnection } from "@nestjs/mongoose";
@@ -53,6 +54,7 @@ export class HealthController {
   private async getRedisStatus(): Promise<string> {
     const client = this.redisService.getClient();
     if (!client) return "disabled";
+    if (!isRedisReady(client)) return "down";
     try {
       await client.ping();
       return "up";

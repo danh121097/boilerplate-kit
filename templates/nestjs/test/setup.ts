@@ -3,30 +3,28 @@
  * Vitest setupFiles — runs in EACH test worker before any test file imports.
  *
  * MongoMemoryServer is started in global-setup.ts (main process, before workers).
- * This file reads the URI from the temp file global-setup wrote and sets all
+ * This file reads the URI global-setup provided (per run) and sets all
  * required env vars synchronously — before NestJS ConfigModule / AppConfigService
  * are ever constructed.
  *
  * Lifecycle:
- *   globalSetup.setup()     → starts mongod, writes URI to temp file
- *   setupFiles (this file)  → reads URI, sets process.env, wires mongoose hooks
+ *   globalSetup.setup()     → starts mongod, provides its URI to workers
+ *   setupFiles (this file)  → injects URI, sets process.env, wires mongoose hooks
  *   test file beforeAll     → creates NestJS app (reads env from process.env ✓)
  *   test file afterEach     → (flush via global afterEach below)
- *   globalSetup.teardown()  → stops mongod, removes temp file
+ *   globalSetup.teardown()  → stops mongod
  */
-import { MONGO_URI_FILE } from "./global-setup";
-import { afterAll, afterEach, beforeAll } from "vitest";
+import type {} from "./global-setup"; // augments ProvidedContext with mongoUri
+import { afterAll, afterEach, beforeAll, inject } from "vitest";
 import crypto from "crypto";
 import fs from "fs";
 import mongoose from "mongoose";
 import os from "os";
 import path from "path";
 
-// ---------------------------------------------------------------------------
-// Read MongoDB URI from temp file written by globalSetup (synchronous — safe
-// at module-eval time because globalSetup runs before any worker starts).
-// ---------------------------------------------------------------------------
-const mongoUri = fs.readFileSync(MONGO_URI_FILE, "utf8").trim();
+// Per-run URI provided by globalSetup (available synchronously before any module
+// import in the worker).
+const mongoUri = inject("mongoUri");
 
 // ---------------------------------------------------------------------------
 // All env vars — set synchronously here so they are present when any module

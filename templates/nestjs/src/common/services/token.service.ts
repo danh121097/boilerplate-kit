@@ -18,6 +18,7 @@ import jwt from "jsonwebtoken";
  *                  refresh; the signature is not re-verified on that path.
  * token_use claim: distinguishes access vs refresh so a refresh token can never
  *                  satisfy access verification and vice-versa.
+ * iat_ms:         millisecond issue time on access tokens (see signAccessToken).
  * jti:            random UUID per refresh token so two tokens for the same user
  *                 signed within the same second are never byte-identical.
  * issuer:         first CORS origin (undefined disables the check in dev/test).
@@ -36,11 +37,17 @@ export class TokenService {
 
   /** Sign a short-lived access token (RS256, keypair). */
   signAccessToken(payload: JwtPayload): string {
-    return jwt.sign({ ...payload, token_use: "access" }, this.config.jwtAccessPrivateKey, {
-      algorithm: "RS256",
-      issuer: this.tokenIssuer,
-      expiresIn: this.config.jwtAccessExpiry as jwt.SignOptions["expiresIn"],
-    });
+    // iat_ms: millisecond issue time, so revocation can tell a token issued before a
+    // logout from one issued after it inside the same second (iat is whole seconds).
+    return jwt.sign(
+      { ...payload, token_use: "access", iat_ms: Date.now() },
+      this.config.jwtAccessPrivateKey,
+      {
+        algorithm: "RS256",
+        issuer: this.tokenIssuer,
+        expiresIn: this.config.jwtAccessExpiry as jwt.SignOptions["expiresIn"],
+      },
+    );
   }
 
   /**

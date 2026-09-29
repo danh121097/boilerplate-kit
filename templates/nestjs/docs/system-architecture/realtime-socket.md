@@ -36,7 +36,7 @@ const server = super.createIOServer(port, {
   // pingTimeout: 20000, maxHttpBufferSize: 1e6 (1 MB cap on inbound payloads)
 });
 if (this.pubClient) {
-  server.adapter(createAdapter(this.pubClient, this.pubClient.duplicate())); // cross-instance delivery
+  server.adapter(createAdapter(createSafePubClient(pub, warn), subClient)); // cross-instance delivery
 }
 ```
 
@@ -46,8 +46,18 @@ Notes:
   single-instance (CORS and the other options still apply); with Redis, `@socket.io/redis-adapter`
   makes emits reach clients on every instance.
 - **Ownership** — `pubClient` is the shared client owned by `RedisModule` (never
-  quit in the adapter); the `subClient` duplicate is owned by the redis-adapter
-  and cleaned up on close.
+  quit in the adapter); the `subClient` duplicate is owned by `SocketIoAdapter`,
+  which quits it in `close()`.
+- **Outage safety** — `@socket.io/redis-adapter` publishes and subscribes
+  fire-and-forget, so a rejection there would be an unhandled rejection that exits
+  the process. The adapter therefore publishes through `createSafePubClient` (a
+  proxy whose `publish` logs a rejection at warn and resolves 0), and the `subClient`
+  keeps the offline queue with no retry cap or command timeout
+  (`enableOfflineQueue: true, commandTimeout: undefined, maxRetriesPerRequest: null`)
+  plus an `error` listener. `SocketEmitService` also wraps every emit/disconnect
+  (log at warn); `disconnectUser` drops local sockets first
+  (`io.local.in(room)`), then cluster-wide, so this instance honors a revoke even
+  during an outage.
 - **Per-user rooms** — each connection joins `user:<userId>`, enabling targeted
   emits.
 - **Heartbeat + payload cap** drop dead connections and bound memory abuse.
@@ -85,7 +95,7 @@ or the `accessToken` cookie, then:
 ```ts
 const payload = this.tokenService.verifyAccessToken(token);
 const revokedAt = await this.tokenRevocationService.getUserRevokedAt(payload.userId);
-if (revokedAt && payload.iat && payload.iat < revokedAt) return this.rejectClient(client);
+if (isTokenRevoked(payload, revokedAt)) return this.rejectClient(client); // iat_ms < cutoff (ms)
 client.data.user = payload;
 void client.join(`user:${payload.userId}`);
 client.emit(SOCKET_EVENT.AUTHENTICATED);

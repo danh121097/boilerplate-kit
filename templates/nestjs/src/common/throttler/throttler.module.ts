@@ -1,5 +1,6 @@
 import { AppException } from "@/common/exceptions/app.exception";
 import { AppConfigService } from "@/config/app-config.service";
+import { isRedisReady } from "@/redis/redis-ready.util";
 import { RedisService } from "@/redis/redis.service";
 import { ThrottlerStorageRedisService } from "@nest-lab/throttler-storage-redis";
 import { ExecutionContext, HttpException, Injectable, Module } from "@nestjs/common";
@@ -9,6 +10,7 @@ import {
   ThrottlerModule,
   ThrottlerRequest,
 } from "@nestjs/throttler";
+import type { Redis } from "ioredis";
 
 /**
  * Custom throttler guard that:
@@ -75,6 +77,24 @@ export class AppThrottlerGuard extends ThrottlerGuard {
   }
 }
 
+/**
+ * Redis throttler storage that refuses immediately when the client is not "ready",
+ * so the guard (which fails open on storage errors) does not wait on a dead
+ * connection during an outage.
+ */
+export class ReadyGuardedThrottlerStorage extends ThrottlerStorageRedisService {
+  constructor(private readonly client: Redis) {
+    super(client);
+  }
+
+  override async increment(
+    ...args: Parameters<ThrottlerStorageRedisService["increment"]>
+  ): ReturnType<ThrottlerStorageRedisService["increment"]> {
+    if (!isRedisReady(this.client)) throw new Error("Redis not ready");
+    return super.increment(...args);
+  }
+}
+
 // Metadata key @Throttle() writes per throttler name (THROTTLER_LIMIT + name in
 // @nestjs/throttler). Not re-exported by the package, so it is mirrored here.
 const THROTTLER_LIMIT_METADATA = "THROTTLER:LIMIT";
@@ -115,9 +135,7 @@ export function skipUnlessOptedIn(name: string): (context: ExecutionContext) => 
 
         // Build Redis storage only when the client is available; otherwise
         // ThrottlerModule uses its built-in in-memory MemoryStore.
-        const storage = client
-          ? new ThrottlerStorageRedisService(client)
-          : undefined;
+        const storage = client ? new ReadyGuardedThrottlerStorage(client) : undefined;
 
         return {
           ...(storage ? { storage } : {}),
