@@ -5,7 +5,7 @@ import { endSession, persistAccessToken } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
 import { syncAuthWithOtherTabs, useAuthStore } from "@/stores/auth";
 import { QueryObserver } from "@tanstack/react-query";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 /**
  * What mounted components (the header reading `auth.me`, a page listing users)
@@ -52,9 +52,13 @@ async function loginInThisTab() {
 describe("mounted observers across session end and login", () => {
   beforeEach(() => queryClient.clear());
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.unstubAllGlobals();
+  // Runs after each test's own onTestFinished cleanups, which unsubscribe
+  // from the stubbed globals.
+  beforeEach(({ onTestFinished }) => {
+    onTestFinished(() => {
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    });
   });
 
   it("a logout in another tab shows signed-out data to mounted observers without refetching", () => {
@@ -68,8 +72,10 @@ describe("mounted observers across session end and login", () => {
     persistAccessToken("AT", "MAIN");
     useAuthStore.setState({ isAuthenticated: true, user: { _id: "u1" } as never });
     const stop = syncAuthWithOtherTabs(vi.fn());
+    onTestFinished(stop);
     const fetchMe = vi.fn(async () => ({ _id: "u1" }));
     const page = mountSignedInPage(fetchMe);
+    onTestFinished(page.unmount);
 
     localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN); // the other tab's logout
     onStorage({ key: STORAGE_KEYS.ACCESS_TOKEN });
@@ -78,13 +84,12 @@ describe("mounted observers across session end and login", () => {
     expect(page.list.getCurrentResult().data).toBeUndefined();
     expect(fetchMe).not.toHaveBeenCalled();
     expect(page.fetchUsers).not.toHaveBeenCalled();
-    page.unmount();
-    stop();
   });
 
   it("logout then login again in the same tab shows the new user to the mounted header", async () => {
     const fetchMe = vi.fn(async () => ({ _id: "u2" }));
     const page = mountSignedInPage(fetchMe);
+    onTestFinished(page.unmount);
 
     endSession("logout");
     expect(page.header.getCurrentResult().data).toBeNull();
@@ -92,12 +97,12 @@ describe("mounted observers across session end and login", () => {
 
     expect(fetchMe).toHaveBeenCalledTimes(1);
     expect(page.header.getCurrentResult().data).toEqual({ _id: "u2" });
-    page.unmount();
   });
 
   it("session expiry then login shows the new user to the mounted header", async () => {
     const fetchMe = vi.fn(async () => ({ _id: "u2" }));
     const page = mountSignedInPage(fetchMe);
+    onTestFinished(page.unmount);
 
     endSession("expired");
     expect(page.header.getCurrentResult().data).toBeNull();
@@ -105,7 +110,6 @@ describe("mounted observers across session end and login", () => {
     await loginInThisTab();
 
     expect(page.header.getCurrentResult().data).toEqual({ _id: "u2" });
-    page.unmount();
   });
 
   it("a login in another tab refetches the mounted header's user", async () => {
@@ -119,15 +123,15 @@ describe("mounted observers across session end and login", () => {
     vi.spyOn(AuthModel, "getMe").mockResolvedValue({ _id: "u2" } as never);
     const fetchMe = vi.fn(async () => ({ _id: "u2" }));
     const page = mountSignedInPage(fetchMe);
+    onTestFinished(page.unmount);
     endSession("logout");
     const stop = syncAuthWithOtherTabs(vi.fn());
+    onTestFinished(stop);
 
     localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, "AT"); // the other tab's login
     onStorage({ key: STORAGE_KEYS.ACCESS_TOKEN });
 
     await vi.waitFor(() => expect(page.header.getCurrentResult().data).toEqual({ _id: "u2" }));
-    page.unmount();
-    stop();
   });
 
   it("session end drops unobserved queries and keeps auth.me pinned to null", () => {

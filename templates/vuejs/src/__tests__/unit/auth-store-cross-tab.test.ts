@@ -3,7 +3,7 @@ import { loadAuthStore } from "@/__tests__/helpers/session-harness";
 import { STORAGE_KEYS } from "@/enums";
 import { AuthModel } from "@/services/auth/auth";
 import { onSessionEnded, persistAccessToken, persistRefreshToken } from "@/services/core";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import * as pinia from "pinia";
 
 /**
@@ -83,6 +83,7 @@ describe("auth store across tabs", () => {
       const store = useAuthStore();
       const ended = vi.fn();
       const stop = onSessionEnded(ended);
+      onTestFinished(stop);
 
       // This tab signs in.
       persistAccessToken("AT2", "MAIN");
@@ -92,7 +93,6 @@ describe("auth store across tabs", () => {
       // Another tab signs out.
       localStorage.clear();
       target.dispatchEvent(new Event("storage"));
-      stop();
 
       expect(ended).toHaveBeenCalledWith("logout", "MAIN");
       expect(store.isAuthenticated).toBe(false);

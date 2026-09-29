@@ -8,7 +8,7 @@ import {
   persistAccessToken,
   persistRefreshToken,
 } from "@/services/core";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import * as pinia from "pinia";
 import * as vue from "vue";
 
@@ -110,12 +110,12 @@ describe("auth store", () => {
     vi.spyOn(AuthModel.api, "post").mockRejectedValue({ error_code: 0, message: "Network Error" });
     const ended = vi.fn();
     const unsubscribe = onSessionEnded(ended);
+    onTestFinished(unsubscribe);
     queryClient.setQueryData(["users.list"], ["someone"]);
     const store = useAuthStore();
     store.setUser({ _id: "u1", email: "a@b.com", name: "A", role: "user" } as never);
 
     await store.logout();
-    unsubscribe();
 
     expect(ended).toHaveBeenCalledExactlyOnceWith("logout", "MAIN");
     expect(store.user).toBeNull();

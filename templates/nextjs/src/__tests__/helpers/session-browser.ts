@@ -1,7 +1,7 @@
 import { makeClient } from "@/__tests__/helpers/http-mocks";
 import { STORAGE_KEYS } from "@/enums";
 import { loginPathWithReturn, onSessionEnded, redirectOnSessionExpired } from "@/services/core";
-import { vi } from "vitest";
+import { onTestFinished, vi } from "vitest";
 import axios from "axios";
 
 /** Browser stand-ins for the session tests (the test environment is Node). */
@@ -36,7 +36,7 @@ export function installBrowser(cookie = "") {
 }
 
 /** Record session-end events and expiry redirects (the app's redirect adds the
- * current path as the return path). */
+ * current path as the return path). Listeners are removed when the test finishes. */
 export function observeSessionEnd() {
   const ended = vi.fn();
   const redirected = vi.fn();
@@ -44,13 +44,13 @@ export function observeSessionEnd() {
   const offRedirect = redirectOnSessionExpired(() =>
     redirected(loginPathWithReturn("/users?page=2#top")),
   );
+  onTestFinished(() => {
+    offEnded();
+    offRedirect();
+  });
   return {
     ended,
     redirected,
-    off: () => {
-      offEnded();
-      offRedirect();
-    },
   };
 }
 

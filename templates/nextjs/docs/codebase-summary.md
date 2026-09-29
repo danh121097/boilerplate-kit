@@ -38,7 +38,7 @@ src/
 ├── lib/                  # cn() utility
 ├── hooks/                # Custom React hooks (useAppVersion)
 └── __tests__/            # Vitest suite (helpers + unit + integration)
-    ├── helpers/          # http-mocks, fake-http (no storage tests — tokens are httpOnly)
-    ├── unit/             # hmac-signature, headers-utils, api, model, refresh-token-manager, tanstack, query-keys
-    └── integration/      # auth-service, interceptors-refresh
+    ├── helpers/          # http-mocks, session-browser, fake-web-locks (no storage tests — tokens are httpOnly)
+    ├── unit/             # core + server helpers: hmac, headers, api, model, refresh manager, server-api, server session read, tanstack, query-keys
+    └── integration/      # auth service, refresh interceptors, session flows (auth, refresh failure, logout race, cross-tab, revoke, cache observers)
 ```

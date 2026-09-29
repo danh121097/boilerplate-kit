@@ -10,7 +10,7 @@ import {
   persistAccessToken,
   persistRefreshToken,
 } from "@/services/core/auth-token-storage";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import axios from "axios";
 
 /**
@@ -66,6 +66,7 @@ describe("logout during an in-flight refresh", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -198,7 +199,6 @@ describe("logout during an in-flight refresh", () => {
     hung.resolve();
     await vi.runAllTimersAsync();
     expect(getAccessToken("MAIN")).toBeNull(); // the late refresh stored nothing
-    vi.useRealTimers();
   });
 
   it("logout proceeds without the lock when another tab holds it past 15s", async () => {
@@ -216,7 +216,6 @@ describe("logout during an in-flight refresh", () => {
 
     expect(logoutPost).toHaveBeenCalledTimes(1);
     expect(getRefreshToken("MAIN")).toBeNull();
-    vi.useRealTimers();
   });
 
   it("a refresh refused after the session ended fires no session-expired", async () => {
@@ -227,6 +226,7 @@ describe("logout during an in-flight refresh", () => {
     });
     const ended = vi.fn();
     const off = onSessionEnded(ended);
+    onTestFinished(off);
     const http = makeClient(async (config) => httpError(config, 401), REFRESH);
 
     const pending = http.get("/users").catch((e: unknown) => e);
@@ -237,6 +237,5 @@ describe("logout during an in-flight refresh", () => {
     expect(await pending).toMatchObject({ error_code: 401, message: "session_ended" });
     expect(ended).toHaveBeenCalledTimes(1);
     expect(ended).toHaveBeenCalledWith("logout", "MAIN");
-    off();
   });
 });

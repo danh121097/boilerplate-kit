@@ -1,6 +1,6 @@
 import { resetQueriesToSignedOut } from "@/services/core";
 import { QueryClient, QueryObserver } from "@tanstack/vue-query";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 /**
  * `resetQueriesToSignedOut` against a live observer — the same `QueryObserver` the
@@ -31,6 +31,7 @@ describe("resetQueriesToSignedOut with a mounted session observer", () => {
     let user: unknown = { _id: "u1" };
     const fetchMe = vi.fn(async () => user);
     const header = observeSession(queryClient, fetchMe);
+    onTestFinished(header.unsubscribe);
     await flush();
     expect(header.observer.getCurrentResult().data).toEqual({ _id: "u1" });
 
@@ -43,7 +44,6 @@ describe("resetQueriesToSignedOut with a mounted session observer", () => {
     expect(fetchMe).toHaveBeenCalledTimes(2);
     expect(header.observer.getCurrentResult().data).toEqual({ _id: "u2" });
     expect(header.seen.at(-1)).toEqual({ _id: "u2" });
-    header.unsubscribe();
   });
 
   it("drops observed page data without detaching it, and removes unobserved data", async () => {
@@ -54,6 +54,7 @@ describe("resetQueriesToSignedOut with a mounted session observer", () => {
       staleTime: Infinity,
     });
     const unsubscribe = list.subscribe(() => {});
+    onTestFinished(unsubscribe);
     await flush();
     queryClient.setQueryData(["users.detail"], { _id: "x" });
 
@@ -66,13 +67,13 @@ describe("resetQueriesToSignedOut with a mounted session observer", () => {
     await queryClient.invalidateQueries({ queryKey: ["users.list"] }); // next login
     expect(fetchList).toHaveBeenCalledTimes(2);
     expect(list.getCurrentResult().data).toEqual({ data: ["page"] });
-    unsubscribe();
   });
 
   it("cancels an in-flight fetch so the old user's response never lands", async () => {
     let resolveMe!: (user: unknown) => void;
     const fetchMe = vi.fn(() => new Promise((resolve) => (resolveMe = resolve)));
     const header = observeSession(queryClient, fetchMe);
+    onTestFinished(header.unsubscribe);
     await flush();
     expect(fetchMe).toHaveBeenCalledTimes(1);
 
@@ -81,7 +82,6 @@ describe("resetQueriesToSignedOut with a mounted session observer", () => {
     await flush();
 
     expect(header.observer.getCurrentResult().data).toBeNull();
-    header.unsubscribe();
   });
 
   it("seeds a null session even when nothing observes it", () => {

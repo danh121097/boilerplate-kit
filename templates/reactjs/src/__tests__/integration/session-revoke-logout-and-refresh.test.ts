@@ -74,7 +74,6 @@ describe("revoke vs logout and refresh", () => {
     expect(post).toHaveBeenCalledTimes(1);
     expect(nav.reasons).toHaveBeenCalledExactlyOnceWith("expired", "MAIN");
     expect(getAccessToken()).toBeNull();
-    nav.stop();
   });
 
   it("a revoke waiting for the lock does nothing when a refused refresh ends the session first", async () => {
@@ -101,7 +100,6 @@ describe("revoke vs logout and refresh", () => {
     expect(await revoke).toBe(false);
     expect(post).not.toHaveBeenCalled();
     expect(nav.reasons).toHaveBeenCalledExactlyOnceWith("expired", "MAIN");
-    nav.stop();
   });
 
   it("a logout joining a revoke that backs out still signs out", async () => {
@@ -130,7 +128,6 @@ describe("revoke vs logout and refresh", () => {
     expect(nav.reasons).toHaveBeenCalledExactlyOnceWith("logout", "MAIN");
     expect(getAccessToken()).toBeNull();
     expect(getRefreshToken()).toBeNull();
-    nav.stop();
   });
 
   it("without Web Locks, a revoke waiting for this tab's refresh does nothing when it is refused", async () => {
@@ -160,6 +157,5 @@ describe("revoke vs logout and refresh", () => {
     expect(getAccessToken()).toBeNull();
     expect(getRefreshToken()).toBeNull();
     expect(nav.reasons).toHaveBeenCalledExactlyOnceWith("expired", "MAIN");
-    nav.stop();
   });
 });

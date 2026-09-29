@@ -8,7 +8,7 @@ import {
   onSessionEnded,
   RefreshTokenManager,
 } from "@/services/core";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import axios from "axios";
 
 /**
@@ -167,9 +167,9 @@ describe("logout vs in-flight refresh", () => {
     vi.spyOn(AuthModel.api, "post").mockRejectedValue({ error_code: 0, message: "Network Error" });
     const ended = vi.fn();
     const unsubscribe = onSessionEnded(ended);
+    onTestFinished(unsubscribe);
 
     await expect(AuthModel.logout()).rejects.toMatchObject({ error_code: 0 });
-    unsubscribe();
 
     expect(ended).toHaveBeenCalledExactlyOnceWith("logout", "MAIN");
     expect(hasSessionHint()).toBe(false);

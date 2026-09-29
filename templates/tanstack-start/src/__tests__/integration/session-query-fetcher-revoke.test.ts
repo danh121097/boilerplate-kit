@@ -35,13 +35,12 @@ describe("the session query fetcher (server function read)", () => {
     registerSessionRefresher(vi.fn().mockResolvedValue(undefined)); // refresh succeeds…
     getMe.mockResolvedValue(UNAUTHORIZED_HINTED); // …but the read still 401s
     const post = vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
-    const { ended, redirected, off } = observeSessionEnd();
+    const { ended, redirected } = observeSessionEnd();
 
     await expect(fetchSession()).resolves.toBeNull();
     expect(post).toHaveBeenCalledTimes(1);
     expect(ended).toHaveBeenCalledWith("expired", "MAIN");
     expect(redirected).toHaveBeenCalledTimes(1);
-    off();
   });
 
   it("the server-side read never revokes", async () => {

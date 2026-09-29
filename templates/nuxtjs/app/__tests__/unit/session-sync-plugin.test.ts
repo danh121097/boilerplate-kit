@@ -1,6 +1,16 @@
 import { markSessionActive, onSessionEnded, resetQueriesOnSessionEnd } from "@/services/core";
 import { QueryClient, QueryObserver } from "@tanstack/vue-query";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+  vi,
+} from "vitest";
 
 /**
  * The client plugin that follows logins / logouts made in other tabs: the
@@ -99,6 +109,7 @@ describe("05.session-sync.client plugin", () => {
       staleTime: Infinity,
     });
     const unsubscribe = header.subscribe(() => {});
+    onTestFinished(unsubscribe);
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     doc.cookie = ""; // the other tab logged out
@@ -112,17 +123,16 @@ describe("05.session-sync.client plugin", () => {
 
     expect(fetchMe).toHaveBeenCalledTimes(2);
     expect(header.getCurrentResult().data).toEqual({ _id: "u2" });
-    unsubscribe();
   });
 
   it("another tab's logout broadcast ends this tab's session as a logout", () => {
     const ended = vi.fn();
     const unsubscribe = onSessionEnded(ended);
+    onTestFinished(unsubscribe);
     queryClient.setQueryData(["auth.me"], { _id: "u1" });
 
     doc.cookie = ""; // the other tab dropped the hint and announced it
     authSync("logout");
-    unsubscribe();
 
     expect(ended).toHaveBeenCalledExactlyOnceWith("logout", "MAIN");
     expect(queryClient.getQueryData(["auth.me"])).toBeNull();
@@ -164,11 +174,11 @@ describe("05.session-sync.client plugin", () => {
   it("ignores unrelated storage keys and malformed broadcasts", () => {
     const ended = vi.fn();
     const unsubscribe = onSessionEnded(ended);
+    onTestFinished(unsubscribe);
     win.dispatchEvent(Object.assign(new Event("storage"), { key: "other", newValue: "x" }));
     win.dispatchEvent(
       Object.assign(new Event("storage"), { key: "PRISM_APP_AUTH_SYNC", newValue: "{" }),
     );
-    unsubscribe();
     expect(ended).not.toHaveBeenCalled();
   });
 });

@@ -65,7 +65,6 @@ describe("session revoke and logout", () => {
       isAuthenticated: false,
       hydrated: true,
     });
-    nav.stop();
   });
 
   it("a revoke with the epoch moved since the request started does not post logout", async () => {
@@ -94,7 +93,6 @@ describe("session revoke and logout", () => {
     expect(post).not.toHaveBeenCalled();
     expect(nav.reasons).toHaveBeenCalledTimes(1);
     expect(useAuthStore.getState()).toMatchObject({ user: null, isAuthenticated: false });
-    nav.stop();
   });
 
   it("concurrent revokes post logout once", async () => {
@@ -112,7 +110,6 @@ describe("session revoke and logout", () => {
     expect(results).toEqual([true, true, null]);
     expect(post).toHaveBeenCalledTimes(1);
     expect(nav.reasons).toHaveBeenCalledExactlyOnceWith("expired", "MAIN");
-    nav.stop();
   });
 
   it("a revoke never rejects when the logout request fails", async () => {
@@ -132,6 +129,5 @@ describe("session revoke and logout", () => {
 
     expect(nav.reasons).toHaveBeenCalledExactlyOnceWith("logout", "MAIN");
     expect(nav.expiredTo).not.toHaveBeenCalled();
-    nav.stop();
   });
 });

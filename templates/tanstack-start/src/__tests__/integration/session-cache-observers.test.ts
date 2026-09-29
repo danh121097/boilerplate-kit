@@ -6,7 +6,7 @@ import {
 } from "@/services/core/query-client";
 import { endSession, markSessionActive, syncAuthAcrossTabs } from "@/services/core/session";
 import { QueryObserver } from "@tanstack/react-query";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import type { QueryClient } from "@tanstack/react-query";
 
 /**
@@ -57,9 +57,13 @@ async function loginInThisTab(queryClient: QueryClient) {
 }
 
 describe("mounted observers across session end and login", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.unstubAllGlobals();
+  // Runs after each test's own onTestFinished cleanups, which unsubscribe
+  // from the stubbed globals.
+  beforeEach(({ onTestFinished }) => {
+    onTestFinished(() => {
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    });
   });
 
   it("a logout in another tab shows signed-out data to mounted observers without refetching", () => {
@@ -67,9 +71,12 @@ describe("mounted observers across session end and login", () => {
     markSessionActive();
     const queryClient = makeQueryClient();
     const off = resetQueriesOnSessionEnd(queryClient, ME);
+    onTestFinished(off);
     const stop = syncAuthAcrossTabs();
+    onTestFinished(stop);
     const fetchMe = vi.fn(async () => ({ _id: "u1" }));
     const page = mountSignedInPage(queryClient, fetchMe);
+    onTestFinished(page.unmount);
 
     document.cookie = `${STORAGE_KEYS.SESSION}=; path=/; max-age=0`; // other tab cleared it
     handlers.storage!({ key: STORAGE_KEYS.AUTH_SYNC, newValue: "logout:1" });
@@ -78,17 +85,16 @@ describe("mounted observers across session end and login", () => {
     expect(page.list.getCurrentResult().data).toBeUndefined();
     expect(fetchMe).not.toHaveBeenCalled();
     expect(page.fetchUsers).not.toHaveBeenCalled();
-    page.unmount();
-    stop();
-    off();
   });
 
   it("logout then login again in the same tab shows the new user to the mounted header", async () => {
     installBrowser();
     const queryClient = makeQueryClient();
     const off = resetQueriesOnSessionEnd(queryClient, ME);
+    onTestFinished(off);
     const fetchMe = vi.fn(async () => ({ _id: "u2" }));
     const page = mountSignedInPage(queryClient, fetchMe);
+    onTestFinished(page.unmount);
 
     endSession("logout");
     expect(page.header.getCurrentResult().data).toBeNull();
@@ -96,16 +102,16 @@ describe("mounted observers across session end and login", () => {
 
     expect(fetchMe).toHaveBeenCalledTimes(1);
     expect(page.header.getCurrentResult().data).toEqual({ _id: "u2" });
-    page.unmount();
-    off();
   });
 
   it("session expiry then login shows the new user to the mounted header", async () => {
     installBrowser();
     const queryClient = makeQueryClient();
     const off = resetQueriesOnSessionEnd(queryClient, ME);
+    onTestFinished(off);
     const fetchMe = vi.fn(async () => ({ _id: "u2" }));
     const page = mountSignedInPage(queryClient, fetchMe);
+    onTestFinished(page.unmount);
 
     endSession("expired");
     expect(page.header.getCurrentResult().data).toBeNull();
@@ -113,35 +119,33 @@ describe("mounted observers across session end and login", () => {
     await loginInThisTab(queryClient);
 
     expect(page.header.getCurrentResult().data).toEqual({ _id: "u2" });
-    page.unmount();
-    off();
   });
 
   it("a login in another tab refetches the mounted header's user", async () => {
     installBrowser();
     const queryClient = makeQueryClient();
     const off = resetQueriesOnSessionEnd(queryClient, ME);
+    onTestFinished(off);
     const fetchMe = vi.fn(async () => ({ _id: "u2" }));
     const page = mountSignedInPage(queryClient, fetchMe);
+    onTestFinished(page.unmount);
     endSession("logout");
 
     resyncQueriesAfterLogin(queryClient, ME);
 
     await vi.waitFor(() => expect(page.header.getCurrentResult().data).toEqual({ _id: "u2" }));
-    page.unmount();
-    off();
   });
 
   it("session end drops unobserved queries and keeps auth.me pinned to null", () => {
     installBrowser();
     const queryClient = makeQueryClient();
     const off = resetQueriesOnSessionEnd(queryClient, ME);
+    onTestFinished(off);
     queryClient.setQueryData(["users.detail", "1"], { _id: "1" });
 
     endSession("logout");
 
     expect(queryClient.getQueryCache().find({ queryKey: ["users.detail", "1"] })).toBeUndefined();
     expect(queryClient.getQueryData([ME])).toBeNull();
-    off();
   });
 });

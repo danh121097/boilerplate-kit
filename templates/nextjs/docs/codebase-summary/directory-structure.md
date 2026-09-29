@@ -50,7 +50,7 @@ templates/nextjs/
     ├── stores/
     │   └── counter.ts
     └── __tests__/
-        ├── helpers/http-mocks.ts
-        ├── unit/             # 7 unit test files (hmac, headers, api, model, refresh-manager, tanstack, query-keys)
-        └── integration/      # 2 integration test files (auth-service, interceptors-refresh)
+        ├── helpers/          # http-mocks, session-browser, fake-web-locks
+        ├── unit/             # 9 unit test files (hmac, headers, api, model, refresh-manager, server-api, server-session-read, tanstack, query-keys)
+        └── integration/      # 8 integration test files (auth-service, interceptors-refresh, session-*: auth flows, refresh failure, logout race, cross-tab sync, revoke, cache observers)
 ```

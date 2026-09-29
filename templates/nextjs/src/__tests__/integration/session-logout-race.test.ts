@@ -11,7 +11,7 @@ import {
   onSessionEnded,
   SESSION_WAIT_TIMEOUT_MS,
 } from "@/services/core";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import axios from "axios";
 
 /** Logout vs an in-flight (or hung, or locked-elsewhere) refresh. */
@@ -32,6 +32,7 @@ describe("logout during an in-flight refresh", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -54,6 +55,7 @@ describe("logout during an in-flight refresh", () => {
     });
     const ended = vi.fn();
     const off = onSessionEnded(ended);
+    onTestFinished(off);
 
     const http = makeClient(async (config) => httpError(config, 401), {
       MAIN: { endpoint: "/auth/refresh", skipPaths: ["/auth/logout"], hasSession: hasSessionHint },
@@ -74,7 +76,6 @@ describe("logout during an in-flight refresh", () => {
     // Refresh and logout share one app-prefixed lock.
     const lockNames = lockRequest.mock.calls.map(([name]) => name);
     expect(new Set(lockNames)).toEqual(new Set([`${APP_PREFIX}:auth-refresh:MAIN`]));
-    off();
   });
 
   it("without Web Locks: 401s during a slow logout reject and never call /auth/refresh", async () => {
@@ -132,7 +133,6 @@ describe("logout during an in-flight refresh", () => {
     expect(logoutPost).toHaveBeenCalledTimes(1);
     expect(hasSessionHint()).toBe(false);
     hung.resolve();
-    vi.useRealTimers();
   });
 
   it("logout proceeds without the lock when another tab holds it past 15s", async () => {
@@ -152,7 +152,6 @@ describe("logout during an in-flight refresh", () => {
 
     expect(logoutPost).toHaveBeenCalledTimes(1);
     expect(hasSessionHint()).toBe(false);
-    vi.useRealTimers();
   });
 
   it("a refresh that resolves after the session ended writes back no hint", async () => {
@@ -186,6 +185,7 @@ describe("logout during an in-flight refresh", () => {
     });
     const ended = vi.fn();
     const off = onSessionEnded(ended);
+    onTestFinished(off);
     const http = makeClient(async (config) => httpError(config, 401), {
       MAIN: { endpoint: "/auth/refresh", hasSession: hasSessionHint },
     });
@@ -198,6 +198,5 @@ describe("logout during an in-flight refresh", () => {
     expect(await pending).toMatchObject({ error_code: 401, message: "session_ended" });
     expect(ended).toHaveBeenCalledTimes(1);
     expect(ended).toHaveBeenCalledWith("logout", "MAIN");
-    off();
   });
 });

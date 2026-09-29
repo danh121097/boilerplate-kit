@@ -3,7 +3,7 @@ import { bearerOf, httpError, makeClient, ok } from "@/__tests__/helpers/http-mo
 import { STORAGE_KEYS } from "@/enums";
 import { Api, onSessionEnded } from "@/services/core";
 import { getAccessToken, getRefreshToken } from "@/services/core/auth-token-storage";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import axios from "axios";
 
 /**
@@ -23,9 +23,13 @@ describe("interceptors — token refresh", () => {
     Api.setBaseURL("http://api.test", "MAIN");
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.unstubAllGlobals();
+  // Runs after each test's own onTestFinished cleanups, which unsubscribe
+  // from the stubbed globals.
+  beforeEach(({ onTestFinished }) => {
+    onTestFinished(() => {
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    });
   });
 
   it("refreshes once and replays the failed request transparently", async () => {
@@ -89,12 +93,12 @@ describe("interceptors — token refresh", () => {
 
     const ended = vi.fn();
     const off = onSessionEnded(ended);
+    onTestFinished(off);
 
     await expect(client.get("/users")).rejects.toMatchObject({ error_code: 401 });
     expect(calls).toBe(2);
     expect(getAccessToken("MAIN")).toBe("NEW");
     expect(ended).not.toHaveBeenCalled();
-    off();
   });
 
   it("does not attempt refresh for anonymous traffic (no token)", async () => {

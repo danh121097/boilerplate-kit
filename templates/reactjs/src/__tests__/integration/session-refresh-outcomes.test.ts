@@ -7,7 +7,7 @@ import {
   persistAccessToken,
   persistRefreshToken,
 } from "@/services/core/auth-token-storage";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import axios from "axios";
 
 /**
@@ -46,9 +46,13 @@ describe("refresh outcomes", () => {
     Api.setBaseURL("http://api.test", "MAIN");
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.unstubAllGlobals();
+  // Runs after each test's own onTestFinished cleanups, which unsubscribe
+  // from the stubbed globals.
+  beforeEach(({ onTestFinished }) => {
+    onTestFinished(() => {
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    });
   });
 
   it("refresh failure ends the session without reloading and rejects with the original 401", async () => {
@@ -58,6 +62,7 @@ describe("refresh outcomes", () => {
     post.mockRejectedValue(refreshError({ status: 401 }));
     const ended = vi.fn();
     const off = onSessionEnded(ended);
+    onTestFinished(off);
 
     const http = client(async (config) => httpError(config, 401));
 
@@ -67,7 +72,6 @@ describe("refresh outcomes", () => {
     expect(reload).not.toHaveBeenCalled();
     expect(getAccessToken()).toBeNull();
     expect(getRefreshToken()).toBeNull();
-    off();
   });
 
   it.each([
@@ -85,6 +89,7 @@ describe("refresh outcomes", () => {
       post.mockRejectedValue(refreshError(failure));
       const ended = vi.fn();
       const off = onSessionEnded(ended);
+      onTestFinished(off);
 
       const http = client(async (config) => httpError(config, 401));
 
@@ -95,7 +100,6 @@ describe("refresh outcomes", () => {
       expect(reload).not.toHaveBeenCalled();
       expect(getAccessToken()).toBe("OLD");
       expect(getRefreshToken()).toBe("RT");
-      off();
     },
   );
 
@@ -106,13 +110,13 @@ describe("refresh outcomes", () => {
     post.mockResolvedValue({ data: { data: {} } });
     const ended = vi.fn();
     const off = onSessionEnded(ended);
+    onTestFinished(off);
 
     const http = client(async (config) => httpError(config, 401));
 
     await expect(http.get("/users")).rejects.toMatchObject({ error_code: 0, retryable: true });
     expect(ended).not.toHaveBeenCalled();
     expect(getRefreshToken()).toBe("RT");
-    off();
   });
 
   it("the refresh request gives up after 15s so a hung refresh cannot stall requests", async () => {
@@ -154,13 +158,13 @@ describe("refresh outcomes", () => {
     post.mockRejectedValue(refreshError({ status }));
     const ended = vi.fn();
     const off = onSessionEnded(ended);
+    onTestFinished(off);
 
     const http = client(async (config) => httpError(config, 401));
 
     await expect(http.get("/users")).rejects.toMatchObject({ error_code: 401 });
     expect(ended).toHaveBeenCalledWith("expired", "MAIN");
     expect(getRefreshToken()).toBeNull();
-    off();
   });
 
   it("refreshes with only a refresh token stored (expired access token was cleared)", async () => {

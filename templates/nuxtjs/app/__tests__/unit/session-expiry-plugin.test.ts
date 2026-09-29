@@ -1,6 +1,16 @@
 import { endSession } from "@/services/core";
 import { QueryClient, QueryObserver } from "@tanstack/vue-query";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+  vi,
+} from "vitest";
 
 /**
  * The client plugin that replaced the page reload: when the main session ends
@@ -109,6 +119,7 @@ describe("04.session-expiry.client plugin", () => {
       staleTime: Infinity,
     });
     const unsubscribe = header.subscribe(() => {});
+    onTestFinished(unsubscribe);
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     endSession("expired", "MAIN");
@@ -119,6 +130,5 @@ describe("04.session-expiry.client plugin", () => {
 
     expect(fetchMe).toHaveBeenCalledTimes(2);
     expect(header.getCurrentResult().data).toEqual({ _id: "u1", again: true });
-    unsubscribe();
   });
 });

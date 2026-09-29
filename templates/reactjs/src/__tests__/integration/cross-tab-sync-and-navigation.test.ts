@@ -8,7 +8,7 @@ import { persistAccessToken } from "@/services/core/auth-token-storage";
 import { queryKeys } from "@/services/query-keys";
 import { setupSessionExpiry } from "@/services/session-expiry";
 import { syncAuthWithOtherTabs, useAuthStore } from "@/stores/auth";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 /**
  * Logins/logouts made in another tab, and where the root layout sends the user
@@ -51,9 +51,13 @@ describe("cross-tab auth sync", () => {
     });
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.unstubAllGlobals();
+  // Runs after each test's own onTestFinished cleanups, which unsubscribe
+  // from the stubbed globals.
+  beforeEach(({ onTestFinished }) => {
+    onTestFinished(() => {
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    });
   });
 
   it("a logout in another tab signs this tab out and ends its session as logout", () => {
@@ -61,8 +65,10 @@ describe("cross-tab auth sync", () => {
     useAuthStore.setState({ isAuthenticated: true, user: { _id: "u1" } as never });
     const ended = vi.fn();
     const stopEnds = onSessionEnded(ended);
+    onTestFinished(stopEnds);
     const onChange = vi.fn();
     const stop = syncAuthWithOtherTabs(onChange);
+    onTestFinished(stop);
 
     localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN); // the other tab's logout
     onStorage({ key: STORAGE_KEYS.ACCESS_TOKEN });
@@ -72,8 +78,6 @@ describe("cross-tab auth sync", () => {
     // the guard re-run once signed out.
     expect(ended).toHaveBeenCalledExactlyOnceWith("logout", "MAIN");
     expect(onChange).toHaveBeenCalledTimes(1);
-    stop();
-    stopEnds();
   });
 
   it("a login in another tab drops the cached signed-out user and marks every query stale", () => {
@@ -82,13 +86,13 @@ describe("cross-tab auth sync", () => {
     queryClient.setQueryData([queryKeys.auth.me], null);
     queryClient.setQueryData(["users.list"], { data: [] });
     const stop = syncAuthWithOtherTabs(vi.fn());
+    onTestFinished(stop);
 
     localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, "AT"); // the other tab's login
     onStorage({ key: STORAGE_KEYS.ACCESS_TOKEN });
 
     expect(queryClient.getQueryData([queryKeys.auth.me])).toBeUndefined();
     expect(queryClient.getQueryState(["users.list"])?.isInvalidated).toBe(true);
-    stop();
   });
 
   it("a login in another tab loads the user; a token rotation is ignored", () => {
@@ -96,6 +100,7 @@ describe("cross-tab auth sync", () => {
     const getMe = vi.spyOn(AuthModel, "getMe").mockResolvedValue({ _id: "u1" } as never);
     const onChange = vi.fn();
     const stop = syncAuthWithOtherTabs(onChange);
+    onTestFinished(stop);
 
     localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, "AT"); // the other tab's login
     onStorage({ key: STORAGE_KEYS.ACCESS_TOKEN });
@@ -107,7 +112,6 @@ describe("cross-tab auth sync", () => {
     onStorage({ key: STORAGE_KEYS.ACCESS_TOKEN });
     onStorage({ key: STORAGE_KEYS.LANGUAGE });
     expect(onChange).toHaveBeenCalledTimes(1);
-    stop();
   });
 
   it("after this tab logs out, a login in another tab signs this tab in again", async () => {
@@ -118,6 +122,7 @@ describe("cross-tab auth sync", () => {
     vi.spyOn(AuthModel, "getMe").mockResolvedValue({ _id: "u2" } as never);
     const onChange = vi.fn();
     const stop = syncAuthWithOtherTabs(onChange);
+    onTestFinished(stop);
 
     await AuthModel.logout(); // this tab's own logout: no storage event here
     localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, "AT2"); // the other tab's login
@@ -125,7 +130,6 @@ describe("cross-tab auth sync", () => {
 
     expect(useAuthStore.getState().isAuthenticated).toBe(true);
     expect(onChange).toHaveBeenCalledTimes(1);
-    stop();
   });
 
   it("a remote logout resets this tab without writing storage or posting", () => {
@@ -134,7 +138,9 @@ describe("cross-tab auth sync", () => {
     const post = vi.spyOn(AuthModel.api, "post");
     const ended = vi.fn();
     const off = onSessionEnded(ended);
+    onTestFinished(off);
     const stop = syncAuthWithOtherTabs(vi.fn());
+    onTestFinished(stop);
     localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN); // the other tab's logout
     const setItem = vi.spyOn(localStorage, "setItem");
     const removeItem = vi.spyOn(localStorage, "removeItem");
@@ -146,8 +152,6 @@ describe("cross-tab auth sync", () => {
     expect(post).not.toHaveBeenCalled();
     expect(ended).toHaveBeenCalledExactlyOnceWith("logout", "MAIN");
     expect(useAuthStore.getState()).toMatchObject({ user: null, isAuthenticated: false });
-    stop();
-    off();
   });
 });
 
@@ -156,41 +160,45 @@ describe("navigation on session end", () => {
     installLocalStorage();
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.unstubAllGlobals();
+  // Runs after each test's own onTestFinished cleanups, which unsubscribe
+  // from the stubbed globals.
+  beforeEach(({ onTestFinished }) => {
+    onTestFinished(() => {
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    });
   });
 
   it("a remote logout on a protected page goes to /login without a return path", () => {
     const router = fakeRouter("/users?page=2", true);
     const stop = setupSessionExpiry(router as never);
+    onTestFinished(stop);
 
     endSession("logout", "MAIN"); // what cross-tab sync runs for another tab's logout
 
     expect(router.navigate).toHaveBeenCalledExactlyOnceWith({ to: "/login" });
-    stop();
   });
 
   it("a remote logout on a public page stays there", () => {
     const router = fakeRouter("/counter", false);
     const stop = setupSessionExpiry(router as never);
+    onTestFinished(stop);
 
     endSession("logout", "MAIN");
 
     expect(router.navigate).not.toHaveBeenCalled();
-    stop();
   });
 
   it("an expired session goes to /login with a return path", () => {
     const router = fakeRouter("/users?page=2", true);
     const stop = setupSessionExpiry(router as never);
+    onTestFinished(stop);
 
     endSession("expired", "MAIN");
 
     expect(router.navigate).toHaveBeenCalledExactlyOnceWith({
       href: "/login?redirect=%2Fusers%3Fpage%3D2",
     });
-    stop();
   });
 
   it("a local logout on a protected page navigates once", async () => {
@@ -198,13 +206,13 @@ describe("navigation on session end", () => {
     vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
     const router = fakeRouter("/users", true);
     const stop = setupSessionExpiry(router as never);
+    onTestFinished(stop);
 
     // What the root layout's logout button does.
     await useAuthStore.getState().logout();
     await router.navigate({ to: "/login" });
 
     expect(router.navigate).toHaveBeenCalledExactlyOnceWith({ to: "/login" });
-    stop();
   });
 
   it("a remote logout while a revoke waits for the lock leaves a protected page", async () => {
@@ -222,7 +230,9 @@ describe("navigation on session end", () => {
     const post = vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
     const router = fakeRouter("/users", true);
     const stop = setupSessionExpiry(router as never);
+    onTestFinished(stop);
     const stopSync = syncAuthWithOtherTabs(vi.fn());
+    onTestFinished(stopSync);
 
     // The session was rejected: the revoke queues behind the held lock.
     const revoke = AuthModel.revokeSession(getSessionEpoch("MAIN"));
@@ -233,7 +243,5 @@ describe("navigation on session end", () => {
     await expect(revoke).resolves.toBe(false);
     expect(post).not.toHaveBeenCalled();
     expect(router.navigate).toHaveBeenCalledExactlyOnceWith({ to: "/login" });
-    stopSync();
-    stop();
   });
 });

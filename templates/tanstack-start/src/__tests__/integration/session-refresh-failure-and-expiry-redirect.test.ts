@@ -13,7 +13,7 @@ import {
   safeRedirect,
 } from "@/services/core";
 import { makeQueryClient, resetQueriesOnSessionEnd } from "@/services/core/query-client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import axios from "axios";
 
 /**
@@ -28,9 +28,13 @@ describe("session auth flows", () => {
     vi.stubGlobal("document", { cookie: "" });
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.unstubAllGlobals();
+  // Runs after each test's own onTestFinished cleanups, which unsubscribe
+  // from the stubbed globals.
+  beforeEach(({ onTestFinished }) => {
+    onTestFinished(() => {
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    });
   });
 
   it("refresh failure ends the session without reloading and rejects with the original 401", async () => {
@@ -38,6 +42,7 @@ describe("session auth flows", () => {
     post.mockRejectedValue(refreshError({ status: 401 }));
     const ended = vi.fn();
     const off = onSessionEnded(ended);
+    onTestFinished(off);
 
     const http = client(async (config) => httpError(config, 401));
 
@@ -45,7 +50,6 @@ describe("session auth flows", () => {
     expect(post).toHaveBeenCalledTimes(1);
     expect(ended).toHaveBeenCalledWith("expired", "MAIN");
     expect(reload).not.toHaveBeenCalled();
-    off();
   });
 
   it.each([
@@ -61,6 +65,7 @@ describe("session auth flows", () => {
       post.mockRejectedValue(refreshError(failure));
       const ended = vi.fn();
       const off = onSessionEnded(ended);
+      onTestFinished(off);
 
       const http = client(async (config) => httpError(config, 401));
 
@@ -70,7 +75,6 @@ describe("session auth flows", () => {
       expect(ended).not.toHaveBeenCalled();
       expect(reload).not.toHaveBeenCalled();
       expect(hasSessionHint()).toBe(true);
-      off();
     },
   );
 
@@ -93,13 +97,13 @@ describe("session auth flows", () => {
     post.mockRejectedValue(refreshError({ status: 403 }));
     const ended = vi.fn();
     const off = onSessionEnded(ended);
+    onTestFinished(off);
 
     const http = client(async (config) => httpError(config, 401));
 
     await expect(http.get("/users")).rejects.toMatchObject({ error_code: 401 });
     expect(ended).toHaveBeenCalledWith("expired", "MAIN");
     expect(hasSessionHint()).toBe(false);
-    off();
   });
 
   it("redirects to /login when a hinted session's refresh is refused", async () => {
@@ -108,12 +112,12 @@ describe("session auth flows", () => {
     post.mockRejectedValue(refreshError({ status: 401 }));
     const redirect = vi.fn();
     const off = redirectOnSessionExpired(redirect);
+    onTestFinished(off);
 
     const http = client(async (config) => httpError(config, 401));
 
     await expect(http.get("/users")).rejects.toMatchObject({ error_code: 401 });
     expect(redirect).toHaveBeenCalledTimes(1);
-    off();
   });
 
   it("never redirects an anonymous visitor (no hint) or on a transient failure", async () => {
@@ -121,6 +125,7 @@ describe("session auth flows", () => {
     post.mockRejectedValue(refreshError({ status: 503 }));
     const redirect = vi.fn();
     const off = redirectOnSessionExpired(redirect);
+    onTestFinished(off);
     const http = client(async (config) => httpError(config, 401));
 
     await expect(http.get("/auth/me")).rejects.toMatchObject({ error_code: 401 }); // anonymous
@@ -132,7 +137,6 @@ describe("session auth flows", () => {
 
     await AuthModel.logout().catch(() => {}); // logout is not a redirect trigger
     expect(redirect).not.toHaveBeenCalled();
-    off();
   });
   it("a refused refresh of another service keeps the main session", async () => {
     markSessionActive();
@@ -148,10 +152,13 @@ describe("session auth flows", () => {
     const queryClient = makeQueryClient();
     queryClient.setQueryData(["auth.me"], { _id: "1" });
     const offReset = resetQueriesOnSessionEnd(queryClient, "auth.me");
+    onTestFinished(offReset);
     const redirect = vi.fn();
     const offRedirect = redirectOnSessionExpired(redirect);
+    onTestFinished(offRedirect);
     const ended = vi.fn();
     const off = onSessionEnded(ended);
+    onTestFinished(off);
     const mainEpoch = getSessionEpoch("MAIN");
     const billingEpoch = getSessionEpoch("BILLING");
 
@@ -165,9 +172,6 @@ describe("session auth flows", () => {
     expect(getSessionEpoch("MAIN")).toBe(mainEpoch);
     expect(queryClient.getQueryData(["auth.me"])).toEqual({ _id: "1" });
     expect(redirect).not.toHaveBeenCalled();
-    off();
-    offRedirect();
-    offReset();
   });
 });
 

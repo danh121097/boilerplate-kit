@@ -8,7 +8,7 @@ import {
   resetQueriesOnSessionEnd,
   resyncQueriesAfterLogin,
 } from "@/services/core/query-client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 /**
  * Regression tests for the session rules: an anonymous or credential 401 never
@@ -22,9 +22,13 @@ describe("session auth flows", () => {
     vi.stubGlobal("document", { cookie: "" });
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.unstubAllGlobals();
+  // Runs after each test's own onTestFinished cleanups, which unsubscribe
+  // from the stubbed globals.
+  beforeEach(({ onTestFinished }) => {
+    onTestFinished(() => {
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    });
   });
 
   it("anonymous 401 on /auth/me: no refresh, no reload, rejects with error_code 401", async () => {
@@ -85,11 +89,11 @@ describe("session auth flows", () => {
     vi.spyOn(AuthModel.api, "post").mockRejectedValue(new Error("network"));
     const ended = vi.fn();
     const off = onSessionEnded(ended);
+    onTestFinished(off);
 
     await expect(AuthModel.logout()).rejects.toThrow("network");
     expect(ended).toHaveBeenCalledWith("logout", "MAIN");
     expect(hasSessionHint()).toBe(false);
-    off();
   });
 
   it("session end drops unobserved queries and pins auth.me to null", async () => {
@@ -97,6 +101,7 @@ describe("session auth flows", () => {
     queryClient.setQueryData(["users.list"], { data: [{ _id: "1" }] });
     queryClient.setQueryData(["auth.me"], { _id: "1" });
     const off = resetQueriesOnSessionEnd(queryClient, "auth.me");
+    onTestFinished(off);
 
     vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
     await AuthModel.logout();
@@ -104,7 +109,6 @@ describe("session auth flows", () => {
     expect(queryClient.getQueryData(["users.list"])).toBeUndefined();
     expect(queryClient.getQueryData(["auth.me"])).toBeNull();
     expect(document.cookie).toContain(`${STORAGE_KEYS.SESSION}=;`);
-    off();
   });
 
   it("a login in another tab drops the cached signed-out user and marks every query stale", () => {

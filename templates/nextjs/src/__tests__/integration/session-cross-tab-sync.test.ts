@@ -13,14 +13,18 @@ import {
   onSessionEnded,
   syncAuthAcrossTabs,
 } from "@/services/core";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 /** Cross-tab login/logout sync, and how a tab reacts to a logout made in another tab. */
 
 describe("cross-tab auth sync", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.unstubAllGlobals();
+  // Runs after each test's own onTestFinished cleanups, which unsubscribe
+  // from the stubbed globals.
+  beforeEach(({ onTestFinished }) => {
+    onTestFinished(() => {
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    });
   });
 
   it("session end broadcasts a logout other tabs can observe", () => {
@@ -36,9 +40,11 @@ describe("cross-tab auth sync", () => {
     markSessionActive();
     const ended = vi.fn();
     const off = onSessionEnded(ended);
+    onTestFinished(off);
     const onLogin = vi.fn();
     const onLogout = vi.fn();
     const stop = syncAuthAcrossTabs({ onLogin, onLogout });
+    onTestFinished(stop);
     const epoch = getSessionEpoch();
 
     document.cookie = `${STORAGE_KEYS.SESSION}=; path=/; max-age=0`; // other tab cleared it
@@ -54,8 +60,6 @@ describe("cross-tab auth sync", () => {
     expect(onLogin).not.toHaveBeenCalled();
     handlers.storage!({ key: STORAGE_KEYS.AUTH_SYNC, newValue: "login:2" });
     expect(onLogin).toHaveBeenCalledTimes(1);
-    stop();
-    off();
   });
 
   it("notices a hint-cookie change when the tab becomes visible or regains focus", () => {
@@ -64,6 +68,7 @@ describe("cross-tab auth sync", () => {
     const onLogin = vi.fn();
     const onLogout = vi.fn();
     const stop = syncAuthAcrossTabs({ onLogin, onLogout });
+    onTestFinished(stop);
 
     document.cookie = `${STORAGE_KEYS.SESSION}=1`; // another tab signed in
     handlers.visibilitychange!({});
@@ -74,14 +79,17 @@ describe("cross-tab auth sync", () => {
     handlers.focus!({});
     expect(onLogout).toHaveBeenCalledTimes(1);
     expect(getSessionEpoch()).toBe(epoch + 1);
-    stop();
   });
 });
 
 describe("a logout made in another tab", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.unstubAllGlobals();
+  // Runs after each test's own onTestFinished cleanups, which unsubscribe
+  // from the stubbed globals.
+  beforeEach(({ onTestFinished }) => {
+    onTestFinished(() => {
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    });
   });
 
   it("a remote logout does not clear the session hint or re-broadcast", () => {
@@ -92,8 +100,9 @@ describe("a logout made in another tab", () => {
 
     const onLogout = vi.fn();
     const stop = syncAuthAcrossTabs({ onLogout });
+    onTestFinished(stop);
 
-    const { ended, redirected, off } = observeSessionEnd();
+    const { ended, redirected } = observeSessionEnd();
 
     handlers.storage!({ key: STORAGE_KEYS.AUTH_SYNC, newValue: "logout:1" });
 
@@ -112,7 +121,5 @@ describe("a logout made in another tab", () => {
     handlers.storage!({ key: STORAGE_KEYS.AUTH_SYNC, newValue: "logout:1" });
     expect(ended).toHaveBeenCalledTimes(1);
     expect(onLogout).toHaveBeenCalledTimes(1);
-    stop();
-    off();
   });
 });

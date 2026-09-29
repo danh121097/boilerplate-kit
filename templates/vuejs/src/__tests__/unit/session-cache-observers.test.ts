@@ -3,7 +3,7 @@ import { STORAGE_KEYS } from "@/enums";
 import { AuthModel } from "@/services/auth/auth";
 import { persistAccessToken, persistRefreshToken } from "@/services/core";
 import { QueryObserver } from "@tanstack/vue-query";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import * as pinia from "pinia";
 import * as vue from "vue";
 
@@ -61,6 +61,7 @@ describe("mounted observers across session end and login", () => {
     useAuthStore().setUser({ _id: "u1" } as never);
     const fetchUsers = vi.fn(async () => [{ _id: "previous-user-row" }]);
     const view = mountUsersView(fetchUsers);
+    onTestFinished(view.unmount);
     await flush();
     expect(view.list.getCurrentResult().data).toEqual([{ _id: "previous-user-row" }]);
 
@@ -70,7 +71,6 @@ describe("mounted observers across session end and login", () => {
     expect(view.list.getCurrentResult().data).toBeUndefined();
     expect(fetchUsers).toHaveBeenCalledTimes(1);
     expect(queryClient.getQueryData(["auth.me"])).toBeNull();
-    view.unmount();
   });
 
   it("another tab's logout then login refetches the mounted users view", async () => {
@@ -80,6 +80,7 @@ describe("mounted observers across session end and login", () => {
     let rows: unknown = [{ _id: "u1-row" }];
     const fetchUsers = vi.fn(async () => rows);
     const view = mountUsersView(fetchUsers);
+    onTestFinished(view.unmount);
     await flush();
 
     localStorage.clear(); // the other tab logged out
@@ -93,7 +94,6 @@ describe("mounted observers across session end and login", () => {
     await vi.waitFor(() => expect(view.list.getCurrentResult().data).toEqual([{ _id: "u2-row" }]));
     expect(fetchUsers).toHaveBeenCalledTimes(2);
     await vi.waitFor(() => expect(store.user).toEqual({ _id: "u2" }));
-    view.unmount();
   });
 
   it("logout then login in the same tab refetches the mounted view", async () => {
@@ -102,6 +102,7 @@ describe("mounted observers across session end and login", () => {
     let rows: unknown = [{ _id: "u1-row" }];
     const fetchUsers = vi.fn(async () => rows);
     const view = mountUsersView(fetchUsers);
+    onTestFinished(view.unmount);
     await flush();
 
     await store.logout();
@@ -112,7 +113,6 @@ describe("mounted observers across session end and login", () => {
 
     expect(fetchUsers).toHaveBeenCalledTimes(2);
     expect(view.list.getCurrentResult().data).toEqual([{ _id: "u2-row" }]);
-    view.unmount();
   });
 
   it("session end removes unobserved queries and pins auth.me to null", () => {
