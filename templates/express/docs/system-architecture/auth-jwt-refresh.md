@@ -225,7 +225,10 @@ auth gate. Tokens without `iat_ms` fall back to `iat * 1000`, and cutoffs stored
 as seconds by older versions are scaled up, so a token issued in the same second
 as a logout is judged correctly (rejected if issued before it, valid if issued
 after, e.g. a re-login). With several instances this relies on their clocks agreeing
-(NTP); skew shifts the boundary by that much. The key auto-expires after one access-token lifetime
+(NTP); skew shifts the boundary by that much. When upgrading from a version that
+stored the cutoff in seconds, upgrade every instance together (or drain the old
+ones): an older instance compares `iat` in seconds against the new ms cutoff and
+rejects that user's access tokens until the key expires. The key auto-expires after one access-token lifetime
 (`accessTtlSeconds()`). When Redis is disabled, `revokeUserTokens` and
 `getUserRevokedAt` are no-ops — logout still works (the refresh token is revoked
 in Mongo) but outstanding access tokens simply live out their ≤15 min. The same
