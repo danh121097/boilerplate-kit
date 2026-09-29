@@ -44,7 +44,7 @@ the values at build time:
 | `NEXT_PUBLIC_APP_NAME`      | `enums/storage-keys.ts` — prefix for cookie, storage and lock keys (default `PRISM_APP`)                        |
 | `NEXT_PUBLIC_HMAC_SECRET`   | `hmac-signature.ts` — HMAC signing                                                                              |
 | `NEXT_PUBLIC_BUILD_VERSION` | `hmac-signature.ts` — `x-version` header                                                                        |
-| `NEXT_PUBLIC_LANGUAGE_CODE` | `i18n/i18n.ts` — default locale fallback                                                                        |
+| `NEXT_PUBLIC_LANGUAGE_CODE` | `app/layout.tsx`, `i18n/i18n.ts` — default locale when no language cookie is set                                |
 | `NEXT_PUBLIC_AUTH_MOCK`     | `mock-auth-config.ts` — dev only: `true`/`1` answers `/auth/*` and `/users`. Ignored in production builds       |
 | `NEXT_PUBLIC_AUTH_MOCK_EMAIL` / `NEXT_PUBLIC_AUTH_MOCK_PASSWORD` | `mock-auth-config.ts` — mock login credentials (default `demo@example.com` / `password`) |
 
@@ -55,14 +55,11 @@ with the reactjs/vuejs templates.
 
 ## Service Initialization Timing
 
-`initServices()` is called inside `useEffect` in `app/providers.tsx`. This
-guarantees it only runs after hydration in the browser — never during SSR:
+`initServices()` runs once at module load of `app/providers.tsx`, behind a
+`typeof window !== "undefined"` guard — in the browser before any component
+renders or query runs (an effect would fire after the children's effects and
+the first query would go out unsigned), and never during SSR:
 
 ```ts
-useEffect(() => {
-  if (!initialized.current) {
-    initServices();
-    initialized.current = true;
-  }
-}, []);
+if (typeof window !== "undefined") initServices();
 ```

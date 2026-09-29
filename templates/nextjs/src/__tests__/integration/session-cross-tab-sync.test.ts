@@ -95,8 +95,8 @@ describe("a logout made in another tab", () => {
   it("a remote logout does not clear the session hint or re-broadcast", () => {
     const handlers = installBrowser(HINT);
     const store = installLocalStorage();
-    const post = vi.spyOn(AuthModel.api, "post");
     const epoch = getSessionEpoch();
+    const post = vi.spyOn(AuthModel.api, "post");
 
     const onLogout = vi.fn();
     const stop = syncAuthAcrossTabs({ onLogout });

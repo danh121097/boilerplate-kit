@@ -9,6 +9,12 @@ type QueryDefOpts<TData, TParams = void> = Omit<
   "queryKey" | "queryFn"
 >;
 
+/** A plain queryKey + queryFn object, consumable by ensureQueryData / prefetchQuery. */
+export interface QueryOptionsObject<TData, TParams = void> {
+  queryKey: QueryDefinitionKey<TParams>;
+  queryFn: () => Promise<TData>;
+}
+
 interface UseQueryConfig<TData, TParams = void> extends QueryDefOpts<TData, TParams> {
   params?: TParams;
 }
@@ -24,6 +30,10 @@ export interface QueryDefinition<TData, TParams = void> {
   ): ReturnType<typeof useQuery<TData, ApiResponseError, TData, QueryDefinitionKey<TParams>>>;
   key: string;
   queryKey: (params?: TParams) => QueryDefinitionKey<TParams>;
+  /** Same key + fetcher as the hook, as a plain object, for `prefetchQuery` /
+   * `ensureQueryData`. Fetchers are browser-only (axios + cookie hint), so call it
+   * from client code; server prefetch goes through `server/hydrated-queries.tsx`. */
+  queryOptions: (params?: TParams) => QueryOptionsObject<TData, TParams>;
 }
 
 export function defineQuery<TData, TParams = void>(config: DefineQueryConfig<TData, TParams>) {
@@ -45,6 +55,10 @@ export function defineQuery<TData, TParams = void>(config: DefineQueryConfig<TDa
   const definition = use as QueryDefinition<TData, TParams>;
   definition.key = key;
   definition.queryKey = queryKey;
+  definition.queryOptions = (params?: TParams) => ({
+    queryKey: queryKey(params),
+    queryFn: () => fetcher(params as TParams),
+  });
   return definition;
 }
 

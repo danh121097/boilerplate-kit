@@ -47,12 +47,20 @@ describe("session auth flows", () => {
     expect(calls).toBe(1);
   });
 
-  it("getSession resolves an anonymous 401 to null (signed out), not an error", async () => {
+  it("getSession resolves a 401 to null (signed out), not an error", async () => {
+    markSessionActive();
     vi.spyOn(AuthModel.api, "get").mockRejectedValue({ error_code: 401, message: "no" });
     await expect(AuthModel.getSession()).resolves.toBeNull();
   });
 
+  it("getSession with no session hint resolves signed out without a request", async () => {
+    const get = vi.spyOn(AuthModel.api, "get").mockRejectedValue({ error_code: 503 });
+    await expect(AuthModel.getSession()).resolves.toBeNull();
+    expect(get).not.toHaveBeenCalled();
+  });
+
   it("getSession rethrows non-auth failures so they are not cached as signed out", async () => {
+    markSessionActive();
     vi.spyOn(AuthModel.api, "get").mockRejectedValue({ error_code: 503, message: "down" });
     await expect(AuthModel.getSession()).rejects.toMatchObject({ error_code: 503 });
   });

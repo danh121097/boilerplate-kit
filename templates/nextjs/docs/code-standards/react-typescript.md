@@ -2,7 +2,9 @@
 
 ## TypeScript config
 
-- `strict: true` — all strict checks enabled.
+- `strict: true` — all strict checks enabled, plus `noUncheckedIndexedAccess`,
+  `noFallthroughCasesInSwitch` and `verbatimModuleSyntax` (use `import type` for
+  types; indexed access returns `T | undefined`).
 - No `any` without an explicit justification comment.
 - Module resolution: `bundler`; `@/*` maps to `./src/*`.
 
@@ -75,6 +77,21 @@ const { data, isLoading, error } = useUsersListQuery();
 import { useCounterStore } from "@/stores/counter";
 const { count, increment } = useCounterStore();
 ```
+
+## Forms and validation
+
+Forms use `react-hook-form` with `zodResolver` and zod 4 idioms (`z.email()`).
+Schema messages are i18n keys, translated where they render:
+
+```tsx
+const schema = z.object({
+  email: z.email("validation.email"),
+  password: z.string().min(8, "validation.password_min"),
+});
+// error={errors.email?.message && t(errors.email.message)}
+```
+
+Every field goes through `FormField` (label + `htmlFor`/`id`).
 
 ## i18n
 

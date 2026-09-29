@@ -2,13 +2,17 @@
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { FormField } from "@/components/ui/form-field";
 import { useLoginMutation } from "@/services/auth";
+import { loginSchema } from "@/services/auth/login-schema";
 import { useAuth } from "@/services/auth/session";
-import { safeRedirect } from "@/services/core/session";
+import { getApiErrorMessage, safeRedirect } from "@/services/core";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import type { LoginFormValues } from "@/services/auth/login-schema";
 import type { FormEvent } from "react";
 
 /** Where to go after signing in: the same-origin `?redirect=` path (set when a
@@ -34,51 +38,59 @@ export default function LoginPage() {
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: "", password: "" },
+  });
 
   // Already signed in → no reason to show the form.
   useEffect(() => {
     if (isAuthenticated) router.replace(returnPath());
   }, [isAuthenticated, router]);
 
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    login.mutate({ email, password });
-  }
+  // Reset first so a previous server error never outlives a new submit (even one
+  // that fails client validation).
+  const onSubmit = (e: FormEvent) => {
+    login.reset();
+    return handleSubmit((values) => login.mutate(values))(e);
+  };
 
   return (
     <section>
       <h1 className="mb-4 text-3xl font-bold">{t("login.title")}</h1>
 
       <Card className="max-w-md">
-        <form onSubmit={onSubmit} className="space-y-4">
-          <div className="space-y-1">
-            <label className="text-sm font-medium">{t("login.email")}</label>
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              autoComplete="username"
-            />
-          </div>
+        <form onSubmit={onSubmit} className="space-y-4" noValidate>
+          <FormField
+            label={t("login.email")}
+            type="email"
+            placeholder="you@example.com"
+            autoComplete="username"
+            error={errors.email?.message && t(errors.email.message)}
+            {...register("email")}
+          />
 
-          <div className="space-y-1">
-            <label className="text-sm font-medium">{t("login.password")}</label>
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-            />
-          </div>
+          <FormField
+            label={t("login.password")}
+            type="password"
+            autoComplete="current-password"
+            error={errors.password?.message && t(errors.password.message)}
+            {...register("password")}
+          />
 
           <Button type="submit" block disabled={login.isPending}>
             {login.isPending ? t("login.submitting") : t("login.submit")}
           </Button>
 
-          {login.isError && <p className="text-sm text-red-600">{login.error.message}</p>}
+          {login.isError && (
+            <p role="alert" className="text-sm text-destructive">
+              {getApiErrorMessage(login.error, t("login.error"))}
+            </p>
+          )}
         </form>
       </Card>
     </section>

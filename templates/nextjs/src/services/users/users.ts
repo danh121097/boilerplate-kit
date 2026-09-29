@@ -15,7 +15,7 @@ export class UsersModel extends Model {
     });
   }
 
-  static listPaginated(params: PaginationParams = {}): Promise<PaginatedResponse<User>> {
+  static list(params: PaginationParams = {}): Promise<PaginatedResponse<User>> {
     return this.api.paginate<User>({ params });
   }
 
@@ -33,5 +33,5 @@ export class UsersModel extends Model {
 // Queries
 export const useUsersListQuery = defineQuery<PaginatedResponse<User>>({
   key: queryKeys.users.list,
-  fetcher: () => UsersModel.listPaginated(),
+  fetcher: () => UsersModel.list(),
 });

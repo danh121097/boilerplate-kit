@@ -1,16 +1,20 @@
 import { SOCKET_EVENT, SOCKET_UNAUTHORIZED_MESSAGE } from "@/enums";
+import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import { useSocketIOStore } from "@/stores/socket-io";
-import { useEffect, useRef, useCallback } from "react";
-import Base64 from "crypto-js/enc-base64";
-import HmacSHA256 from "crypto-js/hmac-sha256";
+import { useCallback, useEffect, useRef } from "react";
 
-function signHeader(): { sig: string; ctime: number } | Record<string, never> {
-  const secret = process.env.NEXT_PUBLIC_HMAC_SECRET;
-  if (!secret) return {};
-  const ctime = Date.now();
-  const stringToSign = ["GET", "application/json", ctime, "/socket", ""].join("\n");
-  const sig = Base64.stringify(HmacSHA256(stringToSign, secret));
-  return { sig, ctime };
+/** Trailing delay before an auth-rejected handshake tears the socket down. */
+const RECONNECT_THROTTLE_MS = 2000;
+
+/** Handshake signature, built by the same signer as the HTTP requests. Empty when
+ * no HMAC secret is configured. */
+function signHeader(): { sig?: string; ctime?: number } {
+  const signed = HMACSignatureGenerator.signRequest({
+    method: "GET",
+    path: "/socket",
+    contentType: "application/json",
+  });
+  return signed ? { sig: signed.sig, ctime: signed.ctime } : {};
 }
 
 function buildAuth() {
@@ -78,7 +82,7 @@ export function useSocketIO() {
       reconnectTimer.current = setTimeout(() => {
         reconnectTimer.current = null;
         destroySocket();
-      }, 2000);
+      }, RECONNECT_THROTTLE_MS);
     };
 
     const handleUnauthorized = () => destroySocket();
@@ -110,7 +114,7 @@ export function useSocketIO() {
  * Requires the consuming component to be a client component (`"use client"`).
  */
 export function useSocketEvent(event: string, callback: (...args: unknown[]) => void) {
-  const { socket } = useSocketIOStore();
+  const socket = useSocketIOStore((s) => s.socket);
 
   useEffect(() => {
     if (!socket) return;

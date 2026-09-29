@@ -23,7 +23,7 @@ Package manager: **pnpm**.
 
 ## Conventions Quick Reference
 
-- **SSR-safe**: storage/`window` access is client-guarded (`isClient()`); HMAC
+- **SSR-safe**: storage/`window`/`document` access is client-guarded (`typeof window`); HMAC
   secret read via `process.env.NEXT_PUBLIC_*` (build-time public).
 - **Filenames**: kebab-case for `.ts`; hooks use `useXxx.ts` camelCase.
 - **Components**: PascalCase `.tsx` files under `src/components/`.
@@ -43,7 +43,8 @@ pnpm start        # next start (production)
 pnpm typecheck    # tsc --noEmit
 pnpm test         # vitest run
 pnpm test:watch   # vitest
-pnpm lint         # eslint
+pnpm lint         # eslint + prettier --check (read-only)
+pnpm lint:fix     # eslint --fix + prettier --write
 pnpm format       # prettier --write
 ```
 
@@ -57,7 +58,7 @@ docs/
 ├── README.md                # documentation map (start here)
 ├── project-overview-pdr.md  # vision, stack, scripts, constraints
 ├── codebase-summary.md      # → codebase-summary/* (structure, services-and-stores, conventions)
-├── code-standards.md        # → code-standards/* (file-naming, react-typescript, lint, commits)
-├── system-architecture.md   # → system-architecture/* (bootstrap, networking, security-auth, state, build, errors)
-└── design-guidelines.md     # → design-guidelines/* (tailwind, shadcn, theming, a11y)
+├── code-standards.md        # → code-standards/* (file-naming, react-typescript, lint-format, testing, commit-convention)
+├── system-architecture.md   # → system-architecture/* (bootstrap-flow, ssr-and-runtime-config, networking-realtime, security-auth, state-management, build-pipeline, error-handling)
+└── design-guidelines.md     # → design-guidelines/* (tailwindcss, shadcn-components, theming, accessibility)
 ```

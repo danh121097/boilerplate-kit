@@ -1,6 +1,22 @@
 # Testing
 
-Vitest conventions for test setup and teardown.
+Vitest 4 conventions for test setup and teardown. Tests run in the `node`
+environment (no jsdom); `pnpm test` runs `vitest run`.
+
+## Layout
+
+`src/__tests__/{unit,integration,helpers}`. Every suite runs with the dev-only
+mock auth forced off (`setup-mock-auth-off.ts`); the mock-auth tests turn it on
+explicitly.
+
+## Testing components without a DOM
+
+Server-render the component with `renderWithI18n()` from
+`src/__tests__/helpers/render-with-i18n.ts` and assert on the HTML (not-found
+page, session banner, users list). Seed React Query data with
+`queryClient.setQueryData` so nothing fetches. Behavior that depends on queries
+(session unavailable, retry) is tested with a `QueryObserver` over the real
+service functions, mocking only `Api` calls.
 
 ## Restoring mocks and globals
 

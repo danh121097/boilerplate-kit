@@ -1,4 +1,5 @@
 import { Providers } from "@/app/providers";
+import { SessionAlert } from "@/components/session-banner";
 import { SiteHeader } from "@/components/site-header";
 import { STORAGE_KEYS } from "@/enums";
 import { cookies } from "next/headers";
@@ -30,10 +31,13 @@ export default async function RootLayout({ children }: RootLayoutProps) {
 
   return (
     <html lang={lang} suppressHydrationWarning>
-      <body className="min-h-screen bg-gray-50 text-gray-900" suppressHydrationWarning>
+      <body className="min-h-screen bg-background text-foreground" suppressHydrationWarning>
         <Providers initialLanguage={lang}>
           <SiteHeader />
-          <main className="mx-auto max-w-3xl px-6 py-8">{children}</main>
+          <main className="mx-auto max-w-3xl px-6 py-8">
+            <SessionAlert />
+            {children}
+          </main>
         </Providers>
       </body>
     </html>

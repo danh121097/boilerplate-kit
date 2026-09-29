@@ -9,20 +9,15 @@
 | `pnpm start`     | Serve production build (`next start`)        |
 | `pnpm typecheck` | `tsc --noEmit` — type-check without emitting |
 | `pnpm test`      | `vitest run` — node environment, `@/` alias  |
-| `pnpm lint`      | ESLint with flat config (jiti loader)        |
+| `pnpm lint`      | `eslint . && prettier --check .` (read-only) |
+| `pnpm lint:fix`  | `eslint . --fix && prettier --write .`       |
 | `pnpm format`    | Prettier write                               |
 
 ## Next.js Config
 
-`next.config.ts` is minimal — only enables the React Compiler:
-
-```ts
-experimental: {
-  reactCompiler: true;
-}
-```
-
-No custom webpack config. Turbopack handles dev bundling.
+`next.config.ts` is an empty `NextConfig` — no experimental flags and no custom
+webpack config. Turbopack handles dev bundling. `next build` also type-checks;
+`pnpm typecheck` runs the same check standalone.
 
 ## Tailwind v4
 
@@ -41,13 +36,15 @@ Vitest runs in `node` environment (no jsdom). This lets tests use `node:crypto`
 for HMAC verification. No localStorage mocks needed — tokens are httpOnly cookies
 (server-managed). The `@/` alias resolves to `src/` via `vitest.config.ts`.
 
-**Test suite:** 9 test files covering HMAC, headers, Api, Model, TanStack, and
-interceptor refresh flows. Integration tests verify interceptor 401→refresh→replay
-and auth service behavior.
+**Test suite:** Vitest 4, unit tests for core helpers (HMAC, headers, Api, Model,
+TanStack, server API/session read, route guard, login schema, session banner,
+not-found and users pages) and integration tests for the interceptor
+401→refresh→replay flow, the auth service, session flows and mock auth/users.
 
 ## TypeScript
 
 - `moduleResolution: "bundler"` — Next.js recommended
+- `strict`, `noUncheckedIndexedAccess`, `noFallthroughCasesInSwitch`, `verbatimModuleSyntax` — the shared baseline
 - `isolatedModules: true` — required by Next.js transform
 - `paths: { "@/*": ["./src/*"] }` — the `@/` alias
 - `plugins: [{ name: "next" }]` — enables Next.js LSP features in editors

@@ -63,3 +63,32 @@ The interceptor recognizes two envelope shapes:
 ```
 
 Non-envelope responses (e.g. jsonplaceholder plain arrays) pass through as-is.
+
+## Pagination
+
+`Api.paginate<T>({ params })` (offset: `?page&limit`) and `Api.cursorPaginate<T>`
+(`?cursor&limit`) return the backend's full envelope — `PaginatedResponse<T>`
+(`{ data, meta }`) or `CursorResponse<T>` — instead of unwrapping `data`, so
+pagination metadata reaches the caller. `UsersModel.list(params?)` is built on
+`paginate`; the SSR counterpart is `serverApiPaginate` in `src/server/server-api.ts`.
+
+## Socket.IO
+
+`useSocketIO()` (`src/hooks/useSocketIO.ts`, client only) creates the socket from
+`NEXT_PUBLIC_APP_ENDPOINT` (bare origin, no API prefix) with `transports:
+["websocket"]`, `withCredentials: true` (the httpOnly access cookie authenticates
+the handshake — no Bearer), `autoConnect: false` and `forceBase64: true`. The
+`socket.io-client` module is imported lazily inside an effect, so it stays out of
+the SSR bundle.
+
+- **Handshake auth** is `{ role: "user", sig, ctime }`. `sig`/`ctime` come from the
+  same `HMACSignatureGenerator.signRequest` the HTTP interceptor uses (method
+  `GET`, path `/socket`); without `NEXT_PUBLIC_HMAC_SECRET` they are omitted.
+- **Reconnect** — an auth-rejected `connect_error` schedules one trailing
+  `RECONNECT_THROTTLE_MS` (2000 ms) timer that destroys the socket; further
+  errors inside that window do not reschedule. The timer is cleared on unmount.
+- **State** lives in `stores/socket-io.ts` (`socket`, `authenticated`).
+  `useSocketEvent(event, cb)` reads the socket through a selector
+  (`useSocketIOStore((s) => s.socket)`), so it rebinds when the socket changes.
+
+Event names are in `src/enums/socket-events.ts`.

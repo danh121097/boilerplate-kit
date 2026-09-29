@@ -3,7 +3,7 @@
 ## File Naming
 
 - **TypeScript/TSX**: kebab-case (`hmac-signature.ts`, `query-keys.ts`, `counter.ts`)
-- **Hooks**: camelCase matching function name (`useAppVersion.ts`, `useAuth.ts`)
+- **Hooks**: camelCase matching function name (`useSocketIO.ts`)
 - **Components**: PascalCase only in JSX imports; files are kebab-case when possible
 - **App Router pages**: `page.tsx` inside named segment folders
 - **Server helpers**: kebab-case in `src/server/` (`server-api.ts`, `session.ts`)
@@ -31,15 +31,14 @@ Add `"use client"` at the top of any file that uses:
 Guard browser APIs that may be called from server contexts:
 
 ```ts
-export function initI18n(): void {
-  // Safe to call from RSC + client; returns env default when window is undefined
-  const lang = typeof window !== "undefined" ? getSavedLanguage() : DEFAULT_LANG;
-  i18n.changeLanguage(lang);
+export function readCookie(name: string): string | null {
+  if (typeof document === "undefined") return null; // server: no document
+  // ...
 }
 ```
 
 **Note:** Auth tokens are httpOnly cookies (inaccessible to JavaScript on any platform).
-Storage guards only apply to i18n locale persistence and the session hint / cross-tab sync.
+Browser guards only apply to the language cookie, the session hint and cross-tab sync.
 
 ## Commit Style
 

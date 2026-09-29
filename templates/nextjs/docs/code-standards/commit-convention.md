@@ -1,4 +1,4 @@
-# Commits
+# Commit Convention
 
 Conventional Commits format: `<type>(<scope>): <description>`
 

@@ -29,8 +29,8 @@ Config in `prettier.config.ts`:
 
 | Script | Does |
 |--------|------|
-| `pnpm lint` | `eslint . --fix && prettier --write .` |
-| `pnpm lint:check` | `eslint . && prettier --check .` (CI) |
+| `pnpm lint` | `eslint . && prettier --check .` (read-only, use in CI) |
+| `pnpm lint:fix` | `eslint . --fix && prettier --write .` |
 | `pnpm format` | `prettier --write .` |
 | `pnpm typecheck` | `tsc --noEmit` |
 

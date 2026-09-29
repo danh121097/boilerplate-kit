@@ -131,11 +131,14 @@ export class AuthModel extends Model {
     return res.data.user;
   }
 
-  /** Current user, or null when signed out. A 401 resolves to null; while the
+  /** Current user, or null when signed out. Without a session hint (anonymous) it
+   * resolves null with no request. A 401 resolves to null; while the
    * session is still live (hint set, not ended meanwhile) it is revoked first
    * (`revokeSession`, ends as "expired"). Other failures (network/5xx) still
    * throw so they are not cached as "signed out". Browser-only. */
   static async getSession(): Promise<AuthUser | null> {
+    // No session hint → anonymous: signed out without a request (nothing to restore).
+    if (!hasSessionHint()) return null;
     const epoch = getSessionEpoch(this.service);
     try {
       return await this.getMe();
@@ -171,4 +174,7 @@ export const useRegisterMutation = defineMutation<AuthResult, RegisterPayload>({
 export const useLogoutMutation = defineMutation({
   key: queryKeys.auth.logout,
   mutator: () => AuthModel.logout(),
+  // Run even offline: a paused logout would never settle, leaving the user
+  // signed in with a spinning button. The client signs out on settle anyway.
+  options: { networkMode: "always" },
 });

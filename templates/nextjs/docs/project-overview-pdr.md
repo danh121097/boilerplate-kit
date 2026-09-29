@@ -15,15 +15,15 @@ and the browser handles cookies.
 | Concern         | Choice                  | Version     |
 | --------------- | ----------------------- | ----------- |
 | Framework       | Next.js (App Router)    | 16          |
-| Language        | TypeScript              | 5.x strict  |
+| Language        | TypeScript              | 6.x strict  |
 | Data fetching   | TanStack React Query    | 5.x         |
 | State           | Zustand                 | 5           |
-| Forms           | react-hook-form + zod   | 7.x / 3.x   |
+| Forms           | react-hook-form + zod   | 7.x / 4.x   |
 | UI primitives   | shadcn/ui (new-york)    | latest      |
 | Styling         | Tailwind CSS            | v4          |
 | HTTP            | axios                   | 1.x         |
 | i18n            | react-i18next + i18next | 15.x / 24.x |
-| Tests           | Vitest                  | 3.x         |
+| Tests           | Vitest                  | 4.x         |
 | Package manager | pnpm                    | 9+          |
 
 ## Scripts
@@ -35,14 +35,15 @@ pnpm start        # next start (production)
 pnpm typecheck    # tsc --noEmit
 pnpm test         # vitest run (node env)
 pnpm test:watch   # vitest watch
-pnpm lint         # eslint (flat config, jiti)
+pnpm lint         # eslint + prettier --check (read-only)
+pnpm lint:fix     # eslint --fix + prettier --write
 pnpm format       # prettier --write
 ```
 
 ## Constraints
 
 - No `any` without explicit justification comment.
-- `strict: true` in tsconfig; `isolatedModules: true` for Next.js compatibility.
+- `strict: true`, `noUncheckedIndexedAccess`, `noFallthroughCasesInSwitch` and `verbatimModuleSyntax` in tsconfig (type-only imports use `import type`); `isolatedModules: true` for Next.js compatibility.
 - HMAC secret must match backend `HMAC_SECRET`; leave empty for backends without HMAC.
 - Both tokens (accessToken + refreshToken) are httpOnly cookies, server-managed. Client never reads them.
 - Service layer is client-side only — never call service methods in RSC or server actions.

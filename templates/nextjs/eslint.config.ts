@@ -49,7 +49,7 @@ export default [
       // Group each function's leading declarations: let -> const -> destructuring.
       "local/sort-leading-declarations": "warn",
       ...reactHooks.configs.recommended.rules,
-      // Allow underscore-prefixed params/vars to be unused (e.g. _wrapperClassName omit-props).
+      // Allow underscore-prefixed params/vars to be unused (e.g. omit-props rest siblings).
       "@typescript-eslint/no-unused-vars": [
         "error",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_", ignoreRestSiblings: true },

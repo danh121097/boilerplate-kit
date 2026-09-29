@@ -81,7 +81,7 @@ describe("mock users", () => {
     const app = await boot();
     await app.AuthModel.login(DEMO);
 
-    const body = await app.UsersModel.listPaginated();
+    const body = await app.UsersModel.list();
 
     expect(body).toMatchObject({
       status: "success",
@@ -112,7 +112,7 @@ describe("mock users", () => {
     const app = await boot();
     await app.AuthModel.login(DEMO);
 
-    const body = await app.UsersModel.listPaginated({ page: 2, limit: 4 });
+    const body = await app.UsersModel.list({ page: 2, limit: 4 });
 
     expect(body.data.map((u) => u._id)).toEqual(["mock-user-2", "mock-user-1"]);
     expect(body).toMatchObject({
@@ -149,7 +149,7 @@ describe("mock users", () => {
     const app = await boot();
     await app.AuthModel.register(NEW_USER);
 
-    await expect(app.UsersModel.listPaginated()).rejects.toMatchObject({
+    await expect(app.UsersModel.list()).rejects.toMatchObject({
       error_code: 403,
       message: "Insufficient permissions!",
     });
@@ -160,7 +160,7 @@ describe("mock users", () => {
   it("answers 401 without a session", async () => {
     const app = await boot();
 
-    await expect(app.UsersModel.listPaginated()).rejects.toMatchObject({
+    await expect(app.UsersModel.list()).rejects.toMatchObject({
       error_code: 401,
       message: "Access token required!",
     });
@@ -176,7 +176,7 @@ describe("mock users", () => {
     vi.spyOn(axios.defaults, "adapter", "get").mockReturnValue(backend);
     const app = await boot();
 
-    await expect(app.UsersModel.listPaginated()).resolves.toEqual(REAL_LIST);
+    await expect(app.UsersModel.list()).resolves.toEqual(REAL_LIST);
     expect(backend).toHaveBeenCalledTimes(1);
   });
 

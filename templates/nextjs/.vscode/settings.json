@@ -1,6 +1,6 @@
 {
   // Run ESLint auto-fix on every save: perfectionist import sorting +
-  // local/sort-component-declarations (let -> const -> destructuring).
+  // local/sort-leading-declarations (let -> const -> destructuring).
   "editor.codeActionsOnSave": {
     "source.fixAll.eslint": "explicit"
   },
