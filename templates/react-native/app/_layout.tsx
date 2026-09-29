@@ -1,3 +1,4 @@
+import { MockAuthBadge } from "@/components/mock-auth-badge";
 import { initI18n } from "@/i18n/i18n";
 import { AppQueryClientProvider } from "@/providers/query-client-provider";
 import { initServices } from "@/services";
@@ -35,6 +36,7 @@ export default function RootLayout() {
         <AppQueryClientProvider>
           <I18nextProvider i18n={i18n}>
             <Stack screenOptions={{ headerShown: false }} />
+            <MockAuthBadge />
           </I18nextProvider>
         </AppQueryClientProvider>
       </SafeAreaProvider>

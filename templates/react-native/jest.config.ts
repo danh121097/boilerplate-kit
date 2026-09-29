@@ -7,6 +7,8 @@ import type { Config } from "jest";
  */
 const config: Config = {
   preset: "jest-expo",
+  // Keeps a local `EXPO_PUBLIC_AUTH_MOCK*` from turning the dev-only mock auth on in every suite.
+  setupFilesAfterEnv: ["<rootDir>/src/__tests__/setup-mock-auth-off.ts"],
   // Only *.test.* files are suites — helpers under __tests__/helpers/ are shared
   // fixtures, not tests.
   testMatch: ["**/*.test.ts", "**/*.test.tsx"],

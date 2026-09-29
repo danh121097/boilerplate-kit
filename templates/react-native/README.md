@@ -37,6 +37,15 @@ Point `EXPO_PUBLIC_APP_ENDPOINT` at a running backend (the `express` or `nestjs`
 template in this kit works out of the box). Every `EXPO_PUBLIC_*` var is inlined
 into the JS bundle at build time — never put real secrets there.
 
+```sh
+# Optional, dev only — answer /auth/* in the app before the backend auth exists
+# EXPO_PUBLIC_AUTH_MOCK=true
+# EXPO_PUBLIC_AUTH_MOCK_EMAIL=demo@example.com
+# EXPO_PUBLIC_AUTH_MOCK_PASSWORD=password
+```
+
+See [Mock auth](./docs/system-architecture/security-auth.md#mock-auth-before-backend-integration): the flag is ignored in production builds.
+
 ## Scripts
 
 | Script           | Does                                            |
@@ -64,7 +73,7 @@ src/
   providers/             QueryClientProvider
   services/
     core/                axios client, interceptors, refresh, HMAC, token storage
-    auth/                auth service (login / register / logout / me)
+    auth/                auth service (login / register / logout / me) + dev mock-auth*.ts
     users/               users service
     init-services.ts     wire base URLs + interceptors + refresh options
   stores/                Zustand stores (auth, socket-io)

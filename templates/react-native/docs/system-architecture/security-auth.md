@@ -262,3 +262,47 @@ token is stored) and calls `getMe`:
 `useMeQuery` (a TanStack query on `queryKeys.auth.me`) fetches through
 `AuthModel.getSession()`, which resolves `null` on a 401 instead of throwing, so
 a signed-out session reads as `data: null`.
+
+## Mock auth (before backend integration)
+
+`EXPO_PUBLIC_AUTH_MOCK=true` answers the auth routes in the app so screens can be
+built before the backend auth exists. It is **off by default**; turn it off and
+the real backend is used with no change to screens, stores or guards.
+
+```
+EXPO_PUBLIC_AUTH_MOCK=true
+# Optional — defaults: demo@example.com / password
+# EXPO_PUBLIC_AUTH_MOCK_EMAIL=dev@example.com
+# EXPO_PUBLIC_AUTH_MOCK_PASSWORD=s3cret-pass
+```
+
+Truthy is exactly `"true"` or `"1"` (anything else, e.g. `TRUE`, is off).
+Restart Metro after changing an `EXPO_PUBLIC_*` value. The login form requires 8+
+characters, so keep an overridden password that long. Implementation:
+`services/auth/mock-auth.ts` (adapter), with `mock-auth-config.ts` (flag),
+`mock-auth-session.ts` (tokens) and `mock-auth-responses.ts` (backend-shaped
+replies).
+
+- **Seam.** `mockAuthAdapter` replaces only axios's network adapter, on
+  `AuthModel`'s client and on the bare refresh call (`auth-refresh-client.ts`).
+  Requests still run the real interceptors, and answers use the backend's
+  shapes: login/register/refresh/logout/me return the `{ success, data }`
+  envelope, and a wrong password is the same 401
+  (`{ error_code: 401, message: "Invalid email or password!" }`) the login form
+  already shows. Every other API still calls the real backend.
+- **Session.** Persisted exactly like the real mode: opaque
+  `mock-access|…` / `mock-refresh|…` tokens go to the same SecureStore slots,
+  so an app restart keeps the session, an invalid access token refreshes through
+  the mock, and logout works. The token carries the user, so `me` and
+  `refresh` need no server state.
+- **Credentials.** One login pair. `register` signs up any user, who stays
+  signed in but cannot log in again (no user store).
+- **Signals.** One `console.warn` at boot (`initServices`) and a "Mock auth"
+  badge in `app/_layout.tsx` (`components/mock-auth-badge.tsx`), only while active.
+- **Production guard.** In a production build (`!__DEV__`) the flag is ignored,
+  with one `console.warn`, and the mock adapter is `undefined` (the auth client
+  uses axios's network adapter); the badge is gated on it too, so it never renders.
+- **Limits.** Protected non-auth endpoints on the real backend still reject a
+  mock token (401): point them at a backend that accepts it, or mock them
+  separately. The Socket.IO handshake sends the mock token and is refused the
+  same way. Tokens never expire, so expiry flows need a real backend.

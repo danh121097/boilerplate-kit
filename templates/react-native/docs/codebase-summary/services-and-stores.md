@@ -24,6 +24,7 @@ src/services/
 │   └── index.ts
 ├── auth/
 │   ├── auth.ts             # AuthModel + useLoginMutation, useRegisterMutation, etc.
+│   ├── mock-auth*.ts       # Dev-only mock auth adapter (EXPO_PUBLIC_AUTH_MOCK)
 │   ├── types/auth.ts       # AuthUser, AuthResult, LoginPayload, RegisterPayload
 │   └── index.ts
 └── users/
