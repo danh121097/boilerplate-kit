@@ -17,9 +17,9 @@ export default defineNuxtConfig({
   vite: { plugins: [tailwindcss()] },        // Tailwind v4 native Vite plugin
 
   pinia: { storesDirs: [] },                  // disable store auto-import (explicit only)
-  i18n: { defaultLocale: "en", strategy: "no_prefix", lazy: true, locales: [...] },
+  i18n: { defaultLocale: DEFAULT_LOCALE, strategy: "no_prefix", lazy: true, locales: [...] },
   runtimeConfig: { public: { /* see SSR doc */ } },
-  typescript: { strict: true, typeCheck: false },
+  typescript: { strict: true, typeCheck: false, tsConfig: { /* noUncheckedIndexedAccess, noFallthroughCasesInSwitch, verbatimModuleSyntax */ } },
 });
 ```
 
@@ -90,6 +90,7 @@ pnpm preview      # nuxt preview — serve the production build
 pnpm typecheck    # nuxt typecheck — types only
 pnpm test         # vitest run
 pnpm test:watch   # vitest — watch mode
-pnpm lint         # eslint .
+pnpm lint         # eslint . && prettier --check . (read-only)
+pnpm lint:fix     # eslint . --fix && prettier --write .
 pnpm format       # prettier --write .
 ```

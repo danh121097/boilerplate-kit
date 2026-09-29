@@ -18,7 +18,7 @@ function buildAuth() {
 Event handler functions are prefixed `handle*`; submit/action callbacks `on*`.
 
 ```ts
-const handleConnectError = useThrottleFn((e: Error) => { /* ... */ }, 1000);
+function handleConnectError(e: Error) { /* ... */ }
 const onSubmit = handleSubmit(() => { success.value = true; });
 ```
 

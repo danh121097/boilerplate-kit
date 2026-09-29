@@ -3,16 +3,16 @@ import { authContract } from "@/services/auth/contract";
 import { isMockAuthEnabled } from "@/services/auth/mock-auth-config";
 import { mockUnauthorizedError } from "@/services/auth/mock-auth-responses";
 import { readMockServerUser } from "@/services/auth/mock-auth-session";
-import { defineQuery, hasSessionHint, isUnauthorizedError, serverApiGet } from "@/services/core";
+import { defineQuery, hasSessionHint, serverApiGet } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
 import type { AuthUser } from "@/services/auth/types/auth";
 
 /**
  * Resolve the signed-in user (null when anonymous).
  *
- * - SSR: a direct signed fetch with the forwarded cookie. It cannot refresh. A
- *   401 without the session hint is an anonymous visitor → null. Any other
- *   failure — including a 401 while the hint says a session exists (an access
+ * - SSR: without the session hint it is an anonymous visitor → null, no request.
+ *   Otherwise a direct signed fetch with the forwarded cookie. It cannot refresh.
+ *   Any failure — including a 401 while the hint says a session exists (an access
  *   cookie that merely expired) — rejects. Read it with `useServerRenderedQuery`
  *   (the layout does): a 401 renders signed-out and the browser resolves it after
  *   hydration instead of the page showing a stale "logged out"; any other failure
@@ -25,7 +25,11 @@ import type { AuthUser } from "@/services/auth/types/auth";
  *   (network, 5xx) surfaces to the query rather than looking like a logout.
  */
 export function fetchSessionUser(): Promise<AuthUser | null> {
-  return import.meta.server ? readServerSession() : AuthModel.getSession();
+  if (import.meta.server) return readServerSession();
+  // No session hint: an anonymous visitor. Signed out without a network call, so
+  // an unreachable backend never shows the session-unavailable banner to them.
+  if (typeof document !== "undefined" && !hasSessionHint()) return Promise.resolve(null);
+  return AuthModel.getSession();
 }
 
 /** The SSR branch of `fetchSessionUser`. It never refreshes. Call it inside
@@ -40,15 +44,12 @@ export async function readServerSession(): Promise<AuthUser | null> {
     if (!hinted) return null;
     throw mockUnauthorizedError(); // hinted, cookie gone: the browser resolves it
   }
-  try {
-    const body = await serverApiGet<{ user?: AuthUser }>(authContract.paths.me);
-    return body?.user ?? null;
-  } catch (error) {
-    // No hint → anonymous visitor. Hint → an expired access cookie only the
-    // browser can refresh: reject so the query is resolved after hydration.
-    if (isUnauthorizedError(error) && !hinted) return null;
-    throw error;
-  }
+  // No hint: an anonymous visitor. Nothing to look up, no network call.
+  if (!hinted) return null;
+  // Hint set: any failure rejects, including a 401 (an expired access cookie only
+  // the browser can refresh), so the query is resolved after hydration.
+  const body = await serverApiGet<{ user?: AuthUser }>(authContract.paths.me);
+  return body?.user ?? null;
 }
 
 export const useMeQuery = defineQuery<AuthUser | null>({

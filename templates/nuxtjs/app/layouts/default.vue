@@ -46,30 +46,43 @@ function toggleLocale() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 text-gray-900">
-    <header class="border-b bg-white">
+  <div class="min-h-screen bg-background text-foreground">
+    <header class="border-b border-border bg-card">
       <nav class="mx-auto flex max-w-3xl items-center gap-6 px-6 py-3 text-sm">
-        <NuxtLink to="/" class="font-semibold hover:text-indigo-600">
+        <NuxtLink
+          to="/"
+          class="font-semibold hover:text-primary [&.router-link-active]:text-primary"
+        >
           {{ t("nav.home") }}
         </NuxtLink>
-        <NuxtLink to="/counter" class="hover:text-indigo-600">{{ t("nav.counter") }}</NuxtLink>
-        <NuxtLink to="/users" class="hover:text-indigo-600">{{ t("nav.users") }}</NuxtLink>
-        <NuxtLink to="/form" class="hover:text-indigo-600">{{ t("nav.form") }}</NuxtLink>
+        <NuxtLink to="/counter" class="hover:text-primary [&.router-link-active]:text-primary">
+          {{ t("nav.counter") }}
+        </NuxtLink>
+        <NuxtLink to="/users" class="hover:text-primary [&.router-link-active]:text-primary">
+          {{ t("nav.users") }}
+        </NuxtLink>
+        <NuxtLink to="/form" class="hover:text-primary [&.router-link-active]:text-primary">
+          {{ t("nav.form") }}
+        </NuxtLink>
         <UiButton
           v-if="isAuthenticated"
           variant="unstyled"
-          class="ml-auto hover:text-indigo-600"
+          class="ml-auto hover:text-primary"
           :disabled="logoutPending"
           @click="doLogout()"
         >
           {{ t("nav.logout") }}
         </UiButton>
-        <NuxtLink v-else to="/login" class="ml-auto hover:text-indigo-600">
+        <NuxtLink
+          v-else
+          to="/login"
+          class="ml-auto hover:text-primary [&.router-link-active]:text-primary"
+        >
           {{ t("nav.login") }}
         </NuxtLink>
         <UiButton
           variant="unstyled"
-          class="rounded-md border px-2 py-0.5 text-xs hover:bg-gray-100"
+          class="rounded-md border px-2 py-0.5 text-xs hover:bg-accent"
           @click="toggleLocale"
         >
           {{ locale.toUpperCase() }}

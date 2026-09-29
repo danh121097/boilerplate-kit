@@ -21,6 +21,8 @@ export interface BaseInputProps {
   /** Placeholder text (also used to determine if the floating label should lift). */
   placeholder?: string;
   autofocus?: boolean;
+  /** Native `autocomplete` token (e.g. `username`, `current-password`). */
+  autocomplete?: string;
   maxlength?: number;
   /** Centre the input text + floating label. */
   center?: boolean;

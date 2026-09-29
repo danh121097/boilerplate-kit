@@ -186,6 +186,7 @@ describe("mock auth", () => {
       vi.stubEnv("PROD", true);
       const forged = { _id: "forged", email: "admin@example.com", name: "Forged", role: "admin" };
       jar.set("PRISM_APP_MOCK_USER", encodeURIComponent(JSON.stringify(forged)));
+      jar.set("PRISM_APP_SESSION", "1");
       const app = await boot(jar);
       app.fetchSpy.mockResolvedValue({ user: null });
 

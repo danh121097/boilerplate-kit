@@ -89,6 +89,16 @@ describe("default layout session SSR", () => {
     expect(session?.state).toMatchObject({ status: "error", data: undefined });
   });
 
+  it("shows no banner when the session is rejected with a 401", async () => {
+    slowUsers();
+    vi.spyOn(AuthModel, "getSession").mockRejectedValue({ error_code: 401, message: "no session" });
+
+    const { html } = await renderUsersRoute();
+
+    expect(html).toContain("nav.login");
+    expect(html).not.toContain("session.unavailable");
+  });
+
   it("renders a resolved session as signed in", async () => {
     slowUsers();
     const probe = vi.spyOn(AuthModel, "getSession").mockResolvedValue(SESSION_USER);

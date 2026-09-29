@@ -9,6 +9,7 @@ templates/nuxtjs/
 ├── nuxt.config.ts          # Nuxt config: modules, css, vite/tailwind, i18n, runtimeConfig
 ├── app/
 │   ├── app.vue             # Root: <NuxtLayout><NuxtPage /></NuxtLayout>
+│   ├── error.vue           # Error page: 404 → not-found content, else a generic message
 │   ├── plugins/            # Ordered bootstrap (server + client)
 │   │   ├── 01.init-services.ts   # Wire Api base URLs, token slots, refresh interceptors
 │   │   ├── 02.vue-query.ts       # Install TanStack Vue Query (universal QueryClient)

@@ -11,11 +11,15 @@ patterns present in the template — not features that don't exist.
   removes the tap highlight. The ring uses the themed `--color-ring` token.
 - **Semantic elements**: `Button` renders a real `<button>` with an explicit
   `type` (default `"button"`, so it never submits a form by accident). `Input`
-  renders a real `<input>` with an associated `<label>`.
+  renders a real `<input>` whose `<label for>` points at its generated `id`
+  (`useId()`), so a field's label is always programmatically tied to it; pass
+  `autocomplete` (e.g. `username`, `current-password`) for credential fields.
 - **Disabled handling**: `Button` sets the native `disabled` attribute and
   `disabled:pointer-events-none` so disabled controls are not interactive.
 - **Icon labeling**: decorative icons are marked `aria-hidden` (e.g. the Button
-  spinner); the password toggle button has `aria-label="Toggle password visibility"`.
+  spinner); the password toggle button's `aria-label` comes from i18n
+  (`input.toggle_password`). Validation and server errors render as text (never
+  `v-html`); the login server error sits in a `role="alert"` element.
 - **Keyboard-neutral affordances**: in-field affordances (password toggle, clear,
   search) use `tabindex="-1"` so they don't add extra tab stops over the input.
 - **Correct input semantics**: `Input` sets `inputmode="numeric"` for `tel` /

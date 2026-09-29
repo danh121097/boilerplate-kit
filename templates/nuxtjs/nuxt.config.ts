@@ -1,5 +1,9 @@
 import tailwindcss from "@tailwindcss/vite";
 
+// Locale used when neither the saved cookie nor the browser language picks one.
+// `NUXT_PUBLIC_LANGUAGE_CODE` (en | ja) is read at build time, like the cookie key.
+const DEFAULT_LOCALE = process.env.NUXT_PUBLIC_LANGUAGE_CODE === "ja" ? "ja" : "en";
+
 export default defineNuxtConfig({
   compatibilityDate: "2026-05-21",
   devtools: { enabled: true },
@@ -43,7 +47,7 @@ export default defineNuxtConfig({
   },
 
   i18n: {
-    defaultLocale: "en",
+    defaultLocale: DEFAULT_LOCALE,
     strategy: "no_prefix",
     lazy: true,
     locales: [
@@ -52,10 +56,12 @@ export default defineNuxtConfig({
     ],
     // Persist the chosen locale under the namespaced LANGUAGE key (mirrors
     // STORAGE_KEYS.LANGUAGE = `${APP_NAME}_LANGUAGE`) instead of the default
-    // `i18n_redirected`, so the app's storage keys stay consistent.
+    // `i18n_redirected`, so the app's storage keys stay consistent. Order:
+    // saved cookie > browser language > `DEFAULT_LOCALE` > en.
     detectBrowserLanguage: {
       useCookie: true,
       cookieKey: `${process.env.NUXT_PUBLIC_APP_NAME}_LANGUAGE`,
+      fallbackLocale: DEFAULT_LOCALE,
       redirectOn: "root",
     },
   },
@@ -65,7 +71,7 @@ export default defineNuxtConfig({
       appEndpoint: "",
       apiPrefix: "/api/v1",
       appName: "",
-      languageCode: "en",
+      languageCode: DEFAULT_LOCALE,
       hmacSecret: "",
       buildVersion: "1.0.0",
       // Dev-only mock auth (see services/auth/mock-auth.ts). Off unless "true"/"1".
@@ -78,5 +84,15 @@ export default defineNuxtConfig({
   typescript: {
     strict: true,
     typeCheck: false,
+    // Nuxt's generated tsconfig already sets noUncheckedIndexedAccess and
+    // verbatimModuleSyntax; stated here so the baseline shared with the other
+    // templates is explicit. Applies to the app tsconfig, not tsconfig.server.json.
+    tsConfig: {
+      compilerOptions: {
+        noUncheckedIndexedAccess: true,
+        noFallthroughCasesInSwitch: true,
+        verbatimModuleSyntax: true,
+      },
+    },
   },
 });

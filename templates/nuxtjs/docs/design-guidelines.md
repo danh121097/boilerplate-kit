@@ -9,7 +9,7 @@ This is a thin hub. Each topic lives in a focused, concrete file below.
 | Doc | Covers |
 | --- | --- |
 | [tailwindcss.md](./design-guidelines/tailwindcss.md) | Tailwind v4 setup (Vite plugin in `nuxt.config.ts`, `app/css/main.css`), `@theme` tokens, `@utility`, the `cn()` helper, `main.scss` globals |
-| [shadcn-vue-components.md](./design-guidelines/shadcn-vue-components.md) | The `app/components/ui/` pattern — how Badge / Button / Card / Input / VeeInput are structured (`*.variants.ts`, `*.props.ts`), Nuxt auto-import |
+| [shadcn-components.md](./design-guidelines/shadcn-components.md) | The `app/components/ui/` pattern — how Badge / Button / Card / Input / VeeInput are structured (`*.variants.ts`, `*.props.ts`), Nuxt auto-import |
 | [theming.md](./design-guidelines/theming.md) | Color tokens, light/dark mode, CSS variables as defined in `app/css/main.css` + `main.scss` |
 | [accessibility.md](./design-guidelines/accessibility.md) | Short, actionable a11y checklist grounded in what the UI components actually do |
 

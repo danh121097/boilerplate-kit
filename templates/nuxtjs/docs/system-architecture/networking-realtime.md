@@ -81,9 +81,9 @@ is never misread as an error.
 with stable key builders.
 
 ```ts
-export const useUsersListQuery = defineQuery<User[]>({
+export const useUsersListQuery = defineQuery<PaginatedResponse<User>>({
   key: "users.list",
-  fetcher: () => UsersModel.list().then((r) => r.data),
+  fetcher: () => UsersModel.list(),
 });
 ```
 
@@ -124,13 +124,16 @@ Behavior:
 
 - `buildAuth()` carries no token (the browser sends the httpOnly access cookie via
   `withCredentials`) plus, when `hmacSecret` is set, an HMAC
-  `{ sig, ctime }` over the canonical string for `GET /socket` (see
+  `{ sig, ctime }` from the core `HMACSignatureGenerator.signRequest` (the same
+  generator the HTTP interceptor uses) over the canonical string for `GET /socket` (see
   [Security & Auth](./security-auth.md)).
 - Lifecycle: connects `onMounted`, tears down on `onScopeDispose`. Events come
   from the `SOCKET_EVENT` registry (`enums/socket-events.ts`): `authenticated`,
   `unauthorized`, `connect_error`.
 - `connect_error` whose message equals `SOCKET_UNAUTHORIZED_MESSAGE`
-  (`"Unauthorized!"`) flips `authenticated` false and throttle-reconnects;
+  (`"Unauthorized!"`) flips `authenticated` false; every `connect_error` schedules
+  a reconnect on a trailing timer (`RECONNECT_THROTTLE_MS`, 2s) — the first error
+  arms it, errors inside the window share it;
   `unauthorized` destroys the socket.
 - Helpers: `useIo()` (get/lazy-init the shared socket), `useSocketEvent(event, cb)`
   (auto-unsubscribe on unmount).

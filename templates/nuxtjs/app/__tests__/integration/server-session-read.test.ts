@@ -51,8 +51,16 @@ describe("readServerSession (SSR)", () => {
       }),
     );
 
-  it("no session hint + 401 → null (anonymous, safe to dehydrate)", async () => {
+  it("no session hint → null (anonymous) without any request", async () => {
     stubServer("PRISM_APP_LANGUAGE=en", unauthorized);
+    await expect(readServerSession()).resolves.toBeNull();
+    expect($fetch).not.toHaveBeenCalled();
+  });
+
+  it("no session hint + backend down → still null, no retry banner", async () => {
+    stubServer(undefined, () =>
+      Promise.reject(Object.assign(new Error("fetch failed"), { statusCode: 503 })),
+    );
     await expect(readServerSession()).resolves.toBeNull();
   });
 
@@ -66,8 +74,8 @@ describe("readServerSession (SSR)", () => {
     await expect(readServerSession()).resolves.toEqual(USER);
   });
 
-  it("non-401 failures reject even without the hint", async () => {
-    stubServer(undefined, () =>
+  it("non-401 failures reject while a session hint is set", async () => {
+    stubServer("PRISM_APP_SESSION=1", () =>
       Promise.reject(Object.assign(new Error("fetch failed"), { statusCode: 503 })),
     );
     await expect(readServerSession()).rejects.toMatchObject({

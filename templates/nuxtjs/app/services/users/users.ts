@@ -4,7 +4,7 @@ import { defineQuery, Model, serverApiPaginate } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
 import { usersContract } from "@/services/users/contract";
 import { answerMockServerUsers } from "@/services/users/mock-users";
-import type { PaginatedResponse } from "@/services/core";
+import type { PaginatedResponse, PaginationParams } from "@/services/core";
 import type { UpdateUserPayload, User } from "@/services/users/types/user";
 
 export class UsersModel extends Model {
@@ -28,8 +28,8 @@ export class UsersModel extends Model {
   }
 
   /** Browser-side list read — refreshes-and-retries on 401 via the interceptors. */
-  static list(): Promise<PaginatedResponse<User>> {
-    return this.api.paginate<User>({ url: usersContract.paths.list });
+  static list(params?: PaginationParams): Promise<PaginatedResponse<User>> {
+    return this.api.paginate<User>({ url: usersContract.paths.list, params });
   }
 }
 

@@ -76,6 +76,15 @@ describe("users page SSR", () => {
     expect(queries[0]?.state).toMatchObject({ status: "error", error: failure });
   });
 
+  it("renders the empty state for an empty list", async () => {
+    vi.spyOn(UsersModel, "list").mockResolvedValue({ ...USERS, data: [] });
+
+    const { html } = await renderOnServer();
+
+    expect(html).toContain("users.empty");
+    expect(html).not.toContain("users.loading");
+  });
+
   it("leaves a 401 to the browser: renders loading and ships nothing", async () => {
     vi.spyOn(UsersModel, "list").mockRejectedValue({ error_code: 401, message: "unauthorized" });
 

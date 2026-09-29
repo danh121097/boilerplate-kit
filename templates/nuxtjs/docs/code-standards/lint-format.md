@@ -7,7 +7,8 @@ pulled in by `@nuxt/eslint`, disables stylistic rules that would conflict).
 ## Scripts
 
 ```bash
-pnpm lint          # eslint .
+pnpm lint          # eslint . && prettier --check . (read-only, use in CI)
+pnpm lint:fix      # eslint . --fix && prettier --write .
 pnpm format        # prettier --write .
 pnpm typecheck     # nuxt typecheck
 pnpm build         # nuxt build
@@ -84,7 +85,7 @@ auto-import, so import stores explicitly from `@/stores/...`.
 
 ## Before committing
 
-1. `pnpm format` — apply Prettier.
+1. `pnpm lint:fix` — apply ESLint fixes and Prettier.
 2. `pnpm lint` — no errors (warnings like import order should be cleaned up).
 3. `pnpm typecheck` — passes.
 4. `pnpm test` — passes (run before pushing).

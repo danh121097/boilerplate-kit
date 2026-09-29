@@ -51,6 +51,11 @@ only accent hues.
 
 ## Usage Rules
 
+- Layouts and pages use tokens too (`bg-background`, `text-foreground`, `bg-card`,
+  `border-border`, `text-primary` for the active nav link via `[&.router-link-active]:text-primary`) — no hard-coded gray or
+  indigo. The amber session banner and mock-auth badge are the only status colors
+  outside the palette. There is no dark-mode toggle: the `.dark` block exists for
+  when one is added, but the template does not provide it.
 - Use token utilities, not raw colors: `bg-card`, `text-muted-foreground`,
   `border-input`, `text-destructive`, `ring-ring`.
 - Pair foregrounds with their surface: `bg-primary` + `text-primary-foreground`,

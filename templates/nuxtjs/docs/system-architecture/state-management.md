@@ -14,8 +14,8 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: false,
-      refetchOnWindowFocus: false,
-      staleTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: true,
+      staleTime: 60_000,
       placeholderData: keepPreviousData,
     },
   },
@@ -34,9 +34,9 @@ the client after hydration (see
 Builds a reusable, typed query with a stable key builder:
 
 ```ts
-export const useUsersListQuery = defineQuery<User[]>({
+export const useUsersListQuery = defineQuery<PaginatedResponse<User>>({
   key: "users.list",
-  fetcher: () => UsersModel.list().then((r) => r.data),
+  fetcher: () => UsersModel.list(),
 });
 
 // in a component:
@@ -113,4 +113,5 @@ syntax. `defineStore` / `ref` are Nuxt auto-imports.
 | --- | --- |
 | Anything fetched from a backend | TanStack Vue Query (`defineQuery`/`defineMutation`) |
 | The live socket, auth/session UI flags, transient UI state | Pinia store |
-| Auth-token / locale / theme persistence | localStorage via `useStorageKeys` (client-only) |
+| Locale persistence | the `<APP_NAME>_LANGUAGE` cookie, managed by `@nuxtjs/i18n` (readable on the server, so SSR renders the saved language) |
+| Session | the httpOnly cookies + the `auth.me` query (no auth store); see [Security & Auth](./security-auth.md) |

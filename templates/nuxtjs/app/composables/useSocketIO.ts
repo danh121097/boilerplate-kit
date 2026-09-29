@@ -3,6 +3,9 @@ import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import { useSocketIOStore } from "@/stores/socket-io";
 import { io, type Socket } from "socket.io-client";
 
+/** Delay before a failed connection is retried; errors inside it share one retry. */
+const RECONNECT_THROTTLE_MS = 2000;
+
 export function useSocketIO() {
   const storeSocketIO = useSocketIOStore();
 
@@ -53,17 +56,24 @@ export function useSocketIO() {
     }
   }
 
-  const reConnect = useThrottleFn(() => {
-    destroySocket();
-    connectSocket();
-  }, 2000);
+  // Trailing timer: the first error schedules one reconnect, later errors inside
+  // the window share it, so a burst of errors cannot cause a reconnect storm.
+  let reConnectTimer: ReturnType<typeof setTimeout> | null = null;
+  function reConnect() {
+    if (reConnectTimer) return;
+    reConnectTimer = setTimeout(() => {
+      reConnectTimer = null;
+      destroySocket();
+      connectSocket();
+    }, RECONNECT_THROTTLE_MS);
+  }
 
   const handleAuthenticated = () => storeSocketIO.setSocketIO({ authenticated: true, socket });
-  const handleConnectError = useThrottleFn((e: Error) => {
+  const handleConnectError = (e: Error) => {
     if (e.message === SOCKET_UNAUTHORIZED_MESSAGE)
       storeSocketIO.setSocketIO({ authenticated: false });
     reConnect();
-  }, 1000);
+  };
   const onSocketUnauthorized = () => destroySocket();
 
   socket.on(SOCKET_EVENT.AUTHENTICATED, handleAuthenticated);
@@ -76,6 +86,8 @@ export function useSocketIO() {
     socket.off(SOCKET_EVENT.AUTHENTICATED, handleAuthenticated);
     socket.off(SOCKET_EVENT.CONNECT_ERROR, handleConnectError);
     socket.off(SOCKET_EVENT.UNAUTHORIZED, onSocketUnauthorized);
+    if (reConnectTimer) clearTimeout(reConnectTimer);
+    reConnectTimer = null;
     destroySocket();
   });
 

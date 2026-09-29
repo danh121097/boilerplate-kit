@@ -46,7 +46,8 @@ pnpm postinstall  # nuxt prepare (runs automatically)
 pnpm typecheck    # nuxt typecheck
 pnpm test         # vitest run
 pnpm test:watch   # vitest (watch mode)
-pnpm lint         # eslint .
+pnpm lint         # eslint . && prettier --check . (read-only)
+pnpm lint:fix     # eslint . --fix && prettier --write .
 pnpm format       # prettier --write .
 ```
 
@@ -61,7 +62,7 @@ Bound to `runtimeConfig.public` in `nuxt.config.ts` (read via
 | `NUXT_PUBLIC_APP_ENDPOINT` | `appEndpoint` | Backend origin; `getApiBaseUrl()` appends `/api/v1` (Socket.IO uses it bare) |
 | `NUXT_PUBLIC_API_PREFIX` | `apiPrefix` | REST version prefix (default `/api/v1`) |
 | `NUXT_PUBLIC_APP_ENDPOINT` | `appEndpoint` | Socket.IO endpoint |
-| `NUXT_PUBLIC_LANGUAGE_CODE` | `languageCode` | default locale code |
+| `NUXT_PUBLIC_LANGUAGE_CODE` | `languageCode` | default locale (`en` / `ja`) when there is no saved cookie or matching browser language; read when `nuxt.config.ts` loads |
 | `NUXT_PUBLIC_HMAC_SECRET` | `hmacSecret` | HMAC request signing secret |
 | `NUXT_PUBLIC_BUILD_VERSION` | `buildVersion` | sent as `x-version` header |
 | `NUXT_PUBLIC_AUTH_MOCK` | `authMock` | dev only: `true`/`1` answers `/auth/*` and `/users` in the browser; ignored in production builds |

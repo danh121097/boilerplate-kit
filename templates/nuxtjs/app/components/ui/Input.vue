@@ -21,6 +21,9 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emits = defineEmits<Emits>();
 
+const { t } = useI18n();
+
+const inputId = useId();
 const inputRef = useTemplateRef<HTMLInputElement>("inputRef");
 
 const variantClasses: Record<InputVariant, string> = {
@@ -115,6 +118,7 @@ onMounted(async () => {
     <div :class="containerClasses">
       <label
         v-if="label"
+        :for="inputId"
         :class="
           cn(
             'absolute transition-all duration-150 pointer-events-none select-none text-muted-foreground',
@@ -129,6 +133,7 @@ onMounted(async () => {
       </label>
 
       <input
+        :id="inputId"
         ref="inputRef"
         :type="currentType"
         :value="modelValue"
@@ -136,6 +141,8 @@ onMounted(async () => {
         :disabled="disabled"
         :placeholder="isFloating ? placeholder : ''"
         :maxlength="maxlength"
+        :autocomplete="autocomplete"
+        :aria-invalid="error || undefined"
         :inputmode="type === 'tel' || type === 'number' ? 'numeric' : undefined"
         :class="
           cn(
@@ -156,7 +163,7 @@ onMounted(async () => {
       <button
         v-if="showPasswordToggle"
         type="button"
-        aria-label="Toggle password visibility"
+        :aria-label="t('input.toggle_password')"
         class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
         tabindex="-1"
         @pointerdown.prevent="showPassword"
@@ -193,7 +200,7 @@ onMounted(async () => {
       </div>
     </div>
 
-    <p v-if="error && errorMessage" class="mt-1 text-xs text-destructive" v-html="errorMessage" />
+    <p v-if="error && errorMessage" class="mt-1 text-xs text-destructive">{{ errorMessage }}</p>
   </div>
 </template>
 

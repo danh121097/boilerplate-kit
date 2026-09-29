@@ -18,7 +18,7 @@ runtimeConfig: {
     appEndpoint: "",
     apiPrefix: "/api/v1",
     appName: "",
-    languageCode: "en",
+    languageCode: DEFAULT_LOCALE, // "en" | "ja" from NUXT_PUBLIC_LANGUAGE_CODE
     hmacSecret: "",
     buildVersion: "1.0.0",
   },
@@ -34,7 +34,7 @@ server-only. Each key is overridable at runtime by a matching env var, camelCase
 | `public.appEndpoint` | `NUXT_PUBLIC_APP_ENDPOINT` | `01.init-services.ts` via getApiBaseUrl() (origin + /api/v1) |
 | `public.apiPrefix` | `NUXT_PUBLIC_API_PREFIX` | `api-config.ts` (REST prefix, default `/api/v1`) |
 | `public.appName` | `NUXT_PUBLIC_APP_NAME` | `storage-keys.ts` (localStorage prefix) |
-| `public.languageCode` | `NUXT_PUBLIC_LANGUAGE_CODE` | locale fallback |
+| `public.languageCode` | `NUXT_PUBLIC_LANGUAGE_CODE` | default locale (`en` / `ja`); read when `nuxt.config.ts` loads, so a change needs a rebuild/restart, unlike the other keys |
 | `public.hmacSecret` | `NUXT_PUBLIC_HMAC_SECRET` | `hmac-signature.ts`, `useSocketIO.ts` |
 | `public.buildVersion` | `NUXT_PUBLIC_BUILD_VERSION` | `hmac-signature.ts` (`x-version`) |
 | `public.authMock` / `authMockEmail` / `authMockPassword` | `NUXT_PUBLIC_AUTH_MOCK` / `_EMAIL` / `_PASSWORD` | `mock-auth.ts` (dev-only mock auth; ignored in production builds) |
@@ -135,3 +135,12 @@ production note in [Security & Auth](./security-auth.md).
   errors). A later mount of the same query (client navigation) retries as usual.
 - **Socket.IO:** the `io()` constructor is lazy and safe server-side; the actual
   handshake fires in `onMounted`, which only runs on the client.
+
+## Locale resolution
+
+`@nuxtjs/i18n` (`strategy: "no_prefix"`) picks the language in this order: the
+saved `<APP_NAME>_LANGUAGE` cookie (written when the layout's EN/JA toggle is
+used), then the browser language, then `languageCode` (`NUXT_PUBLIC_LANGUAGE_CODE`,
+`en` or `ja`; both `defaultLocale` and `detectBrowserLanguage.fallbackLocale`
+use it), then `en`. The cookie is readable on the server, so SSR renders the saved
+language and hydration matches.

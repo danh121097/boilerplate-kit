@@ -22,7 +22,7 @@ export default defineNuxtPlugin((nuxtApp) => {
     defaultOptions: {
       queries: {
         retry: false,
-        refetchOnWindowFocus: false,
+        refetchOnWindowFocus: true,
         staleTime: 60_000,
         placeholderData: keepPreviousData,
       },

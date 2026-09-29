@@ -1,6 +1,6 @@
 # Nuxt starter
 
-Opinionated Nuxt 4 starter mirroring the production patterns from the sibling Vue template. Canonical `app/` directory layout per the Nuxt 4 docs, with SSR-aware services and Japanese-ready i18n.
+Opinionated Nuxt 4 SSR starter mirroring the production patterns from the sibling Vue template. Canonical `app/` directory layout per the Nuxt 4 docs, with SSR-aware services, httpOnly-cookie auth and Japanese-ready i18n.
 
 ## Stack
 
@@ -8,161 +8,142 @@ Opinionated Nuxt 4 starter mirroring the production patterns from the sibling Vu
 |---|---|
 | Framework | Nuxt 4 (Nitro server + Vue 3 + `<script setup>` + TypeScript) |
 | UI primitives | Reka UI (headless, project drives styling) |
-| Project UI components | `app/components/ui/` (Button, Card, Input, VeeInput, Badge) with cva variants + shadcn-vue HSL tokens — auto-registered as `<Ui*>` |
+| UI components | `app/components/ui/` (Button, Card, Input, VeeInput, Badge) with cva variants + shadcn-vue HSL tokens — auto-registered as `<Ui*>` |
 | Styling | Tailwind v4 (`@tailwindcss/vite` plugin) + `tailwindcss-animate` |
 | Client state | Pinia (explicit imports — auto-import disabled) |
 | Server state | TanStack Vue Query + `defineQuery` / `defineMutation` helpers |
-| HTTP | Axios + class-based `Api` + interceptors (optional HMAC signing) |
+| HTTP | Axios + class-based `Api` + interceptors (HMAC signing, cookie refresh) |
 | Forms | vee-validate + zod via `@vee-validate/zod` |
 | i18n | `@nuxtjs/i18n` (en + ja TS locales, lazy-loaded; vue-i18n message types augmented) |
+| Realtime | Socket.IO client |
 | Icons | lucide-vue-next |
 | Dates | dayjs |
-| Lint / format | `@nuxt/eslint` (flat config, TS via jiti) + Prettier (TS) |
+| Lint / format | `@nuxt/eslint` (flat config, TS via jiti) + Prettier |
 
-## Setup
+## Quick start
 
 ```sh
 pnpm install
 pnpm dev
 ```
 
-`pnpm install` runs `nuxt prepare` postinstall to generate `.nuxt/`. Then `pnpm dev` boots the dev server at `http://localhost:3000`.
+`pnpm install` runs `nuxt prepare` (postinstall) to generate `.nuxt/`. `pnpm dev` boots the dev server at `http://localhost:4321`.
 
 ## Scripts
 
-- `dev` — Nuxt dev server
-- `build` — `nuxt build` (Nitro bundle in `.output/`)
-- `preview` — `nuxt preview` the built bundle
-- `generate` — full SSG build
-- `typecheck` — `nuxt typecheck` (uses `vue-tsc`)
-- `lint` — ESLint
-- `format` — Prettier write
+| Script | What it does |
+|---|---|
+| `pnpm dev` | Nuxt dev server |
+| `pnpm build` | `nuxt build` (Nitro bundle in `.output/`) |
+| `pnpm preview` | Serve the production build |
+| `pnpm generate` | Full static (SSG) build |
+| `pnpm typecheck` | `nuxt typecheck` (`vue-tsc`) |
+| `pnpm test` | Vitest (`vitest run`) |
+| `pnpm test:watch` | Vitest in watch mode |
+| `pnpm lint` | Read-only: `eslint .` + `prettier --check .` |
+| `pnpm lint:fix` | `eslint . --fix` + `prettier --write .` |
+| `pnpm format` | `prettier --write .` |
 
-## Project layout (Nuxt 4 canonical)
+## Env
+
+Bound to `runtimeConfig.public` (read via `useRuntimeConfig()`); copy `.env.example` to `.env`.
+
+| Variable | Default | Notes |
+|---|---|---|
+| `NUXT_PUBLIC_APP_NAME` | unset | Prefix for storage / cookie keys |
+| `NUXT_PUBLIC_APP_ENDPOINT` | `http://localhost:3000` | Backend origin |
+| `NUXT_PUBLIC_API_PREFIX` | `/api/v1` | API path prefix |
+| `NUXT_PUBLIC_LANGUAGE_CODE` | `en` | Default locale (`en` / `ja`) when no cookie or browser language matches; read at build/start of `nuxt.config.ts` |
+| `NUXT_PUBLIC_HMAC_SECRET` | unset | Optional. Enables HMAC-signed requests; visible to every client (anti-casual-abuse, not authentication) |
+| `NUXT_PUBLIC_BUILD_VERSION` | `1.0.0` | Optional. Sent as `x-version` when signing |
+| `NUXT_PUBLIC_AUTH_MOCK` | unset | Optional, dev only. `true` answers `/auth/*` and `/users` in the browser |
+| `NUXT_PUBLIC_AUTH_MOCK_EMAIL` | `demo@example.com` | Optional, dev only. Demo account email |
+| `NUXT_PUBLIC_AUTH_MOCK_PASSWORD` | `password` | Optional, dev only. Demo account password |
+
+For private (server-only) secrets, add unprefixed keys (e.g. `NUXT_MY_SECRET`, declared under `runtimeConfig`) and read them via `useRuntimeConfig().mySecret`. The HMAC secret is **not** one of them: the browser signs its own requests, so it stays `NUXT_PUBLIC_HMAC_SECRET`.
+
+## Structure
 
 ```
 templates/nuxtjs/
-├── nuxt.config.ts                  # modules, components scope, pinia override, i18n, runtimeConfig
+├── nuxt.config.ts                  # modules, pinia override, i18n, runtimeConfig, tsconfig baseline
 ├── tsconfig.json                   # extends ./.nuxt/tsconfig.json
-├── eslint.config.ts                # uses @nuxt/eslint (TS via jiti)
+├── eslint.config.ts                # @nuxt/eslint (TS via jiti) + local/sort-setup-declarations
 ├── prettier.config.ts
-├── pnpm-workspace.yaml             # strictDepBuilds:false, minimumReleaseAge:0
+├── pnpm-workspace.yaml
 ├── app/
 │   ├── app.vue                     # <NuxtLayout><NuxtPage /></NuxtLayout>
-│   ├── css/
-│   │   ├── main.css                # @import "tailwindcss"; @theme HSL tokens + @utility helpers
-│   │   └── main.scss               # SCSS extras (safe-area, mixins)
-│   ├── components/
-│   │   └── ui/                     # auto-registered globally (Button, Card, Input, VeeInput, Badge)
-│   ├── composables/                # auto-imported by Nuxt (camelCase `useFoo.ts`)
-│   ├── enums/                      # STORAGE_KEYS (runtimeConfig-prefixed)
-│   ├── layouts/default.vue         # nav + locale toggle
-│   ├── pages/
-│   │   ├── index.vue               # Reka UI Dialog showcase + project component grid
-│   │   ├── counter.vue             # Pinia (explicit import)
-│   │   ├── users.vue               # TanStack Query demo
-│   │   └── form.vue                # vee-validate + zod + VeeInput
-│   ├── plugins/
-│   │   ├── 01.init-services.ts     # Api.setBaseURL + interceptors (universal)
-│   │   ├── 02.vue-query.ts         # QueryClient registration
-│   │   ├── 03.directives.ts        # v-track demo
-│   │   └── 04.vee-validate.ts      # global VeeForm/VeeField/VeeError
-│   ├── services/
-│   │   ├── core/                   # api, model, interceptors, tanstack, hmac, headers, types
-│   │   └── users/                  # domain folder with types/ subfolder
-│   ├── stores/counter.ts           # Pinia (explicit imports — never auto)
-│   └── utils/                      # cn (cva merge), format (dayjs) — auto-imported by Nuxt
-├── i18n/locales/                   # en.json, ja.json (lazy-loaded)
-├── server/                         # Nitro routes (empty placeholder)
-└── public/                         # favicon, robots.txt
+│   ├── error.vue                   # 404 → not-found content, other errors → generic message
+│   ├── css/                        # main.css (Tailwind @theme tokens), main.scss (extras)
+│   ├── components/ui/              # Button, Card, Input, VeeInput, Badge (auto-registered as <Ui*>)
+│   ├── composables/                # useSocketIO (auto-imported, camelCase filenames)
+│   ├── enums/                      # STORAGE_KEYS, socket events
+│   ├── layouts/default.vue         # nav, locale toggle, session-unavailable banner
+│   ├── middleware/                 # auth + guest route middleware
+│   ├── pages/                      # index, counter, users, form, login
+│   ├── plugins/                    # init-services, vue-query, directives, session expiry/sync
+│   ├── services/                   # core (api, model, interceptors, tanstack, hmac), auth, users
+│   ├── stores/                     # counter, socket-io (Pinia, explicit imports)
+│   ├── utils/                      # cn, date-format (auto-imported)
+│   └── __tests__/                  # unit + integration (Vitest, node env)
+├── i18n/locales/                   # en.ts, ja.ts (lazy-loaded)
+├── eslint-rules/                   # local ESLint rule: sort-setup-declarations
+└── types/i18n.d.ts                 # typed message keys
 ```
 
-## Key conventions (mirror the Vue template)
+## How auth works
 
-- **Pinia stores stay explicit.** `import { useCounterStore } from "@/stores/counter"`. `pinia.storesDirs: []` in `nuxt.config.ts` disables auto-import.
-- **UI components live under `@/components/ui/` and auto-import with the `<Ui*>` prefix** (Nuxt's default path-derived naming): `<UiButton>`, `<UiCard>`, `<UiInput>`, `<UiVeeInput>`, `<UiBadge>`. No explicit `components:` config needed — Nuxt's default scan handles it. Headless primitives come from Reka UI (imported directly).
-- **Composable filenames in camelCase** (`useFoo.ts`) — exception to project-wide kebab-case.
-- **Every SFC: named `interface Props` / `interface Emits` extracted above macros.** Never inline.
-- **`<script setup>` strict section order:** imports → types → defineProps/Emits → composables → const → destructuring → let → ref → computed → functions → lifecycle.
-- **No `any` types anywhere.**
+Cookie-first: the backend sets httpOnly access + refresh cookies, so no token touches JS. The layout resolves the session once during SSR (`useMeQuery` through `useServerRenderedQuery`), so the header renders signed in or out on the server and hydrates without a mismatch. A 401 renders signed-out and the browser resolves it after hydration (it can refresh the access cookie). Any other failure (offline, timeout, 5xx) keeps the session and shows a `role="alert"` banner with a Retry button. `/login` validates with vee-validate + zod (`validation.*` messages) and shows server errors in a `role="alert"` element. Details: [Security & Auth](./docs/system-architecture/security-auth.md).
 
-## SSR safeguards
+## SSR safety
 
-- `app/services/core/auth-token-storage.ts` guards every `localStorage` access behind `typeof window !== "undefined"`. Reads return `null` on the server; writes are no-ops.
-- `STORAGE_KEYS` resolves prefix from `useRuntimeConfig().public.appName` so server + client see identical key names.
-- `HMACSignatureGenerator` reads the secret from `runtimeConfig` (server-only by default); demo only — production HMAC belongs in a Nitro route.
-- TanStack Vue Query plugin runs on both server and client; hydration handled internally.
+- Storage and `window` access are client-guarded; secrets come from `runtimeConfig`, never `import.meta.env`.
+- `STORAGE_KEYS` resolves its prefix from `useRuntimeConfig().public.appName` so server and client agree.
+- A page that renders query data resolves it during SSR with `useServerRenderedQuery(useXxxQuery)` so the server renders the data (or error) the client hydrates, not a loading state the client never shows.
+- `HMACSignatureGenerator` reads the secret from `runtimeConfig`; the socket handshake reuses it.
 
-## Services layer (mirrors Vue template)
+See [SSR & Runtime Config](./docs/system-architecture/ssr-and-runtime-config.md).
 
-`app/services/core/` holds the shared HTTP infra. Domain models live under `app/services/<domain>/` with a `types/` subfolder. Example:
+## Auto-imports
 
-```ts
-// app/services/users/users.ts
-export class UsersModel extends Model {
-  static {
-    Model.setup.call(this, { path: "/users", service: "MAIN" });
-  }
-  static list() { return this.api.get<User[]>(); }
-}
+Nuxt auto-imports Vue APIs, Nuxt composables, `app/composables/**`, `app/utils/**` and `app/components/**` (with a path-derived prefix: `components/ui/Button.vue` becomes `<UiButton>`). Pinia stores stay explicit (`pinia.storesDirs: []`). Composable filenames are camelCase (`useFoo.ts`).
 
-export const useUsersListQuery = defineQuery<User[]>({
-  key: "users.list",
-  fetcher: async () => (await UsersModel.list()).data,
-});
-```
+## Users contract
+
+`UsersModel.list(params?)` resolves the paginated envelope `{ data, meta }` (`PaginatedResponse<User>`); `get` and `update` resolve the unwrapped `User`. `/users` renders `data.data`, the error message, or `users.empty` when the list is empty.
 
 ## i18n
 
-`@nuxtjs/i18n` 10.x with `strategy: "no_prefix"` (no URL prefix). Bundled locales in `i18n/locales/{en,ja}.ts` are lazy-loaded. `types/i18n.d.ts` augments `vue-i18n`'s `DefineLocaleMessage` so `t("nav.home")` autocompletes and typos fail at compile time. Toggle via the layout's locale button — persists via cookie.
+`@nuxtjs/i18n` with `strategy: "no_prefix"`. The language is the saved `<APP_NAME>_LANGUAGE` cookie, else the browser language, else `NUXT_PUBLIC_LANGUAGE_CODE`, else `en`. The layout's EN/JA button saves the choice. `types/i18n.d.ts` types `t("nav.home")` keys from `en.ts`.
 
 ## Forms
 
-vee-validate + zod via `@vee-validate/zod`. See `app/pages/form.vue` for the canonical pattern (`useForm` with `initialValues` to dodge "expected string, received undefined" on first paint).
+vee-validate + zod via `@vee-validate/zod`. See `app/pages/login.vue` and `app/pages/form.vue` for the pattern: `useForm` with `initialValues` (avoids "expected string, received undefined" on first paint) and `UiVeeInput` fields whose labels are tied to their inputs.
 
 ## UI components
-
-Project owns the entire UI surface — Reka UI provides headless primitives (Dialog, Popover, Combobox, …) and the project layers styled wrappers on top.
 
 | Component | Source | Notes |
 |---|---|---|
 | `<UiButton>` | `components/ui/Button.vue` | variant × shape × size, loading spinner, ripple, block, `unstyled` escape hatch |
-| `<UiInput>` | `components/ui/Input.vue` | floating label, type-aware (password/email/number/tel/search), mask helper, slots |
+| `<UiInput>` | `components/ui/Input.vue` | floating label linked with `for`/`id`, `autocomplete`, type-aware (password/email/number/tel/search), mask helper, slots |
 | `<UiVeeInput>` | `components/ui/VeeInput.vue` | wraps `<UiInput>` via `useField`; pass `name="..."` |
 | `<UiCard>` | `components/ui/Card.vue` | rounded container with shadow |
 | `<UiBadge>` | `components/ui/Badge.vue` | CVA variant pill |
 
-For complex interactive primitives (dialog, popover, dropdown, accordion, combobox, …) import directly from `reka-ui` — see `pages/index.vue` for a `DialogRoot` showcase.
+Complex primitives (dialog, popover, …) come straight from `reka-ui` — see `pages/index.vue` for the dialog demo. Layouts and pages use theme tokens (`bg-background`, `text-foreground`, `text-primary`, …); the active nav link takes `text-primary`. No dark-mode toggle is provided.
 
 ## Routes
 
-- `/` — Reka UI dialog showcase + project `<UiButton>` variants in a `<UiCard>` grid
-- `/counter` — Pinia store demo (`useCounterStore` explicit import)
-- `/users` — TanStack Query demo via `usersService.list()` → axios
-- `/form` — vee-validate + zod with `<VeeInput>` + `<Button>` + `<Card>` + `<Badge>`
+- `/` — Reka UI dialog demo
+- `/counter` — Pinia store demo
+- `/users` — TanStack Query demo (admin only; paginated list)
+- `/form` — vee-validate + zod demo
+- `/login` — sign in
+- any other path — `app/error.vue` not-found page
 
-## Environment
+## Mock auth (before backend integration)
 
-```
-NUXT_PUBLIC_APP_NAME=PRISM_APP
-NUXT_PUBLIC_APP_ENDPOINT=http://localhost:3000
-NUXT_PUBLIC_API_PREFIX=/api/v1
-NUXT_PUBLIC_LANGUAGE_CODE=en
-# Optional, dev only — answer /auth/* and /users in the browser before the backend exists
-# NUXT_PUBLIC_AUTH_MOCK=true
-# NUXT_PUBLIC_AUTH_MOCK_EMAIL=demo@example.com
-# NUXT_PUBLIC_AUTH_MOCK_PASSWORD=password
-```
-
-See [Mock auth](./docs/system-architecture/security-auth.md#mock-auth-before-backend-integration): mock mode answers auth and users; the flag is ignored in production builds.
-
-For private (server-only) secrets, add unprefixed keys (e.g. `NUXT_MY_SECRET=...`, declared under `runtimeConfig`) and access via `useRuntimeConfig().mySecret`. The HMAC secret is **not** one of them: the browser signs its own requests, so it must stay `NUXT_PUBLIC_HMAC_SECRET` — it is visible to every client and is an anti-casual-abuse measure, not authentication.
-
-## Verified
-
-- `pnpm install` → green (workspace yaml ships with `strictDepBuilds: false`, `minimumReleaseAge: 0`)
-- `pnpm build` → 7.19 MB / 1.72 MB gzipped
-- `pnpm typecheck` → clean (`vue-tsc` 3.x)
+`NUXT_PUBLIC_AUTH_MOCK=true` answers auth and users in the browser and during SSR, so pages can be built before the backend exists. The flag is ignored in production builds. See [Mock auth](./docs/system-architecture/security-auth.md#mock-auth-before-backend-integration).
 
 ## Documentation
 

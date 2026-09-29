@@ -19,7 +19,7 @@ interface ApiResponseError {
 
 TanStack wrappers type their error channel as `ApiResponseError`, so
 `query.error.value` / `mutation.error.value` are this shape (see
-`app/pages/users.vue`, which reads `error.error_message || error.message`).
+`app/pages/users.vue`, which renders `t("users.error", { message: error.error_message || error.message })`).
 
 ## Envelope Detection
 
@@ -111,6 +111,25 @@ if (response.data instanceof Blob) {
 
 This converts a failed binary response into the same `ApiResponseError` shape
 every other error uses, instead of an unreadable error blob.
+
+## Error page (`app/error.vue`)
+
+Nuxt renders `app/error.vue` for any error that reaches the app root, outside the
+layout. A `404` (unknown route) shows the not-found content (`not_found.title`,
+`not_found.description`, `not_found.back_home`); any other status shows the generic
+`error.title` with `error.back_home`. The button calls `clearError({ redirect: "/" })`.
+Failures inside a page or query are not routed here: they stay in the page as the
+`ApiResponseError` messages described above.
+
+## Login form errors
+
+`pages/login.vue` validates client-side (vee-validate + zod: `email` is a valid
+email, `password` at least 8 characters) before calling the API. The shared schema
+is `services/auth/login-schema.ts`; its messages are i18n keys (`validation.email`,
+`validation.password_min`) that `VeeInput` translates when it renders, so they follow
+a locale switch. A failed sign-in shows
+`getApiErrorMessage(error, t("login.error"))` in a `role="alert"` paragraph; the
+submit button is disabled and reads `login.submitting` while the request is pending. Each submit clears the previous server error first.
 
 ## Summary
 

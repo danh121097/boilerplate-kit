@@ -136,8 +136,11 @@ cookie; never refreshes) and `AuthModel.getSession()` in the browser. Types in
 
 ### Users (`app/services/users/users.ts`)
 
-`UsersModel extends Model` (path `/users`) with `list/get/update` and a
-`useUsersListQuery`. Types in `types/user.ts`.
+`UsersModel extends Model` (path `/users`) with `list(params?: PaginationParams)`
+(resolves the `PaginatedResponse<User>` envelope: `{ data, meta }`), `get(id)` and
+`update(id, payload)` (both resolve the unwrapped `User`), plus `useUsersListQuery`
+(same envelope; key `users.list`). The users page reads `data.data` and shows
+`users.empty` for an empty list. Types in `types/user.ts`.
 
 ## Bootstrap plugin (`app/plugins/01.init-services.ts`)
 

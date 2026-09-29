@@ -337,8 +337,11 @@ list or its error (a 401 renders loading and the browser refreshes). `serverApi*
 (`error_code` = HTTP status, `0` when unreachable; `retryable: true` for
 unreachable, 408, 429 and 5xx) instead of returning `null`. SSR never calls
 `/auth/refresh`. Only a 401 ends the session on boot: a retryable failure keeps
-the session and `layouts/default.vue` shows a banner with a Retry button
-(`refetchSession()`).
+the session and `layouts/default.vue` shows a `role="alert"` banner
+(`session.unavailable`) with a Retry button (`session.retry`, `refetchSession()`);
+the banner disappears once the retry succeeds. An anonymous visitor (no session hint cookie) resolves to signed-out without any
+request, so an unreachable backend never shows the banner to them. A 401 (or a refused refresh) is the
+normal signed-out flow and shows no banner. Covered by `layout-session-ssr.test.ts`.
 
 ## Per-Service Refresh Config
 

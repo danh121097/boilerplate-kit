@@ -25,7 +25,23 @@ export default {
     open_dialog: "Open a Reka UI dialog",
   },
   counter: { title: "Pinia counter", count: "Count" },
-  users: { title: "TanStack Query users", loading: "Loading…", error: "Error: {message}" },
+  users: {
+    title: "TanStack Query users",
+    loading: "Loading…",
+    error: "Error: {message}",
+    empty: "No users yet.",
+  },
+  validation: {
+    email: "Enter a valid email address",
+    password_min: "Password must be at least 8 characters",
+  },
+  input: { toggle_password: "Toggle password visibility" },
+  not_found: {
+    title: "Page not found",
+    description: "The page you are looking for does not exist.",
+    back_home: "Back to home",
+  },
+  error: { title: "Something went wrong", back_home: "Back to home" },
   form: {
     title: "Form (vee-validate + zod)",
     email: "Email",

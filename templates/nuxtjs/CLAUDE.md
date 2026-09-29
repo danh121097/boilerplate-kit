@@ -39,7 +39,8 @@ pnpm build        # nuxt build
 pnpm generate     # nuxt generate (static)
 pnpm typecheck    # nuxt typecheck
 pnpm test         # vitest run
-pnpm lint         # eslint
+pnpm lint         # eslint . && prettier --check . (read-only)
+pnpm lint:fix     # eslint . --fix && prettier --write .
 pnpm format       # prettier --write
 ```
 
