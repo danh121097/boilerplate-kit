@@ -126,7 +126,9 @@ All flows live in
   inactive or bad credentials (401 `AUTHENTICATION_ERROR`, **same message either
   way** — no enumeration), `comparePassword` (bcrypt), sign tokens, set cookies.
 - **refresh** (`POST /auth/refresh`, `@Public`) — read raw token from body or
-  the `refreshToken` cookie; controller 401s if absent. See rotation below.
+  the `refreshToken` cookie; controller 401s if absent. Any 401/403 refusal clears both
+  token cookies (same options as set) before the unchanged error is returned;
+  5xx/429 do not. See rotation below.
 - **logout** (`POST /auth/logout`, `@Public`) — mark the stored refresh token
   `isRevoked`, call `revokeUserTokens(userId)` (Redis access-token cutoff), clear
   cookies. Graceful when no token is present.

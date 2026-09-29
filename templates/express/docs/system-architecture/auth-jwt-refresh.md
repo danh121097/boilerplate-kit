@@ -155,11 +155,14 @@ const newRefreshToken = await createRefreshTokenInDb(user._id, payload); // issu
 ```
 
 Each refresh **revokes the old token and issues a fresh pair**; new cookies are
-set by the controller. Clients must single-flight refreshes (the frontend
-templates lock across tabs). A parallel refresh with the same token is treated as
-reuse, but detection is best-effort under true concurrency: the winning
-request's new refresh token (and its access token) can be issued after the
-reuse branch revoked the family, and so survive it.
+set by the controller. A refused refresh (`401`/`403`: token missing, invalid,
+expired, reused or revoked) clears both token cookies with the options they were
+set with, then returns the unchanged error; `5xx`/`429` leave cookies alone.
+Clients must single-flight refreshes (the frontend templates lock across tabs).
+A parallel refresh with the same token is treated as reuse, but detection is
+best-effort under true concurrency: the winning request's new refresh token
+(and its access token) can be issued after the reuse branch revoked the family,
+and so survive it.
 
 ## Verifying Requests: `authenticate`
 

@@ -37,8 +37,8 @@ automatically — treat it as source of truth and this page as the stable summar
   enforces token revocation.
 - **`@Roles(role)`** — role-rank check, runs after the JWT step.
 - **Auth cookies** — register / login / refresh set `accessToken` and
-  `refreshToken` as httpOnly cookies; logout clears them. `refresh` and `logout`
-  also accept the token in the request body (SSR / non-browser clients).
+  `refreshToken` as httpOnly cookies; logout clears them, and so does a refused
+  refresh (`401`/`403`; not `5xx`/`429`). `refresh` and `logout` also accept the token in the request body (SSR / non-browser clients).
 
 ## Endpoints
 
@@ -47,7 +47,7 @@ automatically — treat it as source of truth and this page as the stable summar
 | GET | `/api/v1/health` | HMAC, `@Public`, global rate-limit | — | `{ status: "ok", timestamp, uptime, database, redis }` |
 | POST | `/api/v1/auth/register` | HMAC, `@Public`, `auth` throttler (30/15m), `RegisterDto` | `{ email: string (email), password: string (min 8), name: string (min 1) }` | `201` `{ success: true, message, data: { user, tokens: { accessToken, refreshToken } } }` + httpOnly cookies |
 | POST | `/api/v1/auth/login` | HMAC, `@Public`, `login` throttler (30/15m), `LoginDto` | `{ email: string (email), password: string (min 1) }` | `{ success: true, message, data: { user, tokens } }` + httpOnly cookies |
-| POST | `/api/v1/auth/refresh` | HMAC, `@Public`, `auth` throttler (30/15m), `RefreshDto` | `{ refreshToken?: string }` (or `refreshToken` cookie) | `{ success: true, message, data: { tokens } }` + rotated cookies. `401` if missing/invalid/reused |
+| POST | `/api/v1/auth/refresh` | HMAC, `@Public`, `auth` throttler (30/15m), `RefreshDto` | `{ refreshToken?: string }` (or `refreshToken` cookie) | `{ success: true, message, data: { tokens } }` + rotated cookies. `401` if missing/invalid/expired/reused, with both token cookies cleared (`Set-Cookie` expired, `refreshToken` on its auth path); body unchanged |
 | POST | `/api/v1/auth/logout` | HMAC, `@Public`, `auth` throttler (30/15m), `RefreshDto` | `{ refreshToken?: string }` (or cookie) | `{ success: true, message }` + cleared cookies |
 | GET | `/api/v1/auth/me` | HMAC, JWT | — | `{ success: true, data: { user } }` |
 | GET | `/api/v1/users` | HMAC, JWT, `@Roles('admin')` | — (query: `page`≥1 def 1, `limit` 1–100 def 20) | `{ status: "success", data: User[], meta: OffsetMeta }` (passwords stripped). `403` if below admin |

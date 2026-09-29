@@ -57,6 +57,19 @@ function signedGet(path: string, accessToken: string) {
     .set("Authorization", h.Authorization);
 }
 
+/** Assert both token cookies are expired; refreshToken keeps its auth-route path */
+function expectTokenCookiesCleared(setCookie: string[] | undefined): void {
+  expect(setCookie).toBeDefined();
+  const access = setCookie!.find((c) => c.startsWith("accessToken="));
+  const refreshC = setCookie!.find((c) => c.startsWith("refreshToken="));
+  expect(access).toMatch(/^accessToken=;/);
+  expect(access).toMatch(/Expires=Thu, 01 Jan 1970/i);
+  expect(access).toMatch(/Path=\/(;|$)/);
+  expect(refreshC).toMatch(/^refreshToken=;/);
+  expect(refreshC).toMatch(/Expires=Thu, 01 Jan 1970/i);
+  expect(refreshC).toMatch(/Path=\/api\/v1\/auth(;|$)/);
+}
+
 // ── register ───────────────────────────────────────────────────────────────
 
 describe("POST /auth/register", () => {
@@ -209,16 +222,49 @@ describe("POST /auth/refresh — token rotation", () => {
     expect(res.body.data.tokens.refreshToken).not.toBe(originalRefreshToken);
   });
 
-  it("returns 401 for invalid refresh token string", async () => {
+  it("sets fresh non-expired token cookies on success", async () => {
+    const loginRes = await signedPost("/auth/login", {
+      email: USER.email,
+      password: USER.password,
+    });
+    const res = await signedPost("/auth/refresh", {
+      refreshToken: loginRes.body.data.tokens.refreshToken,
+    });
+    expect(res.status).toBe(200);
+    const cookies = res.headers["set-cookie"] as unknown as string[];
+    const access = cookies.find((c) => c.startsWith("accessToken="))!;
+    const refreshC = cookies.find((c) => c.startsWith("refreshToken="))!;
+    expect(access).not.toMatch(/^accessToken=;/);
+    expect(refreshC).not.toMatch(/^refreshToken=;/);
+    expect(access).toMatch(/Max-Age=900/i);
+    expect(refreshC).toMatch(/Max-Age=604800/i);
+  });
+
+  it("returns 401 and clears token cookies for invalid refresh token string", async () => {
     const res = await signedPost("/auth/refresh", {
       refreshToken: "completely-invalid-token",
     });
     expect(res.status).toBe(401);
+    expect(res.body.success).toBe(false);
+    expectTokenCookiesCleared(res.headers["set-cookie"] as unknown as string[]);
   });
 
-  it("returns 401 when no refresh token provided", async () => {
+  it("returns 401 and clears token cookies when no refresh token provided", async () => {
     const res = await signedPost("/auth/refresh", {});
     expect(res.status).toBe(401);
+    expectTokenCookiesCleared(res.headers["set-cookie"] as unknown as string[]);
+  });
+
+  it("returns 401 and clears token cookies when a rotated token is reused", async () => {
+    const loginRes = await signedPost("/auth/login", {
+      email: USER.email,
+      password: USER.password,
+    });
+    const refreshToken = loginRes.body.data.tokens.refreshToken as string;
+    await signedPost("/auth/refresh", { refreshToken });
+    const res = await signedPost("/auth/refresh", { refreshToken });
+    expect(res.status).toBe(401);
+    expectTokenCookiesCleared(res.headers["set-cookie"] as unknown as string[]);
   });
 });
 

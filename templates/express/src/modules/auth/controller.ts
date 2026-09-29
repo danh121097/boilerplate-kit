@@ -1,6 +1,7 @@
 import { clearTokenCookies, setTokenCookies } from "@/utils/cookie";
 import { Request, Response } from "express";
 import * as AuthService from "@/modules/auth/service";
+import { AppError } from "@/types";
 
 /** POST /api/auth/register */
 export async function register(req: Request, res: Response): Promise<void> {
@@ -35,6 +36,8 @@ export async function login(req: Request, res: Response): Promise<void> {
 export async function refresh(req: Request, res: Response): Promise<void> {
   const refreshToken = req.body?.refreshToken || req.cookies?.refreshToken;
   if (!refreshToken) {
+    // Drop any stale access cookie so cookie-forwarding clients stop sending it.
+    clearTokenCookies(res);
     res.status(401).json({
       success: false,
       message: "Refresh token not found in request body or cookies!",
@@ -42,7 +45,17 @@ export async function refresh(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const tokens = await AuthService.refresh(refreshToken);
+  let tokens: Awaited<ReturnType<typeof AuthService.refresh>>;
+  try {
+    tokens = await AuthService.refresh(refreshToken);
+  } catch (err) {
+    // Auth refusal only (401/403): clear the dead cookies, then let the
+    // error handler emit the unchanged error response. 5xx/429 keep cookies.
+    if (err instanceof AppError && (err.statusCode === 401 || err.statusCode === 403)) {
+      clearTokenCookies(res);
+    }
+    throw err;
+  }
 
   setTokenCookies(res, tokens.accessToken, tokens.refreshToken);
 

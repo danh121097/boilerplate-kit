@@ -8,15 +8,7 @@ import { clearTokenCookies, setTokenCookies } from "@/modules/auth/cookie.util";
 import { LoginDto } from "@/modules/auth/dto/login.dto";
 import { RefreshDto } from "@/modules/auth/dto/refresh.dto";
 import { RegisterDto } from "@/modules/auth/dto/register.dto";
-import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  Post,
-  Req,
-  Res,
-} from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, HttpException, Post, Req, Res } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import type { Request, Response } from "express";
 
@@ -100,6 +92,8 @@ export class AuthController {
       dto.refreshToken ?? (req.cookies as Record<string, string> | undefined)?.["refreshToken"];
 
     if (!rawToken) {
+      // Drop any stale access cookie so cookie-forwarding clients stop sending it.
+      clearTokenCookies(res, this.config);
       throw new AppException({
         message: "Refresh token not found in request body or cookies!",
         statusCode: 401,
@@ -107,7 +101,17 @@ export class AuthController {
       });
     }
 
-    const tokens = await this.authService.refresh(rawToken);
+    let tokens: Awaited<ReturnType<AuthService["refresh"]>>;
+    try {
+      tokens = await this.authService.refresh(rawToken);
+    } catch (err) {
+      // Auth refusal only (401/403): clear the dead cookies, then rethrow so the
+      // exception filter emits the unchanged error response. 5xx/429 keep cookies.
+      if (err instanceof HttpException && (err.getStatus() === 401 || err.getStatus() === 403)) {
+        clearTokenCookies(res, this.config);
+      }
+      throw err;
+    }
     setTokenCookies(res, tokens.accessToken, tokens.refreshToken, this.config);
     return {
       success: true,

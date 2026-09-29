@@ -18,6 +18,19 @@ describe("Auth Routes", () => {
   const cookieValue = (setCookie: string[], name: string): string | undefined =>
     setCookie.find((c) => c.startsWith(`${name}=`))?.split(";")[0];
 
+  /** Assert both token cookies are expired; refreshToken keeps its auth-route path */
+  const expectTokenCookiesCleared = (setCookie: string[] | undefined): void => {
+    expect(setCookie).toBeDefined();
+    const access = setCookie!.find((c) => c.startsWith("accessToken="));
+    const refreshC = setCookie!.find((c) => c.startsWith("refreshToken="));
+    expect(access).toMatch(/^accessToken=;/);
+    expect(access).toMatch(/Expires=Thu, 01 Jan 1970/i);
+    expect(access).toMatch(/Path=\/(;|$)/);
+    expect(refreshC).toMatch(/^refreshToken=;/);
+    expect(refreshC).toMatch(/Expires=Thu, 01 Jan 1970/i);
+    expect(refreshC).toMatch(/Path=\/api\/v1\/auth(;|$)/);
+  };
+
   /** Register a fresh user and return its Set-Cookie array */
   const registerUser = async (): Promise<string[]> => {
     const url = "/api/v1/auth/register";
@@ -137,6 +150,51 @@ describe("Auth Routes", () => {
     const url = "/api/v1/auth/refresh";
     const res = await request(app).post(url).set(signHmac("POST", url));
     expect(res.status).toBe(401);
+    expectTokenCookiesCleared(res.headers["set-cookie"] as unknown as string[]);
+  });
+
+  it("POST /api/v1/auth/refresh — 401 with invalid token clears token cookies", async () => {
+    const url = "/api/v1/auth/refresh";
+    const body = { refreshToken: "completely-invalid-token" };
+    const res = await request(app)
+      .post(url)
+      .set(signHmac("POST", url, body))
+      .send(body);
+    expect(res.status).toBe(401);
+    expect(res.body.success).toBe(false);
+    expectTokenCookiesCleared(res.headers["set-cookie"] as unknown as string[]);
+  });
+
+  it("POST /api/v1/auth/refresh — 401 with reused token clears token cookies", async () => {
+    const regCookies = await registerUser();
+    const url = "/api/v1/auth/refresh";
+    await request(app)
+      .post(url)
+      .set(signHmac("POST", url))
+      .set("Cookie", toCookieHeader(regCookies));
+    const res = await request(app)
+      .post(url)
+      .set(signHmac("POST", url))
+      .set("Cookie", toCookieHeader(regCookies));
+    expect(res.status).toBe(401);
+    expectTokenCookiesCleared(res.headers["set-cookie"] as unknown as string[]);
+  });
+
+  it("POST /api/v1/auth/refresh — 200 sets fresh non-expired token cookies", async () => {
+    const regCookies = await registerUser();
+    const url = "/api/v1/auth/refresh";
+    const res = await request(app)
+      .post(url)
+      .set(signHmac("POST", url))
+      .set("Cookie", toCookieHeader(regCookies));
+    expect(res.status).toBe(200);
+    const cookies = res.headers["set-cookie"] as unknown as string[];
+    const access = cookies.find((c) => c.startsWith("accessToken="))!;
+    const refreshC = cookies.find((c) => c.startsWith("refreshToken="))!;
+    expect(access).not.toMatch(/^accessToken=;/);
+    expect(refreshC).not.toMatch(/^refreshToken=;/);
+    expect(access).toMatch(/Max-Age=900/i);
+    expect(refreshC).toMatch(/Max-Age=604800/i);
   });
 
   it("POST /api/v1/auth/logout — 200 (cookie / SSR client)", async () => {

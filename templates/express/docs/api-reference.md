@@ -24,7 +24,8 @@ list.
 - **`requireMinRole(role)`** — role-rank check, runs after `authenticate`
   (`src/middleware/role.ts`).
 - **Auth cookies** — register / login / refresh set `accessToken` and
-  `refreshToken` as httpOnly cookies; logout clears them.
+  `refreshToken` as httpOnly cookies; logout clears them, and so does a refused
+  refresh (`401`/`403`; not `5xx`/`429`).
 
 ## Endpoints
 
@@ -33,7 +34,7 @@ list.
 | GET | `/api/v1/health` | HMAC, global rate-limit | — | `{ status: "ok", timestamp, uptime, database, redis }` |
 | POST | `/api/v1/auth/register` | HMAC, `authRateLimiter` (30/15m), `validate(registerSchema)` | `{ email: string (email), password: string (min 8), name: string (min 1) }` | `201` `{ success: true, message, data: { user, tokens: { accessToken, refreshToken } } }` + httpOnly cookies |
 | POST | `/api/v1/auth/login` | HMAC, `loginRateLimiter` (10/15m), `validate(loginSchema)` | `{ email: string (email), password: string (min 1) }` | `{ success: true, message, data: { user, tokens: { accessToken, refreshToken } } }` + httpOnly cookies |
-| POST | `/api/v1/auth/refresh` | HMAC, `authRateLimiter` (30/15m) | — (refresh token read from `refreshToken` cookie) | `{ success: true, message, data: { tokens: { accessToken, refreshToken } } }` + rotated cookies. `401` if cookie missing/invalid |
+| POST | `/api/v1/auth/refresh` | HMAC, `authRateLimiter` (30/15m) | — (refresh token read from `refreshToken` cookie) | `{ success: true, message, data: { tokens: { accessToken, refreshToken } } }` + rotated cookies. `401` if cookie missing/invalid/expired/reused, with both token cookies cleared (`Set-Cookie` expired, `refreshToken` on its auth path); body unchanged |
 | POST | `/api/v1/auth/logout` | HMAC, `authRateLimiter` (30/15m) | — (refresh token read from `refreshToken` cookie) | `{ success: true, message }` + cleared cookies |
 | GET | `/api/v1/auth/me` | HMAC, `authenticate` | — | `{ success: true, data: { user } }` |
 | GET | `/api/v1/users` | HMAC, `authenticate`, `requireMinRole('admin')` | — (query: `page`≥1 def 1, `limit` 1–100 def 20) | `{ status: "success", data: User[], meta: OffsetMeta }` (passwords stripped). `403` if below admin |
