@@ -35,6 +35,7 @@ export default {
     email: "Enter a valid email address",
     password_min: "Password must be at least 8 characters",
   },
+  socket: { connected: "Realtime connected", reconnecting: "Realtime reconnecting" },
   input: { toggle_password: "Toggle password visibility" },
   not_found: {
     title: "Page not found",

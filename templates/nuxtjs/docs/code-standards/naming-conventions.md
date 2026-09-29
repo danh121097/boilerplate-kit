@@ -71,7 +71,7 @@ Shared event names, messages, and keys are UPPER_SNAKE_CASE constants/enum
 members, centralized in `app/enums/`.
 
 ```ts
-import { SOCKET_EVENT, SOCKET_UNAUTHORIZED_MESSAGE } from "@/enums";
+import { SOCKET_EVENT } from "@/enums";
 socket.on(SOCKET_EVENT.AUTHENTICATED, handleAuthenticated);
 ```
 

@@ -56,8 +56,8 @@ Centralize string keys / event names so renames ripple cleanly:
   `PRISM_APP`). Resolved lazily inside the accessor (the prefix needs
   `useRuntimeConfig()`, valid only in a request scope) and cached. Always go
   through it instead of hard-coding `localStorage` strings.
-- **`app/enums/socket-events.ts`** — `SOCKET_EVENT` map +
-  `SOCKET_UNAUTHORIZED_MESSAGE`; reference these instead of raw event strings.
+- **`app/enums/socket-events.ts`** — `SOCKET_EVENT` map; reference it instead of
+  raw event strings.
 
 ## SSR safety
 

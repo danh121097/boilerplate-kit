@@ -99,6 +99,11 @@ export const useUsersListQuery = defineQuery<PaginatedResponse<User>>({
 
 ## Socket.IO (`app/composables/useSocketIO.ts` + `app/stores/socket-io.ts`)
 
+The socket is opened only while signed in: `components/socket-status.vue` calls
+`useSocketIO()` and the default layout renders it, inside `<ClientOnly>` (the socket
+stays client-only), next to the Logout button only when the session exists. Signing
+out unmounts it, which destroys the socket.
+
 `useSocketIO()` creates a connection scoped to the calling component tree. The
 live socket is cached in a Pinia store (`useSocketIOStore`) so the whole app
 shares one connection.
@@ -112,6 +117,13 @@ const socket = io(URL, {
   forceBase64: true,
 });
 ```
+
+### Header status
+
+`<SocketStatus>` shows a small dot (`size-2 rounded-full`; `bg-emerald-500` when
+`authenticated`, `bg-muted-foreground` otherwise) in a `role="status"` wrapper with a
+visually hidden label and a `title`: `socket.connected` ("Realtime connected") or
+`socket.reconnecting` ("Realtime reconnecting"), in en and ja.
 
 SSR safety is built in:
 
@@ -127,13 +139,21 @@ Behavior:
   `{ sig, ctime }` from the core `HMACSignatureGenerator.signRequest` (the same
   generator the HTTP interceptor uses) over the canonical string for `GET /socket` (see
   [Security & Auth](./security-auth.md)).
-- Lifecycle: connects `onMounted`, tears down on `onScopeDispose`. Events come
-  from the `SOCKET_EVENT` registry (`enums/socket-events.ts`): `authenticated`,
-  `unauthorized`, `connect_error`.
-- `connect_error` whose message equals `SOCKET_UNAUTHORIZED_MESSAGE`
-  (`"Unauthorized!"`) flips `authenticated` false; every `connect_error` schedules
-  a reconnect on a trailing timer (`RECONNECT_THROTTLE_MS`, 2s) — the first error
-  arms it, errors inside the window share it;
-  `unauthorized` destroys the socket.
+- Lifecycle: connects `onMounted`, tears down on `onScopeDispose` (which also
+  clears a pending retry timer). Events come from the `SOCKET_EVENT` registry
+  (`enums/socket-events.ts`): `authenticated`, `unauthorized`, `disconnect`,
+  `connect_error`.
+- Connection state: `authenticated` in the store becomes `true` only when the
+  server emits `authenticated`. It becomes `false` on `connect_error`, on
+  `disconnect` and on destroy. `connectSocket()` never sets it to `true`.
+- Reconnect policy (`RECONNECT_BASE_MS = 2000`, `RECONNECT_MAX_MS = 30_000`): on
+  `connect_error`, if `socket.active` is true socket.io is already reconnecting
+  (network error, server down) and nothing extra runs. If it is false the server
+  rejected the handshake (`"Unauthorized!"`: missing/expired/revoked token or bad
+  HMAC): one manual retry is scheduled (errors while it is pending do not
+  reschedule) after `min(RECONNECT_BASE_MS * 2 ** attempt, RECONNECT_MAX_MS)` —
+  2s, 4s, 8s, 16s, 30s, 30s, … The retry rebuilds `socket.auth` (fresh HMAC
+  `sig`/`ctime`) and calls `connect()` on the same socket. A `disconnect` with reason `io server disconnect` (the server closed the socket, e.g. a graceful restart; socket.io does not reconnect on its own) schedules the same retry. `attempt` resets to 0
+  on `authenticated`. The server's `unauthorized` event destroys the socket.
 - Helpers: `useIo()` (get/lazy-init the shared socket), `useSocketEvent(event, cb)`
   (auto-unsubscribe on unmount).

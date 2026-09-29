@@ -166,8 +166,11 @@ SSR-safe: `io()` is lazy (no socket opens until `.connect()`) and
 `onMounted(connectSocket)` only fires client-side. Auth payload is
 `{ role, sig, ctime }` (the httpOnly cookie authenticates) —
 `signHeader()` HMAC-signs `["GET","application/json",ctime,"/socket",""]` using
-`runtimeConfig.public.hmacSecret`. Throttled reconnect, event handlers keyed off
-`SOCKET_EVENT`, and `onScopeDispose` cleanup. Also exports `useIo()` (lazy
+`runtimeConfig.public.hmacSecret`. `authenticated` is set only by the server's `authenticated` event; a rejected
+handshake is retried with a doubling delay (`RECONNECT_BASE_MS`,
+`RECONNECT_MAX_MS`) while socket.io handles network errors itself. Event handlers
+are keyed off `SOCKET_EVENT`, with `onScopeDispose` cleanup. `components/socket-status.vue`
+mounts it while signed in. See [Networking & Realtime](../system-architecture/networking-realtime.md). Also exports `useIo()` (lazy
 shared socket) and `useSocketEvent(event, cb)` (auto-cleanup subscription).
 
 ## Related

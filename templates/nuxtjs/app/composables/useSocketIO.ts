@@ -1,10 +1,14 @@
-import { SOCKET_EVENT, SOCKET_UNAUTHORIZED_MESSAGE } from "@/enums";
+import { SOCKET_EVENT } from "@/enums";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import { useSocketIOStore } from "@/stores/socket-io";
 import { io, type Socket } from "socket.io-client";
 
-/** Delay before a failed connection is retried; errors inside it share one retry. */
-const RECONNECT_THROTTLE_MS = 2000;
+/** First delay before retrying a handshake the server rejected; doubles per attempt. */
+const RECONNECT_BASE_MS = 2000;
+/** Ceiling of the retry delay. */
+const RECONNECT_MAX_MS = 30_000;
+/** Disconnect reason when the server closed the socket; socket.io does not reconnect on its own. */
+const SERVER_DISCONNECT = "io server disconnect";
 
 export function useSocketIO() {
   const storeSocketIO = useSocketIOStore();
@@ -39,44 +43,61 @@ export function useSocketIO() {
   });
   if (!ioStore.value.socket) storeSocketIO.setSocketIO({ socket });
 
+  // Only the server's `authenticated` event marks the connection authenticated;
+  // opening the transport says nothing about the handshake result.
   function connectSocket() {
     socket.auth = buildAuth();
-    if (socket.connected) {
-      storeSocketIO.setSocketIO({ authenticated: true, socket });
-      return;
-    }
+    if (socket.connected) return;
     socket.connect();
-    storeSocketIO.setSocketIO({ authenticated: true, socket });
+  }
+
+  // Manual retry after a rejected handshake: one pending timer at a time, the
+  // delay doubling from RECONNECT_BASE_MS up to RECONNECT_MAX_MS. Network errors
+  // are left to socket.io's own reconnection (`socket.active`).
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
+  let attempt = 0;
+
+  function clearRetry() {
+    if (retryTimer) clearTimeout(retryTimer);
+    retryTimer = null;
   }
 
   function destroySocket() {
+    clearRetry();
     socket.disconnect();
     if (ioStore.value.socket === socket) {
       storeSocketIO.setSocketIO({ authenticated: false, socket: null });
     }
   }
 
-  // Trailing timer: the first error schedules one reconnect, later errors inside
-  // the window share it, so a burst of errors cannot cause a reconnect storm.
-  let reConnectTimer: ReturnType<typeof setTimeout> | null = null;
-  function reConnect() {
-    if (reConnectTimer) return;
-    reConnectTimer = setTimeout(() => {
-      reConnectTimer = null;
-      destroySocket();
+  function scheduleRetry() {
+    if (retryTimer) return;
+    const delay = Math.min(RECONNECT_BASE_MS * 2 ** attempt, RECONNECT_MAX_MS);
+    attempt++;
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
       connectSocket();
-    }, RECONNECT_THROTTLE_MS);
+    }, delay);
   }
 
-  const handleAuthenticated = () => storeSocketIO.setSocketIO({ authenticated: true, socket });
-  const handleConnectError = (e: Error) => {
-    if (e.message === SOCKET_UNAUTHORIZED_MESSAGE)
-      storeSocketIO.setSocketIO({ authenticated: false });
-    reConnect();
+  const handleAuthenticated = () => {
+    attempt = 0;
+    storeSocketIO.setSocketIO({ authenticated: true, socket });
+  };
+  const handleDisconnect = (reason: string) => {
+    storeSocketIO.setSocketIO({ authenticated: false });
+    // socket.io never reconnects after the server closes the socket itself (e.g. a
+    // graceful restart), so that case joins the same backoff as a rejected handshake.
+    if (reason === SERVER_DISCONNECT) scheduleRetry();
+  };
+  const handleConnectError = () => {
+    storeSocketIO.setSocketIO({ authenticated: false });
+    if (!socket.active) scheduleRetry();
   };
   const onSocketUnauthorized = () => destroySocket();
 
   socket.on(SOCKET_EVENT.AUTHENTICATED, handleAuthenticated);
+  socket.on(SOCKET_EVENT.DISCONNECT, handleDisconnect);
   socket.on(SOCKET_EVENT.CONNECT_ERROR, handleConnectError);
   socket.on(SOCKET_EVENT.UNAUTHORIZED, onSocketUnauthorized);
 
@@ -84,10 +105,9 @@ export function useSocketIO() {
 
   onScopeDispose(() => {
     socket.off(SOCKET_EVENT.AUTHENTICATED, handleAuthenticated);
+    socket.off(SOCKET_EVENT.DISCONNECT, handleDisconnect);
     socket.off(SOCKET_EVENT.CONNECT_ERROR, handleConnectError);
     socket.off(SOCKET_EVENT.UNAUTHORIZED, onSocketUnauthorized);
-    if (reConnectTimer) clearTimeout(reConnectTimer);
-    reConnectTimer = null;
     destroySocket();
   });
 

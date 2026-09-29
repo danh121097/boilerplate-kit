@@ -35,6 +35,7 @@ export default {
     email: "有効なメールアドレスを入力してください",
     password_min: "パスワードは8文字以上で入力してください",
   },
+  socket: { connected: "リアルタイム接続済み", reconnecting: "リアルタイム再接続中" },
   input: { toggle_password: "パスワードの表示を切り替える" },
   not_found: {
     title: "ページが見つかりません",

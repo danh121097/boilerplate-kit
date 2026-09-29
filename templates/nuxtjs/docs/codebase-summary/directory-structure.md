@@ -23,11 +23,12 @@ templates/nuxtjs/
 │   ├── layouts/
 │   │   └── default.vue     # Nav header + i18n locale toggle + <slot/>
 │   ├── components/ui/      # Auto-imported with "Ui" prefix (Button → <UiButton>)
+│   ├── components/socket-status.vue  # Header realtime dot; mounts useSocketIO while signed in
 │   │   ├── Button.vue, Input.vue, VeeInput.vue, Badge.vue, Card.vue
 │   │   ├── badge.variants.ts     # CVA variant map for Badge
 │   │   └── input.props.ts        # Shared BaseInputProps for Input/VeeInput
 │   ├── composables/
-│   │   └── useSocketIO.ts  # Socket.IO connection + useIo/useSocketEvent helpers
+│   │   └── useSocketIO.ts  # Socket.IO connection, backoff retry, useIo/useSocketEvent helpers
 │   ├── services/           # axios service layer (see services-and-stores.md)
 │   │   ├── core/           # Api, Model, interceptors, refresh, HMAC, tanstack, types
 │   │   ├── auth/           # AuthModel + login/register/logout/me query+mutations

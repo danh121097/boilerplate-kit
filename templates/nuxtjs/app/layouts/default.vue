@@ -64,15 +64,17 @@ function toggleLocale() {
         <NuxtLink to="/form" class="hover:text-primary [&.router-link-active]:text-primary">
           {{ t("nav.form") }}
         </NuxtLink>
-        <UiButton
-          v-if="isAuthenticated"
-          variant="unstyled"
-          class="ml-auto hover:text-primary"
-          :disabled="logoutPending"
-          @click="doLogout()"
-        >
-          {{ t("nav.logout") }}
-        </UiButton>
+        <div v-if="isAuthenticated" class="ml-auto flex items-center gap-3">
+          <ClientOnly><SocketStatus /></ClientOnly>
+          <UiButton
+            variant="unstyled"
+            class="hover:text-primary"
+            :disabled="logoutPending"
+            @click="doLogout()"
+          >
+            {{ t("nav.logout") }}
+          </UiButton>
+        </div>
         <NuxtLink
           v-else
           to="/login"
