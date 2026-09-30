@@ -1,7 +1,3 @@
-import { HmacService, DEFAULT_CONTENT_TYPE, SOCKET_HMAC_PATH } from "@/common/services/hmac.service";
-import { TokenRevocationService, isTokenRevoked } from "@/common/services/token-revocation.service";
-import { TokenService } from "@/common/services/token.service";
-import { JwtPayload } from "@/common/types/auth.types";
 import { SOCKET_EVENT, SOCKET_UNAUTHORIZED } from "@/modules/realtime/events";
 import { Injectable } from "@nestjs/common";
 import {
@@ -13,16 +9,17 @@ import {
 import type { Server, Socket } from "socket.io";
 
 /**
- * WebSocket gateway — authenticates handshakes and manages user rooms.
+ * WebSocket gateway — joins authenticated sockets to their user room.
  *
  * CORS + socket options are intentionally NOT set in the decorator: SocketIoAdapter
  * (installed by configureApp, Redis on or off) constructs the Socket.IO Server in
  * createIOServer() with the full options, so they live in exactly one place.
  *
- * Handshake security — HMAC first, then JWT (mirrors express middleware chain):
- *   1. HMAC: sig + ctime from handshake.auth verify the signed socket contract.
- *   2. JWT:  token from handshake.auth.token or accessToken cookie; revocation check.
- * Any failure disconnects the socket immediately with SOCKET_UNAUTHORIZED.
+ * Handshake security (HMAC, then JWT + revocation) runs as Socket.IO middleware
+ * registered by SocketIoAdapter, so unauthenticated clients never reach this class
+ * (they get `connect_error` "Unauthorized!"). handleConnection still refuses a
+ * socket that arrives without an identity, in case the gateway is ever mounted
+ * under an adapter that does not install the middleware.
  */
 @WebSocketGateway()
 @Injectable()
@@ -30,66 +27,16 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server!: Server;
 
-  constructor(
-    private readonly hmacService: HmacService,
-    private readonly tokenService: TokenService,
-    private readonly tokenRevocationService: TokenRevocationService,
-  ) {}
-
-  /**
-   * Handshake gate: HMAC integrity/replay check → JWT identity check.
-   * Mirrors express socketHmac (runs first) then socketAuth (runs second).
-   */
-  async handleConnection(client: Socket): Promise<void> {
-    try {
-      // --- Step 1: HMAC gate (integrity + replay prevention) ---
-      const sig = client.handshake.auth?.sig as string | undefined;
-      const ctime = client.handshake.auth?.ctime as string | number | undefined;
-
-      if (!sig || ctime === undefined) {
-        this.rejectClient(client);
-        return;
-      }
-
-      const hmacError = this.hmacService.verifyHmac({
-        method: "GET",
-        contentType: DEFAULT_CONTENT_TYPE,
-        ctime,
-        path: SOCKET_HMAC_PATH,
-        sig,
-      });
-
-      if (hmacError) {
-        this.rejectClient(client);
-        return;
-      }
-
-      // --- Step 2: JWT gate (identity + revocation) ---
-      const token = this.extractToken(client);
-      if (!token) {
-        this.rejectClient(client);
-        return;
-      }
-
-      const payload = this.tokenService.verifyAccessToken(token) as JwtPayload & {
-        iat?: number;
-        iat_ms?: number;
-      };
-
-      const revokedAt = await this.tokenRevocationService.getUserRevokedAt(payload.userId);
-      if (isTokenRevoked(payload, revokedAt)) {
-        this.rejectClient(client);
-        return;
-      }
-
-      // Handshake accepted — set user context, join personal room, signal client.
-      client.data.user = payload;
-      void client.join(`user:${payload.userId}`);
-      client.emit(SOCKET_EVENT.AUTHENTICATED);
-    } catch {
-      // verifyAccessToken or any unexpected error → reject.
-      this.rejectClient(client);
+  /** Join the personal room and signal the client that the handshake was accepted. */
+  handleConnection(client: Socket): void {
+    const userId = (client.data.user as { userId?: string } | undefined)?.userId;
+    if (!userId) {
+      client.emit("error", SOCKET_UNAUTHORIZED);
+      client.disconnect(true);
+      return;
     }
+    void client.join(`user:${userId}`);
+    client.emit(SOCKET_EVENT.AUTHENTICATED);
   }
 
   /**
@@ -98,37 +45,5 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
    */
   handleDisconnect(_client: Socket): void {
     // socket.io automatically leaves all rooms on disconnect.
-  }
-
-  // ---------------------------------------------------------------------------
-  // Private helpers
-  // ---------------------------------------------------------------------------
-
-  /** Emit error event then force-disconnect the socket. */
-  private rejectClient(client: Socket): void {
-    client.emit("error", SOCKET_UNAUTHORIZED);
-    client.disconnect(true);
-  }
-
-  /**
-   * Extract the raw access token from handshake auth or the accessToken cookie.
-   * Strips the "Bearer " prefix if present — mirrors express auth-middleware.
-   */
-  private extractToken(client: Socket): string | undefined {
-    const fromAuth = client.handshake.auth?.token as string | undefined;
-    if (fromAuth) {
-      return fromAuth.startsWith("Bearer ") ? fromAuth.slice(7) : fromAuth;
-    }
-    return this.readCookie(client.handshake.headers.cookie, "accessToken");
-  }
-
-  /** Parse a single cookie value from a raw Cookie header string. */
-  private readCookie(header: string | undefined, name: string): string | undefined {
-    if (!header) return undefined;
-    for (const part of header.split(";")) {
-      const [key, ...rest] = part.trim().split("=");
-      if (key === name) return decodeURIComponent(rest.join("="));
-    }
-    return undefined;
   }
 }

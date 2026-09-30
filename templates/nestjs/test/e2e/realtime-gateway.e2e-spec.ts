@@ -3,8 +3,8 @@
  *
  * Scenarios:
  *   - Authenticated + HMAC-signed handshake → connects and receives "authenticated" event.
- *   - Unsigned handshake → server disconnects the socket.
- *   - HMAC signed but no Bearer token → server disconnects the socket.
+ *   - Unsigned handshake → refused at the handshake (connect_error, never connected).
+ *   - HMAC signed but no Bearer token → refused at the handshake.
  *   - Polling handshake from an allowed Origin carries CORS headers (Redis off).
  *   - Logout and a reuse-detected family revoke disconnect the user's sockets.
  *
@@ -162,27 +162,31 @@ describe("Socket.IO gateway handshake", () => {
   );
 
   it.skipIf(SKIP)(
-    "unsigned handshake is disconnected by the gateway",
+    "unsigned handshake is refused before a connection exists",
     async () => {
       const accessToken = await getAccessToken();
-      // No sig/ctime — HMAC check in handleConnection rejects immediately.
-      const { socket, event } = await connectAndWait({ token: accessToken });
+      // No sig/ctime — the handshake HMAC middleware rejects it.
+      const { socket, event, data } = await connectAndWait({ token: accessToken });
       openSockets.push(socket);
 
-      expect(["disconnect", "connect_error"]).toContain(event);
+      expect(event).toBe("connect_error");
+      expect(data).toBe("Unauthorized!");
+      expect(socket.connected).toBe(false);
     },
     10_000,
   );
 
   it.skipIf(SKIP)(
-    "HMAC signed but no auth token is disconnected (JWT check fails)",
+    "HMAC signed but no auth token is refused (JWT gate fails)",
     async () => {
       const { sig, ctime } = signSocketHandshake();
-      // Valid HMAC but no token — JWT step rejects.
-      const { socket, event } = await connectAndWait({ sig, ctime });
+      // Valid HMAC but no token — the handshake JWT middleware rejects it.
+      const { socket, event, data } = await connectAndWait({ sig, ctime });
       openSockets.push(socket);
 
-      expect(["disconnect", "connect_error"]).toContain(event);
+      expect(event).toBe("connect_error");
+      expect(data).toBe("Unauthorized!");
+      expect(socket.connected).toBe(false);
     },
     10_000,
   );

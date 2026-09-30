@@ -12,9 +12,11 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
+// Cookie-only clients send no body at all; Fastify hands the validator `null` for
+// that, so the schema must accept null as well as undefined.
 export const refreshBodySchema = z
   .object({ refreshToken: z.string("refreshToken must be a string").optional() })
-  .optional()
+  .nullish()
   .transform((body) => body ?? {});
 
 export const publicUserSchema = z.object({

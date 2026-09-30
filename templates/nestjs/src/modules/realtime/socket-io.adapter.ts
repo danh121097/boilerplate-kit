@@ -1,5 +1,12 @@
 import { AppLogger } from "@/common/logger/app-logger.service";
+import { HmacService } from "@/common/services/hmac.service";
+import { TokenRevocationService } from "@/common/services/token-revocation.service";
+import { TokenService } from "@/common/services/token.service";
 import { AppConfigService } from "@/config/app-config.service";
+import {
+  createSocketAuthMiddleware,
+  createSocketHmacMiddleware,
+} from "@/modules/realtime/handshake-middleware";
 import { createSafePubClient, createSafeSubClient } from "@/redis/safe-pub-client";
 import { INestApplication } from "@nestjs/common";
 import { IoAdapter } from "@nestjs/platform-socket.io";
@@ -36,10 +43,17 @@ export function buildSocketServerOptions(corsOrigins: string[]): Partial<ServerO
  *
  * Options are set here (not in the @WebSocketGateway decorator) so there is exactly
  * one place to change them.
+ *
+ * Handshakes are gated here too, as Socket.IO middleware (HMAC, then JWT), so an
+ * unauthenticated client is refused before a connection exists — same as express
+ * socket/index.ts. The gateway only ever sees authenticated sockets.
  */
 export class SocketIoAdapter extends IoAdapter {
   private readonly corsOrigins: string[];
   private readonly logger: AppLogger;
+  private readonly hmacService: HmacService;
+  private readonly tokenService: TokenService;
+  private readonly revocationService: TokenRevocationService;
   private subClient: Redis | null = null;
 
   constructor(
@@ -49,6 +63,9 @@ export class SocketIoAdapter extends IoAdapter {
     super(app);
     this.corsOrigins = app.get(AppConfigService).corsOrigins;
     this.logger = app.get(AppLogger);
+    this.hmacService = app.get(HmacService);
+    this.tokenService = app.get(TokenService);
+    this.revocationService = app.get(TokenRevocationService);
   }
 
   createIOServer(port: number, options?: ServerOptions): ReturnType<IoAdapter["createIOServer"]> {
@@ -72,6 +89,10 @@ export class SocketIoAdapter extends IoAdapter {
         ),
       );
     }
+
+    // Reject unauthenticated handshakes before any connection is established.
+    server.use(createSocketHmacMiddleware(this.hmacService));
+    server.use(createSocketAuthMiddleware(this.tokenService, this.revocationService));
     return server;
   }
 

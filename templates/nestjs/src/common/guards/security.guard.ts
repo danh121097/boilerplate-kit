@@ -16,7 +16,7 @@ import type { Request } from "express";
 /**
  * Composite security guard — runs a fixed sequence:
  *   1. HMAC integrity  (all routes including @Public and /health)
- *   2. Origin/CSRF     (gated by config.enableCsrf, mutating methods only)
+ *   2. Origin/CSRF     (gated by config.enableCsrf, non-safe methods)
  *   3. JWT identity    (skipped for @Public routes)
  *   4. Role check      (skipped when no @Roles metadata)
  *
@@ -40,7 +40,7 @@ export class SecurityGuard implements CanActivate {
     // Step 1: HMAC — applies to ALL routes (no @Public exemption, no /health exemption).
     this.checkHmac(req);
 
-    // Step 2: Origin/CSRF — only when enableCsrf and mutating method.
+    // Step 2: Origin/CSRF — only when enableCsrf and a non-safe method.
     this.checkOrigin(req);
 
     // Step 3: JWT — skip for @Public routes.
@@ -120,7 +120,7 @@ export class SecurityGuard implements CanActivate {
 
   /**
    * Origin/CSRF step: mirrors express createVerifyOrigin. Gated by config.enableCsrf;
-   * only applied to mutating methods (see origin-check.ts).
+   * applied to every method except GET/HEAD/OPTIONS (see origin-check.ts).
    */
   private checkOrigin(req: Request): void {
     assertAllowedOrigin(req, this.config);

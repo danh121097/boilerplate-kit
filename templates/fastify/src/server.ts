@@ -30,16 +30,22 @@ async function startServer(): Promise<void> {
     }, 10_000);
     timer.unref();
 
-    try {
-      await app.close();
-      await disconnectDatabase();
-      await disconnectRedis();
-      clearTimeout(timer);
-      process.exitCode = 0;
-    } catch {
-      clearTimeout(timer);
-      process.exitCode = 1;
+    // Run every step in order even if an earlier one fails, so DB and Redis always close.
+    let failed = false;
+    const steps: Array<() => Promise<unknown>> = [
+      (): Promise<void> => app.close(),
+      disconnectDatabase,
+      disconnectRedis,
+    ];
+    for (const step of steps) {
+      try {
+        await step();
+      } catch {
+        failed = true;
+      }
     }
+    clearTimeout(timer);
+    process.exitCode = failed ? 1 : 0;
   };
 
   process.once("SIGINT", () => void shutdown("SIGINT"));
