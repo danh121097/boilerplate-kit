@@ -56,6 +56,8 @@ or off; unset = on outside production. API_PREFIX defaults to /api/v1;
 PORT defaults to 3000, REDIS_URL to redis://localhost:6379 (used when REDIS_ENABLED=true),
 COOKIE_DOMAIN (optional) sets the auth cookie domain, and APP_NAME (optional) sets the Swagger title; see .env.example for all supported values.
 
+Startup fails with a listed error when NODE_ENV is not development, production or test, when PORT is not a positive integer, or when ENABLE_CSRF, REDIS_ENABLED or DOCS_ENABLED is anything but true or false (empty counts as unset).
+
 TRUST_PROXY accepts true, false, or comma-separated IP/CIDR ranges. Numeric
 hop counts are rejected by Fastify 5.12 because they cannot verify the immediate
 peer address safely.

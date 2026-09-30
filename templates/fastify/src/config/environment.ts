@@ -1,10 +1,14 @@
 import { parseDurationSeconds } from "@/config/duration";
+import { parseEnvironmentFlags } from "@/config/env-validation";
 import { loadRsaKeyPair } from "@/config/keys";
 import { parseTrustProxy } from "@/config/trust-proxy";
 import { EnvironmentConfig } from "@/types";
 import dotenv from "dotenv";
 
 dotenv.config();
+
+// Validate flags first so a typo like NODE_ENV=prod fails with a clear message.
+const flags = parseEnvironmentFlags();
 
 const { privateKey: jwtAccessPrivateKey, publicKey: jwtAccessPublicKey } = loadRsaKeyPair();
 
@@ -48,12 +52,12 @@ function getLogLevel(isProd: boolean): EnvironmentConfig["logLevel"] {
   return isProd ? "info" : "debug";
 }
 
-const nodeEnv = process.env.NODE_ENV || "development";
+const { nodeEnv } = flags;
 const isProduction = nodeEnv === "production";
 const isDevelopment = nodeEnv === "development";
 const isTest = nodeEnv === "test";
 // Swagger UI + OpenAPI spec: on outside production unless DOCS_ENABLED overrides it.
-const docsEnabled = process.env.DOCS_ENABLED ? process.env.DOCS_ENABLED === "true" : !isProduction;
+const docsEnabled = flags.docsEnabled ?? !isProduction;
 
 /**
  * Allowed browser origins for CORS + the CSRF guard. Hard-coded here (not env) so
@@ -68,7 +72,7 @@ const corsOrigins: string[] = isProduction
 
 /** Validated environment configuration */
 export const config: EnvironmentConfig = {
-  port: parseInt(process.env.PORT || "3000", 10),
+  port: flags.port,
   isProduction,
   isDevelopment,
   isTest,
@@ -84,14 +88,14 @@ export const config: EnvironmentConfig = {
   jwtAccessPublicKey,
   corsOrigins,
   // Off by default — same-origin proxy deploy closes CSRF via SameSite; opt in for defense-in-depth.
-  enableCsrf: process.env.ENABLE_CSRF === "true",
+  enableCsrf: flags.enableCsrf,
   // Unset = host-only cookie; set for split-domain deploys (e.g. ".example.com").
   cookieDomain: process.env.COOKIE_DOMAIN || undefined,
   // Unset = trust no proxy; explicit proxy ranges let request.ip and rate limits use the client IP.
   trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
   apiPrefix: getApiPrefix(),
   // Redis is optional: not read via getRequiredEnvVar so the app boots fine when off.
-  redisEnabled: process.env.REDIS_ENABLED === "true",
+  redisEnabled: flags.redisEnabled,
   redisUrl: process.env.REDIS_URL || "redis://localhost:6379",
   logLevel: getLogLevel(isProduction),
 };

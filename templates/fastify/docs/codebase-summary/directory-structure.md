@@ -10,6 +10,7 @@ This tree reflects the current template. Unit and integration tests live in test
     - response-descriptions.ts — OpenAPI response descriptions and docs transforms
   - config/
     - environment.ts — dotenv loading and validated application config
+    - env-validation.ts — Zod check of NODE_ENV, PORT, ENABLE_CSRF, REDIS_ENABLED, DOCS_ENABLED
     - database.ts — Mongoose connect and disconnect
     - duration.ts — token lifetime parsing
     - keys.ts — RSA key loading and validation

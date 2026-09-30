@@ -71,6 +71,8 @@ pnpm test           # vitest run           (test:watch, test:coverage)
 `ENABLE_CSRF` (optional), `COOKIE_DOMAIN` (optional), `APP_NAME` (optional; Swagger title). CORS origins are not an env var:
 they are the hard-coded `corsOrigins` list in `src/config/environment.ts`.
 
+Startup fails with a listed error when `NODE_ENV` is not `development`, `production` or `test`, when `PORT` is not a positive integer, or when `ENABLE_CSRF`, `REDIS_ENABLED` or `DOCS_ENABLED` is anything but `true` or `false` (empty counts as unset).
+
 `MONGODB_URI`, `HMAC_SECRET`, and `JWT_REFRESH_SECRET` (symmetric secret; use
 ≥32 random chars, length is not enforced) are **required** — boot throws if
 missing (`src/config/environment.ts`). The RSA key paths (`JWT_PRIVATE_KEY_PATH`,
