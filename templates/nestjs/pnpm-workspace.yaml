@@ -3,3 +3,6 @@ allowBuilds:
   '@swc/core': true
   bcrypt: true
   mongodb-memory-server: true
+overrides:
+  # @nestjs/platform-socket.io bundles socket.io 4.8.3; a second copy breaks Server typings.
+  socket.io: 4.8.3
