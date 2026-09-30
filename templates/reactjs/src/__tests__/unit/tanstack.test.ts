@@ -40,6 +40,19 @@ describe("defineQuery", () => {
     await (opts.queryFn as (c: unknown) => Promise<unknown>)({ signal });
     expect(fetcher).toHaveBeenCalledWith(undefined, { signal });
   });
+
+  it("leaves the abort signal unread for a fetcher that ignores it", async () => {
+    let reads = 0;
+    const context = {
+      get signal() {
+        reads += 1;
+        return signal;
+      },
+    };
+    const useIgnoring = defineQuery<string>({ key: "ignoring", fetcher: async () => "v" });
+    await (useIgnoring.queryOptions().queryFn as (c: unknown) => Promise<unknown>)(context);
+    expect(reads).toBe(0);
+  });
 });
 
 describe("defineMutation", () => {

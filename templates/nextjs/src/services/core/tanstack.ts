@@ -18,6 +18,19 @@ export interface QueryFetcherContext {
   signal: AbortSignal;
 }
 
+/**
+ * Hand the fetcher a lazy `signal`. TanStack treats reading `signal` as opting into cancellation: the
+ * query is cancelled and refetched when its last observer unmounts (a StrictMode remount, a fast
+ * route change). Only a fetcher that actually uses the signal should pay for that.
+ */
+function fetcherContext(context: QueryFetcherContext): QueryFetcherContext {
+  return {
+    get signal() {
+      return context.signal;
+    },
+  };
+}
+
 interface DefineQueryConfig<TData, TParams = void> extends QueryDefOpts<TData, TParams> {
   key: string;
   fetcher: (params: TParams, context: QueryFetcherContext) => Promise<TData>;
@@ -53,7 +66,7 @@ export function defineQuery<TData, TParams = void>(config: DefineQueryConfig<TDa
     return queryOptions<TData, ApiResponseError, TData, QueryDefinitionKey<TParams>>({
       ...defaults,
       queryKey: queryKey(params),
-      queryFn: ({ signal }) => fetcher(params as TParams, { signal }),
+      queryFn: (context) => fetcher(params as TParams, fetcherContext(context)),
     } as UndefinedInitialDataOptions<TData, ApiResponseError, TData, QueryDefinitionKey<TParams>>);
   }
 
