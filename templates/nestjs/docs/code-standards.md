@@ -5,13 +5,13 @@ topic links to a focused, concrete page under [`code-standards/`](./code-standar
 
 ## Topics
 
-| Page | Covers |
-| --- | --- |
-| [file-naming.md](./code-standards/file-naming.md) | kebab-case `.ts`, Nest file roles (`*.module/controller/service`), file-size limit |
-| [naming-conventions.md](./code-standards/naming-conventions.md) | variables, functions, types, Zod schemas, schemas, API fields |
-| [commit-convention.md](./code-standards/commit-convention.md) | Conventional Commits, header rules, examples |
-| [typescript-nestjs.md](./code-standards/typescript-nestjs.md) | strict TS, DI, `AppException`, DTOs via `createZodDto`, guards/decorators, env via config |
-| [lint-format.md](./code-standards/lint-format.md) | ESLint flat config + Prettier, import sorting, scripts, Vitest via SWC |
+| Page                                                            | Covers                                                                                    |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| [file-naming.md](./code-standards/file-naming.md)               | kebab-case `.ts`, Nest file roles (`*.module/controller/service`), file-size limit        |
+| [naming-conventions.md](./code-standards/naming-conventions.md) | variables, functions, types, Zod schemas, schemas, API fields                             |
+| [commit-convention.md](./code-standards/commit-convention.md)   | Conventional Commits, header rules, examples                                              |
+| [typescript-nestjs.md](./code-standards/typescript-nestjs.md)   | strict TS, DI, `AppException`, DTOs via `createZodDto`, guards/decorators, env via config |
+| [lint-format.md](./code-standards/lint-format.md)               | ESLint flat config + Prettier, import sorting, scripts, Vitest via SWC                    |
 
 ## Core Principles
 

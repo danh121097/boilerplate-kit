@@ -25,12 +25,12 @@ file's responsibility.
 Each feature lives in `src/modules/<feature>/` and splits by responsibility. Keep
 each file doing one job:
 
-| File | Responsibility |
-| --- | --- |
-| `<feature>.module.ts` | `@Module` wiring: controllers, providers, `MongooseModule.forFeature`. |
+| File                      | Responsibility                                                                                                            |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `<feature>.module.ts`     | `@Module` wiring: controllers, providers, `MongooseModule.forFeature`.                                                    |
 | `<feature>.controller.ts` | HTTP layer: `@Controller` + route decorators; read input, call the service, shape the response. No business logic, no DB. |
-| `<feature>.service.ts` | Business logic + data access (injected models). Throws `AppException`. No request/response. |
-| `dto/<name>.dto.ts` | Zod schema + `createZodDto` class for request bodies. |
+| `<feature>.service.ts`    | Business logic + data access (injected models). Throws `AppException`. No request/response.                               |
+| `dto/<name>.dto.ts`       | Zod schema + `createZodDto` class for request bodies.                                                                     |
 
 Reference: `src/modules/auth/{auth.module,auth.controller,auth.service}.ts` plus
 `dto/`. A smaller feature may omit files it does not need (e.g.

@@ -7,12 +7,12 @@ How a feature is structured and how its routes reach the HTTP server in NestJS.
 Each feature is a Nest **module** (`@Module`) that groups a controller, a
 service, and its dependencies:
 
-| File | Responsibility |
-| --- | --- |
-| `dto/*.dto.ts` | Zod schemas wrapped with `createZodDto` — validated by the global `ZodValidationPipe` |
+| File              | Responsibility                                                                                                        |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `dto/*.dto.ts`    | Zod schemas wrapped with `createZodDto` — validated by the global `ZodValidationPipe`                                 |
 | `*.controller.ts` | HTTP layer: `@Controller` + `@Get`/`@Post` handlers; read params/body/`@CurrentUser`, set cookies, shape the response |
-| `*.service.ts` | Business logic + persistence (injected Mongoose models); throws `AppException`; no request/response objects |
-| `*.module.ts` | Wires the controller + service and `MongooseModule.forFeature([...])` for the schemas it needs |
+| `*.service.ts`    | Business logic + persistence (injected Mongoose models); throws `AppException`; no request/response objects           |
+| `*.module.ts`     | Wires the controller + service and `MongooseModule.forFeature([...])` for the schemas it needs                        |
 
 `user` has no DTO folder — its endpoints are read-only and take a route param /
 query object. Add DTOs only when an endpoint accepts a body.
@@ -62,10 +62,12 @@ Route-level metadata read by the global guards:
 
    ```ts
    @Module({
-     imports: [MongooseModule.forFeature([
-       { name: User.name, schema: UserSchema },
-       { name: RefreshToken.name, schema: RefreshTokenSchema },
-     ])],
+     imports: [
+       MongooseModule.forFeature([
+         { name: User.name, schema: UserSchema },
+         { name: RefreshToken.name, schema: RefreshTokenSchema },
+       ]),
+     ],
      controllers: [AuthController],
      providers: [AuthService],
    })
@@ -92,15 +94,15 @@ automatically; no per-route security wiring is needed beyond
 
 ## Endpoints Today
 
-| Method | Path (under `API_PREFIX`) | Guards / Decorators | Notes |
-| --- | --- | --- | --- |
-| GET | `/health` | `@Public` (HMAC still enforced) | server + DB + Redis status |
-| POST | `/auth/register` | `@Public`, `@Throttle(auth)`, `RegisterDto` | sets token cookies |
-| POST | `/auth/login` | `@Public`, `@Throttle(login)`, `LoginDto` | sets token cookies |
-| POST | `/auth/refresh` | `@Public`, `@Throttle(auth)`, `RefreshDto` | rotates refresh token (body or cookie) |
-| POST | `/auth/logout` | `@Public`, `@Throttle(auth)`, `RefreshDto` | revokes refresh + user access tokens |
-| GET | `/auth/me` | JWT (no `@Public`), `@CurrentUser` | current user profile |
-| GET | `/users` | JWT + `@Roles('admin')` | list users (offset pagination) |
-| GET | `/users/:id` | JWT + `@Roles('admin')` | user by id |
+| Method | Path (under `API_PREFIX`) | Guards / Decorators                         | Notes                                  |
+| ------ | ------------------------- | ------------------------------------------- | -------------------------------------- |
+| GET    | `/health`                 | `@Public` (HMAC still enforced)             | server + DB + Redis status             |
+| POST   | `/auth/register`          | `@Public`, `@Throttle(auth)`, `RegisterDto` | sets token cookies                     |
+| POST   | `/auth/login`             | `@Public`, `@Throttle(login)`, `LoginDto`   | sets token cookies                     |
+| POST   | `/auth/refresh`           | `@Public`, `@Throttle(auth)`, `RefreshDto`  | rotates refresh token (body or cookie) |
+| POST   | `/auth/logout`            | `@Public`, `@Throttle(auth)`, `RefreshDto`  | revokes refresh + user access tokens   |
+| GET    | `/auth/me`                | JWT (no `@Public`), `@CurrentUser`          | current user profile                   |
+| GET    | `/users`                  | JWT + `@Roles('admin')`                     | list users (offset pagination)         |
+| GET    | `/users/:id`              | JWT + `@Roles('admin')`                     | user by id                             |
 
 The live, always-accurate version of this table is the Swagger UI at `/docs`.

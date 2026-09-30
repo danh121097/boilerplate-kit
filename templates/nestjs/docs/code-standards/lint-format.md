@@ -21,12 +21,12 @@ Back to [Code Standards](../code-standards.md).
 
 Active rules on `src/**/*.ts`:
 
-| Rule | Setting | Effect |
-| --- | --- | --- |
-| `@typescript-eslint/no-unused-vars` | `error`, `argsIgnorePattern: "^_"` | No unused vars; prefix intentionally-unused args with `_`. |
-| `@typescript-eslint/explicit-function-return-type` | `warn` | Annotate function/method return types. |
-| `@typescript-eslint/no-extraneous-class` | `off` | NestJS modules/DTO classes are often metadata-only — allowed. |
-| `perfectionist/sort-imports` | `warn` | Imports sorted by **syntax kind**, then alphabetically. |
+| Rule                                               | Setting                            | Effect                                                        |
+| -------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------- |
+| `@typescript-eslint/no-unused-vars`                | `error`, `argsIgnorePattern: "^_"` | No unused vars; prefix intentionally-unused args with `_`.    |
+| `@typescript-eslint/explicit-function-return-type` | `warn`                             | Annotate function/method return types.                        |
+| `@typescript-eslint/no-extraneous-class`           | `off`                              | NestJS modules/DTO classes are often metadata-only — allowed. |
+| `perfectionist/sort-imports`                       | `warn`                             | Imports sorted by **syntax kind**, then alphabetically.       |
 
 Tests (`src/**/*.spec.ts`, `test/**/*.ts`) relax two rules: `no-explicit-any`
 and `explicit-function-return-type` are **off** — terse mocks are allowed there.

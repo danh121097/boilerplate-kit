@@ -18,23 +18,23 @@ empty element produces a final newline — it MUST be present:
 
 ```ts
 // utils/hmac.ts
-[method.toUpperCase(), contentType, String(ctime), path, ''].join('\n')
+[method.toUpperCase(), contentType, String(ctime), path, ""].join("\n");
 ```
 
 The signature is `HMAC-SHA256(stringToSign, HMAC_SECRET)` **Base64-encoded**:
 
 ```ts
-crypto.createHmac('sha256', config.hmacSecret).update(stringToSign).digest('base64');
+crypto.createHmac("sha256", config.hmacSecret).update(stringToSign).digest("base64");
 ```
 
 Fields:
 
-| Field | Value |
-| --- | --- |
-| `method` | HTTP verb, uppercased (`GET`, `POST`, …) |
-| `contentType` | the raw `Content-Type` header (empty string when none) |
-| `ctime` | client time, epoch **milliseconds** |
-| `path` | request path **after** the API prefix, **no** query string |
+| Field         | Value                                                      |
+| ------------- | ---------------------------------------------------------- |
+| `method`      | HTTP verb, uppercased (`GET`, `POST`, …)                   |
+| `contentType` | the raw `Content-Type` header (empty string when none)     |
+| `ctime`       | client time, epoch **milliseconds**                        |
+| `path`        | request path **after** the API prefix, **no** query string |
 
 ## The Middleware
 
@@ -85,7 +85,7 @@ signatures. The Vue/Nuxt clients sign with CryptoJS in
 
 ```ts
 // client (CryptoJS)
-const stringToSign = [method, contentType, ctime, path, ''].join('\n');
+const stringToSign = [method, contentType, ctime, path, ""].join("\n");
 const sig = Base64.stringify(HmacSHA256(stringToSign, secret));
 // sent as { sig, ctime, "x-version" } request headers
 ```

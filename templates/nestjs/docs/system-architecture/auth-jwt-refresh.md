@@ -11,14 +11,14 @@ tokens delivered as httpOnly cookies, with reuse detection. Source:
 
 ## Two Token Types
 
-| | Access token | Refresh token |
-| --- | --- | --- |
-| Algorithm | **RS256** (RSA keypair) | **HS256** (symmetric secret) |
-| Lifetime | `JWT_ACCESS_EXPIRY` (default `15m`) | `JWT_REFRESH_EXPIRY` (default `7d`) |
-| Sent as | `Authorization: Bearer` **or** `accessToken` cookie | `refreshToken` cookie **or** request body |
-| Stored server-side | no | yes — SHA-256 hash in `RefreshToken` collection |
-| `token_use` claim | `access` | `refresh` |
-| `iss` (issuer) claim | primary CORS origin | primary CORS origin |
+|                      | Access token                                        | Refresh token                                   |
+| -------------------- | --------------------------------------------------- | ----------------------------------------------- |
+| Algorithm            | **RS256** (RSA keypair)                             | **HS256** (symmetric secret)                    |
+| Lifetime             | `JWT_ACCESS_EXPIRY` (default `15m`)                 | `JWT_REFRESH_EXPIRY` (default `7d`)             |
+| Sent as              | `Authorization: Bearer` **or** `accessToken` cookie | `refreshToken` cookie **or** request body       |
+| Stored server-side   | no                                                  | yes — SHA-256 hash in `RefreshToken` collection |
+| `token_use` claim    | `access`                                            | `refresh`                                       |
+| `iss` (issuer) claim | primary CORS origin                                 | primary CORS origin                             |
 
 The two token classes use different algorithms by design. **Access tokens are
 RS256** (asymmetric): the RSA private key signs, the public key verifies — so any
@@ -79,12 +79,12 @@ required at boot. The `JwtPayload` carries `{ userId, email, role }` only.
 ```ts
 @Schema({ timestamps: true })
 class RefreshToken {
-  @Prop({ required: true, unique: true }) token: string;          // SHA-256 hash, NOT the raw JWT
+  @Prop({ required: true, unique: true }) token: string; // SHA-256 hash, NOT the raw JWT
   @Prop({ type: Types.ObjectId, ref: "User", required: true, index: true }) userId: Types.ObjectId;
   @Prop({ required: true, index: { expires: 0 } }) expiresAt: Date; // TTL index → Mongo auto-purges
   @Prop({ default: false }) isRevoked: boolean;
-  @Prop({ index: true }) familyId?: string;   // device session chain; absent on legacy tokens
-  @Prop() rotatedAt?: Date;   // set only when consumed by a rotation (drives the reuse grace window)
+  @Prop({ index: true }) familyId?: string; // device session chain; absent on legacy tokens
+  @Prop() rotatedAt?: Date; // set only when consumed by a rotation (drives the reuse grace window)
 }
 ```
 
@@ -104,9 +104,9 @@ httpOnly cookies:
 ```ts
 const baseCookieOptions = {
   httpOnly: true,
-  secure: config.isProduction,                       // HTTPS-only in prod
+  secure: config.isProduction, // HTTPS-only in prod
   sameSite: config.isProduction ? "strict" : "lax",
-  domain: config.cookieDomain,                        // optional, host-only when unset
+  domain: config.cookieDomain, // optional, host-only when unset
 };
 // accessToken  → maxAge from JWT_ACCESS_EXPIRY  (default 15m)
 // refreshToken → maxAge from JWT_REFRESH_EXPIRY (default 7d)
@@ -157,11 +157,12 @@ token produce exactly one `200`:
 
 ```ts
 const hashedToken = this.tokenService.hashToken(rawRefreshToken);
-const claimed = await this.refreshTokenModel.findOneAndUpdate(   // 1. atomic claim = revoke old
+const claimed = await this.refreshTokenModel.findOneAndUpdate(
+  // 1. atomic claim = revoke old
   { token: hashedToken, isRevoked: false, expiresAt: { $gt: new Date() } },
   { isRevoked: true, rotatedAt: new Date() },
 );
-if (!claimed) return this.resolveUnclaimableToken(hashedToken);  // 2. re-lookup + classify:
+if (!claimed) return this.resolveUnclaimableToken(hashedToken); // 2. re-lookup + classify:
 //   unknown → 401
 //   revoked by a rotation ≤ REFRESH_REUSE_GRACE_MS ago, unexpired → benign retry:
 //               issue a fresh pair (200), revoke nothing

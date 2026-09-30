@@ -39,25 +39,25 @@ handlers) to the global filter automatically, so handlers can `throw` freely.
 registered as `APP_FILTER` (in `CommonModule`) with `@Catch()` — it catches
 **everything**. It normalizes three cases into one envelope:
 
-| Thrown thing | How it is rendered |
-| --- | --- |
-| `AppException` | `statusCode` + `message` + its `errorType`, verbatim |
-| any other `HttpException` (e.g. Nest's `NotFoundException` for unmatched routes) | status + unwrapped message; `errorType` mapped from status via `mapHttpStatusToErrorType` |
-| Mongoose `CastError` / `ValidationError` | `400` `VALIDATION_ERROR`, names the field(s) only (`map-database-error.ts`) |
-| Zod validation failure (`ZodValidationException`) | `400` `VALIDATION_ERROR`, issue messages joined with `", "` — same text as the express validator |
-| body-parser error (too large, malformed JSON, bad encoding) | `413` / `400` / `415` `VALIDATION_ERROR`, fixed client-safe message (`map-body-parser-error.ts`); logged as `warn`, never `error` |
-| MongoDB duplicate key (`code 11000`) | `409` `CONFLICT`, names the field(s) only |
-| any other non-HTTP error | `500` `INTERNAL_ERROR`, generic message |
+| Thrown thing                                                                     | How it is rendered                                                                                                                |
+| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `AppException`                                                                   | `statusCode` + `message` + its `errorType`, verbatim                                                                              |
+| any other `HttpException` (e.g. Nest's `NotFoundException` for unmatched routes) | status + unwrapped message; `errorType` mapped from status via `mapHttpStatusToErrorType`                                         |
+| Mongoose `CastError` / `ValidationError`                                         | `400` `VALIDATION_ERROR`, names the field(s) only (`map-database-error.ts`)                                                       |
+| Zod validation failure (`ZodValidationException`)                                | `400` `VALIDATION_ERROR`, issue messages joined with `", "` — same text as the express validator                                  |
+| body-parser error (too large, malformed JSON, bad encoding)                      | `413` / `400` / `415` `VALIDATION_ERROR`, fixed client-safe message (`map-body-parser-error.ts`); logged as `warn`, never `error` |
+| MongoDB duplicate key (`code 11000`)                                             | `409` `CONFLICT`, names the field(s) only                                                                                         |
+| any other non-HTTP error                                                         | `500` `INTERNAL_ERROR`, generic message                                                                                           |
 
 ```ts
 res.status(statusCode).json({
   success: false,
   status: "error",
-  errorType,                                  // e.g. 'AUTHENTICATION_ERROR'
+  errorType, // e.g. 'AUTHENTICATION_ERROR'
   message,
-  error_code: statusCode,                     // mirrored under the client's field names
+  error_code: statusCode, // mirrored under the client's field names
   error_message: message,
-  ...(isDev && stack ? { stack } : {}),       // stack only outside production
+  ...(isDev && stack ? { stack } : {}), // stack only outside production
 });
 ```
 
@@ -79,15 +79,15 @@ with `errorType: "NOT_FOUND"` — the same envelope as every other error.
 For framework `HttpException`s that lack an `errorType`,
 `mapHttpStatusToErrorType` keeps the contract consistent:
 
-| Status | errorType |
-| --- | --- |
-| 400 | `VALIDATION_ERROR` |
-| 401 | `AUTHENTICATION_ERROR` |
-| 403 | `AUTHORIZATION_ERROR` |
-| 404 | `NOT_FOUND` |
-| 409 | `CONFLICT` |
-| 429 | `RATE_LIMIT` |
-| ≥ 500 | `INTERNAL_ERROR` |
+| Status | errorType              |
+| ------ | ---------------------- |
+| 400    | `VALIDATION_ERROR`     |
+| 401    | `AUTHENTICATION_ERROR` |
+| 403    | `AUTHORIZATION_ERROR`  |
+| 404    | `NOT_FOUND`            |
+| 409    | `CONFLICT`             |
+| 429    | `RATE_LIMIT`           |
+| ≥ 500  | `INTERNAL_ERROR`       |
 
 ## Validation Errors
 

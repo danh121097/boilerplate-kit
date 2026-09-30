@@ -53,8 +53,14 @@ The global `HttpExceptionFilter` (registered as `APP_FILTER`) catches it — and
 any other thrown error — and emits one shape:
 
 ```json
-{ "success": false, "status": "error", "errorType": "...",
-  "message": "...", "error_code": 409, "error_message": "..." }
+{
+  "success": false,
+  "status": "error",
+  "errorType": "...",
+  "message": "...",
+  "error_code": 409,
+  "error_message": "..."
+}
 ```
 
 `stack` is included only in development. Throwing inside an async handler is

@@ -20,17 +20,17 @@ leading emoji is allowed but not required — the type is what matters.
 
 ## Types
 
-| Type | Use for |
-| --- | --- |
-| `feat` | new feature |
-| `fix` | bug fix |
+| Type       | Use for                                                 |
+| ---------- | ------------------------------------------------------- |
+| `feat`     | new feature                                             |
+| `fix`      | bug fix                                                 |
 | `refactor` | code change that neither fixes a bug nor adds a feature |
-| `perf` | performance improvement |
-| `test` | adding or fixing tests |
-| `docs` | documentation only |
-| `style` | formatting / lint, no logic change |
-| `build` | build system or dependencies |
-| `chore` | other maintenance |
+| `perf`     | performance improvement                                 |
+| `test`     | adding or fixing tests                                  |
+| `docs`     | documentation only                                      |
+| `style`    | formatting / lint, no logic change                      |
+| `build`    | build system or dependencies                            |
+| `chore`    | other maintenance                                       |
 
 ## Examples
 

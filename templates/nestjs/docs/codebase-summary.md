@@ -6,11 +6,11 @@ This is a thin hub — each topic links to a focused page under
 
 ## Topics
 
-| Page | Covers |
-| --- | --- |
-| [directory-structure.md](./codebase-summary/directory-structure.md) | the real `src/` tree with a one-line purpose per file/folder |
-| [modules-and-routes.md](./codebase-summary/modules-and-routes.md) | the Nest module / controller / service pattern and how decorated routes wire under the global `API_PREFIX` |
-| [conventions.md](./codebase-summary/conventions.md) | `@/` alias, DI, `AppException`, DTOs via `createZodDto`, config/env access, RSA keys, optional-tier pattern |
+| Page                                                                | Covers                                                                                                      |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| [directory-structure.md](./codebase-summary/directory-structure.md) | the real `src/` tree with a one-line purpose per file/folder                                                |
+| [modules-and-routes.md](./codebase-summary/modules-and-routes.md)   | the Nest module / controller / service pattern and how decorated routes wire under the global `API_PREFIX`  |
+| [conventions.md](./codebase-summary/conventions.md)                 | `@/` alias, DI, `AppException`, DTOs via `createZodDto`, config/env access, RSA keys, optional-tier pattern |
 
 ## At A Glance
 

@@ -6,11 +6,11 @@ backend. This is a thin hub — each topic links to a focused page under
 
 ## Topics
 
-| Page | Covers |
-| --- | --- |
-| [directory-structure.md](./codebase-summary/directory-structure.md) | the real `src/` tree with a one-line purpose per file/folder |
-| [modules-and-routes.md](./codebase-summary/modules-and-routes.md) | the `controller`/`service`/`routes`/`validation` module pattern and how `RouteGroup` + `route-registrar` wire modules under `API_PREFIX` |
-| [conventions.md](./codebase-summary/conventions.md) | `@/` alias, barrels, `AppError`, `RouteGroup` typing, config/env access, RSA keys |
+| Page                                                                | Covers                                                                                                                                   |
+| ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| [directory-structure.md](./codebase-summary/directory-structure.md) | the real `src/` tree with a one-line purpose per file/folder                                                                             |
+| [modules-and-routes.md](./codebase-summary/modules-and-routes.md)   | the `controller`/`service`/`routes`/`validation` module pattern and how `RouteGroup` + `route-registrar` wire modules under `API_PREFIX` |
+| [conventions.md](./codebase-summary/conventions.md)                 | `@/` alias, barrels, `AppError`, `RouteGroup` typing, config/env access, RSA keys                                                        |
 
 ## At A Glance
 
