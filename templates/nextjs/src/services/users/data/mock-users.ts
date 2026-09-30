@@ -1,15 +1,13 @@
-import { failure, pathOf, queryOf, reply } from "@/services/auth/mock-auth-responses";
-import { readMockServerUser } from "@/services/auth/mock-auth-session";
+import { failure, pathOf, queryOf, reply } from "@/services/auth/data/mock-auth-responses";
 import { usersContract } from "@/services/users/contract";
-import type { MockAuthConfig } from "@/services/auth/mock-auth-config";
+import type { MockAuthConfig } from "@/services/auth/data/mock-auth-config";
 import type { AuthUser } from "@/services/auth/types/auth";
-import type { PaginatedResponse } from "@/services/core";
 import type { User } from "@/services/users/types/user";
 import type { AxiosResponse, InternalAxiosRequestConfig } from "axios";
 
 /**
  * Dev-only mock of the backend users routes (`GET /users`, `GET /users/:id`),
- * answered next to the mock auth (see `services/auth/mock-auth.ts`): same flag,
+ * answered next to the mock auth (see `services/auth/data/mock-auth.ts`): same flag,
  * same seam, same production guard. Mirrors the express users module: the
  * `{ success: true, data, meta }` envelope with offset pagination, no
  * passwords, `401` without a session, `403` below admin, `404` for an unknown id.
@@ -118,6 +116,7 @@ export function respondMockUsers(
   caller: () => MockCaller,
 ): MockUsersOutcome | null {
   const { list, byId } = usersContract.paths;
+
   const idMatch = path.startsWith(`${usersContract.base}/`) ? path.slice(list.length + 1) : null;
   const isList = path === list;
   if (method !== "get" || (!isList && (!idMatch || idMatch.includes("/")))) return null;
@@ -163,19 +162,4 @@ export function answerMockUsers(
   const method = (config.method ?? "get").toLowerCase();
   const outcome = respondMockUsers(mock, method, pathOf(config), queryOf(config), caller);
   return outcome && reply(config, outcome.status, outcome.body);
-}
-
-/**
- * SSR: the users list as the server-side fetch would see it, answered from the
- * mock cookie of the incoming request (call it inside the request's Nuxt
- * context, before any `await`). Resolves the same `{ success, data, meta }`
- * envelope `serverApiPaginate` yields; a non-200 rejects with the backend's
- * error body, the shape `serverApiPaginate` rejects with.
- */
-export function answerMockServerUsers(mock: MockAuthConfig): Promise<PaginatedResponse<User>> {
-  const caller = readMockServerUser() ?? "Access token required!";
-  const outcome = respondMockUsers(mock, "get", usersContract.paths.list, {}, () => caller);
-  if (outcome?.status === 200)
-    return Promise.resolve(outcome.body as unknown as PaginatedResponse<User>);
-  return Promise.reject(outcome?.body);
 }

@@ -1,4 +1,4 @@
-import { MOCK_ACCESS_TOKEN } from "@/services/auth/mock-auth-session";
+import { MOCK_ACCESS_TOKEN } from "@/services/auth/data/mock-auth-session";
 import { AxiosError } from "axios";
 import type { AuthUser } from "@/services/auth/types/auth";
 import type { AxiosResponse, InternalAxiosRequestConfig } from "axios";

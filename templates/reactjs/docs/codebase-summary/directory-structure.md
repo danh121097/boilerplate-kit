@@ -48,7 +48,7 @@ templates/reactjs/
     │   ├── init-services.ts
     │   ├── session-expiry.ts
     │   ├── core/              # api, interceptors, hmac, token-storage, model, tanstack, types
-    │   ├── auth/              # AuthModel + mutations/queries + login-schema (zod)
+    │   ├── auth/              # AuthModel + mutations/queries + schema/ (login zod) + data/ (mock auth)
     │   └── users/             # UsersModel + useUsersListQuery
     ├── i18n/
     │   ├── i18n.ts            # initI18n() + setLocale()

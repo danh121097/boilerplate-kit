@@ -1,8 +1,8 @@
-import { getMockAuth } from "@/services/auth/mock-auth-config";
-import { MOCK_USER_COOKIE, parseMockUser } from "@/services/auth/mock-auth-session";
-import { respondMockUsers } from "@/services/users/mock-users";
+import { getMockAuth } from "@/services/auth/data/mock-auth-config";
+import { MOCK_USER_COOKIE, parseMockUser } from "@/services/auth/data/mock-auth-session";
+import { respondMockUsers } from "@/services/users/data/mock-users";
 import { cookies } from "next/headers";
-import type { MockUsersOutcome } from "@/services/users/mock-users";
+import type { MockUsersOutcome } from "@/services/users/data/mock-users";
 
 /**
  * Dev-only mock auth for server reads (`authedFetch` in `server-api.ts`): the

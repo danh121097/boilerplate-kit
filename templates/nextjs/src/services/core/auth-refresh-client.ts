@@ -1,4 +1,4 @@
-import { mockAuthAdapter } from "@/services/auth/mock-auth";
+import { mockAuthAdapter } from "@/services/auth/data/mock-auth";
 import { Api } from "@/services/core/api";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import type { TokenRefresher } from "@/services/core/refresh-token-manager";

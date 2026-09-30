@@ -1,4 +1,4 @@
-import { loginSchema } from "@/services/auth/login-schema";
+import { loginSchema } from "@/services/auth/schema/login";
 import { describe, expect, it } from "vitest";
 import en from "@/i18n/locales/en";
 import ja from "@/i18n/locales/ja";

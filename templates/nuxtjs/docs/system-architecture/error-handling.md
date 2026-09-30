@@ -126,7 +126,7 @@ Failures inside a page or query are not routed here: they stay in the page as th
 
 `pages/login.vue` validates client-side (vee-validate + zod: `email` is a valid
 email, `password` at least 8 characters) before calling the API. The shared schema
-is `services/auth/login-schema.ts`; its messages are i18n keys (`validation.email`,
+is `services/auth/schema/login.ts`; its messages are i18n keys (`validation.email`,
 `validation.password_min`) that `VeeInput` translates when it renders, so they follow
 a locale switch. A failed sign-in shows
 `getApiErrorMessage(error, t("login.error"))` in a `role="alert"` paragraph; the

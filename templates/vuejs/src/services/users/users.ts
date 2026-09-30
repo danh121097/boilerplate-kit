@@ -1,4 +1,4 @@
-import { mockAuthAdapter } from "@/services/auth/mock-auth";
+import { mockAuthAdapter } from "@/services/auth/data/mock-auth";
 import { defineQuery, Model } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
 import { usersContract } from "@/services/users/contract";

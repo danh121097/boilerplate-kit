@@ -1,5 +1,5 @@
 import { useAuth, useLoginMutation } from "@/services/auth";
-import { loginSchema, type LoginFormValues } from "@/services/auth/login-schema";
+import { loginSchema, type LoginFormValues } from "@/services/auth/schema/login";
 import { getApiErrorMessage } from "@/services/core/api-errors";
 import { redirectIfSignedIn } from "@/services/core/route-guard";
 import { safeRedirect } from "@/services/core/session";

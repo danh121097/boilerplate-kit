@@ -1,4 +1,4 @@
-import { loginSchema } from "@/services/auth/login-schema";
+import { loginSchema } from "@/services/auth/schema/login";
 import { describe, expect, it } from "vitest";
 
 /** Login form validation: failures carry i18n keys, translated where they render. */

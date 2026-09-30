@@ -1,4 +1,4 @@
-import { loginSchema } from "@/services/auth/login-schema";
+import { loginSchema } from "@/services/auth/schema/login";
 import { describe, expect, it } from "vitest";
 
 /** Client-side login validation: failures carry i18n keys the form translates. */

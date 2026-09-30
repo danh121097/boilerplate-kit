@@ -1,5 +1,5 @@
 import { useLoginMutation } from "@/services/auth/auth";
-import { loginSchema, type LoginFormValues } from "@/services/auth/login-schema";
+import { loginSchema, type LoginFormValues } from "@/services/auth/schema/login";
 import { getApiErrorMessage, safeRedirect } from "@/services/core";
 import { useAuthStore } from "@/stores/auth";
 import { zodResolver } from "@hookform/resolvers/zod";

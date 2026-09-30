@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FormField } from "@/components/ui/form-field";
 import { useLoginMutation } from "@/services/auth";
-import { loginSchema } from "@/services/auth/login-schema";
+import { loginSchema } from "@/services/auth/schema/login";
 import { useAuth } from "@/services/auth/session";
 import { getApiErrorMessage, safeRedirect } from "@/services/core";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
-import type { LoginFormValues } from "@/services/auth/login-schema";
+import type { LoginFormValues } from "@/services/auth/schema/login";
 import type { FormEvent } from "react";
 
 /** Where to go after signing in: the same-origin `?redirect=` path (set when a

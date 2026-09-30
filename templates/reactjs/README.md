@@ -78,7 +78,7 @@ src/
 ├── providers/                    # QueryClient provider
 ├── services/
 │   ├── core/                     # api.ts, model.ts, interceptors.ts, tanstack.ts, …
-│   ├── auth/                     # AuthModel, login-schema (zod)
+│   ├── auth/                     # AuthModel, schema/login (zod), data/ (dev mock auth)
 │   ├── users/                    # UsersModel (paginated list) + `useUsersListQuery`
 │   └── init-services.ts          # called from main.tsx before render
 ├── stores/                       # Zustand — explicit imports (`import { useXStore } from "@/stores/x"`)
@@ -126,7 +126,7 @@ Locale stored in `localStorage` under `STORAGE_KEYS.LANGUAGE` (access is wrapped
 
 ## Forms
 
-`react-hook-form` + `zod` via `@hookform/resolvers`. See `routes/login.tsx` and `routes/form.tsx` for the canonical pattern; `services/auth/login-schema.ts` holds the schema, whose messages are i18n keys translated where they render.
+`react-hook-form` + `zod` via `@hookform/resolvers`. See `routes/login.tsx` and `routes/form.tsx` for the canonical pattern; `services/auth/schema/login.ts` holds the schema, whose messages are i18n keys translated where they render.
 
 ## Theme
 

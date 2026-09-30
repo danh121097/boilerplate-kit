@@ -39,6 +39,7 @@ never touches `localStorage` or reads tokens directly.
 - `contract.ts` — endpoint paths + React Query keys (single source of truth)
 - `AuthModel` — login, register, logout, revokeSession, getMe, getSession (401 → null; a live session is revoked first)
 - `useLoginMutation`, `useRegisterMutation`, `useLogoutMutation`, `useMeQuery`
+- `schema/login.ts` — zod `loginSchema`; `data/mock-auth*.ts` — dev-only mock auth
 - `session.ts` — `useAuth()` hook (derives from useMeQuery): `user`, `isAuthenticated`, `isLoading`, `sessionUnavailable`, `retrySession`; `isSessionUnavailable(error)`
 
 ### users/
@@ -46,7 +47,7 @@ never touches `localStorage` or reads tokens directly.
 - `contract.ts` — endpoint paths + React Query keys
 - `UsersModel` — `list(params?: PaginationParams): Promise<PaginatedResponse<User>>`, `get(id): Promise<User>`, `update(id, payload): Promise<User>` (get/update unwrap the response)
 - `useUsersListQuery` — returns the `PaginatedResponse<User>` envelope; pages read the array from `data.data`
-- `mock-users.ts` — dev-only mock of `GET /users` answering the same `{ data, meta }` envelope
+- `data/mock-users.ts` — dev-only mock of `GET /users` answering the same `{ data, meta }` envelope
 
 ### query-keys.ts
 

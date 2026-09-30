@@ -282,9 +282,9 @@ NEXT_PUBLIC_AUTH_MOCK=true
 
 Truthy is `"true"` or `"1"`. These are build-time `NEXT_PUBLIC_*` values, so
 restart `next dev` after changing them. Implementation:
-`services/auth/mock-auth.ts` (adapter), with `mock-auth-config.ts` (flag),
+`services/auth/data/mock-auth.ts` (adapter), with `mock-auth-config.ts` (flag),
 `mock-auth-session.ts` (mock user cookie) and `mock-auth-responses.ts`
-(backend-shaped replies), plus `services/users/mock-users.ts` (the users
+(backend-shaped replies), plus `services/users/data/mock-users.ts` (the users
 fixture and handlers) and `server/mock-server-read.ts` (the server-side read).
 
 - **Seam.** `mockAuthAdapter` replaces only axios's network adapter, on

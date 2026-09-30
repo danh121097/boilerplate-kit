@@ -283,9 +283,9 @@ EXPO_PUBLIC_AUTH_MOCK=true
 Truthy is exactly `"true"` or `"1"` (anything else, e.g. `TRUE`, is off).
 Restart Metro after changing an `EXPO_PUBLIC_*` value. The login form requires 8+
 characters, so keep an overridden password that long. Implementation:
-`services/auth/mock-auth.ts` (adapter), with `mock-auth-config.ts` (flag),
+`services/auth/data/mock-auth.ts` (adapter), with `mock-auth-config.ts` (flag),
 `mock-auth-session.ts` (tokens) and `mock-auth-responses.ts` (backend-shaped
-replies), plus `services/users/mock-users.ts` (the users fixture and handlers).
+replies), plus `services/users/data/mock-users.ts` (the users fixture and handlers).
 
 - **Seam.** `mockAuthAdapter` replaces only axios's network adapter, on
   `AuthModel`'s and `UsersModel`'s clients and on the bare refresh call

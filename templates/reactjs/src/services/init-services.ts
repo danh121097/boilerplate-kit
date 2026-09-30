@@ -1,6 +1,6 @@
 import { STORAGE_KEYS } from "@/enums";
 import { authContract } from "@/services/auth/contract";
-import { getMockAuth } from "@/services/auth/mock-auth";
+import { getMockAuth } from "@/services/auth/data/mock-auth";
 import { Api, ApiInterceptors, getApiBaseUrl } from "@/services/core";
 import { registerServiceToken } from "@/services/core/auth-token-storage";
 import type { ServiceRefreshConfig, ServiceTokenKeys } from "@/services/core";

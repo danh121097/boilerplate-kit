@@ -1,9 +1,9 @@
 import { hasServerSessionHint, toServerApiError } from "@/server/server-api";
-import { MOCK_USER_COOKIE, parseMockUser } from "@/services/auth/mock-auth-session";
+import { MOCK_USER_COOKIE, parseMockUser } from "@/services/auth/data/mock-auth-session";
 import { usersContract } from "@/services/users/contract";
-import { respondMockUsers } from "@/services/users/mock-users";
+import { respondMockUsers } from "@/services/users/data/mock-users";
 import { getCookie } from "@tanstack/react-start/server";
-import type { MockAuthConfig } from "@/services/auth/mock-auth-config";
+import type { MockAuthConfig } from "@/services/auth/data/mock-auth-config";
 import type { AuthUser } from "@/services/auth/types/auth";
 import type { PaginatedResponse } from "@/services/core";
 import type { ServerUnauthorized } from "@/services/core/server-session";
@@ -13,7 +13,7 @@ import type { User } from "@/services/users/types/user";
  * Dev-only mock auth, server side: the SSR counterpart of `readServerSession`
  * when `VITE_AUTH_MOCK` is on. There is no backend token cookie to forward, so
  * the signed-in user comes from the readable mock cookie the browser sends with
- * the page request (see `services/auth/mock-auth`). Same outcomes as the real
+ * the page request (see `services/auth/data/mock-auth`). Same outcomes as the real
  * read: the user, or `ServerUnauthorized` carrying the session hint so the
  * browser refreshes a hinted session (the mock refresh answers from the same
  * cookie) instead of caching "signed out".
@@ -32,7 +32,7 @@ export function readMockServerSession(): AuthUser | ServerUnauthorized {
  * Dev-only mock users, server side: the SSR counterpart of `serverApiPaginate`
  * for the users list when `VITE_AUTH_MOCK` is on. The caller is the same mock
  * cookie the session read uses, and the checks and envelope are the mock users
- * API's (`services/users/mock-users`). Outcomes match the real read: the
+ * API's (`services/users/data/mock-users`). Outcomes match the real read: the
  * paginated body, `ServerUnauthorized` for a `401` (with the session hint, so
  * a hinted session refreshes in the browser), and an `ApiResponseError`
  * rejection for any other refusal (a `403`/`404` body is the backend's error

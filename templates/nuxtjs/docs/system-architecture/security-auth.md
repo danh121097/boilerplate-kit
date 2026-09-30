@@ -391,10 +391,10 @@ Nuxt's env override parses `NUXT_PUBLIC_AUTH_MOCK=true` / `=1` into the boolean
 `true` / number `1` in `runtimeConfig`, so those are accepted too; the same
 parsing turns `TRUE` into `true`, so a differently-cased value is on here. They map to `runtimeConfig.public.authMock`,
 `authMockEmail` and `authMockPassword` (declared in `nuxt.config.ts`), read once
-at boot by `01.init-services.ts`. Implementation: `services/auth/mock-auth.ts`
+at boot by `01.init-services.ts`. Implementation: `services/auth/data/mock-auth.ts`
 (adapter), with `mock-auth-config.ts` (flag), `mock-auth-session.ts` (mock user
 cookie) and `mock-auth-responses.ts` (backend-shaped replies), plus
-`services/users/mock-users.ts` (the users fixture and handlers).
+`services/users/data/mock-users.ts` (the users fixture and handlers).
 
 - **Seam.** `mockAuthAdapter` replaces only axios's network adapter, on
   `AuthModel`'s and `UsersModel`'s clients and on the bare refresh call

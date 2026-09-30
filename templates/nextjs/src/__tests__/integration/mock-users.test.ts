@@ -1,6 +1,6 @@
 import { installLocalStorage } from "@/__tests__/helpers/session-browser";
 import { getUsersServerData } from "@/server/get-users";
-import { MOCK_USER_COOKIE } from "@/services/auth/mock-auth-session";
+import { MOCK_USER_COOKIE } from "@/services/auth/data/mock-auth-session";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { User } from "@/services/users";
 import axios from "axios";

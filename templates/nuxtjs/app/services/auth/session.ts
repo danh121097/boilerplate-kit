@@ -1,8 +1,8 @@
 import { AuthModel } from "@/services/auth/auth";
 import { authContract } from "@/services/auth/contract";
-import { isMockAuthEnabled } from "@/services/auth/mock-auth-config";
-import { mockUnauthorizedError } from "@/services/auth/mock-auth-responses";
-import { readMockServerUser } from "@/services/auth/mock-auth-session";
+import { isMockAuthEnabled } from "@/services/auth/data/mock-auth-config";
+import { mockUnauthorizedError } from "@/services/auth/data/mock-auth-responses";
+import { readMockServerUser } from "@/services/auth/data/mock-auth-session";
 import { defineQuery, hasSessionHint, serverApiGet } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
 import type { AuthUser } from "@/services/auth/types/auth";

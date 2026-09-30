@@ -1,7 +1,7 @@
 import { readMockServerSession } from "@/server/mock-session";
 import { hasServerSessionHint, serverApiGet } from "@/server/server-api";
 import { authContract } from "@/services/auth/contract";
-import { getMockAuth } from "@/services/auth/mock-auth-config";
+import { getMockAuth } from "@/services/auth/data/mock-auth-config";
 import { isServerUnauthorized } from "@/services/core/server-session";
 import type { AuthUser } from "@/services/auth/types/auth";
 import type { ServerUnauthorized } from "@/services/core/server-session";

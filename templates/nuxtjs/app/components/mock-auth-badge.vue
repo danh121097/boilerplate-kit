@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { isMockAuthEnabled } from "@/services/auth/mock-auth";
+import { isMockAuthEnabled } from "@/services/auth/data/mock-auth";
 
 // Dev signal: a small amber pill at the bottom-left while mock auth is active,
 // nothing otherwise. `layouts/default.vue` loads this file only outside

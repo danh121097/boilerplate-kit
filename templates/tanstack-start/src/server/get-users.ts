@@ -1,6 +1,6 @@
 import { readMockServerUsers } from "@/server/mock-session";
 import { serverApiPaginate } from "@/server/server-api";
-import { getMockAuth } from "@/services/auth/mock-auth-config";
+import { getMockAuth } from "@/services/auth/data/mock-auth-config";
 import { usersContract } from "@/services/users/contract";
 import { createServerFn } from "@tanstack/react-start";
 import type { PaginatedResponse } from "@/services/core";

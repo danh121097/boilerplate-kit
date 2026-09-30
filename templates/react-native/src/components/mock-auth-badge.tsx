@@ -1,4 +1,4 @@
-import { isMockAuthEnabled } from "@/services/auth/mock-auth";
+import { isMockAuthEnabled } from "@/services/auth/data/mock-auth";
 import { Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 

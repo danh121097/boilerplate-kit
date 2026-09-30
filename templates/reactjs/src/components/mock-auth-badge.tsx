@@ -1,4 +1,4 @@
-import { isMockAuthEnabled } from "@/services/auth/mock-auth";
+import { isMockAuthEnabled } from "@/services/auth/data/mock-auth";
 
 /** Dev signal: a small amber pill at the bottom-left while mock auth is active.
  * Renders nothing otherwise. The root layout loads this file only outside

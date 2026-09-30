@@ -83,7 +83,7 @@ src/
   providers/             QueryClientProvider
   services/
     core/                axios client, interceptors, refresh, HMAC, token storage
-    auth/                auth service (login / register / logout / me) + dev mock-auth*.ts
+    auth/                auth service (login / register / logout / me) + dev data/mock-auth*.ts
     users/               users service
     init-services.ts     wire base URLs + interceptors + refresh options
   stores/                Zustand stores (auth, socket-io)

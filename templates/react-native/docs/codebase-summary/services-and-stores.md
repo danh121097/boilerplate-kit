@@ -24,12 +24,12 @@ src/services/
 │   └── index.ts
 ├── auth/
 │   ├── auth.ts             # AuthModel + useLoginMutation, useRegisterMutation, etc.
-│   ├── mock-auth*.ts       # Dev-only mock auth adapter (EXPO_PUBLIC_AUTH_MOCK)
+│   ├── data/mock-auth*.ts  # Dev-only mock auth adapter (EXPO_PUBLIC_AUTH_MOCK)
 │   ├── types/auth.ts       # AuthUser, AuthResult, LoginPayload, RegisterPayload
 │   └── index.ts
 └── users/
     ├── users.ts            # UsersModel (list → PaginatedResponse<User>, get/update → User) + useUsersListQuery
-    ├── mock-users.ts       # Dev-only mock /users fixture (EXPO_PUBLIC_AUTH_MOCK)
+    ├── data/mock-users.ts  # Dev-only mock /users fixture (EXPO_PUBLIC_AUTH_MOCK)
     ├── types/user.ts       # User, UpdateUserPayload
     └── index.ts
 ```

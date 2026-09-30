@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useLoginMutation, useMeQuery } from "@/services/auth";
-import { loginSchema } from "@/services/auth/login-schema";
+import { loginSchema } from "@/services/auth/schema/login";
 import { getApiErrorMessage, safeRedirect, useServerRenderedQuery } from "@/services/core";
 import { toTypedSchema } from "@vee-validate/zod";
 import { useForm } from "vee-validate";

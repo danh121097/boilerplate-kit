@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { loginSchema } from "@/services/auth/login-schema";
+import { loginSchema } from "@/services/auth/schema/login";
 import { toTypedSchema } from "@vee-validate/zod";
 import { useForm } from "vee-validate";
 

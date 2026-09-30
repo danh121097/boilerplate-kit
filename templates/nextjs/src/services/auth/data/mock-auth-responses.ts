@@ -1,4 +1,4 @@
-import { MOCK_ACCESS_TOKEN } from "@/services/auth/mock-auth-session";
+import { MOCK_ACCESS_TOKEN } from "@/services/auth/data/mock-auth-session";
 import { AxiosError } from "axios";
 import type { AuthUser } from "@/services/auth/types/auth";
 import type { AxiosResponse, InternalAxiosRequestConfig } from "axios";
@@ -46,11 +46,6 @@ export const failure = (status: number, errorType: string, message: string) => (
 });
 
 export const unauthorized = (message: string) => failure(401, "AUTHENTICATION_ERROR", message);
-
-/** The 401 an expired mock session gets on the server read, shaped like the backend's. */
-export function mockUnauthorizedError() {
-  return unauthorized("Access token required!");
-}
 
 export function bodyOf(config: InternalAxiosRequestConfig): Record<string, unknown> {
   const raw: unknown = config.data;

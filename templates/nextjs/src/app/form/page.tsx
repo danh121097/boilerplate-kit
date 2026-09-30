@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FormField } from "@/components/ui/form-field";
-import { loginSchema, type LoginFormValues } from "@/services/auth/login-schema";
+import { loginSchema, type LoginFormValues } from "@/services/auth/schema/login";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";

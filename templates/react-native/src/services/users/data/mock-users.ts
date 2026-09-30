@@ -1,13 +1,13 @@
-import { failure, pathOf, queryOf, reply } from "@/services/auth/mock-auth-responses";
+import { failure, pathOf, queryOf, reply } from "@/services/auth/data/mock-auth-responses";
 import { usersContract } from "@/services/users/contract";
-import type { MockAuthConfig } from "@/services/auth/mock-auth-config";
+import type { MockAuthConfig } from "@/services/auth/data/mock-auth-config";
 import type { AuthUser } from "@/services/auth/types/auth";
 import type { User } from "@/services/users/types/user";
 import type { AxiosResponse, InternalAxiosRequestConfig } from "axios";
 
 /**
  * Dev-only mock of the backend users routes (`GET /users`, `GET /users/:id`),
- * answered next to the mock auth (see `services/auth/mock-auth.ts`): same flag,
+ * answered next to the mock auth (see `services/auth/data/mock-auth.ts`): same flag,
  * same seam, same production guard. Mirrors the express users module: the
  * `{ success: true, data, meta }` envelope with offset pagination, no
  * passwords, `401` without a session, `403` below admin, `404` for an unknown id.

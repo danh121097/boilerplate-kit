@@ -52,7 +52,7 @@ No global error boundary is wired by default. Add React's `<ErrorBoundary>` from
 
 `react-hook-form` + `zod` + `@hookform/resolvers` handle field-level errors.
 `FormField` renders the error inline below the input. The login and demo forms
-share `loginSchema` (`services/auth/login-schema.ts`): `email` must be a valid
+share `loginSchema` (`services/auth/schema/login.ts`): `email` must be a valid
 email and `password` at least 8 characters. Schema messages are i18n keys
 (`validation.email`, `validation.password_min`) translated where they render, and
 forms use `noValidate` so the browser's native message never replaces them.

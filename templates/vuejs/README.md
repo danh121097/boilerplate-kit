@@ -131,7 +131,7 @@ Locale stored in `localStorage.language` (access is wrapped in try/catch), falli
 
 ## Forms
 
-`vee-validate` + `zod` via `@vee-validate/zod`. See `views/login-view.vue` and `views/form-view.vue` for the canonical pattern (`useForm`, `defineField`, `toTypedSchema`). The shared schema in `services/auth/login-schema.ts` carries i18n keys as messages; `VeeInput` translates them when rendering, so errors follow a locale switch.
+`vee-validate` + `zod` via `@vee-validate/zod`. See `views/login-view.vue` and `views/form-view.vue` for the canonical pattern (`useForm`, `defineField`, `toTypedSchema`). The shared schema in `services/auth/schema/login.ts` carries i18n keys as messages; `VeeInput` translates them when rendering, so errors follow a locale switch.
 
 ## UI components
 

@@ -74,7 +74,7 @@ export default defineNuxtConfig({
       languageCode: DEFAULT_LOCALE,
       hmacSecret: "",
       buildVersion: "1.0.0",
-      // Dev-only mock auth (see services/auth/mock-auth.ts). Off unless "true"/"1".
+      // Dev-only mock auth (see services/auth/data/mock-auth.ts). Off unless "true"/"1".
       authMock: "",
       authMockEmail: "",
       authMockPassword: "",

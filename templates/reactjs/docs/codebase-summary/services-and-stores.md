@@ -26,7 +26,8 @@ src/services/
 │   └── index.ts
 ├── auth/
 │   ├── auth.ts             # AuthModel (getMe, getSession → AuthUser | null, logout, isLoggingOut, revokeSession) + useMeQuery, mutations
-│   ├── login-schema.ts     # loginSchema (zod; messages are i18n keys) + LoginFormValues
+│   ├── schema/login.ts  # loginSchema (zod; messages are i18n keys) + LoginFormValues
+│   ├── data/mock-auth*.ts  # Dev-only mock auth adapter (VITE_AUTH_MOCK)
 │   ├── types/auth.ts       # AuthUser, AuthResult, LoginPayload, RegisterPayload
 │   └── index.ts
 └── users/

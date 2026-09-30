@@ -25,7 +25,8 @@ src/services/
 ├── auth/
 │   ├── auth.ts             # AuthModel (login/register/logout/revokeSession/getMe/getSession) + mutations
 │   ├── session.ts          # fetchSession (SSR server fn) + useMeQuery + useAuth (sessionUnavailable, retrySession) + isSessionUnavailable
-│   ├── login-schema.ts     # zod loginSchema (i18n-key messages) shared by the login and demo forms
+│   ├── schema/login.ts  # zod loginSchema (i18n-key messages) shared by the login and demo forms
+│   ├── data/mock-auth*.ts  # Dev-only mock auth adapter (VITE_AUTH_MOCK)
 │   ├── types/auth.ts       # AuthUser, AuthResult, LoginPayload, RegisterPayload
 │   └── index.ts
 └── users/

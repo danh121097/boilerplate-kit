@@ -1,5 +1,5 @@
 import { authContract } from "@/services/auth/contract";
-import { getMockAuth } from "@/services/auth/mock-auth-config";
+import { getMockAuth } from "@/services/auth/data/mock-auth-config";
 import {
   bearerOf,
   bodyOf,
@@ -7,25 +7,25 @@ import {
   reply,
   succeed,
   unauthorized,
-} from "@/services/auth/mock-auth-responses";
+} from "@/services/auth/data/mock-auth-responses";
 import {
   ACCESS_PREFIX,
   issueTokens,
   REFRESH_PREFIX,
   userFromToken,
-} from "@/services/auth/mock-auth-session";
-import { answerMockUsers, mockDemoUser } from "@/services/users/mock-users";
-import type { MockAuthConfig } from "@/services/auth/mock-auth-config";
+} from "@/services/auth/data/mock-auth-session";
+import { answerMockUsers, mockDemoUser } from "@/services/users/data/mock-users";
+import type { MockAuthConfig } from "@/services/auth/data/mock-auth-config";
 import type { AuthUser } from "@/services/auth/types/auth";
-import type { MockCaller } from "@/services/users/mock-users";
+import type { MockCaller } from "@/services/users/data/mock-users";
 import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import axios from "axios";
 
 /**
  * Dev-only mock of the backend auth routes (login, register, refresh, logout,
- * me) and the users routes (`services/users/mock-users.ts`), so the UI can be
- * built before the backend auth exists. Turn it on with
- * `VITE_AUTH_MOCK=true`; turn it off and the real backend is used with no other
+ * me) and the users routes (`services/users/data/mock-users.ts`), so the UI can be
+ * built before the backend exists. Turn it on with
+ * `EXPO_PUBLIC_AUTH_MOCK=true`; turn it off and the real backend is used with no other
  * change — screens, stores and guards never know the difference.
  *
  * It sits at the axios transport seam: `AuthModel`'s client and the bare refresh
@@ -35,10 +35,10 @@ import axios from "axios";
  * network call is replaced; every other API still hits the real backend.
  *
  * Session persistence is the real mode's: the mock hands out opaque tokens that
- * the client stores in the same localStorage slots, so a reload, cross-tab sync
- * and logout behave as with the backend. Tokens carry the user, so `/auth/me`
+ * the client stores in the same SecureStore slots, so an app restart and logout
+ * behave as with the backend. Tokens carry the user, so `/auth/me`
  * and `/auth/refresh` answer statelessly. Login accepts one credential pair
- * (`VITE_AUTH_MOCK_EMAIL` / `VITE_AUTH_MOCK_PASSWORD`, default
+ * (`EXPO_PUBLIC_AUTH_MOCK_EMAIL` / `EXPO_PUBLIC_AUTH_MOCK_PASSWORD`, default
  * demo@example.com / password); register signs up any user, who then stays
  * signed in but cannot log in again.
  *
@@ -46,15 +46,15 @@ import axios from "axios";
  * `mock-auth-responses.ts` (backend-shaped replies), and this file (the adapter).
  *
  * Never active in a production build: the flag is ignored there (with one
- * warning) and the adapter is not exported, so the bundler drops this code.
+ * warning) and the adapter is undefined (`__DEV__` folds to false).
  */
 export {
   getMockAuth,
   isMockAuthEnabled,
   MOCK_AUTH_DEFAULT_EMAIL,
   MOCK_AUTH_DEFAULT_PASSWORD,
-} from "@/services/auth/mock-auth-config";
-export type { MockAuthConfig } from "@/services/auth/mock-auth-config";
+} from "@/services/auth/data/mock-auth-config";
+export type { MockAuthConfig } from "@/services/auth/data/mock-auth-config";
 
 /** Who sent the request: the user in its access token, or the backend's 401 message for a missing/invalid one. */
 function callerOf(config: InternalAxiosRequestConfig): MockCaller {
@@ -145,10 +145,8 @@ const handleAuthRequest: AxiosAdapter = (config) => {
 
 /**
  * axios adapter for the auth client and the refresh call. Undefined in a
- * production build (axios then uses its network adapter, and the mock is
- * tree-shaken). While the flag is off in development it delegates every request
- * to axios's real adapter, so flipping `VITE_AUTH_MOCK` needs no code change.
+ * production build (axios then uses its network adapter, and the mock handler is
+ * dead code). While the flag is off in development it delegates every request
+ * to axios's real adapter, so flipping `EXPO_PUBLIC_AUTH_MOCK` needs no code change.
  */
-export const mockAuthAdapter: AxiosAdapter | undefined = import.meta.env.PROD
-  ? undefined
-  : handleAuthRequest;
+export const mockAuthAdapter: AxiosAdapter | undefined = __DEV__ ? handleAuthRequest : undefined;

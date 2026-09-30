@@ -263,10 +263,10 @@ VITE_AUTH_MOCK=true
 # VITE_AUTH_MOCK_PASSWORD=s3cret-pass
 ```
 
-Truthy is `"true"` or `"1"`. Implementation: `services/auth/mock-auth.ts`
+Truthy is `"true"` or `"1"`. Implementation: `services/auth/data/mock-auth.ts`
 (adapter), with `mock-auth-config.ts` (flag), `mock-auth-session.ts` (mock user
 cookie) and `mock-auth-responses.ts` (backend-shaped replies) in the browser,
-`services/users/mock-users.ts` (the users fixture and handlers), and
+`services/users/data/mock-users.ts` (the users fixture and handlers), and
 `server/mock-session.ts` (SSR).
 
 - **Seam.** `mockAuthAdapter` replaces only axios's network adapter, on

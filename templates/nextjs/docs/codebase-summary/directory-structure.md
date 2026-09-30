@@ -55,8 +55,8 @@ templates/nextjs/
     │   └── mock-server-read.ts   # dev-only mock answers for server reads
     ├── services/
     │   ├── core/             # Api, interceptors, HMAC, tanstack, pagination types (see services-and-stores.md)
-    │   ├── auth/             # contract, auth (models + hooks), session (useAuth), mock auth
-    │   ├── users/            # contract, users, mock-users
+    │   ├── auth/             # contract, auth (models + hooks), session (useAuth), schema/, data/ (mock auth)
+    │   ├── users/            # contract, users, data/mock-users
     │   ├── query-keys.ts     # Aggregated React Query keys
     │   ├── index.ts
     │   └── init-services.ts

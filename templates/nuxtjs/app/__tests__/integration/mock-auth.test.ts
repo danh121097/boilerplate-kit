@@ -35,7 +35,7 @@ async function boot(jar: Map<string, string>) {
   const plugin = (await import("@/plugins/01.init-services")).default as unknown as () => void;
   const core = await import("@/services/core");
   const auth = await import("@/services/auth");
-  const mock = await import("@/services/auth/mock-auth");
+  const mock = await import("@/services/auth/data/mock-auth");
   plugin();
   return { ...core, ...auth, ...mock, fetchSpy };
 }

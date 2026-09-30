@@ -1,5 +1,5 @@
 import { authContract } from "@/services/auth/contract";
-import { getMockAuth } from "@/services/auth/mock-auth";
+import { getMockAuth } from "@/services/auth/data/mock-auth";
 import {
   Api,
   ApiInterceptors,
