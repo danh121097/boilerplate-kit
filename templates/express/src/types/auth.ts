@@ -10,6 +10,13 @@ export const ROLES = {
 /** User role — derived from ROLES values */
 export type Role = (typeof ROLES)[keyof typeof ROLES];
 
+/** Numeric rank per role (higher = more privileged) — single source for role checks */
+export const ROLE_RANK: Record<Role, number> = {
+  [ROLES.USER]: 1,
+  [ROLES.ADMIN]: 2,
+  [ROLES.SUPER_ADMIN]: 3,
+};
+
 /** User document interface */
 export interface UserDocument extends Document {
   _id: Types.ObjectId;

@@ -1,17 +1,6 @@
 import { AppError } from "@/types";
-import { ROLES, Role } from "@/types/auth";
+import { ROLE_RANK, Role } from "@/types/auth";
 import { NextFunction, Request, Response } from "express";
-
-/**
- * Role hierarchy (higher number = more authority): super_admin > admin > user.
- * A role implicitly satisfies any requirement at or below its rank, so a
- * higher role never needs to be listed explicitly on a route.
- */
-const ROLE_RANK: Record<Role, number> = {
-  [ROLES.USER]: 1,
-  [ROLES.ADMIN]: 2,
-  [ROLES.SUPER_ADMIN]: 3,
-};
 
 /**
  * Require AT LEAST the given role — that role or any higher-ranked one passes.

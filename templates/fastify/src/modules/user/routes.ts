@@ -1,5 +1,6 @@
 import { publicUserSchema } from "@/modules/auth/validation";
-import { authenticate, requireMinRole } from "@/plugins/security";
+import { authenticate } from "@/plugins/auth";
+import { requireMinRole } from "@/plugins/role";
 import { z } from "zod";
 import type { FastifyPluginAsync } from "fastify";
 import * as UserController from "@/modules/user/controller";

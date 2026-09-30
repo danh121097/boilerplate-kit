@@ -8,7 +8,7 @@ import {
   registerResponseSchema,
   registerSchema,
 } from "@/modules/auth/validation";
-import { authenticate } from "@/plugins/security";
+import { authenticate } from "@/plugins/auth";
 import type { FastifyPluginAsync } from "fastify";
 import * as AuthController from "@/modules/auth/controller";
 

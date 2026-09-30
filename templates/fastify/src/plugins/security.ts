@@ -1,20 +1,10 @@
 import { config } from "@/config/environment";
 import { AppError } from "@/types";
 import { verifyHmac } from "@/utils/hmac";
-import { verifyAccessToken } from "@/utils/jwt";
-import { getUserRevokedAt, isAccessTokenRevoked } from "@/utils/token-revocation";
-import type { JwtPayload, Role } from "@/types/auth";
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
-declare module "fastify" {
-  interface FastifyRequest {
-    user: JwtPayload | null;
-  }
-}
-
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
-const ROLE_RANK: Record<Role, number> = { user: 1, admin: 2, super_admin: 3 };
 
 function requestOrigin(request: FastifyRequest): string | undefined {
   const origin = request.headers.origin;
@@ -78,59 +68,4 @@ export function installSecurityHooks(
       });
     }
   });
-}
-
-/** Authenticate from a bearer token or the accessToken cookie. */
-export async function authenticate(request: FastifyRequest, _reply: FastifyReply): Promise<void> {
-  const authorization = request.headers.authorization;
-  const token = authorization?.startsWith("Bearer ")
-    ? authorization.slice("Bearer ".length)
-    : request.cookies?.accessToken;
-  if (!token) {
-    throw new AppError({
-      message: "Access token required!",
-      statusCode: 401,
-      errorType: "AUTHENTICATION_ERROR",
-    });
-  }
-
-  let payload: JwtPayload & { iat?: number; iat_ms?: number };
-  try {
-    payload = verifyAccessToken(token) as JwtPayload & { iat?: number; iat_ms?: number };
-  } catch {
-    throw new AppError({
-      message: "Invalid or expired access token!",
-      statusCode: 401,
-      errorType: "AUTHENTICATION_ERROR",
-    });
-  }
-
-  if (isAccessTokenRevoked(payload, await getUserRevokedAt(payload.userId))) {
-    throw new AppError({
-      message: "Token revoked! Please log in again!",
-      statusCode: 401,
-      errorType: "AUTHENTICATION_ERROR",
-    });
-  }
-  request.user = payload;
-}
-
-/** Enforce a minimum role rank after authenticate has populated request.user. */
-export function requireMinRole(minRole: Role) {
-  return async (request: FastifyRequest, _reply: FastifyReply): Promise<void> => {
-    if (!request.user) {
-      throw new AppError({
-        message: "Authentication required!",
-        statusCode: 401,
-        errorType: "AUTHENTICATION_ERROR",
-      });
-    }
-    if (ROLE_RANK[request.user.role] < ROLE_RANK[minRole]) {
-      throw new AppError({
-        message: "Insufficient permissions!",
-        statusCode: 403,
-        errorType: "AUTHORIZATION_ERROR",
-      });
-    }
-  };
 }
