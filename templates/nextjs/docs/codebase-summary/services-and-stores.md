@@ -9,7 +9,8 @@
 | `server-api.ts`   | `serverApiGet` / `serverApiPaginate` / `serverApiCursorPaginate` — fetch with the access cookie + HMAC; reject with an `ApiResponseError` (401 when the access cookie is missing or rejected; no server refresh). `hasServerSessionHint()` |
 | `session.ts`      | `readServerSession()` — current user, or null when anonymous (no session hint) |
 | `get-users.ts`    | `getUsersServerData()` — users list server-side, returns `PaginatedResponse<User>` |
-| `hydrated-queries.tsx` | `<HydratedQueries prefetch=…>` — prefetch, dehydrate, `HydrationBoundary` |
+| `hydrated-queries.tsx` | `<HydratedQueries prefetch=…>` — prefetch, dehydrate, `HydrationBoundary`; `serverQuery(def, serverFetcher)` pairs a definition with its server fetcher |
+| `queries/`        | One paired server query per resource (`usersListServer`) — what pages prefetch |
 
 ## Service Layer (`src/services/`)
 
@@ -31,7 +32,9 @@ never touches `localStorage` or reads tokens directly.
 | `refresh-token-manager.ts` | Single-flight + cross-tab (Web Lock) refresh, `withSessionLock`    |
 | `session.ts`               | Per-service epoch + logout-pending, session hint, `onSessionEnded` / `endSession(reason, service)`, `syncAuthAcrossTabs`, `redirectOnSessionExpired`, `safeRedirect` |
 | `query-client.ts`          | `makeQueryClient`, `resetQueriesOnSessionEnd(client, key, service)`, `resyncQueriesAfterLogin` |
-| `tanstack.ts`              | `defineQuery` (hook + `key`, `queryKey`, `queryOptions`) + `defineMutation` factory helpers |
+| `tanstack.ts`              | `defineQuery` (hook + `key`, `queryKey`, `queryOptions`) |
+| `tanstack-mutation.ts`     | `defineMutation` (`invalidates`, opt-in `optimistic`, `.mutationOptions()`) |
+| `tanstack-optimistic.ts`   | Optimistic snapshot / rollback helpers used by `defineMutation` |
 | `types.ts`                 | Shared types + axios module augmentation; pagination: `OffsetMeta`, `CursorMeta`, `PaginatedResponse<T>`, `CursorResponse<T>`, `PaginationParams`, `CursorParams` |
 
 ### auth/

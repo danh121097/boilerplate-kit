@@ -15,7 +15,10 @@ full page reload.
 ## Server State — TanStack React Query
 
 React Query manages all async data. Service layer queries are defined with
-`defineQuery` and mutations with `defineMutation` from `src/services/core/tanstack.ts`.
+`defineQuery` (`src/services/core/tanstack.ts`) and mutations with `defineMutation`
+(`tanstack-mutation.ts`; opt-in optimistic updates via `optimistic`, helpers in `tanstack-optimistic.ts`).
+Hook overrides (`onSuccess`/`onError`/`onSettled`/`onMutate`) run after, and never replace, the
+callbacks in the definition's `options`.
 
 ```ts
 // Define once (client axios query, returns the PaginatedResponse envelope):
@@ -43,7 +46,7 @@ export default function UsersPage() {
   return (
     // HydratedQueries prefetches on the server (per-request QueryClient) and
     // wraps children in <HydrationBoundary>.
-    <HydratedQueries prefetch={[{ queryKey: [queryKeys.users.list], queryFn: getUsersServerData }]}>
+    <HydratedQueries prefetch={[usersListServer()]}>
       <UsersListClient /> {/* "use client": reads useUsersListQuery */}
     </HydratedQueries>
   );
@@ -51,7 +54,21 @@ export default function UsersPage() {
 ```
 
 The prefetch (server, `next/headers`) and the client query (axios) are SEPARATE
-fetchers on ONE key — they agree because both return `PaginatedResponse<User>`.
+fetchers on ONE key. Each resource pairs them once in `src/server/queries/`:
+
+```ts
+// src/server/queries/users.ts
+export const usersListServer = serverQuery(useUsersListQuery, getUsersServerData);
+```
+
+`serverQuery(definition, serverFetcher)` takes the key from the definition and types the server
+fetcher to the same `TData`, so key or shape drift fails typecheck instead of silently refetching on
+mount. Pages only pick what to prefetch (`usersListServer(params?)`). For a query with params, pass
+the same params down to the client component as props, so its hook builds the same key.
+
+Query definition modules are imported by Server Components, so they must not touch browser APIs at
+import time; `server-query.test.ts` imports them in the node environment to catch that. Mutations
+stay client-only: `invalidates` refetches through axios, no `router.refresh()` needed.
 This is the only way to share a query across the RSC/client boundary in Next:
 `next/headers` is server-only, so it can't live inside the client query fetcher.
 
@@ -64,8 +81,9 @@ Read pages use this prefetch+hydrate pattern. An RSC that fully renders its data
 could pass it as props instead (then `router.refresh()` after a mutation); reach
 for hydrate when the client query needs to own refetch/invalidation.
 
-`defineQuery` also exposes `queryOptions(params?)` (`{ queryKey, queryFn }`) for code
-that needs the plain query object; here the server prefetch keeps its own fetcher
+`defineQuery` also exposes `queryOptions(params?)` (full TanStack `queryOptions`, keeping the
+definition's `staleTime`/`select`; the fetcher receives `(params, { signal })`) for client code
+that needs the query object; here the server prefetch keeps its own fetcher
 (`next/headers`) on the same key.
 
 ## i18n State — react-i18next

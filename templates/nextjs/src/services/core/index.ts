@@ -11,4 +11,5 @@ export * from "@/services/core/query-client";
 export * from "@/services/core/refresh-token-manager";
 export * from "@/services/core/session";
 export * from "@/services/core/tanstack";
+export * from "@/services/core/tanstack-mutation";
 export * from "@/services/core/types";

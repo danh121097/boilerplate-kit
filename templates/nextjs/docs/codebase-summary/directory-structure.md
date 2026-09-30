@@ -50,6 +50,7 @@ templates/nextjs/
     │   ├── server-api.ts     # serverApiGet / serverApiPaginate / serverApiCursorPaginate
     │   ├── session.ts        # readServerSession()
     │   ├── get-users.ts      # getUsersServerData()
+    │   ├── queries/          # serverQuery pairs per resource
     │   ├── hydrated-queries.tsx  # prefetch + HydrationBoundary
     │   ├── query-client.ts   # per-request QueryClient
     │   └── mock-server-read.ts   # dev-only mock answers for server reads

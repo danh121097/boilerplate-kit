@@ -30,6 +30,7 @@ src/
 │   ├── server-api.ts     # serverApiGet / serverApiPaginate — SSR fetch with auth cookies + HMAC
 │   ├── session.ts        # readServerSession() — current user server-side
 │   ├── get-users.ts      # getUsersServerData() — users list (PaginatedResponse<User>)
+│   ├── queries/          # serverQuery pairs (usersListServer) — what pages prefetch
 │   ├── hydrated-queries.tsx # prefetch + HydrationBoundary wrapper
 │   └── query-client.ts   # per-request QueryClient
 ├── services/             # Axios service layer (client-side only)

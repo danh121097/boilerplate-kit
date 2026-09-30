@@ -1,14 +1,13 @@
 import { UsersListClient } from "@/app/users/users-list-client";
-import { getUsersServerData } from "@/server/get-users";
 import { HydratedQueries } from "@/server/hydrated-queries";
-import { queryKeys } from "@/services/query-keys";
+import { usersListServer } from "@/server/queries";
 
 // Force dynamic rendering — this route reads auth cookies on every request.
 export const dynamic = "force-dynamic";
 
 export default function UsersPage() {
   return (
-    <HydratedQueries prefetch={[{ queryKey: [queryKeys.users.list], queryFn: getUsersServerData }]}>
+    <HydratedQueries prefetch={[usersListServer()]}>
       <UsersListClient />
     </HydratedQueries>
   );
