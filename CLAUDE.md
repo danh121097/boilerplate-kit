@@ -1,93 +1,82 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code (claude.ai/code) working in this repository.
 
-## Role & Responsibilities
+## Project Overview
 
-Your role is to analyze user requirements, delegate tasks to appropriate sub-agents, and ensure cohesive delivery of features that meet specifications and architectural standards.
+`create-prism-app` — a Node CLI (>= 20, ESM, pnpm) that scaffolds full-stack starters.
+The repo holds two things:
 
-## Workflows
+- **The CLI** (`src/`) — wizard, option resolving, template fetch, post-processing.
+- **The starters** (`templates/<name>/`) — `vuejs`, `nuxtjs`, `reactjs`, `nextjs`,
+  `tanstack-start`, `react-native`, `express`, `fastify`, `nestjs`. Each is a standalone
+  project with its own `package.json`, lockfile, `AGENTS.md`, `CLAUDE.md` and `docs/`.
 
-- Primary workflow: `./.claude/rules/primary-workflow.md`
-- Development rules: `./.claude/rules/development-rules.md`
-- Orchestration protocols: `./.claude/rules/orchestration-protocol.md`
-- Documentation management: `./.claude/rules/documentation-management.md`
-- And other workflows: `./.claude/rules/*`
+**IMPORTANT:** Read `./README.md` before planning or implementing anything. When working
+inside `templates/<name>/`, read that template's `CLAUDE.md` / `AGENTS.md` / `docs/README.md`
+first — they override this file for that template.
 
-**IMPORTANT:** Analyze the skills catalog and activate the skills that are needed for the task during the process.
-**IMPORTANT:** DO NOT modify skills in `~/.claude/skills` directory directly. **MUST** modify skills in this current working directory. Unless you are asked to do so.
-**IMPORTANT:** You must follow strictly the development rules in `./.claude/rules/development-rules.md` file.
-**IMPORTANT:** Before you plan or proceed any implementation, always read the `./README.md` file first to get context.
-**IMPORTANT:** Sacrifice grammar for the sake of concision when writing reports.
-**IMPORTANT:** In reports, list any unresolved questions at the end, if any.
+## Commands (root CLI)
+
+```bash
+pnpm install
+pnpm dev            # tsup --watch
+pnpm build          # tsup → dist/cli.mjs
+pnpm typecheck      # tsc --noEmit
+pnpm lint           # eslint .  (lint:fix to autofix)
+pnpm format:check   # prettier --check .  (format to write)
+pnpm test           # vitest run  (test:watch for watch mode)
+node dist/cli.mjs --version
+```
+
+CI (`.github/workflows/ci.yml`) runs typecheck → lint → build → test on
+ubuntu/macos/windows × Node 20/22. Run the same before handing work back.
+
+## CLI Architecture (`src/`)
+
+- `cli.ts` / `main.ts` — citty entry and orchestration; `options-resolver.ts` merges flags with prompts.
+- `wizard/` — one `prompt-*.ts` per interactive question (@clack/prompts).
+- `fetcher/` — `template-registry.ts`, `download-template.ts` (giget, or local copy when linked), `validate-ref.ts`, `verify-extraction.ts`.
+- `postprocess/` — `rewrite-package-json`, `git-init`, `install-dependencies`, `upgrade-dependencies`, `success-banner`.
+- `validators/`, `runtime/` (`run-scaffold`, `tty`), `errors.ts`, `types.ts`.
+- Tests live in `src/__tests__/`.
+
+Local development: a linked/`realpath`-resolved `dist/cli.mjs` copies the sibling `templates/`
+instead of hitting GitHub; `BOILERPLATE_KIT_LOCAL` forces a root. Details in the README.
+
+## Adding or Changing a Template
+
+1. Add `templates/<name>/` (must include `package.json` + `README.md`, plus `AGENTS.md`, `CLAUDE.md`, `docs/`).
+2. Register the key in `src/types.ts` (`TEMPLATES`) and label it in `src/wizard/prompt-template.ts`.
+3. Update `src/__tests__/template-registry.test.ts`, and the stack table / `--template` list in `README.md`.
+4. **Shared files** (TanStack Query layer, test setups, etc.) are copied between templates and
+   guarded by `src/__tests__/template-shared-files.test.ts`. Edit the canonical copy (first root
+   listed in the test), copy it to the others, then run `pnpm test`.
+5. Keep each template's docs in sync with its code (docs are agent-facing and verified against source).
+
+## Development Rules
+
+- **YAGNI / KISS / DRY.** Match surrounding code: naming, comment density, idioms.
+- Files over ~200 LOC: consider splitting along real boundaries. Check existing modules first.
+  Use descriptive kebab-case filenames (not for Markdown, config, env, shell scripts).
+- Handle errors and edge cases; keep public CLI flags and template contracts stable unless intentional.
+- ESLint uses `eslint-plugin-perfectionist` (sorted imports/keys/etc.) and Prettier — run `pnpm lint:fix` / `pnpm format`.
+- No secrets, `.env` files, or keys in commits. Templates must not ship lockfiles' local junk (`node_modules`, `dist`, `tsconfig.tsbuildinfo`).
+- Never modify skills in `~/.claude/skills` directly unless asked.
 
 ## Git
 
-**DO NOT** use `chore` and `docs` in commit messages of file changes in `.claude` directory.
+- Conventional Commits with emoji: `<type>(<scope>): <icon> <description>`, header ≤ 72 chars, imperative.
+  Types: `✨feat`, `🐛fix`, `📚docs`, `💎style`, `📦refactor`, `🚀perf`, `🚨test`, `🛠build`, `⚙️ci`, `♻️chore`, `⏪revert`.
+  Scopes seen here: `templates`, `config`, `backend`, `docs`, plus per-stack names.
+- No AI references in commit messages. Do not commit or push unless asked.
+- Default branch is `master` (templates are fetched from `#master`).
 
-## Hook Response Protocol
+## Plans & Docs
 
-### Privacy Block Hook (`@@PRIVACY_PROMPT@@`)
-
-When a tool call is blocked by the privacy-block hook, the output contains a JSON marker between `@@PRIVACY_PROMPT_START@@` and `@@PRIVACY_PROMPT_END@@`. **You MUST use the `AskUserQuestion` tool** to get proper user approval.
-
-**Required Flow:**
-
-1. Parse the JSON from the hook output
-2. Use `AskUserQuestion` with the question data from the JSON
-3. Based on user's selection:
-   - **"Yes, approve access"** → Use `bash cat "filepath"` to read the file (bash is auto-approved)
-   - **"No, skip this file"** → Continue without accessing the file
-
-**Example AskUserQuestion call:**
-```json
-{
-  "questions": [{
-    "question": "I need to read \".env\" which may contain sensitive data. Do you approve?",
-    "header": "File Access",
-    "options": [
-      { "label": "Yes, approve access", "description": "Allow reading .env this time" },
-      { "label": "No, skip this file", "description": "Continue without accessing this file" }
-    ],
-    "multiSelect": false
-  }]
-}
-```
-
-**IMPORTANT:** Always ask the user via `AskUserQuestion` first. Never try to work around the privacy block without explicit user approval.
-
-## Python Scripts (Skills)
-
-When running Python scripts from `.claude/skills/`, use the venv Python interpreter:
-- **Linux/macOS:** `.claude/skills/.venv/bin/python3 scripts/xxx.py`
-- **Windows:** `.claude\skills\.venv\Scripts\python.exe scripts\xxx.py`
-
-This ensures packages installed by `install.sh` (google-genai, pypdf, etc.) are available.
-
-**IMPORTANT:** When scripts of skills failed, don't stop, try to fix them directly.
-
-## [IMPORTANT] Consider Modularization
-- If a code file exceeds 200 lines of code, consider modularizing it
-- Check existing modules before creating new
-- Analyze logical separation boundaries (functions, classes, concerns)
-- Use kebab-case naming with long descriptive names, it's fine if the file name is long because this ensures file names are self-documenting for LLM tools (Grep, Glob, Search)
-- Write descriptive code comments
-- After modularization, continue with main task
-- When not to modularize: Markdown files, plain text files, bash scripts, configuration files, environment variables files, etc.
-
-## Documentation Management
-
-We keep all important docs in `./docs` folder and keep updating them, structure like below:
-
-```
-./docs
-├── project-overview-pdr.md
-├── code-standards.md
-├── codebase-summary.md
-├── design-guidelines.md
-├── deployment-guide.md
-├── system-architecture.md
-└── project-roadmap.md
-```
-
-**IMPORTANT:** *MUST READ* and *MUST COMPLY* all *INSTRUCTIONS* in project `./CLAUDE.md`, especially *WORKFLOWS* section is *CRITICALLY IMPORTANT*, this rule is *MANDATORY. NON-NEGOTIABLE. NO EXCEPTIONS. MUST REMEMBER AT ALL TIMES!!!*
+- Plans live in `plans/<YYMMDD-HHMM>-<slug>/` (`plan.md` + `phase-NN-*.md`); reports in `plans/reports/`;
+  reusable skeletons in `plans/templates/` (see `template-usage-guide.md`).
+- Documentation lives **per template** in `templates/<name>/docs/` (thin top-level `.md` index →
+  matching `docs/<topic>/` folder). There is no root `./docs`. Update a template's docs only when its
+  behavior, setup, commands, config, or architecture change; read before editing, verify against source after.
+- Reports: sacrifice grammar for concision; list unresolved questions at the end.
