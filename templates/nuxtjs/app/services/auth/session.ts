@@ -8,32 +8,34 @@ import { queryKeys } from "@/services/query-keys";
 import type { AuthUser } from "@/services/auth/types/auth";
 
 /**
- * Resolve the signed-in user (null when anonymous).
+ * Browser read of the signed-in user (null when anonymous) — `useMeQuery`'s
+ * `fetcher`; SSR uses `readServerSession` (its `serverFetcher`).
  *
- * - SSR: without the session hint it is an anonymous visitor → null, no request.
- *   Otherwise a direct signed fetch with the forwarded cookie. It cannot refresh.
- *   Any failure — including a 401 while the hint says a session exists (an access
- *   cookie that merely expired) — rejects. Read it with `useServerRenderedQuery`
- *   (the layout does): a 401 renders signed-out and the browser resolves it after
- *   hydration instead of the page showing a stale "logged out"; any other failure
- *   is rendered and hydrated as that error (the layout's retry banner).
- * - Browser: through the axios Model, which refreshes-and-retries on 401. A 401
- *   that survives the refresh resolves null; while the hint is set it is a
- *   session the server rejected, so it is first revoked
- *   (`AuthModel.revokeSession` — ends it as "expired", unless it already
- *   ended). Without the hint it is an anonymous visitor. Any other error
- *   (network, 5xx) surfaces to the query rather than looking like a logout.
+ * Goes through the axios Model, which refreshes-and-retries on 401. A 401 that
+ * survives the refresh resolves null; while the hint is set it is a session the
+ * server rejected, so it is first revoked (`AuthModel.revokeSession` — ends it
+ * as "expired", unless it already ended). Without the hint it is an anonymous
+ * visitor. Any other error (network, 5xx) surfaces to the query rather than
+ * looking like a logout.
  */
 export function fetchSessionUser(): Promise<AuthUser | null> {
-  if (import.meta.server) return readServerSession();
   // No session hint: an anonymous visitor. Signed out without a network call, so
   // an unreachable backend never shows the session-unavailable banner to them.
   if (typeof document !== "undefined" && !hasSessionHint()) return Promise.resolve(null);
   return AuthModel.getSession();
 }
 
-/** The SSR branch of `fetchSessionUser`. It never refreshes. Call it inside
- * the request's Nuxt context: the hint is read before the first await. */
+/**
+ * SSR read of the signed-in user — `useMeQuery`'s `serverFetcher`. It never
+ * refreshes. Without the session hint it is an anonymous visitor → null, no
+ * request. Otherwise a direct signed fetch with the forwarded cookie; any
+ * failure — including a 401 while the hint says a session exists (an access
+ * cookie that merely expired) — rejects. Read it with `useServerRenderedQuery`
+ * (the layout does): a 401 renders signed-out and the browser resolves it after
+ * hydration; any other failure is rendered and hydrated as that error (the
+ * layout's retry banner). Call it inside the request's Nuxt context: the hint is
+ * read before the first await.
+ */
 export async function readServerSession(): Promise<AuthUser | null> {
   const hinted = hasSessionHint();
   // Dev-only mock auth: the user comes from the mock cookie, not the backend.
@@ -55,6 +57,7 @@ export async function readServerSession(): Promise<AuthUser | null> {
 export const useMeQuery = defineQuery<AuthUser | null>({
   key: queryKeys.auth.me,
   fetcher: fetchSessionUser,
+  serverFetcher: readServerSession,
 });
 
 export function useAuth() {

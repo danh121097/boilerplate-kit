@@ -55,6 +55,9 @@ from deep internal paths.
 app/services/
 ├── core/
 │   ├── tanstack.ts
+│   ├── tanstack-mutation.ts
+│   ├── tanstack-optimistic.ts
+│   ├── tanstack-ssr.ts
 │   ├── auth-token-storage.ts
 │   └── index.ts        # re-exports defineQuery, defineMutation, Model, ...
 ├── auth/
@@ -69,7 +72,7 @@ app/services/
 import { defineMutation, defineQuery, Model } from "@/services/core";
 
 // Avoid — deep path, bypasses the barrel
-import { defineMutation } from "@/services/core/tanstack";
+import { defineMutation } from "@/services/core/tanstack-mutation";
 ```
 
 The `@/` alias maps to `app/`. Barrels exist for `services/`, `services/core`,

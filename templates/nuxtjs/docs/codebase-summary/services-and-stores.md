@@ -98,12 +98,16 @@ is no Authorization header: auth rides on the httpOnly cookies
   (`signRequest`, empty Content-Type for the bodyless call). The backend rotates
   the cookies, so the refresher resolves with no value.
 
-### TanStack helpers (`tanstack.ts`)
+### TanStack helpers (`tanstack*.ts`)
 
-`defineQuery({ key, fetcher, ... })` and `defineMutation({ key, mutator,
-invalidates, ... })` produce typed, reusable query/mutation definitions with
-reactive keys and automatic `invalidateQueries` on mutation success. Errors are
-typed as `ApiResponseError`.
+`defineQuery({ key, fetcher, serverFetcher?, ... })` (`tanstack.ts`) and
+`defineMutation({ key, mutator, invalidates, optimistic?, ... })`
+(`tanstack-mutation.ts`, helpers in `tanstack-optimistic.ts`) produce typed,
+reusable query/mutation definitions with reactive keys and automatic
+`invalidateQueries` on mutation success. `serverFetcher` is the SSR read, used
+instead of `fetcher` when `isServerRender` (`render-env.ts`) is true. `tanstack-ssr.ts` holds
+`useServerRenderedQuery` and `shouldDehydrateQuery`. Errors are typed as
+`ApiResponseError`.
 
 ### Types (`types.ts`)
 
@@ -129,8 +133,9 @@ client-side token persistence. The response interceptor already unwraps the
 envelope, so each method reads `res.data` once. Exposes `useLoginMutation`,
 `useRegisterMutation`, `useLogoutMutation`. The canonical session read is
 `useMeQuery` (`defineQuery<AuthUser | null>` in `services/auth/session.ts`): its
-fetcher runs `readServerSession()` on SSR (`serverApiGet` with the forwarded
-cookie; never refreshes) and `AuthModel.getSession()` in the browser. Types in
+`serverFetcher` is `readServerSession()` (`serverApiGet` with the forwarded
+cookie; never refreshes) and its `fetcher` is `fetchSessionUser()` →
+`AuthModel.getSession()` in the browser. Types in
 `types/auth.ts` (`AuthUser`, `AuthTokens`, `LoginPayload`, `RegisterPayload`,
 `AuthResult`) — note `refreshToken` is optional client-side (it lives in the cookie).
 

@@ -90,9 +90,20 @@ export const useUsersListQuery = defineQuery<PaginatedResponse<User>>({
 - `defineQuery` returns a callable that also exposes `.key` and
   `.queryKey(params)`. The key is reactive: `[key]` or `[key, params]`,
   recomputed from a `computed` over `toValue(params)` (a `MaybeRefOrGetter`).
-- `defineMutation` takes a `mutator` and optional `invalidates: string[]`; on
-  success it invalidates each listed key via the shared `queryClient`, then runs
-  any definition-level `options.onSuccess` and per-call `overrides.onSuccess`.
+- `serverFetcher` (optional) — the SSR read, used instead of `fetcher` when
+  `isServerRender` (`render-env.ts`, `import.meta.server`) is true; it must resolve to the same `TData`. Keep `fetcher` for the browser (axios
+  Model, refreshes on 401). A page resolves the query during SSR with `useServerRenderedQuery`
+  (`tanstack-ssr.ts`). Actions (mutations) stay client-only.
+- `.queryOptions(params?)` — plain options (key, fetcher, `staleTime`, `select`, …) for
+  `ensureQueryData` / prefetch. The fetcher receives `(params, { signal })`; pass `signal` to the
+  request to cancel it.
+- `defineMutation` (`tanstack-mutation.ts`) takes a `mutator` and optional
+  `invalidates: (string | QueryKey)[]` (a string is a key prefix, an array one exact key), awaited
+  on success before the callbacks. Hook overrides (`onMutate/onSuccess/onError/onSettled`) run after,
+  and never replace, the definition's `options` callbacks. `.mutationOptions()` exposes the options.
+- `defineMutation({ optimistic: { queryKey, update } })` — opt-in optimistic cache edit, rolled back
+  on error; invalidation moves to settle and waits for sibling mutations on the same keys (helpers
+  in `tanstack-optimistic.ts`).
 
 `computed` / `toValue` are Nuxt auto-imports — used without explicit import. See
 [State Management](./state-management.md) for keys + invalidation.

@@ -49,7 +49,8 @@ export function fetchUsersOnServer(): Promise<PaginatedResponse<User>> {
  * so an expired access cookie is refreshed. Errors reach the query either way. */
 export const useUsersListQuery = defineQuery<PaginatedResponse<User>>({
   key: queryKeys.users.list,
-  fetcher: () => (import.meta.server ? fetchUsersOnServer() : UsersModel.list()),
+  fetcher: () => UsersModel.list(),
+  serverFetcher: () => fetchUsersOnServer(),
 });
 
 // Mutations

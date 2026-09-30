@@ -1,16 +1,8 @@
-import { isUnauthorizedError } from "@/services/core/api-errors";
-import {
-  defaultShouldDehydrateQuery,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/vue-query";
+import { isServerRender } from "@/services/core/render-env";
+import { useQuery } from "@tanstack/vue-query";
 import type { ApiResponseError } from "@/services/core/types";
 import type {
-  MutationOptions,
-  Query,
-  UseMutationOptions,
-  UseMutationReturnType,
+  QueryObserverOptions,
   UseQueryOptions,
   UseQueryReturnType,
 } from "@tanstack/vue-query";
@@ -30,158 +22,88 @@ type QueryDefOpts<TData, TParams = void> = Omit<
   "queryKey" | "queryFn"
 >;
 
-interface UseQueryConfig<TData, TParams = void> extends QueryDefOpts<TData, TParams> {
+export interface UseQueryConfig<TData, TParams = void> extends QueryDefOpts<TData, TParams> {
   params?: MaybeRefOrGetter<TParams>;
 }
 
+/** Per-call context handed to a query fetcher (TanStack's abort signal). */
+export interface QueryFetcherContext {
+  signal: AbortSignal;
+}
+
+type QueryFetcher<TData, TParams> = (
+  params: TParams,
+  context: QueryFetcherContext,
+) => Promise<TData>;
+
 interface DefineQueryConfig<TData, TParams = void> extends QueryDefOpts<TData, TParams> {
   key: string;
-  fetcher: (params: TParams) => Promise<TData>;
+  /** Browser read (axios Model: refreshes-and-retries on 401). */
+  fetcher: QueryFetcher<TData, TParams>;
+  /**
+   * SSR read (`serverApiGet` & co. with the forwarded cookie; never refreshes). Used instead of `fetcher`
+   * while `isServerRender` (Nuxt only; the SPA never uses it); omitted, `fetcher` runs on both sides.
+   * Must resolve to the same `TData`, so the dehydrated cache matches what the browser would fetch.
+   */
+  serverFetcher?: QueryFetcher<TData, TParams>;
 }
+
+/** Plain (unref'd) query options: key, fetcher and the definition's own options (`staleTime`, …). */
+export type DefinedQueryOptions<TData, TParams = void> = QueryObserverOptions<
+  TData,
+  ApiResponseError,
+  TData,
+  TData,
+  QueryDefinitionKey<TParams>
+>;
 
 export interface QueryDefinition<TData, TParams = void> {
   (config?: UseQueryConfig<TData, TParams>): UseQueryReturnType<TData, ApiResponseError>;
   key: string;
   queryKey: (params?: TParams) => QueryDefinitionKey<TParams>;
-  /**
-   * Plain `{ queryKey, queryFn }` for SSR prefetch: `await
-   * useQueryClient().ensureQueryData(def.queryOptions())` in a page resolves the
-   * query on the server (dehydrated → hydrated), so the same `useXxx()` hook
-   * reads it without a refetch — Vue Query stays the single source + cache.
-   */
-  queryOptions: (params?: TParams) => {
-    queryKey: QueryDefinitionKey<TParams>;
-    queryFn: () => Promise<TData>;
-  };
+  /** Same key, fetcher and definition-level options as the hook, for `ensureQueryData` / prefetch. */
+  queryOptions: (params?: TParams) => DefinedQueryOptions<TData, TParams>;
 }
 
+/**
+ * Declare one query: `key` is the prefix (`["users.list"]` invalidates every param variant),
+ * params extend it (`["users.detail", { id }]`). `params` may be a ref or getter; the key follows it.
+ * Nuxt: a page resolves it during SSR with `useServerRenderedQuery` (`tanstack-ssr.ts`).
+ */
 export function defineQuery<TData, TParams = void>(config: DefineQueryConfig<TData, TParams>) {
-  const { fetcher, key, ...queryOptions } = config;
+  const { fetcher: clientFetcher, key, serverFetcher, ...defaults } = config;
 
-  const queryKey = (params?: TParams): QueryDefinitionKey<TParams> =>
-    params !== undefined ? [key, params] : [key];
+  const fetcher: QueryFetcher<TData, TParams> = (params, context) =>
+    isServerRender && serverFetcher
+      ? serverFetcher(params, context)
+      : clientFetcher(params, context);
 
-  const use = (useConfig?: UseQueryConfig<TData, TParams>) => {
+  function queryKey(params?: TParams): QueryDefinitionKey<TParams> {
+    return params !== undefined ? [key, params] : [key];
+  }
+
+  function buildQueryOptions(params?: TParams): DefinedQueryOptions<TData, TParams> {
+    return {
+      ...(defaults as DefinedQueryOptions<TData, TParams>),
+      queryKey: queryKey(params),
+      queryFn: ({ signal }) => fetcher(params as TParams, { signal }),
+    };
+  }
+
+  function useDefinedQuery(useConfig?: UseQueryConfig<TData, TParams>) {
     const { params, ...overrides } = useConfig ?? {};
-
-    const reactiveQueryKey = computed(() => queryKey(toValue(params)));
-
     const options = {
-      ...queryOptions,
+      ...defaults,
       ...overrides,
-      queryKey: reactiveQueryKey,
-      queryFn: () => fetcher(toValue(params) as TParams),
+      queryKey: computed(() => queryKey(toValue(params))),
+      queryFn: ({ signal }: QueryFetcherContext) => fetcher(toValue(params) as TParams, { signal }),
     } as QueryOpt<TData, TParams>;
     return useQuery<TData, ApiResponseError, TData, QueryDefinitionKey<TParams>>(options);
-  };
+  }
 
-  const definition = use as QueryDefinition<TData, TParams>;
+  const definition = useDefinedQuery as QueryDefinition<TData, TParams>;
   definition.key = key;
   definition.queryKey = queryKey;
-  definition.queryOptions = (params?: TParams) => ({
-    queryKey: queryKey(params),
-    queryFn: () => fetcher(params as TParams),
-  });
-  return definition;
-}
-
-/**
- * What the server ships to the browser in the Nuxt payload: successful queries,
- * and failures the browser could not fix either — so a page resolved with
- * `useServerRenderedQuery` renders the same error on both sides. A 401 is left
- * out: only the browser can refresh an expired access cookie, so it runs the
- * query again after hydration.
- */
-export function shouldDehydrateQuery(query: Query): boolean {
-  return (
-    defaultShouldDehydrateQuery(query) ||
-    (query.state.status === "error" && !isUnauthorizedError(query.state.error))
-  );
-}
-
-/**
- * A page's query, resolved during SSR so the server renders its data or error
- * instead of the loading state (`useQuery` alone never waits on the server; the
- * fetch finishes after render and the client hydrates data the HTML lacks).
- * The server and the hydrating client render the same state:
- *
- * - success → both render the data (dehydrated, fresh, not refetched);
- * - a failure the browser cannot fix → both render the error: it is dehydrated
- *   (`shouldDehydrateQuery`) and not retried while hydrating. A later mount
- *   (client navigation) retries as usual;
- * - a 401 → both render loading: it is not dehydrated, and the browser fetches
- *   through the Model, which refreshes the access cookie.
- *
- * On the server a query is fetched at most once per request: a later reader of
- * a key that already failed (e.g. a page reading the session the layout
- * resolved) neither retries it on mount nor awaits a new fetch. A retry nobody
- * awaits would land in the payload after the HTML was rendered — a mismatch.
- */
-export function useServerRenderedQuery<TData, TParams = void>(
-  definition: QueryDefinition<TData, TParams>,
-  config?: UseQueryConfig<TData, TParams>,
-) {
-  const nuxtApp = useNuxtApp();
-
-  const onServer = Boolean(nuxtApp.ssrContext);
-
-  const query = definition({ retryOnMount: !(onServer || nuxtApp.isHydrating), ...config });
-  onServerPrefetch(async () => {
-    if (!query.isError.value) await query.suspense();
-  });
-
-  const leftForBrowser = computed(() => onServer && isUnauthorizedError(query.error.value));
-  return {
-    ...query,
-    isLoading: computed(() => query.isLoading.value || leftForBrowser.value),
-    error: computed(() => (leftForBrowser.value ? null : query.error.value)),
-  };
-}
-
-type MutationDefOpts<TData, TVars, TCtx = unknown> = Omit<
-  MutationOptions<TData, ApiResponseError, TVars, TCtx>,
-  "mutationKey" | "mutationFn"
->;
-
-interface DefineMutationConfig<TData, TVars, TCtx = unknown> {
-  key: string;
-  mutator: (variables: TVars) => Promise<TData>;
-  invalidates?: string[];
-  options?: MutationDefOpts<TData, TVars, TCtx>;
-}
-
-export interface MutationDefinition<TData, TVars, TCtx = unknown> {
-  (
-    overrides?: MutationDefOpts<TData, TVars, TCtx>,
-  ): UseMutationReturnType<TData, ApiResponseError, TVars, TCtx>;
-  key: string;
-}
-
-export function defineMutation<TData, TVars = void, TCtx = unknown>(
-  config: DefineMutationConfig<TData, TVars, TCtx>,
-) {
-  const use = (overrides: MutationDefOpts<TData, TVars, TCtx> = {}) => {
-    const queryClient = config.invalidates?.length ? useQueryClient() : undefined;
-    const options = config.options;
-
-    return useMutation<TData, ApiResponseError, TVars, TCtx>({
-      ...options,
-      ...overrides,
-      mutationKey: [config.key],
-      mutationFn: config.mutator,
-      onSuccess: async (...args) => {
-        if (queryClient && config.invalidates) {
-          await Promise.all(
-            config.invalidates.map((k) => queryClient.invalidateQueries({ queryKey: [k] })),
-          );
-        }
-        await options?.onSuccess?.(...args);
-        await overrides.onSuccess?.(...args);
-      },
-    } satisfies UseMutationOptions<TData, ApiResponseError, TVars, TCtx>);
-  };
-
-  const definition = use as MutationDefinition<TData, TVars, TCtx>;
-  definition.key = config.key;
+  definition.queryOptions = buildQueryOptions;
   return definition;
 }

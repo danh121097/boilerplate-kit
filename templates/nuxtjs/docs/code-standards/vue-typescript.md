@@ -130,7 +130,11 @@ flag set. Consequences:
 
 ```ts
 const { errorMessage, value } = useField<string | number>(() => props.name);
-export const useMeQuery = defineQuery<AuthUser | null>({ key: "auth.me", fetcher: fetchSessionUser });
+export const useMeQuery = defineQuery<AuthUser | null>({
+  key: "auth.me",
+  fetcher: fetchSessionUser,
+  serverFetcher: readServerSession,
+});
 ```
 
 Validate via `pnpm typecheck` (`nuxt typecheck`).

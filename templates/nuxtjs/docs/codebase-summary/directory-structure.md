@@ -44,7 +44,7 @@ templates/nuxtjs/
 │   │   ├── cn.ts           # clsx + tailwind-merge class combiner
 │   │   └── date-format.ts  # dayjs formatDate/fromNow
 │   ├── css/                # main.css (Tailwind v4) + main.scss
-│   └── __tests__/          # Vitest unit + integration tests + helpers
+│   └── __tests__/          # Vitest unit + integration + ssr tests + helpers
 ├── i18n/locales/           # en.ts, ja.ts message catalogs (lazy-loaded)
 ├── types/i18n.d.ts         # Types vue-i18n's catalog from en.ts
 ├── server/                 # Empty — no Nitro routes (external backend)
@@ -56,7 +56,11 @@ templates/nuxtjs/
 - **No `server/` routes** — the directory exists but is empty; this template is a
   frontend that talks to an external backend (configure via `NUXT_PUBLIC_APP_ENDPOINT`).
 - **Tests** live under `app/__tests__/` (unit + integration), with shared
-  `helpers/` (`fake-storage`, `http-mocks`). Config: `vitest.config.ts`.
+  `helpers/` (`fake-storage`, `http-mocks`). Config: `vitest.config.ts`, two
+  projects: `unit` (as the browser bundle, `import.meta.server` unset) and `ssr`
+  (`*.ssr.test.ts` under `app/__tests__/ssr/`, with `import.meta.server = true`
+  so server-only branches such as a query's `serverFetcher` run). `pnpm test`
+  runs both; `pnpm exec vitest run --project ssr` runs one.
 - **Config files** at root: `eslint.config.ts`, `prettier.config.ts`,
   `tsconfig.json` (extends `.nuxt/tsconfig.json`), `pnpm-workspace.yaml`.
 

@@ -122,7 +122,7 @@ production note in [Security & Auth](./security-auth.md).
   the loading state while the fetch finishes after render and lands in the
   payload, so the client hydrates data the HTML lacks (a hydration mismatch). A
   page that renders a query's data resolves it during SSR with
-  `useServerRenderedQuery(useXxxQuery)` (`services/core/tanstack.ts`, used by
+  `useServerRenderedQuery(useXxxQuery)` (`services/core/tanstack-ssr.ts`, used by
   `pages/users.vue`):
 
   | SSR result | Server renders | Client hydrates |
