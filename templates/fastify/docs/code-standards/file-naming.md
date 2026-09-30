@@ -13,6 +13,10 @@ Features live under src/modules/<feature>/ and may use:
 | routes.ts     | Fastify plugin, route schemas, guards, and handlers             |
 | validation.ts | Zod schemas and inferred types                                  |
 
+Extra files are fine when a concern earns its own module, e.g.
+auth/refresh-session.ts (refresh-token lifecycle, re-exported by service.ts) and
+user/serialize-user.ts (public user allowlist).
+
 Keep a file only when it has a real responsibility. The health module only has
 routes.ts; auth and user have the files required by their behavior.
 

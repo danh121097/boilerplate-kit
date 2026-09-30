@@ -1,7 +1,7 @@
 # Security and Rate Limits
 
 Fastify plugins and route hooks implement the web boundary. Sources:
-src/app.ts, src/plugins/security.ts, and src/modules/*/routes.ts.
+src/app.ts, src/plugins/{security,auth,role}.ts, and src/modules/*/routes.ts.
 
 ## Fastify security plugins
 
@@ -22,7 +22,7 @@ rate limiting uses the plugin's in-process store.
 
 ## Request protections
 
-Root onRequest hooks check HMAC on every route under API_PREFIX, then apply the
+plugins/security.ts installs only the root onRequest hooks. They check HMAC on every route under API_PREFIX, then apply the
 optional CSRF origin check to mutating requests when ENABLE_CSRF=true. HMAC is
 not authentication or body integrity: protected routes still require access
 JWTs, and request bodies are not signed.
@@ -34,8 +34,9 @@ cannot establish that the immediate peer is trusted.
 ## Authentication and authorization
 
 authenticate verifies RS256 access JWTs from the bearer header or accessToken
-cookie and checks revocation state when Redis is enabled. requireMinRole runs
-after authentication; /users requires at least admin. The check is server-side
+cookie and checks revocation state when Redis is enabled (src/plugins/auth.ts).
+requireMinRole (src/plugins/role.ts) runs after authentication and compares
+ROLE_RANK, defined once in src/types/auth.ts; /users requires at least admin. The check is server-side
 and returns 401 when unauthenticated or 403 when the role is too low.
 
 Refresh tokens are hashed in MongoDB, atomically rotated, and grouped by

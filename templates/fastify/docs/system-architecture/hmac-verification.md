@@ -16,7 +16,7 @@ Authorization still depends on access tokens and role checks.
 The client and server sign this exact string, including its final newline:
 
 ```text
-[METHOD, contentType, ctime, path, ""].join("\\n")
+[METHOD, contentType, ctime, path, ""].join("\n")
 ```
 
 The digest is HMAC-SHA256 with HMAC_SECRET, encoded as Base64.

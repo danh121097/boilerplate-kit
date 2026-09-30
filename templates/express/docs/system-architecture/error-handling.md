@@ -15,7 +15,7 @@ codebase throws:
 export class AppError extends Error {
   public readonly statusCode: number;
   public readonly errorType: ErrorType;
-  constructor({ message, statusCode = 500, errorType = 'INTERNAL_ERROR' }: AppErrorParams) {
+  constructor({ message, statusCode = 500, errorType = "INTERNAL_ERROR" }: AppErrorParams) {
     super(message);
     this.statusCode = statusCode;
     this.errorType = errorType;
@@ -43,12 +43,12 @@ registered **last** in `app.ts` and emits:
 ```ts
 res.status(statusCode).json({
   success: false,
-  status: 'error',
-  errorType,                                  // e.g. 'AUTHENTICATION_ERROR'
+  status: "error",
+  errorType, // e.g. 'AUTHENTICATION_ERROR'
   message,
-  error_code: statusCode,                     // mirrored under the client's field names
+  error_code: statusCode, // mirrored under the client's field names
   error_message: message,
-  ...(config.isDevelopment && { stack: err.stack }),  // stack only in development
+  ...(config.isDevelopment && { stack: err.stack }), // stack only in development
 });
 ```
 
@@ -61,7 +61,8 @@ res.status(statusCode).json({
 - `error_code` / `error_message` mirror the status + message under the field names
   the client error type expects (keeps the contract stable for the frontend).
 - The stack is included **only** in `development`.
-- Every error is logged: `console.error("[Error] {status}: {message}")`.
+- Every error is logged through the app `logger`: `error` level (with the
+  stack) for 5xx, `warn` for 4xx.
 
 ## Not-Found Handler
 
@@ -71,8 +72,12 @@ envelope shape for unmatched routes:
 
 ```ts
 res.status(404).json({
-  success: false, status: 'error', errorType: 'NOT_FOUND',
-  message: 'Resource not found!', error_code: 404, error_message: 'Resource not found!',
+  success: false,
+  status: "error",
+  errorType: "NOT_FOUND",
+  message: "Resource not found!",
+  error_code: 404,
+  error_message: "Resource not found!",
 });
 ```
 
@@ -86,10 +91,10 @@ export function validate(schema: z.ZodSchema) {
   return (req, _res, next) => {
     const result = schema.safeParse(req.body);
     if (!result.success) {
-      const message = result.error.issues.map((e) => e.message).join(', ');
-      throw new AppError({ message, statusCode: 400, errorType: 'VALIDATION_ERROR' });
+      const message = result.error.issues.map((e) => e.message).join(", ");
+      throw new AppError({ message, statusCode: 400, errorType: "VALIDATION_ERROR" });
     }
-    req.body = result.data;   // replace with parsed/transformed data
+    req.body = result.data; // replace with parsed/transformed data
     next();
   };
 }

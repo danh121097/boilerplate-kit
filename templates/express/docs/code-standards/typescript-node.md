@@ -8,9 +8,9 @@ the actual `src/` code.
 `tsconfig.json` runs `"strict": true` (target ES2022, module CommonJS). That
 means no implicit `any`, strict null checks, etc. Consequences:
 
-- Prefer `unknown` over `any` when a precise type is not available — e.g.
-  service functions return `{ user: unknown; tokens: AuthTokens }` rather than
-  leaking the Mongoose document type.
+- Prefer `unknown` over `any` when a precise type is not available. Services
+  return typed documents (`UserDocument`); controllers project them to the public
+  shape with `serializeUser` before responding.
 - Annotate exported function return types (ESLint warns on missing ones via
   `explicit-function-return-type`). Async handlers return `Promise<void>`.
 - Imports use the `@/` alias, resolved by swc at build and
@@ -23,9 +23,9 @@ responses in business code:
 
 ```ts
 throw new AppError({
-  message: 'Email already registered!',
+  message: "Email already registered!",
   statusCode: 409,
-  errorType: 'CONFLICT'
+  errorType: "CONFLICT",
 });
 ```
 
@@ -46,7 +46,11 @@ not call `next(err)` or wrap everything in try/catch.**
     const { email, password } = req.body;
     const { user, tokens } = await AuthService.login(email, password);
     setTokenCookies(res, tokens.accessToken, tokens.refreshToken);
-    res.json({ success: true, message: 'Login successful!', data: { user, tokens } });
+    res.json({
+      success: true,
+      message: "Login successful!",
+      data: { user: serializeUser(user), tokens },
+    });
   }
   ```
 
@@ -68,10 +72,10 @@ export function validate(schema: z.ZodSchema) {
   return (req: Request, _res: Response, next: NextFunction): void => {
     const result = schema.safeParse(req.body);
     if (!result.success) {
-      const message = result.error.issues.map((e) => e.message).join(', ');
-      throw new AppError({ message, statusCode: 400, errorType: 'VALIDATION_ERROR' });
+      const message = result.error.issues.map((e) => e.message).join(", ");
+      throw new AppError({ message, statusCode: 400, errorType: "VALIDATION_ERROR" });
     }
-    req.body = result.data;   // parsed + transformed value replaces raw body
+    req.body = result.data; // parsed + transformed value replaces raw body
     next();
   };
 }
@@ -89,16 +93,16 @@ feature exports a `RouteGroup` (`src/types/routing.ts`); the
 
 ```ts
 const authGroup: RouteGroup = {
-  prefix: '/auth',
+  prefix: "/auth",
   routes: [
     {
-      method: 'post',
-      path: '/login',
+      method: "post",
+      path: "/login",
       bodySchema: loginSchema,
       middleware: [loginRateLimiter, validate(loginSchema)],
-      handler: AuthController.login
-    }
-  ]
+      handler: AuthController.login,
+    },
+  ],
 };
 export default authGroup;
 ```
@@ -115,14 +119,14 @@ Never read `process.env` outside `src/config/environment.ts`. Import the typed,
 validated `config` object instead:
 
 ```ts
-import { config } from '@/config/environment';
+import { config } from "@/config/environment";
 
-jwt.verify(token, config.jwtAccessPublicKey, { algorithms: ['RS256'] });
+jwt.verify(token, config.jwtAccessPublicKey, { algorithms: ["RS256"] });
 ```
 
 `environment.ts` loads `.env`, validates required vars via `getRequiredEnvVar`
-(throws on missing `MONGODB_URI`, `HMAC_SECRET`, `JWT_REFRESH_SECRET`, RSA key
-paths), applies
+(throws on missing `MONGODB_URI`, `HMAC_SECRET`, `JWT_REFRESH_SECRET`; RSA key
+files are loaded by `config/keys.ts`), applies
 defaults for the rest, and exposes everything through the `EnvironmentConfig`
 type. Optional features (Redis) are read without `getRequiredEnvVar` so the app
 boots when they are off.

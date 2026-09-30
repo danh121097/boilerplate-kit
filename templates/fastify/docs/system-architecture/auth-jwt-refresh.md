@@ -5,23 +5,24 @@ tokens delivered as httpOnly cookies. Source:
 [`utils/jwt.ts`](../../src/utils/jwt.ts), [`utils/cookie.ts`](../../src/utils/cookie.ts),
 [`models/refresh-token.ts`](../../src/models/refresh-token.ts),
 [`modules/auth/service.ts`](../../src/modules/auth/service.ts),
-[`plugins/security.ts`](../../src/plugins/security.ts),
+[`modules/auth/refresh-session.ts`](../../src/modules/auth/refresh-session.ts),
+[`plugins/auth.ts`](../../src/plugins/auth.ts),
+[`plugins/role.ts`](../../src/plugins/role.ts),
 [`utils/token-revocation.ts`](../../src/utils/token-revocation.ts).
 
 ## Two Token Types
 
-|           | Access token                           | Refresh token                       |
-| --------- | -------------------------------------- | ----------------------------------- |
-| Algorithm | **RS256** (RSA private/public keypair) | **HS256** (symmetric secret)        |
-| Lifetime  | `JWT_ACCESS_EXPIRY` (default `15m`)    | `JWT_REFRESH_EXPIRY` (default `7d`) |
+|                      | Access token                                        | Refresh token                                   |
+| -------------------- | --------------------------------------------------- | ----------------------------------------------- |
+| Algorithm            | **RS256** (RSA private/public keypair)              | **HS256** (symmetric secret)                    |
+| Lifetime             | `JWT_ACCESS_EXPIRY` (default `15m`)                 | `JWT_REFRESH_EXPIRY` (default `7d`)             |
+| Sent as              | `Authorization: Bearer` **or** `accessToken` cookie | `refreshToken` httpOnly cookie                  |
+| Stored server-side   | no                                                  | yes — SHA-256 hash in `RefreshToken` collection |
+| `token_use` claim    | `access`                                            | `refresh`                                       |
+| `iss` (issuer) claim | primary CORS origin                                 | primary CORS origin                             |
 
 Both expiries must match `<positive integer><s|m|h|d>` (`15m`, `7d`); anything
 else (`900`, `1w`, `0`, `-5m`) fails boot with a clear message.
-
-| Sent as | `Authorization: Bearer` **or** `accessToken` cookie | `refreshToken` httpOnly cookie |
-| Stored server-side | no | yes — SHA-256 hash in `RefreshToken` collection |
-| `token_use` claim | `access` | `refresh` |
-| `iss` (issuer) claim | primary CORS origin | primary CORS origin |
 
 Access tokens use **RS256** (asymmetric): signed with the RSA private key and
 verifiable by any party holding the public key — the right tool when a token may
@@ -110,6 +111,7 @@ const baseCookieOptions = {
   secure: config.isProduction, // HTTPS-only in prod
   sameSite: config.isProduction ? "strict" : "lax",
   path: "/",
+  domain: config.cookieDomain,
 };
 // accessToken  → path '/',          maxAge = JWT_ACCESS_EXPIRY  (default 15m)
 // refreshToken → path `${apiPrefix}/auth`, maxAge = JWT_REFRESH_EXPIRY (default 7d)
@@ -126,7 +128,7 @@ using the matching paths.
 
 ## Auth Flows
 
-All flows live in [`modules/auth/service.ts`](../../src/modules/auth/service.ts) /
+register / login / me live in [`modules/auth/service.ts`](../../src/modules/auth/service.ts); token issue, refresh rotation and logout live in [`modules/auth/refresh-session.ts`](../../src/modules/auth/refresh-session.ts). Controllers:
 [`controller.ts`](../../src/modules/auth/controller.ts).
 
 - **register** (`POST /auth/register`) — `validatePasswordStrength`, reject
@@ -152,7 +154,7 @@ All flows live in [`modules/auth/service.ts`](../../src/modules/auth/service.ts)
 
 ### Refresh Rotation
 
-`AuthService.refresh` rotates on every use — a stolen-and-replayed token is
+`refresh()` in `refresh-session.ts` (re-exported as `AuthService.refresh`) rotates on every use — a stolen-and-replayed token is
 detectable and the chain self-heals. The old token is **claimed atomically**;
 concurrent calls have one initial claimant, while the others can receive fresh
 pairs during the 10-second retry grace period:
@@ -170,8 +172,7 @@ const token = stored ?? (await classifyUnclaimableToken(hashedToken)); // 2. re-
 //   revoke every refresh token of the user (clearing rotatedAt), revokeUserTokens,
 //   disconnect their sockets → 401 · expired → deleteOne → 401
 // ...resolve user, then:
-const accessToken = signAccessToken(payload);
-const newRefreshToken = await createRefreshTokenInDb(user._id, payload); // issue NEW
+const tokens = await issueTokens(user, token.familyId); // issue NEW pair, same family
 ```
 
 Each refresh **revokes the old token and issues a fresh pair**; new cookies are
@@ -182,12 +183,12 @@ unchanged error; `5xx`/`429` leave cookies alone.
 Clients must single-flight refreshes (the frontend templates lock across tabs).
 
 **Reuse grace window.** A rotated token presented again within
-`REFRESH_REUSE_GRACE_MS` (10 s, `modules/auth/service.ts`) is a retry or a race
+`REFRESH_REUSE_GRACE_MS` (10 s, `modules/auth/refresh-session.ts`) is a retry or a race
 between tabs, not theft: it gets a fresh access + refresh pair exactly like a
 normal refresh and nothing is revoked. This matters in a browser, where the
 first response already set new cookies — refusing the second request would clear
 them and kill the winning session. Outside the window, or for a token revoked by
-logout (which never sets `rotatedAt`), reuse revokes the user's whole family
+logout (which never sets `rotatedAt`), reuse revokes every refresh token of the user
 and disconnects their sockets. That revocation also clears `rotatedAt` on every
 token, so replaying a recently rotated token after a family revoke stays a `401`.
 A graced retry adds a further live token to the family (same `familyId`); each is
@@ -205,7 +206,7 @@ indistinguishable from a retry and mints another live token for that family
 
 ## Verifying Requests: `authenticate`
 
-[`plugins/security.ts`](../../src/plugins/security.ts) protects routes:
+[`plugins/auth.ts`](../../src/plugins/auth.ts) protects routes:
 
 1. Extract token from `Authorization: Bearer <t>` or the `accessToken` cookie.
 2. `verifyAccessToken` (throws → 401 "Invalid or expired access token!").

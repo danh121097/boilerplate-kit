@@ -70,8 +70,9 @@ opening a PR.
   metadata, so providers fail to resolve. `unplugin-swc` re-emits it
   (`legacyDecorator: true`, `decoratorMetadata: true`). `vite-tsconfig-paths`
   honours the `@/*` alias. Removing either breaks DI in tests.
-- **Test files** — `src/**/*.spec.ts` (co-located unit specs),
-  `test/**/*.spec.ts` (unit), `test/**/*.e2e-spec.ts` (e2e).
+- **Test files** — all under `test/`: `test/unit/*.spec.ts` (unit) and
+  `test/e2e/*.e2e-spec.ts` (e2e). The vitest `include` also globs `src/**` in
+  case a spec is co-located later; none are today.
 - **In-memory MongoDB** — `test/global-setup.ts` starts `mongodb-memory-server`
   once and hands its URI to workers through vitest `provide`/`inject` (per run, so
   concurrent `pnpm test` runs never share a database); `test/setup.ts` injects it, sets env

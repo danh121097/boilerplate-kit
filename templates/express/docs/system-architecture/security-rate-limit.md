@@ -14,42 +14,50 @@ defaults.
 ## CORS With Credentials
 
 ```ts
-app.use(cors({ origin: config.corsOrigin, credentials: true }));
+app.use(cors({ origin: config.corsOrigins, credentials: true }));
 ```
 
 - **`credentials: true`** is required for the browser to send/receive the httpOnly
   auth cookies — without it cookie-based auth breaks cross-origin.
-- **`origin`** is `CORS_ORIGIN` (default `http://localhost:5173`); the Socket.IO
-  server uses the same origin + `credentials: true`.
+- **`origin`** is `config.corsOrigins`, a hard-coded allow-list in
+  [`config/environment.ts`](../../src/config/environment.ts) (three localhost
+  dev origins outside production, a single placeholder origin in production —
+  replace it before deploying). It is not an env var. The Socket.IO server uses
+  the same list + `credentials: true`.
+- **CSRF guard (opt-in)** — with `ENABLE_CSRF=true`,
+  [`middleware/verify-origin.ts`](../../src/middleware/verify-origin.ts) rejects
+  mutating methods (anything but GET/HEAD/OPTIONS) whose `Origin` (or `Referer`
+  origin) is not in `corsOrigins` with `403 AUTHORIZATION_ERROR`. It mounts on
+  `apiPrefix` right after HMAC; off by default.
 
 ## Authentication & Authorization
 
 - **Authentication** — `authenticate` ([`middleware/auth.ts`](../../src/middleware/auth.ts))
   verifies the access token; see [auth-jwt-refresh.md](./auth-jwt-refresh.md).
-- **Authorization** — `requireMinRole(...roles)` ([`middleware/role.ts`](../../src/middleware/role.ts))
+- **Authorization** — `requireMinRole(minRole)` ([`middleware/role.ts`](../../src/middleware/role.ts))
   enforces a role hierarchy and **must run after** `authenticate`:
 
 ```ts
-const ROLE_RANK = { user: 1, admin: 2, super_admin: 3 };
-// least-privileged allowed role sets the bar; anyone at or above passes
-const requiredRank = Math.min(...allowedRoles.map((r) => ROLE_RANK[r]));
+// ROLE_RANK is defined once in src/types/auth.ts (user: 1, admin: 2, super_admin: 3);
+// middleware/role.ts imports it. The given role sets the bar; anyone at or above passes.
+const requiredRank = ROLE_RANK[minRole];
 if (ROLE_RANK[req.user.role] < requiredRank) throw new AppError({ statusCode: 403, errorType: 'AUTHORIZATION_ERROR', ... });
 ```
 
 So `requireMinRole('admin')` allows `admin` and `super_admin`; a higher role never
-needs to be listed explicitly. Missing `req.user` → 401; insufficient rank → 403.
-Example: `GET /users` uses `[authenticate, requireMinRole('admin')]`.
+needs to be named separately. Missing `req.user` → 401; insufficient rank → 403.
+Example: `GET /users` and `GET /users/:id` use `[authenticate, requireMinRole('admin')]`.
 
 ## Rate Limiting
 
 [`middleware/rate-limit.ts`](../../src/middleware/rate-limit.ts) defines three
 limiters via `express-rate-limit`:
 
-| Limiter | Window | Max | Applied to |
-| --- | --- | --- | --- |
-| `globalRateLimiter` | 1 min | 100 | all API routes (`app.use(apiPrefix, ...)`) |
-| `authRateLimiter` | 15 min | 30 | `/auth/register`, `/auth/refresh`, `/auth/logout` |
-| `loginRateLimiter` | 15 min | 30 | `/auth/login` (own bucket, brute-force protection) |
+| Limiter             | Window | Max | Applied to                                         |
+| ------------------- | ------ | --- | -------------------------------------------------- |
+| `globalRateLimiter` | 1 min  | 100 | all API routes (`app.use(apiPrefix, ...)`)         |
+| `authRateLimiter`   | 15 min | 30  | `/auth/register`, `/auth/refresh`, `/auth/logout`  |
+| `loginRateLimiter`  | 15 min | 30  | `/auth/login` (own bucket, brute-force protection) |
 
 Stricter auth/login limiters layer **on top of** the global one via the route
 `middleware` chain. All limiters:
@@ -67,7 +75,7 @@ Stricter auth/login limiters layer **on top of** the global one via the route
 ```ts
 export function makeStore(prefix: string): Store | undefined {
   const client = getRedis();
-  if (!client) return undefined;   // → express-rate-limit uses in-memory MemoryStore
+  if (!client) return undefined; // → express-rate-limit uses in-memory MemoryStore
   return new RedisStore({ prefix, sendCommand: (cmd, ...args) => client.call(cmd, ...args) });
 }
 ```
@@ -106,8 +114,8 @@ Socket.IO adapter.
   query results.
 - **HMAC** request signing on every API route — see
   [hmac-verification.md](./hmac-verification.md).
-- **Secrets via env** — `HMAC_SECRET`, `JWT_REFRESH_SECRET` (≥32 chars), and the
-  RSA key paths (`JWT_PRIVATE_KEY_PATH`, `JWT_PUBLIC_KEY_PATH`) are required
+- **Secrets via env** — `HMAC_SECRET` and `JWT_REFRESH_SECRET` (use ≥32 random
+  chars; length is not enforced) are required
   (`getRequiredEnvVar` throws if missing); never commit them.
 
 ## See Also

@@ -41,7 +41,7 @@ only when every step closed cleanly, 1 otherwise or when shutdown exceeds 10 s.
 | [auth-jwt-refresh.md](./system-architecture/auth-jwt-refresh.md)       | RS256 access + HS256 httpOnly refresh-cookie rotation, RefreshToken model, revocation   |
 | [hmac-verification.md](./system-architecture/hmac-verification.md)     | The canonical signing string, freshness + timing-safe compare, the client invariant     |
 | [error-handling.md](./system-architecture/error-handling.md)           | `AppError`, the error-handler envelope, not-found handler, validation errors            |
-| [database-mongoose.md](./system-architecture/database-mongoose.md)     | Mongoose models, `toJSON` transform, indexes, connection config                         |
+| [database-mongoose.md](./system-architecture/database-mongoose.md)     | Mongoose models, `serializeUser` public shape, indexes, connection config               |
 | [realtime-socket.md](./system-architecture/realtime-socket.md)         | Socket.IO setup, handshake gates, events, emit helpers                                  |
 | [security-rate-limit.md](./system-architecture/security-rate-limit.md) | helmet, CORS-with-credentials, rate limiters, Redis-backed store                        |
 

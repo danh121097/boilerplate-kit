@@ -62,7 +62,7 @@ Unlike Express `app.use(prefix, …)` — which pre-strips the prefix from `req.
 inside a guard. So the guard derives the signed path manually with `derivePath`:
 
 ```ts
-// security.guard.ts — exported for unit testing
+// guards/derive-path.ts — exported for unit testing
 export function derivePath(originalUrl: string, apiPrefix: string): string {
   const prefix = apiPrefix.startsWith("/") ? apiPrefix : `/${apiPrefix}`;
   const withoutQuery = originalUrl.split("?")[0]; // 1. drop query string

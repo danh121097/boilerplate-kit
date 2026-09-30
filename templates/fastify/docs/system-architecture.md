@@ -49,5 +49,6 @@ Errors flow through the shared Fastify error handler.
 - Redis is optional; request paths and health checks remain available without it.
 - Every route below API_PREFIX requires HMAC, including public auth and health
   routes. Swagger is outside that prefix.
-- Auth and user responses never expose stored password hashes.
+- Auth and user responses go through serializeUser, an allowlist that never
+  exposes stored password hashes.
 - AppError and the global handler define the shared error response contract.

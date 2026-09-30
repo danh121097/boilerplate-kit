@@ -55,10 +55,12 @@ Key behaviors:
 
 - **`password` is `select: false`** — excluded from every query unless explicitly
   asked (`User.findOne(...).select('+password')`, as `login` does).
-- **`toJSON` transform deletes `password` and `__v`.** Note it does **not** rename
-  `_id` to `id` — serialized users keep the raw `_id` (and the model keeps `__v`
-  internally; it is only stripped from JSON output). So API responses still expose
-  `_id`.
+- **`toJSON` transform deletes `password` and `__v`** as a fallback for code that
+  serializes a document directly. It does **not** rename `_id` to `id`. API
+  responses do not rely on it: controllers call `serializeUser`
+  ([`modules/user/serialize-user.ts`](../../src/modules/user/serialize-user.ts)), an
+  allowlist that emits `_id` (string), `email`, `name`, `role`, `isActive`, and ISO
+  `createdAt` / `updatedAt`, so new schema fields stay private until added there.
 - **Password hashing** — a `pre('save')` hook bcrypt-hashes the password (cost 12)
   only when modified; `comparePassword` wraps `bcrypt.compare`.
 - **Roles** — enum from the single `ROLES` source of truth in
@@ -70,10 +72,12 @@ Key behaviors:
 
 ```ts
 {
-  token:     { type: String, required: true, index: true },        // SHA-256 hash of the JWT
+  token:     { type: String, required: true, unique: true },       // SHA-256 hash of the JWT
   userId:    { type: ObjectId, ref: 'User', required: true, index: true },
   expiresAt: { type: Date, required: true, index: { expires: 0 } },// TTL index
+  familyId:  { type: String, index: true },                         // one per login/register chain
   isRevoked: { type: Boolean, default: false },
+  rotatedAt: { type: Date },                                        // set by rotation only (not logout)
 }
 ```
 
@@ -88,7 +92,8 @@ Key behaviors:
 | Collection      | Indexed fields                 | Why                            |
 | --------------- | ------------------------------ | ------------------------------ |
 | `users`         | `email` (unique)               | login lookup + uniqueness      |
-| `refreshtokens` | `token`                        | rotation/logout lookup by hash |
+| `refreshtokens` | `token` (unique)               | rotation/logout lookup by hash |
+| `refreshtokens` | `familyId`                     | logout revokes a session chain |
 | `refreshtokens` | `userId`                       | per-user queries               |
 | `refreshtokens` | `expiresAt` (TTL `expires: 0`) | auto-expiry                    |
 

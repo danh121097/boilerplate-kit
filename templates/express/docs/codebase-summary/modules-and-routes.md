@@ -14,14 +14,18 @@ responsibility:
 | `controller.ts` | HTTP layer: read `req`, call the service, set cookies, shape `res` |
 | `service.ts`    | Business logic + persistence; throws `AppError`, no `req`/`res`    |
 
-`user` has no `service.ts` or `validation.ts` — read-only endpoints query the
-model directly in the controller. Add those files only when the logic grows.
+`user` has no `validation.ts` (its endpoints take no body) and adds
+`serialize-user.ts`, the allowlist projection controllers apply before responding.
+`auth` splits the refresh-token lifecycle (`issueTokens`, `refresh`, `logout`)
+into `refresh-session.ts`; `service.ts` re-exports it. Add files only when the
+logic grows.
 
 ### Layering rule
 
 `routes` → `controller` → `service` → `models`. Controllers never embed business
 rules; services never touch `req`/`res`. Example: `auth/controller.ts` reads
-`req.body`, calls `AuthService.register(...)`, then `setTokenCookies(res, ...)`.
+`req.body`, calls `AuthService.register(...)`, then `setTokenCookies(res, ...)` and
+responds with `serializeUser(user)`.
 
 ## Declarative Routes via `RouteGroup`
 
@@ -89,10 +93,11 @@ export default authGroup;
    ```
 
 3. **Mount** — `src/app.ts` mounts the whole registry under `config.apiPrefix`,
-   _after_ HMAC verification and the global rate limiter:
+   _after_ HMAC verification, the origin guard and the global rate limiter:
 
    ```ts
    app.use(config.apiPrefix, verifyHmacRequest);
+   app.use(config.apiPrefix, verifyOrigin);
    app.use(config.apiPrefix, globalRateLimiter);
    app.use(config.apiPrefix, routes); // from src/routes
    app.use(notFoundHandler); // 404, then errorHandler last
@@ -104,7 +109,7 @@ resolves to `POST /api/v1/auth/login`.
 ## Adding a Module
 
 1. Create `src/modules/<name>/{validation,service,controller,routes}.ts`
-   (drop validation/service if the feature doesn't need them).
+   (drop validation if the feature takes no body).
 2. Export a single `RouteGroup` from `routes.ts`.
 3. Register it in `src/routes/index.ts` `groups[]` (the only wiring step).
 
@@ -119,4 +124,4 @@ resolves to `POST /api/v1/auth/login`.
 | POST   | `/auth/logout`            | authRateLimiter                       | revokes refresh + user access tokens |
 | GET    | `/auth/me`                | authenticate                          | current user profile                 |
 | GET    | `/users`                  | authenticate, requireMinRole('admin') | list users                           |
-| GET    | `/users/:id`              | authenticate                          | user by id                           |
+| GET    | `/users/:id`              | authenticate, requireMinRole('admin') | user by id                           |

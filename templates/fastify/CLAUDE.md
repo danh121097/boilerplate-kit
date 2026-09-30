@@ -19,14 +19,18 @@ Socket.IO, rate limiting, optional Redis, Zod validation, and Swagger.
 - Follow Fastify plugin encapsulation and route registration patterns.
 - Keep request validation in route schemas and throw `AppError` for expected
   application errors; the global handler owns the error envelope.
-- Keep business logic in services and never return password hashes.
+- Keep business logic in services. Return users only through
+  `serializeUser` (`src/modules/user/serialize-user.ts`), an allowlist that
+  never includes password hashes.
 - Never commit local keys, `.env` values, tokens, or credentials.
 
 ## Conventions
 
 - Feature modules live under `src/modules/<feature>/` with
   `controller.ts`, `service.ts`, `routes.ts`, and `validation.ts` as needed.
-- Register routes as Fastify plugins from `src/routes/index.ts`.
+- Register routes as Fastify plugins from `src/routes/index.ts`. Protect them
+  with `authenticate` (`src/plugins/auth.ts`) and `requireMinRole`
+  (`src/plugins/role.ts`) in `preHandler`.
 - Use the `@/` import alias and kebab-case file names.
 - Keep request/response schemas, Swagger metadata, and handler behavior aligned.
 
@@ -35,7 +39,7 @@ Socket.IO, rate limiting, optional Redis, Zod validation, and Swagger.
 ```bash
 pnpm dev          # tsx watch src/server.ts (generates local RSA keys first)
 pnpm build        # tsc --noEmit (build config) && swc src -d dist
-pnpm typecheck    # tsc --noEmit -p tsconfig.json
+pnpm typecheck    # tsc --noEmit -p tsconfig.test.json (src + tests)
 pnpm test         # vitest run
 pnpm lint         # eslint src/**/*.ts
 pnpm start        # node dist/server.js

@@ -36,7 +36,7 @@ order regardless of `APP_GUARD` array position (which NestJS does not order):
 
 ```text
 1. HMAC signature   — ALL routes, including @Public and /health
-2. Origin / CSRF    — only when config.enableCsrf AND a mutating method (POST/PUT/PATCH/DELETE)
+2. Origin / CSRF    — only when config.enableCsrf; every method except GET/HEAD/OPTIONS
 3. JWT identity     — skipped for @Public routes; sets req.user
 4. Role check       — only when @Roles metadata is present (needs step 3)
 ```
@@ -45,7 +45,7 @@ order regardless of `APP_GUARD` array position (which NestJS does not order):
 async canActivate(context: ExecutionContext): Promise<boolean> {
   const req = context.switchToHttp().getRequest();
   this.checkHmac(req);                       // 1. always
-  this.checkOrigin(req);                      // 2. enableCsrf + mutating only
+  this.checkOrigin(req);                      // 2. enableCsrf; non-safe methods only
   const isPublic = this.reflector.getAllAndOverride(IS_PUBLIC_KEY, [...]);
   if (!isPublic) await this.checkJwt(req);    // 3. unless @Public
   const minRole = this.reflector.getAllAndOverride(ROLES_KEY, [...]);

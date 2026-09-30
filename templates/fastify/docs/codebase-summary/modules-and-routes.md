@@ -14,7 +14,11 @@ A feature under src/modules/<name>/ may contain:
 | validation.ts | Zod input/response schemas and inferred body types                     |
 
 The health feature is small and only needs routes.ts. Auth and user features
-separate the HTTP layer, services, and schemas.
+separate the HTTP layer, services, and schemas. Auth splits further:
+service.ts holds register, login, and getMe and re-exports the session API from
+refresh-session.ts (issueTokens, refresh, logout, REFRESH_REUSE_GRACE_MS). The
+user module's serialize-user.ts is the allowlist every controller uses to turn a
+user document into the public response shape.
 
 ## Registration
 
@@ -32,7 +36,8 @@ OpenAPI generation.
 ## Request lifecycle
 
 Root HMAC and optional CSRF hooks run before the API route handlers. Per-route
-preHandler hooks run authenticate and then requireMinRole for admin routes.
+preHandler hooks run authenticate (src/plugins/auth.ts) and then requireMinRole
+(src/plugins/role.ts) for admin routes.
 Controllers handle HTTP details; services do not depend on Fastify request or
 reply objects.
 
@@ -47,13 +52,13 @@ reply objects.
 
 All paths below are relative to API_PREFIX and require HMAC.
 
-| Method | Path           | Route-level access                           |
-| ------ | -------------- | -------------------------------------------- |
-| GET    | /health        | Public                                       |
-| POST   | /auth/register | Public                                       |
-| POST   | /auth/login    | Public                                       |
-| POST   | /auth/refresh  | Refresh token in body or cookie              |
-| POST   | /auth/logout   | Public; revokes the presented session family |
-| GET    | /auth/me       | Authenticated user                           |
-| GET    | /users         | Admin or super_admin                         |
-| GET    | /users/:id     | Admin or super_admin                         |
+| Method | Path           | Route-level access                                           |
+| ------ | -------------- | ------------------------------------------------------------ |
+| GET    | /health        | Public                                                       |
+| POST   | /auth/register | Public                                                       |
+| POST   | /auth/login    | Public                                                       |
+| POST   | /auth/refresh  | Refresh token in body or cookie (body optional)              |
+| POST   | /auth/logout   | Public; revokes the presented session family (body optional) |
+| GET    | /auth/me       | Authenticated user                                           |
+| GET    | /users         | Admin or super_admin                                         |
+| GET    | /users/:id     | Admin or super_admin                                         |

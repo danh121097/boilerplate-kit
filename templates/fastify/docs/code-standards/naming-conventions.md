@@ -6,13 +6,13 @@ Back to [Code Standards](../code-standards.md). Filenames are covered in
 ## Variables & functions
 
 - `camelCase` for variables and functions: `accessToken`, `hashedToken`,
-  `requiredRank`, `extractAccessToken`.
+  `storedToken`, `familyId`.
 - Functions read as verbs: `signAccessToken`, `verifyAccessToken`,
-  `createRefreshTokenInDb`, `revokeUserTokens`, `buildPayload`.
+  `issueTokens`, `revokeUserTokens`, `serializeUser`.
 - Exported handlers are named for the action: `register`, `login`, `refresh`,
   `logout`, `getMe`.
 - Module-level constants are `SCREAMING_SNAKE_CASE`:
-  `REFRESH_TOKEN_EXPIRY_DAYS`, `ROLE_RANK`.
+  `REFRESH_REUSE_GRACE_MS`, `ROLE_RANK`.
 
 ## Types & interfaces
 
@@ -55,7 +55,7 @@ export type Role = (typeof ROLES)[keyof typeof ROLES];
 - Suffix schema constants with `Schema`: `registerSchema`, `loginSchema`.
 - Each schema lives in the feature's `validation.ts`.
 - Field-level error messages are written for humans and surfaced verbatim by the
-  `validate()` middleware:
+  Fastify validator compiler (400 `VALIDATION_ERROR`):
 
   ```ts
   password: z.string().min(8, 'Password must be at least 8 characters'),

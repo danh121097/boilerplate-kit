@@ -55,27 +55,31 @@ on, Socket.IO also wires a pub/sub adapter for cross-instance emits.
 ```bash
 pnpm dev            # tsx watch src/server.ts (predev generates RSA keys if absent)
 pnpm build          # tsc --noEmit -p tsconfig.build.json && swc src -d dist
-pnpm typecheck      # tsc --noEmit
+pnpm typecheck      # tsc --noEmit -p tsconfig.test.json
 pnpm start          # node dist/server.js
 pnpm lint           # eslint src/**/*.ts   (lint:fix to autofix)
+pnpm format         # prettier --write .   (format:check to verify)
 pnpm test           # vitest run           (test:watch, test:coverage)
 ```
 
-## Environment (`.env.example`)
+## Environment
 
-`APP_NAME`, `NODE_ENV`, `PORT`, `MONGODB_URI`, `CORS_ORIGIN`, `API_PREFIX`,
+`NODE_ENV`, `PORT`, `MONGODB_URI`, `API_PREFIX`,
 `JWT_PRIVATE_KEY_PATH`, `JWT_PUBLIC_KEY_PATH`, `JWT_REFRESH_SECRET`,
 `JWT_ACCESS_EXPIRY`, `JWT_REFRESH_EXPIRY`, `HMAC_SECRET`, `REDIS_ENABLED`,
-`REDIS_URL`, `TRUST_PROXY` (optional), `DOCS_ENABLED` (optional), `LOG_LEVEL` (optional).
+`REDIS_URL`, `TRUST_PROXY` (optional), `DOCS_ENABLED` (optional), `LOG_LEVEL` (optional),
+`ENABLE_CSRF` (optional), `COOKIE_DOMAIN` (optional), `APP_NAME` (optional; Swagger title). CORS origins are not an env var:
+they are the hard-coded `corsOrigins` list in `src/config/environment.ts`.
 
-`MONGODB_URI`, `HMAC_SECRET`, `JWT_REFRESH_SECRET` (symmetric secret, min 32
-chars), and the RSA key paths (`JWT_PRIVATE_KEY_PATH`, `JWT_PUBLIC_KEY_PATH`) are
-**required** — boot throws if missing (`src/config/environment.ts`). Redis vars
-are optional.
+`MONGODB_URI`, `HMAC_SECRET`, and `JWT_REFRESH_SECRET` (symmetric secret; use
+≥32 random chars, length is not enforced) are **required** — boot throws if
+missing (`src/config/environment.ts`). The RSA key paths (`JWT_PRIVATE_KEY_PATH`,
+`JWT_PUBLIC_KEY_PATH`) must point at readable PEM files outside `test` /
+`development` (see Constraints). Redis vars are optional.
 
 ## Constraints
 
-- MongoDB must be reachable at boot — connection fails fast (15s) and exits.
+- MongoDB must be reachable at boot — a failed connection logs the error and exits.
 - RSA key files are required outside `test` / `development`; other envs fail closed
   rather than forging tokens (`src/config/keys.ts`). Run `src/keys/setup.sh`.
 - Refresh-cookie path is tied to `API_PREFIX`; changing the prefix moves the cookie.

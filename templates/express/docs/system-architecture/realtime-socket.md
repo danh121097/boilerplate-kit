@@ -15,23 +15,23 @@ from `server.ts` after the HTTP server is created:
 
 ```ts
 io = new Server(httpServer, {
-  cors: { origin: config.corsOrigin, credentials: true },
+  cors: { origin: config.corsOrigins, credentials: true },
   pingInterval: 25000,
   pingTimeout: 20000,
-  maxHttpBufferSize: 1e6,        // 1 MB cap on inbound payloads
+  maxHttpBufferSize: 1e6, // 1 MB cap on inbound payloads
 });
 
 const pub = getRedis();
 if (pub) {
   subClient = pub.duplicate();
-  io.adapter(createAdapter(pub, subClient));   // cross-instance delivery when Redis on
+  io.adapter(createAdapter(pub, subClient)); // cross-instance delivery when Redis on
 }
 
-io.use(socketHmac);   // 1. HMAC signature + ctime window
-io.use(socketAuth);   // 2. identity gate
-io.on('connection', (socket) => {
+io.use(socketHmac); // 1. HMAC signature + ctime window
+io.use(socketAuth); // 2. identity gate
+io.on("connection", (socket) => {
   const userId = socket.data.user?.userId;
-  if (userId) socket.join(`user:${userId}`);   // per-user room
+  if (userId) socket.join(`user:${userId}`); // per-user room
   socket.emit(SOCKET_EVENT.AUTHENTICATED);
 });
 ```
@@ -65,10 +65,10 @@ HTTP pipeline. Both reject with the message `SOCKET_UNAUTHORIZED` (`'Unauthorize
 
 ```ts
 verifyHmac({
-  method: 'GET',
-  contentType: DEFAULT_CONTENT_TYPE,   // 'application/json'
+  method: "GET",
+  contentType: DEFAULT_CONTENT_TYPE, // 'application/json'
   ctime,
-  path: SOCKET_HMAC_PATH,              // '/socket'
+  path: SOCKET_HMAC_PATH, // '/socket'
   sig,
 });
 ```
@@ -97,13 +97,14 @@ middleware (revocation is a no-op when Redis is off). On success
 ## Events
 
 [`socket/events.ts`](../../src/socket/events.ts) is the central event-name registry
-(reference these constants instead of string literals):
+(reference these constants instead of string literals; the emit helpers only
+accept names declared here):
 
-| Constant | Value | Direction |
-| --- | --- | --- |
+| Constant                     | Value             | Direction                                |
+| ---------------------------- | ----------------- | ---------------------------------------- |
 | `SOCKET_EVENT.AUTHENTICATED` | `'authenticated'` | server → client, on successful handshake |
-| `SOCKET_EVENT.NOTIFICATION` | `'notification'` | server → client, user-targeted |
-| `SOCKET_UNAUTHORIZED` | `'Unauthorized!'` | handshake rejection error message |
+| `SOCKET_EVENT.PING`          | `'ping'`          | registry entry only; no handler is wired |
+| `SOCKET_UNAUTHORIZED`        | `'Unauthorized!'` | handshake rejection error message        |
 
 ## Emitting From Services
 
@@ -113,9 +114,9 @@ socket layer isn't initialized (tests, CLI scripts) and reach other instances wh
 the Redis adapter is on:
 
 ```ts
-emitToUser(userId, event, payload);   // getIO()?.to(`user:${userId}`).emit(...)
-emitBroadcast(event, payload);        // getIO()?.emit(...)
-disconnectUserSockets(userId);        // getIO()?.in(`user:${userId}`).disconnectSockets(true)
+emitToUser(userId, event, payload); // getIO()?.to(`user:${userId}`).emit(...)
+emitBroadcast(event, payload); // getIO()?.emit(...)
+disconnectUserSockets(userId); // getIO()?.in(`user:${userId}`).disconnectSockets(true)
 ```
 
 `emitToUser` targets the per-user room joined on connection.

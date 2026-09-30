@@ -7,7 +7,7 @@ Back to [Code Standards](../code-standards.md).
 - ESLint flat config checks src TypeScript and import ordering.
 - Prettier formats source, tests, configs, and Markdown.
 - TypeScript uses tsc --noEmit.
-- Vitest runs test/**/*.test.ts.
+- Vitest runs test/**/*.test.ts (test/unit, test/integration; shared helpers in test/helpers).
 - Tests call Fastify's app.inject() and use mongodb-memory-server; no external
   MongoDB service is needed.
 

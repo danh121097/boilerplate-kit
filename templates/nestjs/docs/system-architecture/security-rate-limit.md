@@ -47,10 +47,12 @@ to be listed. Missing `req.user` → 401; insufficient rank → 403. Example:
 
 ### Origin / CSRF (optional)
 
-The guard's step 2 is a CSRF origin check, gated by `ENABLE_CSRF` and applied
-only to mutating methods (`POST/PUT/PATCH/DELETE`). When enabled, the request's
-`Origin` (falling back to the `Referer` host) must be in the allowed CORS
-origins, else `403 AUTHORIZATION_ERROR`. Disabled by default.
+The guard's step 2 is a CSRF origin check, gated by `ENABLE_CSRF` and
+deny-by-default: only the safe methods `GET`, `HEAD` and `OPTIONS` are exempt;
+every other method is checked
+([`origin-check.ts`](../../src/common/guards/origin-check.ts)). When enabled, the
+request's `Origin` (falling back to the `Referer` origin) must be in the allowed
+CORS origins, else `403 AUTHORIZATION_ERROR`. Disabled by default.
 
 ## Rate Limiting
 
@@ -58,11 +60,11 @@ origins, else `403 AUTHORIZATION_ERROR`. Disabled by default.
 `@nestjs/throttler` with **named throttlers** and registers a custom
 `AppThrottlerGuard` as a global `APP_GUARD`:
 
-| Throttler name | Window | Max | Applied to |
-| --- | --- | --- | --- |
-| `default` | 60 s | 100 | all routes (global cap) |
-| `auth` | 15 min | 30 | `/auth/register`, `/auth/refresh`, `/auth/logout` |
-| `login` | 15 min | 30 | `/auth/login` (brute-force protection) |
+| Throttler name | Window | Max | Applied to                                        |
+| -------------- | ------ | --- | ------------------------------------------------- |
+| `default`      | 60 s   | 100 | all routes (global cap)                           |
+| `auth`         | 15 min | 30  | `/auth/register`, `/auth/refresh`, `/auth/logout` |
+| `login`        | 15 min | 30  | `/auth/login` (brute-force protection)            |
 
 Rate limits key on the client IP. Behind a reverse proxy set `TRUST_PROXY`
 (`true`/`false`, a hop count such as `1`, or a comma-separated list of
@@ -87,7 +89,7 @@ them in `@Throttle`. They layer **on top of** the global `default` cap:
   request is allowed through, so a Redis outage never 500s an endpoint. The 429
   (an `HttpException`) is always rethrown.
 - **`throwThrottlingException`** throws `AppException({ errorType: 'RATE_LIMIT',
-  statusCode: 429 })` so the standard error envelope is rendered.
+statusCode: 429 })` so the standard error envelope is rendered.
 
 ### Redis-Backed Store (optional)
 

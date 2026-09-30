@@ -30,8 +30,9 @@ and Swagger/OpenAPI.
   retries. Later reuse revokes the user's sessions.
 - API routes require HMAC sig and ctime headers. Signatures expire after five
   minutes; the body and query string are not signed.
-- authenticate checks bearer or access-cookie tokens. Admin user routes also
-  enforce role rank on the server.
+- authenticate (plugins/auth.ts) checks bearer or access-cookie tokens. Admin
+  user routes also enforce role rank (requireMinRole, plugins/role.ts) on the
+  server.
 - Redis is optional. When enabled it provides distributed rate limits, cache,
   access-token revocation, and Socket.IO cross-instance delivery.
 
@@ -39,7 +40,7 @@ and Swagger/OpenAPI.
 
 - pnpm dev — watch server; generates RSA keys if absent
 - pnpm keys — generate local access-token keys
-- pnpm build — TypeScript build and path-alias rewrite
+- pnpm build — type-check with tsconfig.build.json, then compile src to dist with swc
 - pnpm typecheck — TypeScript check
 - pnpm lint — ESLint
 - pnpm test — Vitest
@@ -52,7 +53,8 @@ JWT_PRIVATE_KEY_PATH and JWT_PUBLIC_KEY_PATH default to files generated under
 src/keys/. REDIS_ENABLED defaults to false. LOG_LEVEL (debug, info, warn, error) defaults
 to debug in development and info in production. DOCS_ENABLED (optional) forces Swagger on
 or off; unset = on outside production. API_PREFIX defaults to /api/v1;
-see .env.example for all supported values.
+PORT defaults to 3000, REDIS_URL to redis://localhost:6379 (used when REDIS_ENABLED=true),
+COOKIE_DOMAIN (optional) sets the auth cookie domain, and APP_NAME (optional) sets the Swagger title; see .env.example for all supported values.
 
 TRUST_PROXY accepts true, false, or comma-separated IP/CIDR ranges. Numeric
 hop counts are rejected by Fastify 5.12 because they cannot verify the immediate

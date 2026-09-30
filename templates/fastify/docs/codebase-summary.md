@@ -19,7 +19,7 @@ A map of this Fastify + TypeScript backend and its module boundaries.
 - Features: health, auth, and user modules under src/modules/.
 - Cross-cutting code: src/plugins/, src/config/, src/models/, src/utils/, and
   src/types/.
-- Tests: test/ uses Fastify's app.inject() and mongodb-memory-server.
+- Tests: test/{unit,integration,helpers}; integration tests use Fastify's app.inject() and mongodb-memory-server.
 
 ## Read order
 

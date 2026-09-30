@@ -17,7 +17,7 @@ MongooseModule.forRootAsync({
   useFactory: (config: AppConfigService) => ({
     uri: config.mongodbUri,
     connectionFactory: (connection) => {
-      if (!config.isProduction) mongoose.set("debug", true);   // query logging in dev
+      if (!config.isProduction) mongoose.set("debug", true); // query logging in dev
       return connection;
     },
   }),
@@ -39,13 +39,19 @@ decorator-based `@Schema` / `@Prop` API:
 
 ```ts
 @Schema({
-  timestamps: true,                                            // createdAt / updatedAt
-  toJSON: { transform: (_doc, ret) => { delete ret.password; delete ret.__v; return ret; } },
+  timestamps: true, // createdAt / updatedAt
+  toJSON: {
+    transform: (_doc, ret) => {
+      delete ret.password;
+      delete ret.__v;
+      return ret;
+    },
+  },
 })
 export class User {
   @Prop({ type: String, required: true, unique: true, lowercase: true, trim: true, index: true })
   email!: string;
-  @Prop({ type: String, required: true, select: false })       // never returned by default
+  @Prop({ type: String, required: true, select: false }) // never returned by default
   password!: string;
   @Prop({ type: String, required: true, trim: true })
   name!: string;
@@ -61,8 +67,11 @@ Key behaviors:
 
 - **`password` is `select: false`** — excluded from every query unless explicitly
   projected (`findOne(...).select("+password")`, as `login` does).
-- **`toJSON` transform deletes `password` and `__v`.** It does **not** rename
-  `_id` to `id` — serialized users keep the raw `_id`.
+- **`toJSON` transform deletes `password` and `__v`** as a backstop. The API
+  contract is [`serializeUser`](../../src/modules/user/serialize-user.ts): an
+  explicit allowlist (`PublicUser`: `_id`, `email`, `name`, `role`, `isActive`,
+  `createdAt`, `updatedAt`) applied by the auth and user controllers, so a new
+  schema field is never exposed unless added there. `_id` is not renamed to `id`.
 - **Password hashing** — a `pre("save")` hook bcrypt-hashes the password (cost 12)
   only when modified; `comparePassword` wraps `bcrypt.compare`.
 - **Roles** — enum from the single `ROLES` source of truth
@@ -75,11 +84,11 @@ Key behaviors:
 ```ts
 @Schema({ timestamps: true })
 export class RefreshToken {
-  @Prop({ type: String, required: true, index: true })                 // SHA-256 hash of the JWT
+  @Prop({ type: String, required: true, index: true }) // SHA-256 hash of the JWT
   token!: string;
   @Prop({ type: Types.ObjectId, ref: "User", required: true, index: true })
   userId!: Types.ObjectId;
-  @Prop({ type: Date, required: true, index: { expires: 0 } })         // TTL index
+  @Prop({ type: Date, required: true, index: { expires: 0 } }) // TTL index
   expiresAt!: Date;
   @Prop({ type: Boolean, default: false })
   isRevoked!: boolean;
@@ -94,17 +103,18 @@ export class RefreshToken {
 
 ## Indexes Summary
 
-| Collection | Indexed fields | Why |
-| --- | --- | --- |
-| `users` | `email` (unique) | login lookup + uniqueness |
-| `refreshtokens` | `token` | rotation/logout lookup by hash |
-| `refreshtokens` | `userId` | per-user queries (reuse detection `updateMany`) |
-| `refreshtokens` | `expiresAt` (TTL `expires: 0`) | auto-expiry |
+| Collection      | Indexed fields                 | Why                                             |
+| --------------- | ------------------------------ | ----------------------------------------------- |
+| `users`         | `email` (unique)               | login lookup + uniqueness                       |
+| `refreshtokens` | `token`                        | rotation/logout lookup by hash                  |
+| `refreshtokens` | `userId`                       | per-user queries (reuse detection `updateMany`) |
+| `refreshtokens` | `expiresAt` (TTL `expires: 0`) | auto-expiry                                     |
 
 ## Querying Patterns
 
 - `login` selects the hidden field: `findOne({ email }).select("+password")`.
-- The user module excludes it defensively: `find().select("-password")`.
+- The user module also excludes it at query time (`find().select("-password")`) as
+  defense in depth; the response contract is `serializeUser`, not the projection.
 - Services resolve users by id (`findById(...)`) and check `isActive`.
 
 ## See Also

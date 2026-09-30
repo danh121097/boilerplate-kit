@@ -23,7 +23,7 @@ layout. Package manager: **pnpm**.
 ## Conventions Quick Reference
 
 - **Module pattern**: each feature = `controller.ts` + `service.ts` + `routes.ts` + `validation.ts`; register via `RouteGroup` in `routes/`.
-- **Errors**: throw `AppError`; the global error-handler emits `{ success, status, message, error_code, error_message }`.
+- **Errors**: throw `AppError`; the global error-handler emits `{ success: false, status: "error", errorType, message, error_code, error_message }`. Success responses are `{ success: true, message?, data, meta? }`; user records go through `serializeUser` (`modules/user/serialize-user.ts`).
 - **Filenames**: kebab-case. **File size**: aim ≤ ~200 LOC; split early. **Imports**: `@/` alias.
 - **Security**: never commit secrets/keys; HMAC + auth middleware guard protected routes.
 - **Commits**: Conventional Commits (`feat`, `fix`, `refactor`, …). Do not auto-commit unless asked.
@@ -35,9 +35,10 @@ Full standards: [docs/code-standards.md](./docs/code-standards.md).
 ```bash
 pnpm dev          # tsx watch src/server.ts
 pnpm build        # tsc --noEmit -p tsconfig.build.json && swc src -d dist
-pnpm typecheck    # tsc --noEmit
+pnpm typecheck    # tsc --noEmit -p tsconfig.test.json
 pnpm test         # vitest run
 pnpm lint         # eslint src/**/*.ts
+pnpm format       # prettier --write .
 pnpm start        # node dist/server.js
 ```
 

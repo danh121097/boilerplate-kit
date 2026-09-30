@@ -4,10 +4,11 @@ Back to [Code Standards](../code-standards.md).
 
 ## Tooling at a glance
 
-- **Lint + formatting:** ESLint (flat config) is the single source of truth.
-  **There is no Prettier in this template** — code style is enforced by ESLint
-  and editor auto-fix on save, not a separate formatter.
-- **Type checking:** `tsc --noEmit`.
+- **Lint:** ESLint (flat config). `eslint-config-prettier` is last in the config
+  so ESLint never fights the formatter.
+- **Formatting:** Prettier (`prettier.config.ts`: double quotes, semicolons,
+  trailing commas, 100 columns). `pnpm format` writes, `pnpm format:check` verifies.
+- **Type checking:** `tsc --noEmit -p tsconfig.test.json` (source and tests).
 - **Tests:** Vitest.
 
 ## ESLint flat config
@@ -54,7 +55,9 @@ Run with **pnpm** (the project's package manager):
 ```bash
 pnpm lint         # eslint src/**/*.ts
 pnpm lint:fix     # eslint src/**/*.ts --fix
-pnpm typecheck    # tsc --noEmit
+pnpm typecheck    # tsc --noEmit -p tsconfig.test.json
+pnpm format       # prettier --write .
+pnpm format:check # prettier --check .
 pnpm test         # vitest run
 pnpm test:watch   # vitest (watch mode)
 pnpm test:coverage# vitest run --coverage
@@ -66,8 +69,9 @@ Run `lint` and `typecheck` clean, and `test` green, before opening a PR.
 
 `vitest.config.ts` (`environment: 'node'`, globals on):
 
-- Test files: `src/__tests__/**/*.test.ts` (unit + integration), with
-  `src/__tests__/setup.ts` as the setup file. The `@/` alias resolves via
+- Test files: `src/__tests__/unit/*.test.ts` and `src/__tests__/integration/*.test.ts`
+  (shared fixtures in `src/__tests__/helpers/`), with `src/__tests__/setup.ts` as
+  the setup file. The `@/` alias resolves via
   `vite-tsconfig-paths` against `tsconfig.test.json`.
 - Integration tests use `supertest` (HTTP) and `mongodb-memory-server` (an
   in-memory MongoDB) — no external services required.

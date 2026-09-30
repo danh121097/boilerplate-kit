@@ -5,23 +5,23 @@ each topic links to a focused, concrete page under [`code-standards/`](./code-st
 
 ## Topics
 
-| Page | Covers |
-| --- | --- |
-| [file-naming.md](./code-standards/file-naming.md) | kebab-case `.ts`, module file roles, file-size limit |
-| [naming-conventions.md](./code-standards/naming-conventions.md) | variables, functions, types, Zod schemas, models, API fields |
-| [commit-convention.md](./code-standards/commit-convention.md) | Conventional Commits, header rules, examples |
-| [typescript-node.md](./code-standards/typescript-node.md) | strict TS, `AppError`, async handlers, Zod middleware, `RouteGroup`, env via config |
-| [lint-format.md](./code-standards/lint-format.md) | ESLint flat config, import sorting, scripts, Vitest |
+| Page                                                            | Covers                                                                              |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| [file-naming.md](./code-standards/file-naming.md)               | kebab-case `.ts`, module file roles, file-size limit                                |
+| [naming-conventions.md](./code-standards/naming-conventions.md) | variables, functions, types, Zod schemas, models, API fields                        |
+| [commit-convention.md](./code-standards/commit-convention.md)   | Conventional Commits, header rules, examples                                        |
+| [typescript-node.md](./code-standards/typescript-node.md)       | strict TS, `AppError`, async handlers, Zod middleware, `RouteGroup`, env via config |
+| [lint-format.md](./code-standards/lint-format.md)               | ESLint flat config, import sorting, scripts, Vitest                                 |
 
 ## Core Principles
 
 - **YAGNI / KISS / DRY** — build only what the task needs; no premature
-  abstraction; factor out genuine duplication (see `buildPayload` /
-  `createRefreshTokenInDb` in `src/modules/auth/service.ts`).
+  abstraction; factor out genuine duplication (see `issueTokens` in
+  `src/modules/auth/refresh-session.ts`, shared by register, login and refresh).
 - **kebab-case filenames** — every source file is `kebab-case.ts`
   (`error-handler.ts`, `route-registrar.ts`, `token-revocation.ts`).
 - **≤ ~200 LOC per file** — split early into focused modules. Existing files sit
-  well under this (the largest module file, `auth/service.ts`, is ~165 lines).
+  well under this (the largest source file, `docs/openapi.ts`, is ~161 lines).
 - **`@/` import alias** — import from source roots via `@/`, never deep relative
   chains (`import { AppError } from "@/types"`). Configured in `tsconfig.json`
   `paths` and resolved at build by swc (`.swcrc` `jsc.paths`), in tests by `vite-tsconfig-paths`.

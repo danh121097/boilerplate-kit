@@ -38,7 +38,9 @@ See [`.env.example`](./.env.example) for the complete list. Required values are
 RSA key paths default to `src/keys/rsa.private` and `src/keys/rsa.public`;
 generate them with `pnpm keys`. `LOG_LEVEL` (`debug`, `info`, `warn`, `error`) defaults to `debug` in
 development and `info` in production. `DOCS_ENABLED` optionally forces Swagger on or off (unset = on outside
-production). `TRUST_PROXY` accepts `true`, `false`, or
+production). `PORT` defaults to `3000`, `REDIS_URL` to `redis://localhost:6379`
+(used only when `REDIS_ENABLED=true`), `COOKIE_DOMAIN` (optional) sets the auth cookie domain, and `APP_NAME` (optional) sets the Swagger title.
+`ENABLE_CSRF` turns on the Origin/Referer check for state-changing requests. `TRUST_PROXY` accepts `true`, `false`, or
 comma-separated IP/CIDR ranges. Fastify 5.12 intentionally does not accept
 hop-count trust because it can allow direct clients to spoof forwarded headers.
 
@@ -84,7 +86,8 @@ src/
 ├── app.ts              # Fastify assembly: plugins, hooks, Swagger, routes
 ├── server.ts           # MongoDB/Redis + HTTP bootstrap and shutdown
 ├── config/             # environment, database, Redis, keys, proxy parsing
-├── plugins/            # Fastify security hooks and error handlers
+├── docs/               # Swagger HMAC interceptor and response descriptions
+├── plugins/            # HMAC/CSRF hooks, authenticate, requireMinRole, error handlers
 ├── models/             # Mongoose user and refresh-token models
 ├── modules/            # health, auth, and user route/controller/service modules
 ├── routes/             # API plugin registry
@@ -92,9 +95,9 @@ src/
 ├── types/              # shared application and auth types
 └── utils/              # JWT, password, HMAC, cookies, cache, and token helpers
 test/
-├── api.test.ts         # public HTTP contract via app.inject()
-├── auth-service.test.ts# refresh rotation and reuse at service boundary
-└── helpers/            # HMAC test signer
+├── unit/               # pure helpers, hooks, schemas, config, socket units
+├── integration/        # HTTP routes via app.inject(), services, Socket.IO, Redis outage
+└── helpers/            # HMAC signers, signed-request client, test-user factory
 ```
 
 ## Documentation

@@ -48,7 +48,11 @@ outside production and off in production unless `DOCS_ENABLED=true`;
 
 Registration requires a valid email, password of at least 8 characters, and a
 non-empty name. Login requires a valid email and non-empty password. Zod
-normalizes email to lowercase and trims it. User responses omit password hashes.
+normalizes email to lowercase and trims it. User responses are built by `serializeUser` (`src/modules/user/serialize-user.ts`),
+an allowlist of `_id`, `email`, `name`, `role`, `isActive`, `createdAt`, and
+`updatedAt` (ISO strings), so password hashes and `__v` never appear.
+`/auth/refresh` and `/auth/logout` accept a request with no body at all (cookie-only
+clients) as well as `{ "refreshToken": "..." }`; a non-string `refreshToken` is a 400. The body token wins over the cookie when both are sent.
 Pagination defaults to page 1 and limit 20; limits are capped at 100, and invalid
 numeric values are clamped by `src/utils/pagination.ts`.
 
@@ -71,5 +75,7 @@ Common types include `VALIDATION_ERROR`, `AUTHENTICATION_ERROR`,
 `AUTHORIZATION_ERROR`, `NOT_FOUND`, `CONFLICT`, `RATE_LIMIT`, and
 `INTERNAL_ERROR`. Internal 5xx messages are generic outside development.
 
-The successful user-list envelope includes `meta` with `page`, `limit`,
+Successful responses use `{ success: true, message?, data, meta? }`; `/health` is
+the exception and returns `{ status: "ok", ... }` without the envelope. The
+successful user-list envelope includes `meta` with `page`, `limit`,
 `total`, `totalPages`, `hasNext`, and `hasPrev`.

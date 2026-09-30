@@ -23,16 +23,17 @@ No `index.ts` barrels except the deliberate aggregation points
 Each feature lives in `src/modules/<feature>/` and is split into four files by
 responsibility. Keep each file doing one job:
 
-| File | Responsibility |
-| --- | --- |
+| File            | Responsibility                                                                             |
+| --------------- | ------------------------------------------------------------------------------------------ |
 | `controller.ts` | HTTP layer: read `req`, call the service, shape `res.json(...)`. No business logic, no DB. |
-| `service.ts` | Business logic + data access. Throws `AppError`. Pure of `req`/`res`. |
-| `routes.ts` | Declarative `RouteGroup`: method, path, middleware chain, handler. |
-| `validation.ts` | Zod schemas + the `validate()` middleware factory for this feature. |
+| `service.ts`    | Business logic + data access. Throws `AppError`. Pure of `req`/`res`.                      |
+| `routes.ts`     | Declarative `RouteGroup`: method, path, middleware chain, handler.                         |
+| `validation.ts` | Zod schemas + the `validate()` middleware factory for this feature.                        |
 
 Reference: `src/modules/auth/{controller,service,routes,validation}.ts`. A
 smaller feature may omit files it does not need (e.g. `src/modules/user/` has no
-`service.ts`/`validation.ts`) — add a file only when there is real content for it
+`validation.ts`) and may add focused helpers (`auth/refresh-session.ts`,
+`user/serialize-user.ts`) — add a file only when there is real content for it
 (YAGNI).
 
 ## File size

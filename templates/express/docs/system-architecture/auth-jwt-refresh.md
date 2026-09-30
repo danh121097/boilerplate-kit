@@ -5,15 +5,16 @@ tokens delivered as httpOnly cookies. Source:
 [`utils/jwt.ts`](../../src/utils/jwt.ts), [`utils/cookie.ts`](../../src/utils/cookie.ts),
 [`models/refresh-token.ts`](../../src/models/refresh-token.ts),
 [`modules/auth/service.ts`](../../src/modules/auth/service.ts),
+[`modules/auth/refresh-session.ts`](../../src/modules/auth/refresh-session.ts),
 [`middleware/auth.ts`](../../src/middleware/auth.ts),
 [`utils/token-revocation.ts`](../../src/utils/token-revocation.ts).
 
 ## Two Token Types
 
-| | Access token | Refresh token |
-| --- | --- | --- |
-| Algorithm | **RS256** (RSA private/public keypair) | **HS256** (symmetric secret) |
-| Lifetime | `JWT_ACCESS_EXPIRY` (default `15m`) | `JWT_REFRESH_EXPIRY` (default `7d`) |
+|           | Access token                           | Refresh token                       |
+| --------- | -------------------------------------- | ----------------------------------- |
+| Algorithm | **RS256** (RSA private/public keypair) | **HS256** (symmetric secret)        |
+| Lifetime  | `JWT_ACCESS_EXPIRY` (default `15m`)    | `JWT_REFRESH_EXPIRY` (default `7d`) |
 
 Both expiries must match `<positive integer><s|m|h|d>` (`15m`, `7d`); anything
 else (`900`, `1w`, `0`, `-5m`) fails boot with a clear message.
@@ -42,24 +43,22 @@ configured it is `undefined`, which disables the check on BOTH sign and verify
 
 ```ts
 // utils/jwt.ts — TOKEN_ISSUER is set on sign AND enforced on verify
-const TOKEN_ISSUER = Array.isArray(config.corsOrigins)
-  ? config.corsOrigins[0]
-  : config.corsOrigins;
+const TOKEN_ISSUER = Array.isArray(config.corsOrigins) ? config.corsOrigins[0] : config.corsOrigins;
 
 export function signAccessToken(payload: JwtPayload): string {
-  return jwt.sign({ ...payload, token_use: 'access' }, config.jwtAccessPrivateKey, {
-    algorithm: 'RS256',
+  return jwt.sign({ ...payload, token_use: "access" }, config.jwtAccessPrivateKey, {
+    algorithm: "RS256",
     issuer: TOKEN_ISSUER,
     expiresIn: config.jwtAccessExpiry,
   });
 }
 
 export function signRefreshToken(payload: JwtPayload): string {
-  return jwt.sign({ ...payload, token_use: 'refresh' }, config.jwtRefreshSecret, {
-    algorithm: 'HS256',
+  return jwt.sign({ ...payload, token_use: "refresh" }, config.jwtRefreshSecret, {
+    algorithm: "HS256",
     issuer: TOKEN_ISSUER,
     expiresIn: config.jwtRefreshExpiry,
-    jwtid: crypto.randomUUID(),   // unique jti → two tokens are never byte-identical
+    jwtid: crypto.randomUUID(), // unique jti → two tokens are never byte-identical
   });
 }
 ```
@@ -75,7 +74,7 @@ it reads `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH`, runs a sign/verify
 self-test, and only `test`/`development` may fall back to an ephemeral in-memory
 keypair — any other env throws (fail-closed, never forge tokens silently). The
 keypair signs and verifies **access** tokens. Refresh tokens are signed and
-verified with `JWT_REFRESH_SECRET` — a symmetric secret (≥32 chars, required).
+verified with `JWT_REFRESH_SECRET` — a required symmetric secret (use ≥32 random chars; length is not enforced).
 The `JwtPayload` carries `{ userId, email, role }` only — never `exp`/`iat`/`iat_ms`
 (owned by `expiresIn`).
 
@@ -109,9 +108,9 @@ expired documents.
 ```ts
 const baseCookieOptions = {
   httpOnly: true,
-  secure: config.isProduction,                       // HTTPS-only in prod
-  sameSite: config.isProduction ? 'strict' : 'lax',
-  path: '/',
+  secure: config.isProduction, // HTTPS-only in prod
+  sameSite: config.isProduction ? "strict" : "lax",
+  path: "/",
 };
 // accessToken  → path '/',          maxAge = JWT_ACCESS_EXPIRY  (default 15m)
 // refreshToken → path `${apiPrefix}/auth`, maxAge = JWT_REFRESH_EXPIRY (default 7d)
@@ -128,7 +127,7 @@ using the matching paths.
 
 ## Auth Flows
 
-All flows live in [`modules/auth/service.ts`](../../src/modules/auth/service.ts) /
+register / login / me live in [`modules/auth/service.ts`](../../src/modules/auth/service.ts); token issue, refresh rotation and logout live in [`modules/auth/refresh-session.ts`](../../src/modules/auth/refresh-session.ts). Controllers:
 [`controller.ts`](../../src/modules/auth/controller.ts).
 
 - **register** (`POST /auth/register`) — `validatePasswordStrength`, reject
@@ -154,13 +153,14 @@ All flows live in [`modules/auth/service.ts`](../../src/modules/auth/service.ts)
 
 ### Refresh Rotation
 
-`AuthService.refresh` rotates on every use — a stolen-and-replayed token is
+`refresh` (`refresh-session.ts`, re-exported by `auth/service.ts`) rotates on every use — a stolen-and-replayed token is
 detectable and the chain self-heals. The old token is **claimed atomically**, so
 concurrent refreshes with the same token produce exactly one `200`:
 
 ```ts
 const hashedToken = hashToken(rawRefreshToken);
-const stored = await RefreshToken.findOneAndUpdate(      // 1. atomic claim = revoke OLD
+const stored = await RefreshToken.findOneAndUpdate(
+  // 1. atomic claim = revoke OLD
   { token: hashedToken, isRevoked: false, expiresAt: { $gt: new Date() } },
   { isRevoked: true, rotatedAt: new Date() },
 );
@@ -169,9 +169,8 @@ const token = stored ?? (await classifyUnclaimableToken(hashedToken)); // 2. re-
 //   → benign retry, continue and issue a fresh pair · any other revoked token → REUSE:
 //   revoke every refresh token of the user (clearing rotatedAt), revokeUserTokens,
 //   disconnect their sockets → 401 · expired → deleteOne → 401
-// ...resolve user, then:
-const accessToken = signAccessToken(payload);
-const newRefreshToken = await createRefreshTokenInDb(user._id, payload); // issue NEW
+// ...resolve user, then issue the NEW pair in the same family:
+const tokens = await issueTokens(user, token.familyId);
 ```
 
 Each refresh **revokes the old token and issues a fresh pair**; new cookies are
@@ -182,7 +181,7 @@ unchanged error; `5xx`/`429` leave cookies alone.
 Clients must single-flight refreshes (the frontend templates lock across tabs).
 
 **Reuse grace window.** A rotated token presented again within
-`REFRESH_REUSE_GRACE_MS` (10 s, `modules/auth/service.ts`) is a retry or a race
+`REFRESH_REUSE_GRACE_MS` (10 s, `modules/auth/refresh-session.ts`) is a retry or a race
 between tabs, not theft: it gets a fresh access + refresh pair exactly like a
 normal refresh and nothing is revoked. This matters in a browser, where the
 first response already set new cookies — refusing the second request would clear
@@ -238,5 +237,5 @@ warning and `getUserRevokedAt` returns `null` immediately.
 ## See Also
 
 - [hmac-verification.md](./hmac-verification.md) — every auth route is also HMAC-gated
-- [database-mongoose.md](./database-mongoose.md) — User model, password hashing, `toJSON`
+- [database-mongoose.md](./database-mongoose.md) — User model, password hashing, public serialization
 - [realtime-socket.md](./realtime-socket.md) — sockets reuse `verifyAccessToken` + revocation

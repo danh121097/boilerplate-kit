@@ -12,22 +12,23 @@ Source: [`src/app.ts`](../../src/app.ts), [`src/routes/index.ts`](../../src/rout
 app.use(helmet());                         // 1. security headers
 if (!config.isTest) app.use(morgan(...));  // 2. request logging (skipped in test)
 app.use(compression());                    // 3. response compression
-app.use(cors({ origin: config.corsOrigin, credentials: true })); // 4. CORS + cookies
+app.use(cors({ origin: config.corsOrigins, credentials: true })); // 4. CORS + cookies
 app.use(express.json());                   // 5. JSON body parser
 app.use(cookieParser());                   // 6. parse cookies (refresh/access cookie)
 app.get("/docs/json", ...);                // 7. public OpenAPI document (if docsEnabled)
 app.use("/docs", swaggerUi.serve, ...);    // 8. public Swagger UI (if docsEnabled)
 app.use(config.apiPrefix, verifyHmacRequest);  // 9. HMAC gate, all API routes
-app.use(config.apiPrefix, globalRateLimiter);  // 10. 100/min default limiter
-app.use(config.apiPrefix, routes);             // 11. route registry
-app.use(notFoundHandler);                  // 12. 404 catch-all (must be after routes)
-app.use(errorHandler);                     // 13. error envelope (must be LAST)
+app.use(config.apiPrefix, verifyOrigin);       // 10. CSRF origin guard (no-op unless ENABLE_CSRF=true)
+app.use(config.apiPrefix, globalRateLimiter);  // 11. 100/min default limiter
+app.use(config.apiPrefix, routes);             // 12. route registry
+app.use(notFoundHandler);                  // 13. 404 catch-all (must be after routes)
+app.use(errorHandler);                     // 14. error envelope (must be LAST)
 ```
 
 Key points:
 
 - **`cors(... credentials: true)`** is required for the httpOnly cookie auth to
-  work cross-origin; `origin` comes from `CORS_ORIGIN`.
+  work cross-origin; `origin` is the hard-coded `config.corsOrigins` list.
 - **`cookieParser()` runs before** HMAC/routes so `req.cookies.refreshToken` /
   `req.cookies.accessToken` are available to the auth controller and middleware.
 - **HMAC and the global rate limiter mount on `config.apiPrefix`** (`/api/v1` by
@@ -93,8 +94,10 @@ Example — `POST /api/v1/auth/login`:
 4. Controller sets httpOnly cookies (`setTokenCookies`) and returns
    `{ success: true, message, data: { user, tokens } }`.
 
-Success responses are plain JSON objects (`{ success, message, data }` for auth;
-`{ status: 'success', data }` for the user module). Errors never reach the
+Success responses are plain JSON objects: `{ success: true, message?, data, meta? }`
+(auth includes `message`; list endpoints add `meta`). The health route keeps its
+own `{ status: "ok", ... }` shape. User records are projected through
+`serializeUser` (`modules/user/serialize-user.ts`). Errors never reach the
 controller body — they propagate to the global error handler.
 
 ## See Also

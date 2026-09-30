@@ -18,7 +18,7 @@ Opinionated Node.js + TypeScript backend built on Express 5. Production-grade st
 | Passwords      | bcrypt                                                                                          |
 | Testing        | Vitest + supertest + `mongodb-memory-server` (no external Mongo needed)                         |
 | Build          | `tsc --noEmit` type-check + `swc`                                                               |
-| Lint           | ESLint flat config (typescript-eslint)                                                          |
+| Lint / format  | ESLint flat config (typescript-eslint) + Prettier                                               |
 | API docs       | OpenAPI spec + Swagger UI at `/docs`                                                            |
 
 ## Setup
@@ -40,20 +40,22 @@ gitignored — never commit `rsa.private`. Rotate with `pnpm keys --force` (or `
 
 All variables are documented in [`.env.example`](.env.example). Key ones:
 
-| Variable                                       | Purpose                                                                                                                                   |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `PORT`                                         | HTTP port (default 3000)                                                                                                                  |
-| `MONGODB_URI`                                  | MongoDB connection string                                                                                                                 |
-| `API_PREFIX`                                   | Base path all routes mount under (default `/api/v1`)                                                                                      |
-| `CORS_ORIGIN`                                  | Allowed CORS origin                                                                                                                       |
-| `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH` | RS256 key file paths (access)                                                                                                             |
-| `JWT_REFRESH_SECRET`                           | HS256 symmetric secret for refresh tokens (≥32 chars, required)                                                                           |
-| `JWT_ACCESS_EXPIRY` / `JWT_REFRESH_EXPIRY`     | Token lifetimes                                                                                                                           |
-| `HMAC_SECRET`                                  | Secret for HMAC request signing                                                                                                           |
-| `REDIS_ENABLED` / `REDIS_URL`                  | Toggle + connection for Redis features                                                                                                    |
-| `TRUST_PROXY`                                  | Optional. Behind a reverse proxy/LB: a hop count (`1`, preferred over `true`), or a comma-separated IP/subnet list. Unset = trust nothing |
-| `LOG_LEVEL`                                    | Optional. `debug` / `info` / `warn` / `error`. Unset = `debug` in development, `info` in production                                       |
-| `DOCS_ENABLED`                                 | Optional. Swagger UI + OpenAPI at `/docs`. Unset = on outside production, off in production; `true`/`false` overrides                     |
+| Variable                                       | Purpose                                                                                                                                                                                                   |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PORT`                                         | HTTP port (default 3000)                                                                                                                                                                                  |
+| `MONGODB_URI`                                  | MongoDB connection string                                                                                                                                                                                 |
+| `API_PREFIX`                                   | Base path all routes mount under (default `/api/v1`)                                                                                                                                                      |
+| `ENABLE_CSRF`                                  | Optional. `true` turns on the Origin allow-list guard for mutating methods (default off). Allowed origins are the hard-coded `corsOrigins` list in `src/config/environment.ts` — edit it before deploying |
+| `COOKIE_DOMAIN`                                | Optional. Cookie `Domain` for split-domain deploys. Unset = host-only cookie                                                                                                                              |
+| `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH` | RS256 key file paths (access)                                                                                                                                                                             |
+| `JWT_REFRESH_SECRET`                           | HS256 symmetric secret for refresh tokens (required; use ≥32 random chars — length is not enforced)                                                                                                       |
+| `JWT_ACCESS_EXPIRY` / `JWT_REFRESH_EXPIRY`     | Token lifetimes                                                                                                                                                                                           |
+| `HMAC_SECRET`                                  | Secret for HMAC request signing                                                                                                                                                                           |
+| `REDIS_ENABLED` / `REDIS_URL`                  | Toggle + connection for Redis features                                                                                                                                                                    |
+| `TRUST_PROXY`                                  | Optional. Behind a reverse proxy/LB: a hop count (`1`, preferred over `true`), or a comma-separated IP/subnet list. Unset = trust nothing                                                                 |
+| `LOG_LEVEL`                                    | Optional. `debug` / `info` / `warn` / `error`. Unset = `debug` in development, `info` in production                                                                                                       |
+| `APP_NAME`                                     | Optional. Swagger title; unset = default title                                                                                                                                                            |
+| `DOCS_ENABLED`                                 | Optional. Swagger UI + OpenAPI at `/docs`. Unset = on outside production, off in production; `true`/`false` overrides                                                                                     |
 
 ## Routes
 
@@ -68,7 +70,7 @@ Mounted under `API_PREFIX` (default `/api/v1`):
 | POST   | `/auth/logout`   | public         | Revoke session / clear cookie  |
 | GET    | `/auth/me`       | access token   | Current user                   |
 | GET    | `/users`         | admin          | List users                     |
-| GET    | `/users/:id`     | access token   | Get user by ID                 |
+| GET    | `/users/:id`     | admin          | Get user by ID                 |
 
 OpenAPI JSON is served at `/docs/json` and Swagger UI at `/docs`. In
 development, Swagger UI signs "Try it out" requests automatically, so only a
@@ -82,7 +84,9 @@ outside production and off in production unless `DOCS_ENABLED=true`;
 
 - `dev` — watch-mode dev server (tsx)
 - `build` — type-check (`tsconfig.build.json`) then compile `src` to `dist` with swc
-- `typecheck` — `tsc --noEmit`
+- `typecheck` — `tsc --noEmit -p tsconfig.test.json` (includes tests)
+- `keys` — generate the RSA keypair (`--force` rotates)
+- `format` / `format:check` — Prettier
 - `start` — run the built server with Node (`node dist/server.js`)
 - `lint` / `lint:fix` — ESLint
 - `test` / `test:watch` / `test:coverage` — Vitest
@@ -94,15 +98,16 @@ src/
 ├── app.ts              # Express app assembly (middleware, routes)
 ├── server.ts           # HTTP + Socket.io bootstrap
 ├── config/             # environment, database, redis, key loading
-├── middleware/         # auth, role, hmac, rate-limit, error handlers
+├── docs/               # OpenAPI document builder + Swagger HMAC interceptor
+├── middleware/         # auth, role, hmac, verify-origin, rate-limit, error handlers
 ├── models/             # Mongoose models (user, refresh-token)
-├── modules/            # feature modules (auth, user): controller/routes/service/validation
+├── modules/            # feature modules (auth, user): controller/routes/service/validation (+ auth/refresh-session, user/serialize-user)
 ├── routes/             # route registry + health check
 ├── socket/             # Socket.io auth + hmac middleware + event wiring
-├── types/              # shared types (auth, routing)
-├── utils/              # jwt, password, hmac, cache, cookie, token-revocation helpers
+├── types/              # shared types (auth, routing, pagination)
+├── utils/              # jwt, password, hmac, cache, cookie, logger, pagination, token-revocation helpers
 ├── keys/               # setup.sh + generated RSA keys (gitignored)
-└── __tests__/          # unit + integration tests
+└── __tests__/          # unit/, integration/, helpers/ (Vitest)
 ```
 
 ## License

@@ -57,8 +57,8 @@ automatically — treat it as source of truth and this page as the stable summar
 | POST   | `/api/v1/auth/refresh`  | HMAC, `@Public`, `auth` throttler (30/15m), `RefreshDto`  | `{ refreshToken?: string }` (or `refreshToken` cookie; an empty string or a bodyless request falls back to the cookie) | `{ success: true, message, data: { tokens } }` + rotated cookies. `401` if missing/invalid/expired/reused after the grace window, with both token cookies cleared (`Set-Cookie` expired, `refreshToken` on its auth path); body unchanged |
 | POST   | `/api/v1/auth/logout`   | HMAC, `@Public`, `auth` throttler (30/15m), `RefreshDto`  | `{ refreshToken?: string }` (or cookie; bodyless allowed)                                                              | `{ success: true, message }` + cleared cookies; the user's sockets are disconnected                                                                                                                                                       |
 | GET    | `/api/v1/auth/me`       | HMAC, JWT                                                 | —                                                                                                                      | `{ success: true, data: { user } }`                                                                                                                                                                                                       |
-| GET    | `/api/v1/users`         | HMAC, JWT, `@Roles('admin')`                              | — (query: `page`≥1 def 1, `limit` 1–100 def 20)                                                                        | `{ success: true, data: User[], meta: OffsetMeta }` (passwords stripped). `403` if below admin                                                                                                                                            |
-| GET    | `/api/v1/users/:id`     | HMAC, JWT, `@Roles('admin')`                              | —                                                                                                                      | `{ success: true, data: User }` (password stripped). `404` if not found                                                                                                                                                                   |
+| GET    | `/api/v1/users`         | HMAC, JWT, `@Roles('admin')`                              | — (query: `page`≥1 def 1, `limit` 1–100 def 20)                                                                        | `{ success: true, data: PublicUser[], meta: OffsetMeta }` (`serializeUser` allowlist). `403` if below admin                                                                                                                               |
+| GET    | `/api/v1/users/:id`     | HMAC, JWT, `@Roles('admin')`                              | —                                                                                                                      | `{ success: true, data: PublicUser }` (`serializeUser` allowlist). `404` if not found                                                                                                                                                     |
 
 ## Error shape
 
@@ -110,11 +110,12 @@ values are clamped, never rejected.
 
 ```ts
 const { page, limit, skip } = parseOffsetPagination(query);
-const [rows, total] = await Promise.all([
+const [users, total] = await Promise.all([
   this.userModel.find().select("-password").sort({ _id: -1 }).skip(skip).limit(limit),
   this.userModel.countDocuments(),
 ]);
-return { success: true, data: rows, meta: buildOffsetMeta(total, page, limit) };
+// controller: every user goes through the serializeUser allowlist (PublicUser)
+return { success: true, data: users.map(serializeUser), meta: buildOffsetMeta(total, page, limit) };
 ```
 
 ### Cursor (`?cursor&limit`) — keyset alternative for feed-style lists

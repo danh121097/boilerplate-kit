@@ -4,6 +4,7 @@ A WebSocket layer attached to the same HTTP server via `@nestjs/websockets`,
 gated by the same security model as the REST API (HMAC then JWT). Source:
 [`realtime/events.gateway.ts`](../../src/modules/realtime/events.gateway.ts),
 [`realtime/socket-io.adapter.ts`](../../src/modules/realtime/socket-io.adapter.ts),
+[`realtime/handshake-middleware.ts`](../../src/modules/realtime/handshake-middleware.ts),
 [`realtime/socket-emit.service.ts`](../../src/modules/realtime/socket-emit.service.ts),
 [`realtime/events.ts`](../../src/modules/realtime/events.ts).
 
@@ -38,6 +39,8 @@ const server = super.createIOServer(port, {
 if (this.pubClient) {
   server.adapter(createAdapter(createSafePubClient(pub, warn), subClient)); // cross-instance delivery
 }
+server.use(createSocketHmacMiddleware(hmacService)); // handshake gate 1
+server.use(createSocketAuthMiddleware(tokenService, revocationService)); // handshake gate 2
 ```
 
 Notes:
@@ -64,9 +67,16 @@ Notes:
 
 ## Handshake Gates (order matters)
 
-`handleConnection` runs two checks on every handshake — **HMAC first, then JWT**
-— mirroring the HTTP guard order. Any failure calls `rejectClient` (emit `error`
-with `SOCKET_UNAUTHORIZED` = `'Unauthorized!'`, then `disconnect(true)`).
+Two Socket.IO middlewares registered by `SocketIoAdapter.createIOServer`
+([`handshake-middleware.ts`](../../src/modules/realtime/handshake-middleware.ts))
+run on every handshake — **HMAC first, then JWT** — mirroring the HTTP guard
+order. Any failure calls `next(new Error(SOCKET_UNAUTHORIZED))` (`'Unauthorized!'`),
+so the client gets a `connect_error` and the connection is never established.
+`EventsGateway.handleConnection` only runs for accepted sockets; it has no
+injected dependencies and only joins the `user:<userId>` room and emits
+`AUTHENTICATED`. As a safety net it still emits `error` (`SOCKET_UNAUTHORIZED`) and
+disconnects a socket that arrives without `socket.data.user`, in case the gateway
+is ever mounted under an adapter that does not install the middleware.
 
 ### 1. HMAC gate
 
@@ -74,11 +84,11 @@ Reads `sig` and `ctime` from the handshake `auth` payload and verifies a
 **fixed** contract:
 
 ```ts
-this.hmacService.verifyHmac({
+hmacService.verifyHmac({
   method: "GET",
-  contentType: DEFAULT_CONTENT_TYPE,   // 'application/json' — socket-only default
+  contentType: DEFAULT_CONTENT_TYPE, // 'application/json' — socket-only default
   ctime,
-  path: SOCKET_HMAC_PATH,              // '/socket'
+  path: SOCKET_HMAC_PATH, // '/socket'
   sig,
 });
 ```
@@ -93,28 +103,30 @@ Extracts the access token from `handshake.auth.token` (strips a `Bearer ` prefix
 or the `accessToken` cookie, then:
 
 ```ts
-const payload = this.tokenService.verifyAccessToken(token);
-const revokedAt = await this.tokenRevocationService.getUserRevokedAt(payload.userId);
-if (isTokenRevoked(payload, revokedAt)) return this.rejectClient(client); // iat_ms < cutoff (ms)
-client.data.user = payload;
+const payload = tokenService.verifyAccessToken(token);
+const revokedAt = await revocationService.getUserRevokedAt(payload.userId);
+if (isTokenRevoked(payload, revokedAt)) return next(new Error(SOCKET_UNAUTHORIZED)); // iat_ms < cutoff (ms)
+socket.data.user = payload;
+next();
+// later, EventsGateway.handleConnection:
 void client.join(`user:${payload.userId}`);
 client.emit(SOCKET_EVENT.AUTHENTICATED);
 ```
 
 Same `verifyAccessToken` + user-level revocation check as the HTTP JWT step
 (revocation is no-op / fail-open when Redis is off). On success
-`client.data.user` is populated and the per-user room is joined.
+`socket.data.user` is populated; the gateway then joins the per-user room.
 
 ## Events
 
 [`realtime/events.ts`](../../src/modules/realtime/events.ts) is the central event-name
 registry (reference these constants instead of string literals):
 
-| Constant | Value | Direction |
-| --- | --- | --- |
+| Constant                     | Value             | Direction                                |
+| ---------------------------- | ----------------- | ---------------------------------------- |
 | `SOCKET_EVENT.AUTHENTICATED` | `'authenticated'` | server → client, on successful handshake |
-| `SOCKET_EVENT.PING` | `'ping'` | reserved app event |
-| `SOCKET_UNAUTHORIZED` | `'Unauthorized!'` | handshake rejection error message |
+| `SOCKET_EVENT.PING`          | `'ping'`          | reserved app event                       |
+| `SOCKET_UNAUTHORIZED`        | `'Unauthorized!'` | handshake rejection error message        |
 
 ## Emitting From Services
 
@@ -124,8 +136,8 @@ gateway. Both helpers **no-op** when the server isn't initialized (tests, CLI,
 pre-listen) and reach other instances when the Redis adapter is on:
 
 ```ts
-emitToUser(userId, event, payload);   // gateway.server?.to(`user:${userId}`).emit(...)
-emitBroadcast(event, payload);        // gateway.server?.emit(...)
+emitToUser(userId, event, payload); // gateway.server?.to(`user:${userId}`).emit(...)
+emitBroadcast(event, payload); // gateway.server?.emit(...)
 ```
 
 `emitToUser` targets the per-user room joined on connection. Inject

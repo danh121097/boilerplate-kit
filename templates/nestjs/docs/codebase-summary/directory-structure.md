@@ -13,6 +13,7 @@ src/
 │   ├── config.module.ts       # AppConfigModule: ConfigModule.forRoot with Zod env validation; provides AppConfigService
 │   ├── app-config.service.ts  # Typed getters for every env var; loads + self-tests RSA keypair at construction
 │   ├── env.schema.ts          # Zod schema: required vs optional env vars + defaults; validateEnv()
+│   ├── trust-proxy.util.ts    # parse TRUST_PROXY (bool / hop count / IP list) for Express `trust proxy`
 │   └── keys.ts                # loadRsaKeyPair: read PEM files, sign/verify self-test (fail-closed)
 │
 ├── keys/
@@ -27,13 +28,16 @@ src/
 │   │   ├── hmac.service.ts             # canonical string-to-sign, computeSignature, verifyHmac, constants (MAX age, SOCKET path)
 │   │   └── cache.service.ts            # cache-aside get/set/del helpers (no-op when Redis off)
 │   ├── utils/
-│   │   └── pagination.util.ts          # offset + cursor pagination parsers/meta builders
+│   │   ├── pagination.util.ts          # offset + cursor pagination parsers/meta builders
+│   │   └── duration.util.ts            # parse `<n><s|m|h|d>` durations to seconds (JWT expiry, cookies, DB expiry)
 │   ├── swagger/
 │   │   └── hmac-interceptor.ts         # dev-tooling: auto-sign Swagger "Try it out" requests with HMAC
 │   ├── throttler/
 │   │   └── throttler.module.ts         # named-throttler config (default / auth / strict tiers)
 │   ├── guards/
-│   │   └── security.guard.ts  # Composite guard: HMAC → origin/CSRF → JWT → role; derivePath helper
+│   │   ├── security.guard.ts  # Composite guard: HMAC → origin/CSRF → JWT → role
+│   │   ├── origin-check.ts    # assertAllowedOrigin: deny-by-default CSRF origin check (GET/HEAD/OPTIONS exempt)
+│   │   └── derive-path.ts     # derivePath: strip apiPrefix + query to get the signed path
 │   ├── decorators/
 │   │   ├── public.decorator.ts      # @Public() → IS_PUBLIC_KEY (skip JWT step)
 │   │   ├── roles.decorator.ts       # @Roles(role) → ROLES_KEY (min-role rank)
@@ -42,7 +46,8 @@ src/
 │   │   └── app.exception.ts   # AppException (extends HttpException) + ErrorType union
 │   ├── filters/
 │   │   ├── http-exception.filter.ts # global filter → standard JSON error envelope
-│   │   └── map-database-error.ts    # Mongoose/Mongo errors → 400/409 AppException
+│   │   ├── map-database-error.ts    # Mongoose/Mongo errors → 400/409 AppException
+│   │   └── map-body-parser-error.ts # body-parser errors (413 / malformed JSON) → 4xx AppException
 │   ├── pipes/
 │   │   └── zod-validation.pipe.ts   # re-export of nestjs-zod ZodValidationPipe (global)
 │   ├── middleware/
@@ -75,13 +80,15 @@ src/
 │   ├── user/
 │   │   ├── user.module.ts      # forFeature([User]); UserController + UserService
 │   │   ├── user.controller.ts  # @Controller('users'): list (@Roles admin) + get-by-id
-│   │   └── user.service.ts     # listUsers (offset pagination) + getUserById
+│   │   ├── user.service.ts     # listUsers (offset pagination) + getUserById
+│   │   └── serialize-user.ts   # serializeUser allowlist → PublicUser (the response contract)
 │   ├── health/
 │   │   ├── health.module.ts    # HealthController
 │   │   └── health.controller.ts # GET /health (@Public): server + DB + Redis status
 │   └── realtime/
 │       ├── realtime.module.ts  # EventsGateway + SocketEmitService
-│       ├── events.gateway.ts   # @WebSocketGateway: handleConnection HMAC→JWT, per-user room, AUTHENTICATED
+│       ├── events.gateway.ts   # @WebSocketGateway: handleConnection joins per-user room, emits AUTHENTICATED
+│       ├── handshake-middleware.ts # io.use HMAC + JWT gates (reject at handshake)
 │       ├── socket-io.adapter.ts # SocketIoAdapter: CORS/heartbeat/payload cap (always) + Redis pub/sub fan-out (when enabled)
 │       ├── socket-emit.service.ts # emitToUser / emitBroadcast / disconnectUser service-facing helpers
 │       └── events.ts           # SOCKET_EVENT registry + SOCKET_UNAUTHORIZED
@@ -89,7 +96,9 @@ src/
 └── redis/
     ├── redis.module.ts        # @Global RedisModule: shared ioredis client (or null) + lifecycle
     ├── redis.service.ts       # getClient(): Redis | null
-    └── redis.constants.ts     # REDIS_CLIENT injection token
+    ├── redis.constants.ts     # REDIS_CLIENT injection token
+    ├── redis-ready.util.ts    # isRedisReady: connected-and-usable check (outage fails open)
+    └── safe-pub-client.ts     # pub-client proxy: publish rejections become warn logs (socket adapter)
 ```
 
 ## Notes

@@ -8,11 +8,11 @@ Back to [Code Standards](../code-standards.md). Filenames are covered in
 - `camelCase` for variables and functions: `accessToken`, `hashedToken`,
   `requiredRank`, `extractAccessToken`.
 - Functions read as verbs: `signAccessToken`, `verifyAccessToken`,
-  `createRefreshTokenInDb`, `revokeUserTokens`, `buildPayload`.
+  `issueTokens`, `revokeUserTokens`, `serializeUser`.
 - Exported handlers are named for the action: `register`, `login`, `refresh`,
   `logout`, `getMe`.
 - Module-level constants are `SCREAMING_SNAKE_CASE`:
-  `REFRESH_TOKEN_EXPIRY_DAYS`, `ROLE_RANK`.
+  `REFRESH_REUSE_GRACE_MS`, `BCRYPT_ROUNDS`, `ROLE_RANK`.
 
 ## Types & interfaces
 
@@ -24,13 +24,13 @@ Back to [Code Standards](../code-standards.md). Filenames are covered in
 
   ```ts
   export type ErrorType =
-    | 'VALIDATION_ERROR'
-    | 'AUTHENTICATION_ERROR'
-    | 'AUTHORIZATION_ERROR'
-    | 'NOT_FOUND'
-    | 'CONFLICT'
-    | 'RATE_LIMIT'
-    | 'INTERNAL_ERROR';
+    | "VALIDATION_ERROR"
+    | "AUTHENTICATION_ERROR"
+    | "AUTHORIZATION_ERROR"
+    | "NOT_FOUND"
+    | "CONFLICT"
+    | "RATE_LIMIT"
+    | "INTERNAL_ERROR";
   ```
 
 ## Roles: single source of truth
@@ -40,9 +40,9 @@ its values — never duplicate the list:
 
 ```ts
 export const ROLES = {
-  USER: 'user',
-  ADMIN: 'admin',
-  SUPER_ADMIN: 'super_admin'
+  USER: "user",
+  ADMIN: "admin",
+  SUPER_ADMIN: "super_admin",
 } as const;
 
 export type Role = (typeof ROLES)[keyof typeof ROLES];
@@ -74,7 +74,9 @@ export type Role = (typeof ROLES)[keyof typeof ROLES];
 
 - **Request bodies** use `camelCase` (validated by Zod): `email`, `password`,
   `name`.
-- **Success responses** follow a stable envelope:
+- **Success responses** follow a stable envelope
+  `{ success: true, message?, data, meta? }` (`meta` on paginated lists). The
+  health route keeps its own `{ status: "ok", ... }` shape:
 
   ```json
   { "success": true, "message": "Login successful!", "data": { "user": {}, "tokens": {} } }

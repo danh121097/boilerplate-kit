@@ -23,8 +23,10 @@ by swc (`.swcrc` `jsc.paths`) and in tests by `vite-tsconfig-paths`. The runtime
 There is no global barrel. Two small, deliberate barrels exist:
 
 - `src/types/index.ts` — exports `AppError`, `ErrorType`, `EnvironmentConfig`.
+  Pagination types live in `src/types/pagination.ts` (imported directly).
   Import shared errors/types as `from '@/types'`.
-- `src/types/auth.ts` — auth-specific types (`ROLES`, `Role`, `JwtPayload`,
+- `src/types/auth.ts` — auth-specific types (`ROLES`, `Role`, `ROLE_RANK` — the
+  single role-rank table `middleware/role.ts` imports — `JwtPayload`,
   `AuthTokens`, document interfaces). Imported directly as `from '@/types/auth'`.
 
 Modules export a single default `RouteGroup` from `routes.ts` and use
@@ -60,7 +62,10 @@ shape for every error:
 }
 ```
 
-`stack` is included only in development. Express 5 forwards thrown errors from
+`stack` is included only in development. Success responses use
+`{ success: true, message?, data, meta? }`; the health route keeps `{ status: "ok", ... }`.
+User records are always projected through `serializeUser` (allowlist), never
+returned as raw documents. Express 5 forwards thrown errors from
 async handlers automatically — no `try/catch` wrapper needed in controllers.
 
 ## Request Validation
@@ -87,7 +92,7 @@ the group as `const x: RouteGroup = { ... }` so the compiler checks every route.
 
 Never read `process.env` outside `src/config/environment.ts`. That file calls
 `dotenv.config()` once, validates required vars (`getRequiredEnvVar` throws on
-missing `MONGODB_URI` / `HMAC_SECRET` / RSA key paths), and exports a
+missing `MONGODB_URI` / `HMAC_SECRET` / `JWT_REFRESH_SECRET`), and exports a
 typed `config: EnvironmentConfig`. Everywhere else:
 
 ```ts
@@ -115,7 +120,7 @@ verify with the public key without holding signing power:
   automatically if `rsa.private` is absent). Keep `rsa.private` out of git.
 
 **Refresh** tokens are HS256-signed with the symmetric secret `JWT_REFRESH_SECRET`
-(≥32 chars, required). Symmetric is the right tool because refresh tokens are
+(required; use ≥32 random chars, length is not enforced). Symmetric is the right tool because refresh tokens are
 only ever verified by this auth server — never sent to third parties. They differ
 from access tokens by the `token_use` claim, expiry, and that they are DB-tracked,
 httpOnly-cookie-delivered, rotated, and reuse-detected. The `token_use` claim

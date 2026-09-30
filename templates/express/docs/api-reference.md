@@ -55,8 +55,8 @@ Bearer <token>` or the `accessToken` cookie; also enforces token revocation
 | POST   | `/api/v1/auth/refresh`  | HMAC, `authRateLimiter` (30/15m)                             | optional `{ refreshToken?: string }` (falls back to the `refreshToken` cookie when absent or `""`; a non-string value is `400 VALIDATION_ERROR`) | `{ success: true, message, data: { tokens: { accessToken, refreshToken } } }` + rotated cookies. A token rotated within the last 10s (retry / parallel tabs) is answered like a normal refresh with a fresh pair. `401 AUTHENTICATION_ERROR` if the token is missing/invalid/expired/reused after that window (reuse revokes every session of the user and disconnects their sockets), with both token cookies cleared (`Set-Cookie` expired, `refreshToken` on its auth path) |
 | POST   | `/api/v1/auth/logout`   | HMAC, `authRateLimiter` (30/15m)                             | optional `{ refreshToken?: string }` (same body/cookie rules as refresh)                                                                         | `{ success: true, message }` + cleared cookies; the user's sockets are disconnected                                                                                                                                                                                                                                                                                                                                                                                            |
 | GET    | `/api/v1/auth/me`       | HMAC, `authenticate`                                         | —                                                                                                                                                | `{ success: true, data: { user } }`                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| GET    | `/api/v1/users`         | HMAC, `authenticate`, `requireMinRole('admin')`              | — (query: `page`≥1 def 1, `limit` 1–100 def 20)                                                                                                  | `{ success: true, data: User[], meta: OffsetMeta }` (passwords stripped). `403` if below admin                                                                                                                                                                                                                                                                                                                                                                                 |
-| GET    | `/api/v1/users/:id`     | HMAC, `authenticate`, `requireMinRole('admin')`              | —                                                                                                                                                | `{ success: true, data: User }` (password stripped). `404` if not found                                                                                                                                                                                                                                                                                                                                                                                                        |
+| GET    | `/api/v1/users`         | HMAC, `authenticate`, `requireMinRole('admin')`              | — (query: `page`≥1 def 1, `limit` 1–100 def 20)                                                                                                  | `{ success: true, data: PublicUser[], meta: OffsetMeta }`. `403` if below admin                                                                                                                                                                                                                                                                                                                                                                                                |
+| GET    | `/api/v1/users/:id`     | HMAC, `authenticate`, `requireMinRole('admin')`              | —                                                                                                                                                | `{ success: true, data: PublicUser }`. `403` if below admin, `404` if not found                                                                                                                                                                                                                                                                                                                                                                                                |
 
 ## Error shape
 
@@ -90,7 +90,7 @@ values are clamped, never rejected.
 {
   "success": true,
   "data": [
-    /* User[] */
+    /* PublicUser[] */
   ],
   "meta": {
     "page": 2,
@@ -133,7 +133,14 @@ res.json({ success: true, data: items, meta }); // meta: { limit, nextCursor, ha
 
 ## Notes
 
+- `user` / `PublicUser` in responses is the allowlisted shape from
+  `serializeUser` (`src/modules/user/serialize-user.ts`): `_id`, `email`, `name`,
+  `role`, `isActive`, `createdAt`, `updatedAt` (ISO strings). No password hash,
+  no `__v`.
+- Success envelope is `{ success: true, message?, data, meta? }`; the health
+  route keeps `{ status: "ok", ... }`.
+
 - `tokens` are also returned in the JSON body for non-browser clients;
   browsers can rely on the httpOnly cookies.
 - Refresh uses rotation: the old refresh token is revoked and a new pair
-  issued on every `/auth/refresh` (`src/modules/auth/service.ts`).
+  issued on every `/auth/refresh` (`src/modules/auth/refresh-session.ts`).

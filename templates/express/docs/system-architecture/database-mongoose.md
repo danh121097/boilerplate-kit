@@ -4,6 +4,7 @@ Mongoose models, transforms, indexes, and the connection lifecycle. Source:
 [`config/database.ts`](../../src/config/database.ts),
 [`models/user.ts`](../../src/models/user.ts),
 [`models/refresh-token.ts`](../../src/models/refresh-token.ts),
+[`modules/user/serialize-user.ts`](../../src/modules/user/serialize-user.ts),
 [`types/auth.ts`](../../src/types/auth.ts).
 
 ## Connection
@@ -11,12 +12,12 @@ Mongoose models, transforms, indexes, and the connection lifecycle. Source:
 [`config/database.ts`](../../src/config/database.ts) connects at boot:
 
 ```ts
-if (!config.isProduction) mongoose.set('debug', true);     // query logging in dev
-await mongoose.connect(config.mongodbUri, { serverSelectionTimeoutMS: 15000 });
+if (!config.isProduction) mongoose.set("debug", true); // query logging in dev
+await mongoose.connect(config.mongodbUri);
 ```
 
-- **Fail-fast** — 15 s server-selection timeout (vs Mongoose's 30 s default) so an
-  unreachable DB surfaces a clear error instead of hanging the boot.
+- **Timeout** — Mongoose's default server-selection timeout (30 s) applies; no
+  custom value is set.
 - **Fail-closed** — on connection error it logs a hint and `process.exit(1)`
   (unlike Redis, the app cannot run without Mongo).
 - Connection-level `error` / `disconnected` events are logged.
@@ -32,16 +33,20 @@ await mongoose.connect(config.mongodbUri, { serverSelectionTimeoutMS: 15000 });
 ```ts
 const userSchema = new Schema<UserDocument>(
   {
-    email:    { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
-    password: { type: String, required: true, select: false },        // never returned by default
-    name:     { type: String, required: true, trim: true },
-    role:     { type: String, enum: Object.values(ROLES), default: ROLES.USER },
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
+    password: { type: String, required: true, select: false }, // never returned by default
+    name: { type: String, required: true, trim: true },
+    role: { type: String, enum: Object.values(ROLES), default: ROLES.USER },
     isActive: { type: Boolean, default: true },
   },
   {
-    timestamps: true,                                                   // createdAt / updatedAt
+    timestamps: true, // createdAt / updatedAt
     toJSON: {
-      transform: (_doc, ret) => { delete ret.password; delete ret.__v; return ret; },
+      transform: (_doc, ret) => {
+        delete ret.password;
+        delete ret.__v;
+        return ret;
+      },
     },
   },
 );
@@ -51,10 +56,12 @@ Key behaviors:
 
 - **`password` is `select: false`** — excluded from every query unless explicitly
   asked (`User.findOne(...).select('+password')`, as `login` does).
-- **`toJSON` transform deletes `password` and `__v`.** Note it does **not** rename
-  `_id` to `id` — serialized users keep the raw `_id` (and the model keeps `__v`
-  internally; it is only stripped from JSON output). So API responses still expose
-  `_id`.
+- **`toJSON` transform deletes `password` and `__v`** — a defensive fallback only.
+  API responses do not rely on it: every user leaves the API through
+  [`serializeUser`](../../src/modules/user/serialize-user.ts), an allowlist
+  projection onto `PublicUser` (`_id` as string, `email`, `name`, `role`,
+  `isActive`, ISO `createdAt` / `updatedAt`). Fields added to the schema later are
+  not exposed until added to `serializeUser`. `_id` is kept (not renamed to `id`).
 - **Password hashing** — a `pre('save')` hook bcrypt-hashes the password (cost 12)
   only when modified; `comparePassword` wraps `bcrypt.compare`.
 - **Roles** — enum from the single `ROLES` source of truth in
@@ -66,10 +73,12 @@ Key behaviors:
 
 ```ts
 {
-  token:     { type: String, required: true, index: true },        // SHA-256 hash of the JWT
+  token:     { type: String, required: true, unique: true },       // SHA-256 hash of the JWT
   userId:    { type: ObjectId, ref: 'User', required: true, index: true },
   expiresAt: { type: Date, required: true, index: { expires: 0 } },// TTL index
+  familyId:  { type: String, index: true },                         // one per login/register chain
   isRevoked: { type: Boolean, default: false },
+  rotatedAt: { type: Date },                                        // set by rotation only (not logout)
 }
 ```
 
@@ -81,17 +90,19 @@ Key behaviors:
 
 ## Indexes Summary
 
-| Collection | Indexed fields | Why |
-| --- | --- | --- |
-| `users` | `email` (unique) | login lookup + uniqueness |
-| `refreshtokens` | `token` | rotation/logout lookup by hash |
-| `refreshtokens` | `userId` | per-user queries |
-| `refreshtokens` | `expiresAt` (TTL `expires: 0`) | auto-expiry |
+| Collection      | Indexed fields                 | Why                                    |
+| --------------- | ------------------------------ | -------------------------------------- |
+| `users`         | `email` (unique)               | login lookup + uniqueness              |
+| `refreshtokens` | `token` (unique)               | rotation/logout lookup by hash         |
+| `refreshtokens` | `familyId`                     | revoke a whole session chain on logout |
+| `refreshtokens` | `userId`                       | per-user queries                       |
+| `refreshtokens` | `expiresAt` (TTL `expires: 0`) | auto-expiry                            |
 
 ## Querying Patterns
 
 - `login` selects the hidden field: `User.findOne({ email }).select('+password')`.
-- The user module excludes it defensively: `User.find().select('-password')`.
+- The user module also excludes it in its queries (`.select('-password')`), and
+  `serializeUser` allowlists the response fields.
 - Services resolve users by id (`User.findById(...)`) and check `isActive`.
 
 ## See Also
