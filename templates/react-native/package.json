@@ -1,6 +1,6 @@
 {
   "name": "react-native-starter",
-  "description": "Expo (managed) + Expo Router mobile starter — NativeWind, TanStack Query, Zustand, SecureStore JWT auth, Socket.IO",
+  "description": "Expo (managed) + Expo Router mobile starter — NativeWind, TanStack Query, Zustand, SecureStore JWT Auth, Socket.IO",
   "version": "1.0.0",
   "private": true,
   "main": "expo-router/entry",

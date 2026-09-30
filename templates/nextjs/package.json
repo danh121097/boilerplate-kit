@@ -1,6 +1,6 @@
 {
   "name": "nextjs-starter",
-  "description": "Next.js 16 + TypeScript SSR starter — App Router, TanStack Query, Zustand, shadcn/ui, Tailwind v4, JWT auth",
+  "description": "Next.js 16 + TypeScript SSR starter — App Router, TanStack Query, Zustand, shadcn/ui, Tailwind v4, JWT Auth",
   "version": "1.0.0",
   "private": true,
   "type": "module",

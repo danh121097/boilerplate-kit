@@ -23,10 +23,10 @@ npm create prism-app@latest
 | **React 19**       | Vite · TanStack Router · TanStack Query · Zustand · shadcn/ui · Tailwind v4         |
 | **Next.js 16**     | App Router · TanStack Query · Zustand · shadcn/ui · Tailwind v4                     |
 | **TanStack Start** | TanStack Ecosystem · Zustand · shadcn/ui · Tailwind v4                              |
-| **React Native**   | Expo · Expo Router · NativeWind · TanStack Query · Zustand · SecureStore · JWT auth |
-| **Express 5**      | TypeScript · Mongoose · Socket.io · Redis · JWT auth · Swagger                      |
-| **Fastify 5**      | TypeScript · Mongoose · Socket.io · Redis · JWT auth · Swagger                      |
-| **NestJS 11**      | TypeScript · Mongoose · Socket.io · Redis · JWT auth · Swagger                      |
+| **React Native**   | Expo · Expo Router · NativeWind · TanStack Query · Zustand · SecureStore · JWT Auth |
+| **Express 5**      | TypeScript · Mongoose · Socket.io · Redis · JWT Auth · Swagger                      |
+| **Fastify 5**      | TypeScript · Mongoose · Socket.io · Redis · JWT Auth · Swagger                      |
+| **NestJS 11**      | TypeScript · Mongoose · Socket.io · Redis · JWT Auth · Swagger                      |
 
 Backends share the same security model — RS256 JWT access + refresh rotation
 (reuse-detected), HMAC-signed requests, RBAC, optional Redis, and Socket.io.

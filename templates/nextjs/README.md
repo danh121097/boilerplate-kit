@@ -1,7 +1,7 @@
 # Next.js Starter
 
 **Next.js 16 + TypeScript SSR starter** — App Router, TanStack React Query,
-Zustand, shadcn/ui + Tailwind v4, JWT auth with HMAC-signed requests.
+Zustand, shadcn/ui + Tailwind v4, JWT Auth with HMAC-signed requests.
 
 ## Stack
 

@@ -1,7 +1,7 @@
 # Project Overview
 
 A Nuxt 4 + TypeScript **SSR** starter, wired for a real backend out of the box:
-an SSR-guarded axios service layer with httpOnly-cookie JWT auth, refresh-token
+an SSR-guarded axios service layer with httpOnly-cookie JWT Auth, refresh-token
 rotation, optional HMAC request signing, TanStack Vue Query for server state,
 Pinia for client state, Socket.IO, and `@nuxtjs/i18n`. The intent is a thin but
 complete foundation — copy it, point the `NUXT_PUBLIC_*` env vars at your API,

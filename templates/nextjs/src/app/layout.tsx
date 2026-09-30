@@ -10,7 +10,7 @@ import "@/app/globals.css";
 export const metadata: Metadata = {
   title: "Next.js Starter",
   description:
-    "Next.js 16 + TypeScript SSR starter — App Router, TanStack Query, Zustand, shadcn/ui, Tailwind v4, JWT auth",
+    "Next.js 16 + TypeScript SSR starter — App Router, TanStack Query, Zustand, shadcn/ui, Tailwind v4, JWT Auth",
 };
 
 interface RootLayoutProps {
