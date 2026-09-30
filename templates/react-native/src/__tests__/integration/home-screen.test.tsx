@@ -35,7 +35,7 @@ const USER = {
 describe("HomeScreen users list", () => {
   it("renders the rows of the paginated data.data", () => {
     mockQuery = {
-      data: { status: "success", data: [USER], meta: META },
+      data: { success: true, data: [USER], meta: META },
       isLoading: false,
       error: null,
     };
@@ -47,7 +47,7 @@ describe("HomeScreen users list", () => {
 
   it("shows users.empty for an empty list", () => {
     mockQuery = {
-      data: { status: "success", data: [], meta: { ...META, total: 0 } },
+      data: { success: true, data: [], meta: { ...META, total: 0 } },
       isLoading: false,
       error: null,
     };

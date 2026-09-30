@@ -30,21 +30,20 @@ interface RefreshContext {
 
 /** Marker fields the interceptor inspects to recognize and route an envelope. */
 interface EnvelopeBody {
-  status?: string;
   success?: boolean;
   error_code?: number;
 }
 
 /**
- * Treat a body as an API envelope only when it carries a recognized marker —
- * `status` of "success"/"error", or a boolean `success`. This avoids
+ * Treat a body as an API envelope only when it carries a boolean `success` —
+ * the marker every backend success and error body carries. This avoids
  * misclassifying domain payloads that merely happen to have a `status` field
  * (e.g. `{ id, status: "done" }`), which would otherwise be rejected as errors.
  */
 function isEnvelope(body: unknown): boolean {
   if (!body || typeof body !== "object") return false;
   const b = body as EnvelopeBody;
-  return b.status === "success" || b.status === "error" || typeof b.success === "boolean";
+  return typeof b.success === "boolean";
 }
 
 /** Request path without query string / hash, for exact endpoint matching. */
@@ -134,10 +133,10 @@ function createResponseInterceptor(opts: ResponseInterceptorOpts) {
       });
     }
     // Unwrap a recognized envelope; otherwise pass the raw response through.
-    // Accepts either convention: { status: "success"|"error", ... } or { success, ... }.
+    // Envelope shape: { success: true, data, ... } on success, { success: false, ... } on failure.
     if (isEnvelope(response.data)) {
       const body = response.data as EnvelopeBody;
-      if (body.status === "success" || body.success === true) return response.data;
+      if (body.success === true) return response.data;
       if (body.error_code === 401) {
         const retry = refreshAndRetry(response.config, response.data as ApiResponseError);
         if (retry) return retry;

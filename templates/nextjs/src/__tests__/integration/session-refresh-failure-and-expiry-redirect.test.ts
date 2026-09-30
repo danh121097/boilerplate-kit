@@ -83,7 +83,7 @@ describe("session auth flows", () => {
     const { post, client } = setup(hasSessionHint);
     post.mockResolvedValue({ data: {} });
     const http = client(async (config) =>
-      config._retry ? ok(config, { status: "success", data: 1 }) : httpError(config, 401),
+      config._retry ? ok(config, { success: true, data: 1 }) : httpError(config, 401),
     );
 
     await http.get("/users");

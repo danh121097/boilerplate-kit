@@ -11,7 +11,7 @@ import type { AxiosResponse, InternalAxiosRequestConfig } from "axios";
  * Dev-only mock of the backend users routes (`GET /users`, `GET /users/:id`),
  * answered next to the mock auth (see `services/auth/mock-auth.ts`): same flag,
  * same seam, same production guard. Mirrors the express users module: the
- * `{ status: "success", data, meta }` envelope with offset pagination, no
+ * `{ success: true, data, meta }` envelope with offset pagination, no
  * passwords, `401` without a session, `403` below admin, `404` for an unknown id.
  *
  * The list is a fixed fixture: the demo user (an admin, so the built-in users
@@ -146,12 +146,12 @@ export function respondMockUsers(
       hasNext: page < totalPages,
       hasPrev: page > 1,
     };
-    return { status: 200, body: { status: "success", data, meta } };
+    return { status: 200, body: { success: true, data, meta } };
   }
 
   const user = users.find((u) => byId(u._id) === path);
   if (!user) return { status: 404, body: failure(404, "NOT_FOUND", "User not found!") };
-  return { status: 200, body: { status: "success", data: user } };
+  return { status: 200, body: { success: true, data: user } };
 }
 
 /** `respondMockUsers` as an axios reply, for the mock adapter. */
@@ -168,7 +168,7 @@ export function answerMockUsers(
 /**
  * SSR: the users list as the server-side fetch would see it, answered from the
  * mock cookie of the incoming request (call it inside the request's Nuxt
- * context, before any `await`). Resolves the same `{ status, data, meta }`
+ * context, before any `await`). Resolves the same `{ success, data, meta }`
  * envelope `serverApiPaginate` yields; a non-200 rejects with the backend's
  * error body, the shape `serverApiPaginate` rejects with.
  */

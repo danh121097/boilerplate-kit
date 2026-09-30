@@ -102,7 +102,7 @@ export async function serverApiGet<T>(path: string): Promise<T | null> {
 }
 
 /**
- * Paginated list — returns the FULL `{ status, data, meta }` envelope (keeps the
+ * Paginated list — returns the FULL `{ success, data, meta }` envelope (keeps the
  * pagination metadata, unlike `serverApiGet` which unwraps `data`). Rejects with an
  * `ApiResponseError` on failure. `params` become the `?page&limit` query string.
  */
@@ -118,7 +118,7 @@ export function serverApiPaginate<T>(
 
 /**
  * Cursor (keyset) paginated list — like `serverApiPaginate` but for `?cursor&limit`
- * endpoints; returns the FULL `{ status, data, meta }` envelope with cursor `meta`
+ * endpoints; returns the FULL `{ success, data, meta }` envelope with cursor `meta`
  * (`nextCursor`, `hasNext`). Rejects with an `ApiResponseError` on failure.
  */
 export function serverApiCursorPaginate<T>(

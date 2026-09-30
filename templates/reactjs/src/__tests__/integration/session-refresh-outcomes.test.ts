@@ -125,7 +125,7 @@ describe("refresh outcomes", () => {
     const { post, client } = setup();
     post.mockResolvedValue({ data: { data: { tokens: { accessToken: "NEW" } } } });
     const http = client(async (config) =>
-      config._retry ? ok(config, { status: "success", data: 1 }) : httpError(config, 401),
+      config._retry ? ok(config, { success: true, data: 1 }) : httpError(config, 401),
     );
 
     await http.get("/users");

@@ -16,7 +16,7 @@ import axios from "axios";
 
 const DEMO = { email: "demo@example.com", password: "password" };
 const NEW_USER = { email: "new@example.com", password: "password", name: "New User" };
-const REAL_LIST = { status: "success", data: [], meta: { page: 1, limit: 20, total: 0 } };
+const REAL_LIST = { success: true, data: [], meta: { page: 1, limit: 20, total: 0 } };
 
 /** The request cookies the SSR server sees — what the browser sends on a page load. */
 const requestCookies = vi.hoisted(() => new Map<string, string>());
@@ -63,7 +63,7 @@ describe("mock users", () => {
     const body = await app.UsersModel.api.get<User[]>({ url: "/users" });
 
     expect(body).toMatchObject({
-      status: "success",
+      success: true,
       meta: { page: 1, limit: 20, total: 6, totalPages: 1, hasNext: false, hasPrev: false },
     });
     expect(body.data).toHaveLength(6);
@@ -171,7 +171,7 @@ describe("mock users", () => {
       const body = await app.getUsers();
 
       expect(body).toMatchObject({
-        status: "success",
+        success: true,
         meta: { page: 1, limit: 20, total: 6, hasNext: false },
       });
       expect((body as { data: User[] }).data.map((u) => u._id)).toEqual([

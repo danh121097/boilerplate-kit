@@ -38,7 +38,7 @@ export const useUsersListQuery = defineQuery<PaginatedResponse<User>>({
 ## Users list contract
 
 `UsersModel.list(params?: PaginationParams): Promise<PaginatedResponse<User>>` returns the
-backend envelope `{ status, data, meta }` (`meta` is `OffsetMeta`); `get(id)` and
+backend envelope `{ success, data, meta }` (`meta` is `OffsetMeta`); `get(id)` and
 `update(id, payload)` resolve the unwrapped `User`. The users page reads `data.data`,
 shows `users.empty` for an empty list and `users.error` (server message first) on
 failure. `Api.paginate` / `Api.cursorPaginate` and the `OffsetMeta`, `CursorMeta`,

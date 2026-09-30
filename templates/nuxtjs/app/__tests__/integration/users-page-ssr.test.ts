@@ -17,7 +17,7 @@ import type { Component } from "vue";
  */
 
 const USERS = {
-  status: "success",
+  success: true,
   data: [
     { _id: "u1", name: "Ada Lovelace", email: "ada@example.com" },
     { _id: "u2", name: "Alan Turing", email: "alan@example.com" },

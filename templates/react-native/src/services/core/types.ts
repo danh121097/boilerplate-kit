@@ -56,7 +56,7 @@ export interface RefreshOptions {
 export type ServiceRefreshConfig = Partial<Omit<RefreshOptions, "service">>;
 
 export interface ApiResponse<T = unknown> {
-  status: string;
+  success: boolean;
   data: T;
   message?: string;
   error_code?: number;
@@ -79,7 +79,7 @@ export interface CursorMeta {
   hasNext: boolean;
 }
 
-/** List envelope with offset `meta` — matches the express `{ status, data, meta }`. */
+/** List envelope with offset `meta` — matches the backend `{ success, data, meta }`. */
 export interface PaginatedResponse<T> extends ApiResponse<T[]> {
   meta: OffsetMeta;
 }

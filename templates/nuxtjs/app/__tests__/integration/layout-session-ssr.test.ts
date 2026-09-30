@@ -27,7 +27,7 @@ import type { Component, FunctionalComponent } from "vue";
  */
 
 const SESSION_USER = { _id: "u1", email: "ada@example.com", name: "Ada", role: "admin" };
-const USERS = { status: "success", data: [], meta: {} } as unknown as PaginatedResponse<User>;
+const USERS = { success: true, data: [], meta: {} } as unknown as PaginatedResponse<User>;
 
 let DefaultLayout: Component;
 let UsersPage: Component;

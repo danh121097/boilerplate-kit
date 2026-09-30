@@ -22,7 +22,7 @@ jest.mock("expo-secure-store", () => ({
 
 const DEMO = { email: "demo@example.com", password: "password" };
 const NEW_USER = { email: "new@example.com", password: "password", name: "New User" };
-const REAL_LIST = { status: "success", data: [], meta: { page: 1, limit: 20, total: 0 } };
+const REAL_LIST = { success: true, data: [], meta: { page: 1, limit: 20, total: 0 } };
 
 /** Stands in for the network: answers every request with `REAL_LIST`. */
 const backend = jest.fn((config: AxiosRequestConfig) =>
@@ -63,7 +63,7 @@ describe("mock users", () => {
     const body = await app.UsersModel.list();
 
     expect(body).toMatchObject({
-      status: "success",
+      success: true,
       meta: { page: 1, limit: 20, total: 6, totalPages: 1, hasNext: false, hasPrev: false },
     });
     expect(body.data).toHaveLength(6);

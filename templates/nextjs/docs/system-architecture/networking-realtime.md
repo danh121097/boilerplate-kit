@@ -33,7 +33,7 @@ use the server helpers in `src/server/` instead.
 **Response:**
 
 - Blob passthrough (for file downloads)
-- Envelope unwrap: `{ status: "success"|"error" }` or `{ success: boolean }`
+- Envelope unwrap: a boolean `success` — `{ success: true, ... }` resolves, `{ success: false, ... }` rejects
 - 401 handling: refresh + replay if eligible; otherwise reject with `error_code: 401`.
   Never reloads. Not eligible: the refresh/credential endpoints (`skipPaths` —
   login/register/logout), an already-replayed request, or no session hint
@@ -55,10 +55,9 @@ cookies. See [security-auth.md](./security-auth.md).
 
 ## Envelope Convention
 
-The interceptor recognizes two envelope shapes:
+The interceptor recognizes the backend envelope by its boolean `success`:
 
 ```json
-{ "status": "success", "data": {...} }
 { "success": true, "data": {...} }
 ```
 

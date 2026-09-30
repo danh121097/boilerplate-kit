@@ -13,7 +13,7 @@ import axios from "axios";
 
 const DEMO = { email: "demo@example.com", password: "password" };
 const NEW_USER = { email: "new@example.com", password: "password", name: "New User" };
-const REAL_LIST = { status: "success", data: [], meta: { page: 1, limit: 20, total: 0 } };
+const REAL_LIST = { success: true, data: [], meta: { page: 1, limit: 20, total: 0 } };
 
 /** A page load: fresh modules, the Nuxt globals, the server's view of the request cookies, the boot plugin. */
 async function boot(jar: Map<string, string>, authMock: unknown = "true") {
@@ -56,7 +56,7 @@ describe("mock users", () => {
     const body = await app.UsersModel.list();
 
     expect(body).toMatchObject({
-      status: "success",
+      success: true,
       meta: { page: 1, limit: 20, total: 6, totalPages: 1, hasNext: false, hasPrev: false },
     });
     expect(body.data).toHaveLength(6);
@@ -160,7 +160,7 @@ describe("mock users", () => {
 
       const body = await server.fetchUsersOnServer();
 
-      expect(body).toMatchObject({ status: "success", meta: { page: 1, limit: 20, total: 6 } });
+      expect(body).toMatchObject({ success: true, meta: { page: 1, limit: 20, total: 6 } });
       expect(body.data[0]).toMatchObject({ _id: "mock-user", role: "admin" });
       expect(server.fetchSpy).not.toHaveBeenCalled();
     });

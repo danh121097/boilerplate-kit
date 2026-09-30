@@ -76,7 +76,7 @@ const SERVICES: ServiceDefinition[] = [
   (`defineQuery<AuthUser | null>` over `getSession`). Types in
   `auth/types/auth.ts`.
 - `users/users.ts` — `UsersModel` (`/users`): `list(params?: PaginationParams)`
-  returns `PaginatedResponse<User>` (`{ status, data, meta }`, read through
+  returns `PaginatedResponse<User>` (`{ success, data, meta }`, read through
   `Api.paginate`); `get` and `update` return the unwrapped `User`. Exposes
   `useUsersListQuery` (same paginated shape, key `users.list`). Pages read
   `data.data` and show `users.empty` for an empty list. Types in
@@ -85,8 +85,7 @@ const SERVICES: ServiceDefinition[] = [
   `core/types.ts`, with `Api.paginate` / `Api.cursorPaginate` in `core/api.ts`.
 
 Models read responses as already-unwrapped payloads because the response
-interceptor strips a recognized envelope (`{ status: "success" }` or
-`{ success: true }`).
+interceptor strips a recognized envelope (`{ success: true }`).
 
 ## Pinia Stores (`src/stores/`)
 

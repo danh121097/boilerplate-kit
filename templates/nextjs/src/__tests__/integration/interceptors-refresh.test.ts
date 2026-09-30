@@ -11,7 +11,7 @@ import axios from "axios";
  * (cookie rotation is a backend side-effect; the client just replays its request).
  */
 
-const REFRESH_OK = { data: { status: "success" } } as never;
+const REFRESH_OK = { data: { success: true } } as never;
 
 function installLocalStorage() {
   const store = new Map<string, string>();

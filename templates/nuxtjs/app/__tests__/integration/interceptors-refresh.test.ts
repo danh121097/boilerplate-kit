@@ -10,7 +10,7 @@ import axios from "axios";
  * (cookie rotation is a backend side-effect; the client just replays its request).
  */
 
-const REFRESH_OK = { data: { status: "success" } } as never;
+const REFRESH_OK = { data: { success: true } } as never;
 
 describe("interceptors — cookie refresh", () => {
   beforeEach(() => {

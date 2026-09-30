@@ -97,12 +97,12 @@ src/
 `src/services/core/` mirrors a production setup:
 
 - `Api` — class-based axios client with multi-service support, lazy interceptor registration and `get` / `paginate` / `cursorPaginate` / `post` / `put` / `patch` / `delete` helpers.
-- `ApiInterceptors` — request interceptor injects the bearer token + optional HMAC headers; response interceptor unwraps `{ status, data, ... }` envelopes and, on 401, refreshes once (single-flight, cross-tab locked) and replays; login/register/logout 401s are never refreshed, and a refused refresh routes to `/login` instead of reloading.
+- `ApiInterceptors` — request interceptor injects the bearer token + optional HMAC headers; response interceptor unwraps `{ success, data, ... }` envelopes and, on 401, refreshes once (single-flight, cross-tab locked) and replays; login/register/logout 401s are never refreshed, and a refused refresh routes to `/login` instead of reloading.
 - `HMACSignatureGenerator` — produces `sig` / `ctime` / `x-version` headers on HTTP requests, and `sig` / `ctime` on the socket handshake, only when `VITE_HMAC_SECRET` is set. The secret ships in the bundle, so this is anti-casual-abuse only, not authentication.
 - `Model` — base class for domain models; subclass and call `Model.setup({ path, service })`.
 - `defineQuery` / `defineMutation` — typed wrappers around TanStack React Query with a consistent error type.
 
-Example domain service in `src/services/users/users.ts`. `list` returns the backend's paginated envelope (`PaginatedResponse<User>`: `{ status, data, meta }`); `get` / `update` return the unwrapped `User`:
+Example domain service in `src/services/users/users.ts`. `list` returns the backend's paginated envelope (`PaginatedResponse<User>`: `{ success, data, meta }`); `get` / `update` return the unwrapped `User`:
 
 ```ts
 export class UsersModel extends Model {

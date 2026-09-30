@@ -68,8 +68,8 @@ through raw. Blob responses return the blob (or reject on a non-2xx when
 `onError`, route into the refresh-and-replay path. Full detail in
 [Security & Auth](./security-auth.md) and [Error Handling](./error-handling.md).
 
-Envelope recognition is deliberately narrow — only `status: "success"|"error"` or
-a boolean `success` counts, so a domain payload like `{ id, status: "done" }` is
+Envelope recognition is deliberately narrow — only a boolean `success`
+counts, so a domain payload like `{ id, status: "done" }` is
 never misread as an error.
 
 ## TanStack Vue Query Wrappers (`src/services/core/tanstack.ts`)

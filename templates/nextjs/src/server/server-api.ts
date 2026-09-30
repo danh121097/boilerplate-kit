@@ -119,7 +119,7 @@ export async function serverApiGet<T>(path: string): Promise<T> {
 }
 
 /**
- * Paginated list — returns the FULL `{ status, data, meta }` envelope (keeps the
+ * Paginated list — returns the FULL `{ success, data, meta }` envelope (keeps the
  * offset pagination metadata, unlike `serverApiGet` which unwraps `data`).
  */
 export function serverApiPaginate<T>(

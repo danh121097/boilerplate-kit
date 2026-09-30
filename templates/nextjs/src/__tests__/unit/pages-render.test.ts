@@ -36,7 +36,7 @@ describe("users list page", () => {
 
   it("reads the paginated envelope and lists the users", async () => {
     const html = await renderUsers({
-      status: "success",
+      success: true,
       data: [{ _id: "1", name: "Ada", email: "ada@example.com" }],
       meta: { ...meta, total: 1, totalPages: 1 },
     });
@@ -46,7 +46,7 @@ describe("users list page", () => {
   });
 
   it("shows the empty state when the list is empty", async () => {
-    const html = await renderUsers({ status: "success", data: [], meta });
+    const html = await renderUsers({ success: true, data: [], meta });
     expect(html).toContain("No users yet.");
   });
 });

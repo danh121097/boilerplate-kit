@@ -292,7 +292,7 @@ and `mock-auth-responses.ts` (backend-shaped replies), plus
   users screen works. `register` signs up any user, who stays signed in but
   cannot log in again (no user store) and is a plain `user`.
 - **Users.** `GET /users` (offset-paginated `?page&limit`, envelope
-  `{ status: "success", data, meta }`) and `GET /users/:id` answer from a fixed
+  `{ success: true, data, meta }`) and `GET /users/:id` answer from a fixed
   fixture: the demo user plus five sample users (`MOCK_SAMPLE_USERS`), newest
   first, no passwords. Checks run in the backend's order: no session is `401`
   ("Access token required!"), a role below `admin` is `403` ("Insufficient

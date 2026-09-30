@@ -22,13 +22,14 @@ TanStack wrappers type their error channel as `ApiResponseError`, so
 ## Envelope Detection
 
 The interceptor unwraps API envelopes but must not mistake domain payloads for
-them. `isEnvelope` recognizes an envelope **only** by a known marker:
+them. `isEnvelope` recognizes an envelope **only** by a boolean `success`, the marker
+every backend success and error body carries:
 
 ```ts
 function isEnvelope(body: unknown): boolean {
   if (!body || typeof body !== "object") return false;
   const b = body as EnvelopeBody;
-  return b.status === "success" || b.status === "error" || typeof b.success === "boolean";
+  return typeof b.success === "boolean";
 }
 ```
 
@@ -38,7 +39,7 @@ So `{ id: 1, status: "done" }` is treated as a raw payload, not an error envelop
 ```ts
 if (isEnvelope(response.data)) {
   const body = response.data;
-  if (body.status === "success" || body.success === true) return response.data; // unwrap
+  if (body.success === true) return response.data; // unwrap
   if (body.error_code === 401) { /* refresh-and-retry when eligible */ }
   return Promise.reject(response.data as ApiResponseError);   // envelope-level error
 }

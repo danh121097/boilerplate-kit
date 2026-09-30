@@ -154,7 +154,7 @@ describe("hmac-signature", () => {
     let sent: Record<string, unknown> = {};
     const http = makeClient(async (config) => {
       sent = { ...(config.headers as unknown as Record<string, unknown>) };
-      return ok(config, { status: "success", data: null });
+      return ok(config, { success: true, data: null });
     });
 
     await http.post("/notes?draft=1", { a: 1 }, { headers: { "Content-Type": pinned } });
