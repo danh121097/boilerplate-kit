@@ -145,7 +145,7 @@ export function createOpenApiDocument(groups: RouteGroup[]): Record<string, unkn
   return {
     openapi: "3.1.0",
     info: {
-      title: "Express Starter API",
+      title: config.appName || "Express Starter API",
       description:
         "All API routes require HMAC signatures. In development, Swagger Try it out signs requests automatically; protected routes still require a Bearer token.",
       version: "1.0.0",

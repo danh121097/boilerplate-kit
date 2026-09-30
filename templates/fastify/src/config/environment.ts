@@ -73,6 +73,7 @@ export const config: EnvironmentConfig = {
   isDevelopment,
   isTest,
   docsEnabled,
+  appName: process.env.APP_NAME || "",
   nodeEnv,
   mongodbUri: getRequiredEnvVar("MONGODB_URI"),
   hmacSecret: getRequiredSecret("HMAC_SECRET"),

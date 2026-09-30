@@ -57,7 +57,7 @@ export function buildApp(
   app.register(swagger, {
     openapi: {
       info: {
-        title: "Fastify Starter API",
+        title: config.appName || "Fastify Starter API",
         description:
           "All API routes require HMAC signatures. In development, Swagger Try it out signs requests automatically; protected routes still require a Bearer token.",
         version: "1.0.0",

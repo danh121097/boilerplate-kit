@@ -34,6 +34,7 @@ export interface EnvironmentConfig {
   isTest: boolean;
   docsEnabled: boolean;
   port: number;
+  appName: string;
   nodeEnv: string;
   mongodbUri: string;
   jwtAccessPrivateKey: string;
