@@ -17,7 +17,7 @@ const userRoutes: FastifyPluginAsync = async (fastify) => {
   const querySchema = z.object({ page: z.string().optional(), limit: z.string().optional() });
   const paramsSchema = z.object({ id: z.string().regex(/^[\da-f]{24}$/i, "Invalid user ID!") });
   const listResponseSchema = z.object({
-    status: z.literal("success"),
+    success: z.literal(true),
     data: z.array(publicUserSchema),
     meta: z.object({
       page: z.number(),
@@ -28,7 +28,7 @@ const userRoutes: FastifyPluginAsync = async (fastify) => {
       hasPrev: z.boolean(),
     }),
   });
-  const getResponseSchema = z.object({ status: z.literal("success"), data: publicUserSchema });
+  const getResponseSchema = z.object({ success: z.literal(true), data: publicUserSchema });
 
   fastify.get<{ Querystring: UserListQuery }>(
     "/",

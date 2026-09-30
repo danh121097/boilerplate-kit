@@ -43,8 +43,8 @@ outside production and off in production unless `DOCS_ENABLED=true`;
 | POST   | `/auth/refresh`  | HMAC, shared auth bucket              | optional `{ refreshToken }` or refresh cookie | `200 { success, message, data: { tokens } }`               |
 | POST   | `/auth/logout`   | HMAC, shared auth bucket              | optional `{ refreshToken }` or refresh cookie | `200 { success, message }`, clears cookies                 |
 | GET    | `/auth/me`       | HMAC, access token                    | —                                             | `200 { success, data: { user } }`                          |
-| GET    | `/users`         | HMAC, access token, admin role        | `page`, `limit` query                         | `200 { status, data: User[], meta }`                       |
-| GET    | `/users/:id`     | HMAC, access token, admin role        | 24-character Mongo ID                         | `200 { status, data: User }`                               |
+| GET    | `/users`         | HMAC, access token, admin role        | `page`, `limit` query                         | `200 { success, data: User[], meta }`                      |
+| GET    | `/users/:id`     | HMAC, access token, admin role        | 24-character Mongo ID                         | `200 { success, data: User }`                              |
 
 Registration requires a valid email, password of at least 8 characters, and a
 non-empty name. Login requires a valid email and non-empty password. Zod

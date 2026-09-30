@@ -83,8 +83,7 @@ feeds the role step of `SecurityGuard` (`src/schemas/user.schema.ts`).
   { "success": true, "message": "Login successful!", "data": { "user": {}, "tokens": {} } }
   ```
 
-  (The user module uses `{ "status": "success", "data": [...], "meta": {...} }`
-  for list endpoints.)
+  (List endpoints add a sibling `meta`: `{ "success": true, "data": [...], "meta": {...} }`.)
 
 - **Error responses** are shaped by `HttpExceptionFilter` and intentionally
   expose both `errorType` and the client-facing `error_code` / `error_message`

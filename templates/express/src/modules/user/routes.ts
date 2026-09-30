@@ -6,7 +6,7 @@ import type { RouteGroup } from "@/types/routing";
 import * as UserController from "@/modules/user/controller";
 
 const listUsersResponseSchema = z.object({
-  status: z.literal("success"),
+  success: z.literal(true),
   data: z.array(publicUserSchema),
   meta: z.object({
     page: z.number(),
@@ -18,7 +18,7 @@ const listUsersResponseSchema = z.object({
   }),
 });
 const getUserResponseSchema = z.object({
-  status: z.literal("success"),
+  success: z.literal(true),
   data: publicUserSchema,
 });
 

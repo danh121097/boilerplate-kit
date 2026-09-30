@@ -17,7 +17,7 @@ export class UserService {
   /**
    * List all users with offset pagination (?page&limit).
    * Sorted by _id descending (newest first), password excluded.
-   * Returns documents + OffsetMeta for the { status, data, meta } envelope.
+   * Returns documents + OffsetMeta for the { success, data, meta } envelope.
    */
   async listUsers(query: Record<string, unknown>): Promise<{ users: UserDocument[]; meta: OffsetMeta }> {
     const { page, limit, skip } = parseOffsetPagination(query);

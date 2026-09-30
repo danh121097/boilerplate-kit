@@ -221,7 +221,7 @@ export async function logout(rawRefreshToken: string): Promise<void> {
 }
 
 /** Get current user profile by ID */
-export async function getMe(userId: string): Promise<unknown> {
+export async function getMe(userId: string): Promise<UserDocument> {
   const user = await User.findById(userId);
   if (!user || !user.isActive)
     throw new AppError({

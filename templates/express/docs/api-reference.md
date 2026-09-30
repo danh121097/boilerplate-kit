@@ -55,8 +55,8 @@ Bearer <token>` or the `accessToken` cookie; also enforces token revocation
 | POST   | `/api/v1/auth/refresh`  | HMAC, `authRateLimiter` (30/15m)                             | optional `{ refreshToken?: string }` (falls back to the `refreshToken` cookie when absent or `""`; a non-string value is `400 VALIDATION_ERROR`) | `{ success: true, message, data: { tokens: { accessToken, refreshToken } } }` + rotated cookies. A token rotated within the last 10s (retry / parallel tabs) is answered like a normal refresh with a fresh pair. `401 AUTHENTICATION_ERROR` if the token is missing/invalid/expired/reused after that window (reuse revokes every session of the user and disconnects their sockets), with both token cookies cleared (`Set-Cookie` expired, `refreshToken` on its auth path) |
 | POST   | `/api/v1/auth/logout`   | HMAC, `authRateLimiter` (30/15m)                             | optional `{ refreshToken?: string }` (same body/cookie rules as refresh)                                                                         | `{ success: true, message }` + cleared cookies; the user's sockets are disconnected                                                                                                                                                                                                                                                                                                                                                                                            |
 | GET    | `/api/v1/auth/me`       | HMAC, `authenticate`                                         | —                                                                                                                                                | `{ success: true, data: { user } }`                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| GET    | `/api/v1/users`         | HMAC, `authenticate`, `requireMinRole('admin')`              | — (query: `page`≥1 def 1, `limit` 1–100 def 20)                                                                                                  | `{ status: "success", data: User[], meta: OffsetMeta }` (passwords stripped). `403` if below admin                                                                                                                                                                                                                                                                                                                                                                             |
-| GET    | `/api/v1/users/:id`     | HMAC, `authenticate`, `requireMinRole('admin')`              | —                                                                                                                                                | `{ status: "success", data: User }` (password stripped). `404` if not found                                                                                                                                                                                                                                                                                                                                                                                                    |
+| GET    | `/api/v1/users`         | HMAC, `authenticate`, `requireMinRole('admin')`              | — (query: `page`≥1 def 1, `limit` 1–100 def 20)                                                                                                  | `{ success: true, data: User[], meta: OffsetMeta }` (passwords stripped). `403` if below admin                                                                                                                                                                                                                                                                                                                                                                                 |
+| GET    | `/api/v1/users/:id`     | HMAC, `authenticate`, `requireMinRole('admin')`              | —                                                                                                                                                | `{ success: true, data: User }` (password stripped). `404` if not found                                                                                                                                                                                                                                                                                                                                                                                                        |
 
 ## Error shape
 
@@ -77,7 +77,7 @@ Unmatched routes under any path fall through to `notFoundHandler`
 ## Pagination
 
 List endpoints use the reusable helpers in `src/utils/pagination.ts`. Two equal
-strategies — pick per list; both keep the `{ status, data }` envelope and add a
+strategies — pick per list; both keep the `{ success, data }` envelope and add a
 sibling `meta`.
 
 ### Offset (`?page&limit`) — used by `GET /users`
@@ -88,7 +88,7 @@ values are clamped, never rejected.
 ```jsonc
 // GET /api/v1/users?page=2&limit=20
 {
-  "status": "success",
+  "success": true,
   "data": [
     /* User[] */
   ],
@@ -109,15 +109,14 @@ const [rows, total] = await Promise.all([
   Model.find().sort({ _id: -1 }).skip(skip).limit(limit),
   Model.countDocuments(),
 ]);
-res.json({ status: "success", data: rows, meta: buildOffsetMeta(total, page, limit) });
+res.json({ success: true, data: rows, meta: buildOffsetMeta(total, page, limit) });
 ```
 
 ### Cursor (`?cursor&limit`) — keyset alternative for feed-style lists
 
 Stable under inserts and fast at scale (no deep `skip`), but no jump-to-page and
 no total. **Valid only for `_id`-sorted lists** (monotonic ObjectId). An invalid
-`cursor` is treated as the first page. Commented inline in
-`modules/user/controller.ts` — drop it into any list that needs it:
+`cursor` is treated as the first page. Drop it into any list that needs it:
 
 ```ts
 import { Types } from "mongoose";
@@ -129,7 +128,7 @@ const rows = await Model.find(filter)
   .sort({ _id: -1 })
   .limit(limit + 1); // +1 detects hasNext
 const { items, meta } = buildCursorMeta(rows, limit);
-res.json({ status: "success", data: items, meta }); // meta: { limit, nextCursor, hasNext }
+res.json({ success: true, data: items, meta }); // meta: { limit, nextCursor, hasNext }
 ```
 
 ## Notes

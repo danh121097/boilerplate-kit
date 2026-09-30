@@ -1,3 +1,4 @@
+import { serializeUser } from "@/modules/user/serialize-user";
 import { AppError } from "@/types";
 import { clearTokenCookies, setTokenCookies } from "@/utils/cookie";
 import { Request, Response } from "express";
@@ -13,7 +14,7 @@ export async function register(req: Request, res: Response): Promise<void> {
   res.status(201).json({
     success: true,
     message: "User registered successfully!",
-    data: { user, tokens },
+    data: { user: serializeUser(user), tokens },
   });
 }
 
@@ -27,7 +28,7 @@ export async function login(req: Request, res: Response): Promise<void> {
   res.json({
     success: true,
     message: "Login successful!",
-    data: { user, tokens },
+    data: { user: serializeUser(user), tokens },
   });
 }
 
@@ -84,5 +85,5 @@ export async function logout(req: Request, res: Response): Promise<void> {
 export async function getMe(req: Request, res: Response): Promise<void> {
   const user = await AuthService.getMe(req.user!.userId);
 
-  res.json({ success: true, data: { user } });
+  res.json({ success: true, data: { user: serializeUser(user) } });
 }

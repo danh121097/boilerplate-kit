@@ -45,7 +45,7 @@ describe("User Routes — GET /users (offset pagination)", () => {
     const res = await list(token, "?page=1&limit=20");
 
     expect(res.status).toBe(200);
-    expect(res.body.status).toBe("success");
+    expect(res.body.success).toBe(true);
     expect(Array.isArray(res.body.data)).toBe(true);
     expect(res.body.data).toHaveLength(20);
     expect(res.body.meta).toEqual({

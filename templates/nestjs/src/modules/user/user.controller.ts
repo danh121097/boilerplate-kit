@@ -1,4 +1,5 @@
 import { Roles } from "@/common/decorators/roles.decorator";
+import { PublicUser, serializeUser } from "@/modules/user/serialize-user";
 import { UserService } from "@/modules/user/user.service";
 import { Controller, Get, HttpCode, Param, Query } from "@nestjs/common";
 import {
@@ -15,8 +16,8 @@ import {
  *
  * Both routes require JWT (enforced by global SecurityGuard) + admin role.
  * Envelope shapes mirror express modules/user/controller.ts:
- *   GET /users       → { status:"success", data: UserDocument[], meta: OffsetMeta }
- *   GET /users/:id   → { status:"success", data: UserDocument }
+ *   GET /users       → { success:true, data: PublicUser[], meta: OffsetMeta }
+ *   GET /users/:id   → { success:true, data: PublicUser }
  *
  * @Roles("admin") sets the minimum role; SecurityGuard enforces it.
  * No @Public() — JWT is required on both routes.
@@ -51,9 +52,9 @@ export class UserController {
   @HttpCode(200)
   async listUsers(
     @Query() query: Record<string, unknown>,
-  ): Promise<{ status: string; data: unknown[]; meta: unknown }> {
+  ): Promise<{ success: boolean; data: PublicUser[]; meta: unknown }> {
     const { users, meta } = await this.userService.listUsers(query);
-    return { status: "success", data: users, meta };
+    return { success: true, data: users.map(serializeUser), meta };
   }
 
   /** GET /users/:id — single user by ObjectId string. */
@@ -71,8 +72,8 @@ export class UserController {
     description: "24-character hexadecimal MongoDB user ID.",
   })
   @HttpCode(200)
-  async getUserById(@Param("id") id: string): Promise<{ status: string; data: unknown }> {
+  async getUserById(@Param("id") id: string): Promise<{ success: boolean; data: PublicUser }> {
     const user = await this.userService.getUserById(id);
-    return { status: "success", data: user };
+    return { success: true, data: serializeUser(user) };
   }
 }

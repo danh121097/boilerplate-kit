@@ -57,8 +57,8 @@ automatically — treat it as source of truth and this page as the stable summar
 | POST   | `/api/v1/auth/refresh`  | HMAC, `@Public`, `auth` throttler (30/15m), `RefreshDto`  | `{ refreshToken?: string }` (or `refreshToken` cookie; an empty string or a bodyless request falls back to the cookie) | `{ success: true, message, data: { tokens } }` + rotated cookies. `401` if missing/invalid/expired/reused after the grace window, with both token cookies cleared (`Set-Cookie` expired, `refreshToken` on its auth path); body unchanged |
 | POST   | `/api/v1/auth/logout`   | HMAC, `@Public`, `auth` throttler (30/15m), `RefreshDto`  | `{ refreshToken?: string }` (or cookie; bodyless allowed)                                                              | `{ success: true, message }` + cleared cookies; the user's sockets are disconnected                                                                                                                                                       |
 | GET    | `/api/v1/auth/me`       | HMAC, JWT                                                 | —                                                                                                                      | `{ success: true, data: { user } }`                                                                                                                                                                                                       |
-| GET    | `/api/v1/users`         | HMAC, JWT, `@Roles('admin')`                              | — (query: `page`≥1 def 1, `limit` 1–100 def 20)                                                                        | `{ status: "success", data: User[], meta: OffsetMeta }` (passwords stripped). `403` if below admin                                                                                                                                        |
-| GET    | `/api/v1/users/:id`     | HMAC, JWT, `@Roles('admin')`                              | —                                                                                                                      | `{ status: "success", data: User }` (password stripped). `404` if not found                                                                                                                                                               |
+| GET    | `/api/v1/users`         | HMAC, JWT, `@Roles('admin')`                              | — (query: `page`≥1 def 1, `limit` 1–100 def 20)                                                                        | `{ success: true, data: User[], meta: OffsetMeta }` (passwords stripped). `403` if below admin                                                                                                                                            |
+| GET    | `/api/v1/users/:id`     | HMAC, JWT, `@Roles('admin')`                              | —                                                                                                                      | `{ success: true, data: User }` (password stripped). `404` if not found                                                                                                                                                                   |
 
 ## Error shape
 
@@ -82,7 +82,7 @@ envelope (`NOT_FOUND`). See
 ## Pagination
 
 List endpoints use the reusable helpers in `src/common/utils/pagination.util.ts`. Two
-equal strategies — pick per list; both keep the `{ status, data }` envelope and
+equal strategies — pick per list; both keep the `{ success, data }` envelope and
 add a sibling `meta`.
 
 ### Offset (`?page&limit`) — used by `GET /users`
@@ -93,7 +93,7 @@ values are clamped, never rejected.
 ```jsonc
 // GET /api/v1/users?page=2&limit=20
 {
-  "status": "success",
+  "success": true,
   "data": [
     /* User[] */
   ],
@@ -114,7 +114,7 @@ const [rows, total] = await Promise.all([
   this.userModel.find().select("-password").sort({ _id: -1 }).skip(skip).limit(limit),
   this.userModel.countDocuments(),
 ]);
-return { status: "success", data: rows, meta: buildOffsetMeta(total, page, limit) };
+return { success: true, data: rows, meta: buildOffsetMeta(total, page, limit) };
 ```
 
 ### Cursor (`?cursor&limit`) — keyset alternative for feed-style lists
@@ -131,7 +131,7 @@ const rows = await Model.find(filter)
   .sort({ _id: -1 })
   .limit(limit + 1); // +1 detects hasNext
 const { items, meta } = buildCursorMeta(rows, limit);
-return { status: "success", data: items, meta }; // meta: { limit, nextCursor, hasNext }
+return { success: true, data: items, meta }; // meta: { limit, nextCursor, hasNext }
 ```
 
 ## Notes

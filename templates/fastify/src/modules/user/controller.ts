@@ -16,7 +16,7 @@ export async function listUsers(
   reply: FastifyReply,
 ): Promise<unknown> {
   const { users, meta } = await UserService.listUsers({ ...request.query });
-  return reply.send({ status: "success", data: users.map(serializeUser), meta });
+  return reply.send({ success: true, data: users.map(serializeUser), meta });
 }
 
 export async function getUserById(
@@ -24,5 +24,5 @@ export async function getUserById(
   reply: FastifyReply,
 ): Promise<unknown> {
   const user = await UserService.getUserById(request.params.id);
-  return reply.send({ status: "success", data: serializeUser(user) });
+  return reply.send({ success: true, data: serializeUser(user) });
 }

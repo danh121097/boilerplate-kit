@@ -104,10 +104,10 @@ describe("GET /users — role=user (403)", () => {
 });
 
 describe("GET /users — role=admin (200)", () => {
-  it("returns 200 with {status, data, meta} envelope", async () => {
+  it("returns 200 with {success, data, meta} envelope", async () => {
     const res = await signedGetAuthed("/users", adminToken);
     expect(res.status).toBe(200);
-    expect(res.body.status).toBe("success");
+    expect(res.body.success).toBe(true);
     expect(Array.isArray(res.body.data)).toBe(true);
     expect(res.body).toHaveProperty("meta");
   });
@@ -159,7 +159,7 @@ describe("GET /users/:id — admin access", () => {
   it("returns 200 with single user for valid id", async () => {
     const res = await signedGetAuthed(`/users/${seededUserId}`, adminToken);
     expect(res.status).toBe(200);
-    expect(res.body.status).toBe("success");
+    expect(res.body.success).toBe(true);
     expect(res.body.data).toHaveProperty("_id");
     expect(res.body.data).not.toHaveProperty("password");
   });

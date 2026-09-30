@@ -6,6 +6,9 @@ import bcrypt from "bcrypt";
 /** Mongoose document type with instance methods. */
 export interface UserDocument extends HydratedDocument<User> {
   _id: Types.ObjectId;
+  /** Supplied by `timestamps: true`. */
+  createdAt: Date;
+  updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 

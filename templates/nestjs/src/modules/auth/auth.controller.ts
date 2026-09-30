@@ -8,6 +8,7 @@ import { clearTokenCookies, setTokenCookies } from "@/modules/auth/cookie.util";
 import { LoginDto } from "@/modules/auth/dto/login.dto";
 import { RefreshDto } from "@/modules/auth/dto/refresh.dto";
 import { RegisterDto } from "@/modules/auth/dto/register.dto";
+import { serializeUser } from "@/modules/user/serialize-user";
 import { Body, Controller, Get, HttpCode, HttpException, Post, Req, Res } from "@nestjs/common";
 import { ApiBody, ApiOperation, ApiResponse, ApiSecurity, ApiTags } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
@@ -61,7 +62,7 @@ export class AuthController {
     return {
       success: true,
       message: "User registered successfully!",
-      data: { user, tokens },
+      data: { user: serializeUser(user), tokens },
     };
   }
 
@@ -85,7 +86,7 @@ export class AuthController {
     return {
       success: true,
       message: "Login successful!",
-      data: { user, tokens },
+      data: { user: serializeUser(user), tokens },
     };
   }
 
@@ -196,6 +197,6 @@ export class AuthController {
     @CurrentUser() currentUser: JwtPayload,
   ): Promise<{ success: boolean; data: { user: unknown } }> {
     const user = await this.authService.getMe(currentUser.userId);
-    return { success: true, data: { user } };
+    return { success: true, data: { user: serializeUser(user) } };
   }
 }
