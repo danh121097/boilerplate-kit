@@ -21,7 +21,10 @@ src/services/
 │   ├── headers-utils.ts    # HeadersUtils.setAuthHeaders / addAuthorizationHeader
 │   ├── hmac-signature.ts   # HMACSignatureGenerator.signRequest / generateSignature, resolveContentType
 │   ├── model.ts            # Model base class — subclass + Model.setup()
-│   ├── tanstack.ts         # defineQuery / defineMutation (React Query)
+│   ├── tanstack.ts         # defineQuery (React Query)
+│   ├── tanstack-mutation.ts   # defineMutation (+ opt-in optimistic updates)
+│   ├── tanstack-optimistic.ts # optimistic snapshot / rollback helpers
+│   ├── tanstack-prefetch.ts   # prefetchQueries / ensureQueries (route loaders)
 │   ├── types.ts            # Shared TS types (incl. pagination) + axios module augmentation
 │   └── index.ts
 ├── auth/

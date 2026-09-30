@@ -37,7 +37,16 @@ export const useUsersListQuery = defineQuery<PaginatedResponse<User>>({
 
 - `.key` — string key used for cache lookup and invalidation.
 - `.queryKey(params?)` — builds the full query key array.
-- `defineMutation({ invalidates: ["users.list"] })` — auto-invalidates on success.
+- `.queryOptions(params?)` — full `queryOptions` (key, fetcher, `staleTime`, `select`, …) for
+  `ensureQueryData`. The fetcher receives `(params, { signal })`; pass `signal` to the
+  request to cancel it.
+- `defineMutation({ invalidates: ["users.list", ["users.detail", id]] })` — auto-invalidates on
+  success; a string is a key prefix, an array targets one exact key.
+- Hook overrides (`onMutate/onSuccess/onError/onSettled`) run after, and never replace, the
+  callbacks in the definition's `options`. `.mutationOptions()` exposes the options for tests.
+- `defineMutation({ optimistic: { queryKey, update } })` — opt-in optimistic cache edit, rolled back
+  on error; invalidation moves to settle and waits for sibling mutations on the same keys. Helpers
+  live in `tanstack-optimistic.ts`; mutations in `tanstack-mutation.ts`.
 
 ## Users contract and pagination
 

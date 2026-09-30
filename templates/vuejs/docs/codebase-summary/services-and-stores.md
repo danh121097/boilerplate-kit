@@ -43,7 +43,10 @@ startup via `initServices()`.
 | `auth-token-storage.ts` | Per-service access + refresh token slots in `localStorage` (`get/persist/clear{Access,Refresh}Token`, `clearServiceTokens`, `clearAuthTokens`, `registerServiceToken`) + `onTokensChanged` for reactive mirrors |
 | `headers-utils.ts` | `HeadersUtils`: attach HMAC signature headers + Bearer authorization header |
 | `hmac-signature.ts` | `HMACSignatureGenerator` (`signRequest`, `generateSignature`) + `resolveContentType`: HMAC-SHA256 sign per request; **no-op unless `VITE_HMAC_SECRET` is set** |
-| `tanstack.ts` | `defineQuery()` / `defineMutation()` factories typed against `ApiResponseError` |
+| `tanstack.ts` | `defineQuery()` factory typed against `ApiResponseError` |
+| `tanstack-mutation.ts` | `defineMutation()` (`invalidates`, opt-in `optimistic`, `.mutationOptions()`) |
+| `tanstack-optimistic.ts` | Optimistic snapshot / rollback helpers |
+| `render-env.ts` | `isServerRender` — always `false` in the SPA (Nuxt sets it from `import.meta.server`) |
 | `types.ts` | Shared types (`ApiService`, `ApiResponse`, `ApiResponseError`, `RefreshOptions`, …) + axios module augmentation (`serviceType`, `_retry`) |
 
 ### `init-services.ts`

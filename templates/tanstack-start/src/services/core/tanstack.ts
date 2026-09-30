@@ -1,11 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useQuery } from "@tanstack/react-query";
 import type { ApiResponseError } from "@/services/core/types";
-import type {
-  MutationOptions,
-  QueryClient,
-  UseMutationOptions,
-  UseQueryOptions,
-} from "@tanstack/react-query";
+import type { UndefinedInitialDataOptions, UseQueryOptions } from "@tanstack/react-query";
 
 type QueryDefinitionKey<TParams> = readonly [string] | readonly [string, TParams];
 
@@ -18,15 +13,14 @@ interface UseQueryConfig<TData, TParams = void> extends QueryDefOpts<TData, TPar
   params?: TParams;
 }
 
-interface DefineQueryConfig<TData, TParams = void> extends QueryDefOpts<TData, TParams> {
-  key: string;
-  fetcher: (params: TParams) => Promise<TData>;
+/** Per-call context handed to a query fetcher (TanStack's abort signal). */
+export interface QueryFetcherContext {
+  signal: AbortSignal;
 }
 
-/** A plain queryKey + queryFn object, consumable by ensureQueryData / prefetchQuery. */
-export interface QueryOptionsObject<TData, TParams = void> {
-  queryKey: QueryDefinitionKey<TParams>;
-  queryFn: () => Promise<TData>;
+interface DefineQueryConfig<TData, TParams = void> extends QueryDefOpts<TData, TParams> {
+  key: string;
+  fetcher: (params: TParams, context: QueryFetcherContext) => Promise<TData>;
 }
 
 export interface QueryDefinition<TData, TParams = void> {
@@ -35,102 +29,45 @@ export interface QueryDefinition<TData, TParams = void> {
   ): ReturnType<typeof useQuery<TData, ApiResponseError, TData, QueryDefinitionKey<TParams>>>;
   key: string;
   queryKey: (params?: TParams) => QueryDefinitionKey<TParams>;
-  /** Same key + fetcher as the hook, as a plain object — lets a route loader
-   * prefetch (ensureQueryData) the exact query the component reads, so SSR
-   * prefetch and client read share one definition. */
-  queryOptions: (params?: TParams) => QueryOptionsObject<TData, TParams>;
-}
-
-export function defineQuery<TData, TParams = void>(config: DefineQueryConfig<TData, TParams>) {
-  const { key, fetcher, ...queryOptions } = config;
-
-  const queryKey = (params?: TParams): QueryDefinitionKey<TParams> =>
-    params !== undefined ? [key, params] : [key];
-
-  const use = (useConfig?: UseQueryConfig<TData, TParams>) => {
-    const { params, ...overrides } = useConfig ?? {};
-    return useQuery<TData, ApiResponseError, TData, QueryDefinitionKey<TParams>>({
-      ...queryOptions,
-      ...overrides,
-      queryKey: queryKey(params),
-      queryFn: () => fetcher(params as TParams),
-    });
-  };
-
-  const definition = use as QueryDefinition<TData, TParams>;
-  definition.key = key;
-  definition.queryKey = queryKey;
-  definition.queryOptions = (params?: TParams) => ({
-    queryKey: queryKey(params),
-    queryFn: () => fetcher(params as TParams),
-  });
-  return definition;
+  /**
+   * Same key, fetcher and definition-level options (`staleTime`, `select`, …) as the hook, so a route
+   * loader (`prefetchQueries` / `ensureQueryData`) and the component share one query.
+   */
+  queryOptions: (
+    params?: TParams,
+  ) => UseQueryOptions<TData, ApiResponseError, TData, QueryDefinitionKey<TParams>>;
 }
 
 /**
- * Build a route `loader` that prefetches one or more query definitions into the
- * router's QueryClient. The router's SSR-query integration (set up once in
- * `router.tsx`) dehydrates them, so the matching `useXxx()` hook hydrates with no
- * refetch. Declare loaders without the boilerplate arrow:
- *
- *   loader: prefetchQueries(useMeQuery, useUsersListQuery),
- *
- * Uses `prefetchQuery` (never throws): a failed prefetch — e.g. an expired
- * session deferred to the browser — must not fail the route. The query is left
- * in an error state without data, so the component's hook refetches on mount.
+ * Declare one query: `key` is the prefix (`["users.list"]` invalidates every param variant),
+ * params extend it (`["users.detail", { id }]`).
  */
-export function prefetchQueries(
-  ...defs: Array<{ queryOptions: () => QueryOptionsObject<unknown> }>
-) {
-  return async ({ context }: { context: { queryClient: QueryClient } }): Promise<void> => {
-    await Promise.all(defs.map((def) => context.queryClient.prefetchQuery(def.queryOptions())));
-  };
-}
+export function defineQuery<TData, TParams = void>(config: DefineQueryConfig<TData, TParams>) {
+  const { key, fetcher, ...defaults } = config;
 
-type MutationDefOpts<TData, TVars, TCtx = unknown> = Omit<
-  MutationOptions<TData, ApiResponseError, TVars, TCtx>,
-  "mutationKey" | "mutationFn"
->;
+  function queryKey(params?: TParams): QueryDefinitionKey<TParams> {
+    return params !== undefined ? [key, params] : [key];
+  }
 
-interface DefineMutationConfig<TData, TVars, TCtx = unknown> {
-  key: string;
-  mutator: (variables: TVars) => Promise<TData>;
-  invalidates?: string[];
-  options?: MutationDefOpts<TData, TVars, TCtx>;
-}
+  function buildQueryOptions(params?: TParams) {
+    return queryOptions<TData, ApiResponseError, TData, QueryDefinitionKey<TParams>>({
+      ...defaults,
+      queryKey: queryKey(params),
+      queryFn: ({ signal }) => fetcher(params as TParams, { signal }),
+    } as UndefinedInitialDataOptions<TData, ApiResponseError, TData, QueryDefinitionKey<TParams>>);
+  }
 
-export interface MutationDefinition<TData, TVars, TCtx = unknown> {
-  (
-    overrides?: MutationDefOpts<TData, TVars, TCtx>,
-  ): ReturnType<typeof useMutation<TData, ApiResponseError, TVars, TCtx>>;
-  key: string;
-}
-
-export function defineMutation<TData, TVars = void, TCtx = unknown>(
-  config: DefineMutationConfig<TData, TVars, TCtx>,
-) {
-  const use = (overrides: MutationDefOpts<TData, TVars, TCtx> = {}) => {
-    const queryClient = useQueryClient();
-    const options = config.options;
-
-    return useMutation<TData, ApiResponseError, TVars, TCtx>({
-      ...options,
+  function useDefinedQuery(useConfig?: UseQueryConfig<TData, TParams>) {
+    const { params, ...overrides } = useConfig ?? {};
+    return useQuery<TData, ApiResponseError, TData, QueryDefinitionKey<TParams>>({
+      ...buildQueryOptions(params),
       ...overrides,
-      mutationKey: [config.key],
-      mutationFn: config.mutator,
-      onSuccess: async (...args) => {
-        if (config.invalidates?.length) {
-          await Promise.all(
-            config.invalidates.map((k) => queryClient.invalidateQueries({ queryKey: [k] })),
-          );
-        }
-        await options?.onSuccess?.(...args);
-        await overrides.onSuccess?.(...args);
-      },
-    } satisfies UseMutationOptions<TData, ApiResponseError, TVars, TCtx>);
-  };
+    });
+  }
 
-  const definition = use as MutationDefinition<TData, TVars, TCtx>;
-  definition.key = config.key;
+  const definition = useDefinedQuery as QueryDefinition<TData, TParams>;
+  definition.key = key;
+  definition.queryKey = queryKey;
+  definition.queryOptions = buildQueryOptions;
   return definition;
 }

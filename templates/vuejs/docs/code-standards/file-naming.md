@@ -44,6 +44,8 @@ Import from the folder, never from deep internal paths.
 src/services/
 ├── core/
 │   ├── tanstack.ts
+│   ├── tanstack-mutation.ts
+│   ├── tanstack-optimistic.ts
 │   ├── auth-token-storage.ts
 │   └── index.ts        # re-exports defineQuery, defineMutation, Model, ...
 ├── auth/
@@ -58,7 +60,7 @@ src/services/
 import { defineMutation, defineQuery, Model } from "@/services/core";
 
 // Avoid — deep path, bypasses the barrel
-import { defineMutation } from "@/services/core/tanstack";
+import { defineMutation } from "@/services/core/tanstack-mutation";
 ```
 
 Barrels exist for `services/`, `services/core`, `services/auth`, `services/users`,

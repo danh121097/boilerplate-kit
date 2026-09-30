@@ -19,7 +19,10 @@ src/services/
 │   ├── headers-utils.ts    # HeadersUtils.setAuthHeaders (HMAC; cookies auto-sent)
 │   ├── hmac-signature.ts   # HMACSignatureGenerator (crypto-js, VITE_HMAC_SECRET), signRequest, resolveContentType
 │   ├── model.ts            # Model base class — subclass + Model.setup()
-│   ├── tanstack.ts         # defineQuery / defineMutation (React Query)
+│   ├── tanstack.ts         # defineQuery (React Query)
+│   ├── tanstack-mutation.ts   # defineMutation (+ opt-in optimistic updates)
+│   ├── tanstack-optimistic.ts # optimistic snapshot / rollback helpers
+│   ├── tanstack-prefetch.ts   # prefetchQueries / ensureQueries (route loaders)
 │   ├── types.ts            # Shared TS types + axios module augmentation
 │   └── index.ts
 ├── auth/
