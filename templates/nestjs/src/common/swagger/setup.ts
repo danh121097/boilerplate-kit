@@ -12,9 +12,12 @@ import type { Express } from "express";
  *
  * API routes are HMAC-guarded. In development we auto-sign every "Try it out"
  * request so users only need a Bearer token for protected routes. Other
- * environments never receive the HMAC secret.
+ * environments never receive the HMAC secret. Disabled in production unless
+ * DOCS_ENABLED=true.
  */
 export function setupSwagger(app: NestExpressApplication, config: AppConfigService): void {
+  if (!config.docsEnabled) return;
+
   const builder = new DocumentBuilder()
     .setTitle(config.appName || "NestJS Starter API")
     .setDescription(

@@ -32,6 +32,7 @@ export interface EnvironmentConfig {
   isProduction: boolean;
   isDevelopment: boolean;
   isTest: boolean;
+  docsEnabled: boolean;
   port: number;
   nodeEnv: string;
   mongodbUri: string;
@@ -52,5 +53,5 @@ export interface EnvironmentConfig {
   apiPrefix: string;
   redisEnabled: boolean;
   redisUrl: string;
-  logLevel: "fatal" | "error" | "warn" | "info" | "debug" | "trace" | "silent";
+  logLevel: "debug" | "info" | "warn" | "error";
 }

@@ -5,6 +5,17 @@ HTTP routes are registered in `src/modules/*/routes.ts` and mounted under
 headers, including health and public authentication routes. See
 [HMAC verification](./system-architecture/hmac-verification.md).
 
+The OpenAPI document is generated from the route Zod schemas and Swagger
+metadata.
+
+OpenAPI JSON is served at `/docs/json` and Swagger UI at `/docs`. In
+development, Swagger UI signs "Try it out" requests automatically, so only a
+Bearer token is needed for protected routes. The server still enforces HMAC,
+and the HMAC secret is served to Swagger only in development. Docs are on
+outside production and off in production unless `DOCS_ENABLED=true`;
+`DOCS_ENABLED=false` hides them everywhere. `NODE_ENV` defaults to
+`development` when unset, so always set `NODE_ENV=production` on deploys.
+
 ## Shared rules
 
 - **Rate limits:** 100 requests per minute globally. Per client, register,

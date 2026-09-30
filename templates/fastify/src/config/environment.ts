@@ -39,10 +39,21 @@ function getApiPrefix(): string {
   return prefix;
 }
 
+const LOG_LEVELS = ["debug", "info", "warn", "error"] as const;
+
+/** LOG_LEVEL if valid; otherwise `info` in production and `debug` elsewhere. */
+function getLogLevel(isProd: boolean): EnvironmentConfig["logLevel"] {
+  const value = process.env.LOG_LEVEL as EnvironmentConfig["logLevel"] | undefined;
+  if (value && LOG_LEVELS.includes(value)) return value;
+  return isProd ? "info" : "debug";
+}
+
 const nodeEnv = process.env.NODE_ENV || "development";
 const isProduction = nodeEnv === "production";
 const isDevelopment = nodeEnv === "development";
 const isTest = nodeEnv === "test";
+// Swagger UI + OpenAPI spec: on outside production unless DOCS_ENABLED overrides it.
+const docsEnabled = process.env.DOCS_ENABLED ? process.env.DOCS_ENABLED === "true" : !isProduction;
 
 /**
  * Allowed browser origins for CORS + the CSRF guard. Hard-coded here (not env) so
@@ -61,6 +72,7 @@ export const config: EnvironmentConfig = {
   isProduction,
   isDevelopment,
   isTest,
+  docsEnabled,
   nodeEnv,
   mongodbUri: getRequiredEnvVar("MONGODB_URI"),
   hmacSecret: getRequiredSecret("HMAC_SECRET"),
@@ -80,6 +92,5 @@ export const config: EnvironmentConfig = {
   // Redis is optional: not read via getRequiredEnvVar so the app boots fine when off.
   redisEnabled: process.env.REDIS_ENABLED === "true",
   redisUrl: process.env.REDIS_URL || "redis://localhost:6379",
-  logLevel: (process.env.LOG_LEVEL ||
-    (isDevelopment ? "debug" : "info")) as EnvironmentConfig["logLevel"],
+  logLevel: getLogLevel(isProduction),
 };

@@ -34,7 +34,7 @@ focused page under [`system-architecture/`](./system-architecture/).
    pub/sub only when `REDIS_ENABLED`; must run before `listen()`, or it silently
    no-ops).
 3. `enableShutdownHooks()`.
-4. Mount Swagger at `/docs` (JSON at `/docs/json`).
+4. Mount Swagger at `/docs` (JSON at `/docs/json`) unless `DOCS_ENABLED` disables it.
 5. `app.listen(port)`.
 
 The global `SecurityGuard` + throttler guard (`APP_GUARD`), `ZodValidationPipe`

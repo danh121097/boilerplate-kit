@@ -41,6 +41,9 @@ export class AppConfigService {
   get isDevelopment(): boolean {
     return this.get("NODE_ENV") === "development";
   }
+  get docsEnabled(): boolean {
+    return this.get("DOCS_ENABLED") ?? !this.isProduction;
+  }
   get isTest(): boolean {
     return this.get("NODE_ENV") === "test";
   }

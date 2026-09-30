@@ -10,7 +10,8 @@ buildApp() configures the Fastify instance in this order:
 1. Fastify logger, body limit, and proxy trust.
 2. Validator and serializer compilers for Zod.
 3. Cookie, CORS, helmet, and compression plugins.
-4. Swagger and Swagger UI at /docs and /docs/json.
+4. Swagger and Swagger UI at /docs and /docs/json (skipped when DOCS_ENABLED
+   turns docs off).
 5. Shared error and not-found handlers.
 6. Root onRequest hooks for HMAC and optional CSRF.
 7. Global rate limiting, plus the shared auth and separate login buckets.

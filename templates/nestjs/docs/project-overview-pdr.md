@@ -83,7 +83,7 @@ pnpm keys           # node scripts/ensure-keys.mjs  (generate/rotate RSA keypair
 ## Environment (`.env.example`)
 
 `APP_NAME`, `NODE_ENV`, `PORT`, `MONGODB_URI`, `API_PREFIX`, `ENABLE_CSRF`,
-`COOKIE_DOMAIN`, `TRUST_PROXY` (optional), `JWT_PRIVATE_KEY_PATH`, `JWT_PUBLIC_KEY_PATH`,
+`COOKIE_DOMAIN`, `TRUST_PROXY` (optional), `DOCS_ENABLED` (optional), `JWT_PRIVATE_KEY_PATH`, `JWT_PUBLIC_KEY_PATH`,
 `JWT_REFRESH_SECRET`, `JWT_ACCESS_EXPIRY`, `JWT_REFRESH_EXPIRY`, `HMAC_SECRET`,
 `REDIS_ENABLED`, `REDIS_URL`, `LOG_LEVEL`.
 

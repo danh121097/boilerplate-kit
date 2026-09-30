@@ -15,8 +15,8 @@ app.use(compression());                    // 3. response compression
 app.use(cors({ origin: config.corsOrigin, credentials: true })); // 4. CORS + cookies
 app.use(express.json());                   // 5. JSON body parser
 app.use(cookieParser());                   // 6. parse cookies (refresh/access cookie)
-app.get("/docs/json", ...);                // 7. public OpenAPI document
-app.use("/docs", swaggerUi.serve, ...);    // 8. public Swagger UI
+app.get("/docs/json", ...);                // 7. public OpenAPI document (if docsEnabled)
+app.use("/docs", swaggerUi.serve, ...);    // 8. public Swagger UI (if docsEnabled)
 app.use(config.apiPrefix, verifyHmacRequest);  // 9. HMAC gate, all API routes
 app.use(config.apiPrefix, globalRateLimiter);  // 10. 100/min default limiter
 app.use(config.apiPrefix, routes);             // 11. route registry

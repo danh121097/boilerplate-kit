@@ -1,3 +1,4 @@
+import { publicUserSchema } from "@/docs/schemas";
 import { authenticate } from "@/middleware/auth";
 import { authRateLimiter, loginRateLimiter } from "@/middleware/rate-limit";
 import {
@@ -6,20 +7,10 @@ import {
   registerSchema,
   validate,
 } from "@/modules/auth/validation";
-import { ROLES } from "@/types/auth";
 import { z } from "zod";
 import type { RouteGroup } from "@/types/routing";
 import * as AuthController from "@/modules/auth/controller";
 
-const publicUserSchema = z.object({
-  _id: z.string(),
-  email: z.email(),
-  name: z.string(),
-  role: z.enum([ROLES.USER, ROLES.ADMIN, ROLES.SUPER_ADMIN]),
-  isActive: z.boolean(),
-  createdAt: z.iso.datetime(),
-  updatedAt: z.iso.datetime(),
-});
 const tokensSchema = z.object({ accessToken: z.string(), refreshToken: z.string() });
 const registerResponseSchema = z.object({
   success: z.literal(true),

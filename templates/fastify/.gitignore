@@ -36,6 +36,3 @@ logs.txt
 .DS_Store
 *.pem
 
-# postman sync uid cache
-postman/.collection-uid
-postman/.environment-uid

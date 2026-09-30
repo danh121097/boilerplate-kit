@@ -6,7 +6,7 @@ Opinionated Node.js + TypeScript backend built on Express 5. Production-grade st
 
 | Concern        | Choice                                                                                          |
 | -------------- | ----------------------------------------------------------------------------------------------- |
-| Runtime        | Node.js + TypeScript                                                          |
+| Runtime        | Node.js + TypeScript                                                                            |
 | Framework      | Express 5                                                                                       |
 | Database       | MongoDB via Mongoose                                                                            |
 | Auth           | JWT access tokens (RS256, file keys) + refresh tokens (HS256 symmetric secret, httpOnly cookie) |
@@ -17,7 +17,7 @@ Opinionated Node.js + TypeScript backend built on Express 5. Production-grade st
 | Security       | helmet, cors, compression, cookie-parser, express-rate-limit                                    |
 | Passwords      | bcrypt                                                                                          |
 | Testing        | Vitest + supertest + `mongodb-memory-server` (no external Mongo needed)                         |
-| Build          | `tsc --noEmit` type-check + `swc`                                                                |
+| Build          | `tsc --noEmit` type-check + `swc`                                                               |
 | Lint           | ESLint flat config (typescript-eslint)                                                          |
 | API docs       | OpenAPI spec + Swagger UI at `/docs`                                                            |
 
@@ -52,6 +52,8 @@ All variables are documented in [`.env.example`](.env.example). Key ones:
 | `HMAC_SECRET`                                  | Secret for HMAC request signing                                                                                                           |
 | `REDIS_ENABLED` / `REDIS_URL`                  | Toggle + connection for Redis features                                                                                                    |
 | `TRUST_PROXY`                                  | Optional. Behind a reverse proxy/LB: a hop count (`1`, preferred over `true`), or a comma-separated IP/subnet list. Unset = trust nothing |
+| `LOG_LEVEL`                                    | Optional. `debug` / `info` / `warn` / `error`. Unset = `debug` in development, `info` in production                                       |
+| `DOCS_ENABLED`                                 | Optional. Swagger UI + OpenAPI at `/docs`. Unset = on outside production, off in production; `true`/`false` overrides                     |
 
 ## Routes
 
@@ -68,11 +70,15 @@ Mounted under `API_PREFIX` (default `/api/v1`):
 | GET    | `/users`         | admin          | List users                     |
 | GET    | `/users/:id`     | access token   | Get user by ID                 |
 
-## Scripts
+OpenAPI JSON is served at `/docs/json` and Swagger UI at `/docs`. In
+development, Swagger UI signs "Try it out" requests automatically, so only a
+Bearer token is needed for protected routes. The server still enforces HMAC,
+and the HMAC secret is served to Swagger only in development. Docs are on
+outside production and off in production unless `DOCS_ENABLED=true`;
+`DOCS_ENABLED=false` hides them everywhere. `NODE_ENV` defaults to
+`development` when unset, so always set `NODE_ENV=production` on deploys.
 
-The OpenAPI spec is available at `/docs/json`; Swagger UI is available at
-`/docs`. In development, Swagger signs "Try it out" requests automatically, so
-only a Bearer token is needed for protected routes. The server still enforces HMAC.
+## Scripts
 
 - `dev` — watch-mode dev server (tsx)
 - `build` — type-check (`tsconfig.build.json`) then compile `src` to `dist` with swc

@@ -49,7 +49,9 @@ and Swagger/OpenAPI.
 
 MONGODB_URI, HMAC_SECRET, and JWT_REFRESH_SECRET are required.
 JWT_PRIVATE_KEY_PATH and JWT_PUBLIC_KEY_PATH default to files generated under
-src/keys/. REDIS_ENABLED defaults to false. API_PREFIX defaults to /api/v1;
+src/keys/. REDIS_ENABLED defaults to false. LOG_LEVEL (debug, info, warn, error) defaults
+to debug in development and info in production. DOCS_ENABLED (optional) forces Swagger on
+or off; unset = on outside production. API_PREFIX defaults to /api/v1;
 see .env.example for all supported values.
 
 TRUST_PROXY accepts true, false, or comma-separated IP/CIDR ranges. Numeric

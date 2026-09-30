@@ -5,10 +5,15 @@ All HTTP endpoints exposed by this template, generated from the route files
 list.
 
 The OpenAPI document is generated from the same route registry, request Zod
-schemas, and response schemas. It is served as JSON at `/docs/json`; Swagger UI
-is served at `/docs`. In development, Swagger signs "Try it out" requests so
-users only need to authorize Bearer tokens. HMAC remains enforced on the server;
-the HMAC secret is served to Swagger only in development.
+schemas, and response schemas.
+
+OpenAPI JSON is served at `/docs/json` and Swagger UI at `/docs`. In
+development, Swagger UI signs "Try it out" requests automatically, so only a
+Bearer token is needed for protected routes. The server still enforces HMAC,
+and the HMAC secret is served to Swagger only in development. Docs are on
+outside production and off in production unless `DOCS_ENABLED=true`;
+`DOCS_ENABLED=false` hides them everywhere. `NODE_ENV` defaults to
+`development` when unset, so always set `NODE_ENV=production` on deploys.
 
 ## Conventions
 

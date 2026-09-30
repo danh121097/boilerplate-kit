@@ -28,6 +28,8 @@ const nodeEnv = process.env.NODE_ENV || "development";
 const isProduction = nodeEnv === "production";
 const isDevelopment = nodeEnv === "development";
 const isTest = nodeEnv === "test";
+// Swagger UI + OpenAPI spec: on outside production unless DOCS_ENABLED overrides it.
+const docsEnabled = process.env.DOCS_ENABLED ? process.env.DOCS_ENABLED === "true" : !isProduction;
 
 /**
  * Allowed browser origins for CORS + the CSRF guard. Hard-coded here (not env) so
@@ -46,6 +48,7 @@ export const config: EnvironmentConfig = {
   isProduction,
   isDevelopment,
   isTest,
+  docsEnabled,
   nodeEnv,
   mongodbUri: getRequiredEnvVar("MONGODB_URI"),
   hmacSecret: getRequiredEnvVar("HMAC_SECRET"),

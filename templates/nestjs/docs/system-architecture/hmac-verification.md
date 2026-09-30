@@ -130,6 +130,7 @@ in the signed string and ignores it for verification.
 > **Swagger note:** development Swagger UI signs "Try it out" requests in the
 > browser, so protected routes only need a Bearer token entered through
 > "Authorize". Other environments do not serve the HMAC secret to Swagger.
+> Docs are off in production unless `DOCS_ENABLED=true`.
 
 ## See Also
 

@@ -22,6 +22,12 @@ export const envSchema = z.object({
   MONGODB_URI: z.string().min(1, "MONGODB_URI is required"),
   API_PREFIX: z.string().default("/api/v1"),
 
+  // Swagger UI + OpenAPI spec. Unset = on outside production, off in production.
+  // An empty `DOCS_ENABLED=` line counts as unset.
+  DOCS_ENABLED: z
+    .preprocess((v) => (v === "" ? undefined : v), z.enum(["true", "false"]).optional())
+    .transform((v) => (v === undefined ? undefined : v === "true")),
+
   // CSRF Origin allow-list guard (mutating methods). Off by default.
   ENABLE_CSRF: z
     .enum(["true", "false"])
@@ -67,7 +73,11 @@ export const envSchema = z.object({
     .transform((v) => v === "true"),
   REDIS_URL: z.string().default("redis://localhost:6379"),
 
-  LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).optional(),
+  // Empty `LOG_LEVEL=` counts as unset: debug in development, info in production.
+  LOG_LEVEL: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.enum(["debug", "info", "warn", "error"]).optional(),
+  ),
 });
 
 export type EnvVars = z.infer<typeof envSchema>;

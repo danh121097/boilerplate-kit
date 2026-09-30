@@ -3,7 +3,7 @@ import { isRedisReady } from "@/redis/redis-ready.util";
 import { RedisService } from "@/redis/redis.service";
 import { Controller, Get } from "@nestjs/common";
 import { InjectConnection } from "@nestjs/mongoose";
-import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { Connection } from "mongoose";
 
 /**
@@ -37,6 +37,8 @@ export class HealthController {
   @Public()
   @Get()
   @ApiOperation({ summary: "Check service, MongoDB, and Redis status" })
+  @ApiResponse({ status: 200, description: "Service health status" })
+  @ApiResponse({ status: 401, description: "Valid HMAC signature headers are required" })
   async check(): Promise<{
     status: string;
     timestamp: string;

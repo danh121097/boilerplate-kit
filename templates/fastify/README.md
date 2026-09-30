@@ -36,7 +36,9 @@ Redis is optional and disabled by default.
 See [`.env.example`](./.env.example) for the complete list. Required values are
 `MONGODB_URI`, `HMAC_SECRET` and `JWT_REFRESH_SECRET` (at least 32 characters).
 RSA key paths default to `src/keys/rsa.private` and `src/keys/rsa.public`;
-generate them with `pnpm keys`. `TRUST_PROXY` accepts `true`, `false`, or
+generate them with `pnpm keys`. `LOG_LEVEL` (`debug`, `info`, `warn`, `error`) defaults to `debug` in
+development and `info` in production. `DOCS_ENABLED` optionally forces Swagger on or off (unset = on outside
+production). `TRUST_PROXY` accepts `true`, `false`, or
 comma-separated IP/CIDR ranges. Fastify 5.12 intentionally does not accept
 hop-count trust because it can allow direct clients to spoof forwarded headers.
 
@@ -56,10 +58,13 @@ and public auth routes, requires valid `sig` and `ctime` HMAC headers.
 | GET    | `/users`         | HMAC + admin         | Paginated user list                     |
 | GET    | `/users/:id`     | HMAC + admin         | Get a user by ID                        |
 
-OpenAPI is available at `/docs/json`, with the interactive Swagger UI at `/docs`.
-In development, Swagger signs "Try it out" requests automatically, so only a
-Bearer token is needed for protected routes. HMAC remains enforced by the server;
-the secret is served to Swagger only in development.
+OpenAPI JSON is served at `/docs/json` and Swagger UI at `/docs`. In
+development, Swagger UI signs "Try it out" requests automatically, so only a
+Bearer token is needed for protected routes. The server still enforces HMAC,
+and the HMAC secret is served to Swagger only in development. Docs are on
+outside production and off in production unless `DOCS_ENABLED=true`;
+`DOCS_ENABLED=false` hides them everywhere. `NODE_ENV` defaults to
+`development` when unset, so always set `NODE_ENV=production` on deploys.
 
 ## Scripts
 

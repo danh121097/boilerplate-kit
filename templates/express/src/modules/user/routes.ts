@@ -1,19 +1,10 @@
+import { publicUserSchema } from "@/docs/schemas";
 import { authenticate } from "@/middleware/auth";
 import { requireMinRole } from "@/middleware/role";
-import { ROLES } from "@/types/auth";
 import { z } from "zod";
 import type { RouteGroup } from "@/types/routing";
 import * as UserController from "@/modules/user/controller";
 
-const publicUserSchema = z.object({
-  _id: z.string(),
-  email: z.email(),
-  name: z.string(),
-  role: z.enum([ROLES.USER, ROLES.ADMIN, ROLES.SUPER_ADMIN]),
-  isActive: z.boolean(),
-  createdAt: z.iso.datetime(),
-  updatedAt: z.iso.datetime(),
-});
 const listUsersResponseSchema = z.object({
   status: z.literal("success"),
   data: z.array(publicUserSchema),

@@ -32,6 +32,7 @@ export interface EnvironmentConfig {
   isProduction: boolean;
   isDevelopment: boolean;
   isTest: boolean;
+  docsEnabled: boolean;
   port: number;
   nodeEnv: string;
   mongodbUri: string;

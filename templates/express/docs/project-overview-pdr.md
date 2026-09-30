@@ -19,7 +19,7 @@ limiting, and an optional Redis tier — all behind a declarative module pattern
 | Optional cache/state | Redis via ioredis (`src/config/redis.ts`)                                                                   |
 | Validation           | Zod 4 (`src/modules/*/validation.ts`)                                                                       |
 | Auth                 | JWT (RS256 access + HS256 refresh) + bcrypt + httpOnly cookies                                              |
-| Package manager      | pnpm                                                                                    |
+| Package manager      | pnpm                                                                                                        |
 | Tests                | Vitest + supertest + `mongodb-memory-server`                                                                |
 | API docs             | OpenAPI generated from route declarations and Zod schemas; Swagger UI at `/docs` with dev-only HMAC signing |
 
@@ -66,7 +66,7 @@ pnpm test           # vitest run           (test:watch, test:coverage)
 `APP_NAME`, `NODE_ENV`, `PORT`, `MONGODB_URI`, `CORS_ORIGIN`, `API_PREFIX`,
 `JWT_PRIVATE_KEY_PATH`, `JWT_PUBLIC_KEY_PATH`, `JWT_REFRESH_SECRET`,
 `JWT_ACCESS_EXPIRY`, `JWT_REFRESH_EXPIRY`, `HMAC_SECRET`, `REDIS_ENABLED`,
-`REDIS_URL`, `TRUST_PROXY` (optional).
+`REDIS_URL`, `TRUST_PROXY` (optional), `DOCS_ENABLED` (optional), `LOG_LEVEL` (optional).
 
 `MONGODB_URI`, `HMAC_SECRET`, `JWT_REFRESH_SECRET` (symmetric secret, min 32
 chars), and the RSA key paths (`JWT_PRIVATE_KEY_PATH`, `JWT_PUBLIC_KEY_PATH`) are

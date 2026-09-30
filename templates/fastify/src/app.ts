@@ -74,23 +74,26 @@ export function buildApp(
     transform: jsonSchemaTransform,
   });
 
-  if (config.isDevelopment) {
-    app.get("/docs/hmac-config", async (_request, reply) => {
-      return reply
-        .header("cache-control", "no-store")
-        .send({ secret: config.hmacSecret, apiPrefix: config.apiPrefix });
+  // Off in production unless DOCS_ENABLED=true.
+  if (config.docsEnabled) {
+    if (config.isDevelopment) {
+      app.get("/docs/hmac-config", async (_request, reply) => {
+        return reply
+          .header("cache-control", "no-store")
+          .send({ secret: config.hmacSecret, apiPrefix: config.apiPrefix });
+      });
+    }
+
+    app.register(swaggerUi, {
+      routePrefix: "/docs",
+      staticCSP: true,
+      uiConfig: {
+        deepLinking: false,
+        docExpansion: "list",
+        ...(config.isDevelopment ? { requestInterceptor: hmacRequestInterceptor } : {}),
+      },
     });
   }
-
-  app.register(swaggerUi, {
-    routePrefix: "/docs",
-    staticCSP: true,
-    uiConfig: {
-      deepLinking: false,
-      docExpansion: "list",
-      ...(config.isDevelopment ? { requestInterceptor: hmacRequestInterceptor } : {}),
-    },
-  });
 
   installErrorHandlers(app);
   installSecurityHooks(app);

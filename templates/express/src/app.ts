@@ -50,27 +50,30 @@ app.use(express.json());
 app.use(cookieParser());
 
 // Keep interactive API documentation outside the API HMAC and rate-limit mounts.
-app.get("/docs/json", (_req, res) => res.json(openApiDocument));
-if (config.isDevelopment) {
-  app.get("/docs/hmac-config.js", (_req, res) => {
-    res
-      .set("Cache-Control", "no-store")
-      .type("application/javascript")
-      .send(buildHmacBootstrapJs(config.hmacSecret, config.apiPrefix));
-  });
+// Off in production unless DOCS_ENABLED=true.
+if (config.docsEnabled) {
+  app.get("/docs/json", (_req, res) => res.json(openApiDocument));
+  if (config.isDevelopment) {
+    app.get("/docs/hmac-config.js", (_req, res) => {
+      res
+        .set("Cache-Control", "no-store")
+        .type("application/javascript")
+        .send(buildHmacBootstrapJs(config.hmacSecret, config.apiPrefix));
+    });
+  }
+  app.use(
+    "/docs",
+    swaggerUi.serve,
+    swaggerUi.setup(openApiDocument, {
+      ...(config.isDevelopment
+        ? {
+            customJs: "/docs/hmac-config.js",
+            swaggerOptions: { requestInterceptor: hmacRequestInterceptor },
+          }
+        : {}),
+    }),
+  );
 }
-app.use(
-  "/docs",
-  swaggerUi.serve,
-  swaggerUi.setup(openApiDocument, {
-    ...(config.isDevelopment
-      ? {
-          customJs: "/docs/hmac-config.js",
-          swaggerOptions: { requestInterceptor: hmacRequestInterceptor },
-        }
-      : {}),
-  }),
-);
 
 // HMAC signature verification for all API routes
 app.use(config.apiPrefix, verifyHmacRequest);

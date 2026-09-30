@@ -1,7 +1,14 @@
 import { Roles } from "@/common/decorators/roles.decorator";
 import { UserService } from "@/modules/user/user.service";
 import { Controller, Get, HttpCode, Param, Query } from "@nestjs/common";
-import { ApiOperation, ApiParam, ApiQuery, ApiSecurity, ApiTags } from "@nestjs/swagger";
+import {
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiResponse,
+  ApiSecurity,
+  ApiTags,
+} from "@nestjs/swagger";
 
 /**
  * User controller — admin-gated list + get-by-id.
@@ -24,6 +31,9 @@ export class UserController {
   /** GET /users?page=&limit= — paginated user list, newest first. */
   @Get()
   @ApiOperation({ summary: "List users" })
+  @ApiResponse({ status: 200, description: "Paginated users without password hashes" })
+  @ApiResponse({ status: 401, description: "A valid access token is required" })
+  @ApiResponse({ status: 403, description: "Admin role is required" })
   @ApiQuery({
     name: "page",
     required: false,
@@ -47,6 +57,10 @@ export class UserController {
   /** GET /users/:id — single user by ObjectId string. */
   @Get(":id")
   @ApiOperation({ summary: "Get a user by ID" })
+  @ApiResponse({ status: 200, description: "User without a password hash" })
+  @ApiResponse({ status: 401, description: "A valid access token is required" })
+  @ApiResponse({ status: 403, description: "Admin role is required" })
+  @ApiResponse({ status: 404, description: "User not found" })
   @ApiParam({
     name: "id",
     type: String,
