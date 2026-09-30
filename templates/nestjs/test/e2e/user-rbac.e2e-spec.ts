@@ -32,7 +32,7 @@ let seededUserId: string;
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
-function signedPost(path: string, body: unknown) {
+function signedPost(path: string, body: object) {
   const h = buildHmacHeaders("POST", path, body);
   return req
     .post(`/api/v1${path}`)

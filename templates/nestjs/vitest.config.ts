@@ -19,7 +19,10 @@ export default defineConfig({
     // Vars must be set here (not globalSetup) because workers have isolated env.
     setupFiles: ["./test/setup.ts"],
     include: [
+      "src/**/*.test.ts",
       "src/**/*.spec.ts",
+      "src/**/*.e2e-spec.ts",
+      "test/**/*.test.ts",
       "test/**/*.spec.ts",
       "test/**/*.e2e-spec.ts",
     ],
@@ -34,7 +37,7 @@ export default defineConfig({
     },
   },
   plugins: [
-    tsconfigPaths(),
+    tsconfigPaths({ projects: ["tsconfig.test.json"] }),
     swc.vite({
       // `module: es6` is required for Vitest (ESM); decorator metadata still emits.
       module: { type: "es6" },

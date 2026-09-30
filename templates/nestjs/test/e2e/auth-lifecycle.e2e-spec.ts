@@ -44,7 +44,7 @@ const USER = {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function signedPost(path: string, body: unknown) {
+function signedPost(path: string, body: object) {
   const headers = buildHmacHeaders("POST", path, body);
   return req
     .post(`/api/v1${path}`)
