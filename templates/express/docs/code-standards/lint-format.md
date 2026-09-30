@@ -49,15 +49,15 @@ extensions (`.vscode/extensions.json`) for this to work.
 
 ## Scripts
 
-Run with **bun** (the project's package manager):
+Run with **pnpm** (the project's package manager):
 
 ```bash
-bun run lint         # eslint src/**/*.ts
-bun run lint:fix     # eslint src/**/*.ts --fix
-bun run typecheck    # tsc --noEmit
-bun run test         # vitest run
-bun run test:watch   # vitest (watch mode)
-bun run test:coverage# vitest run --coverage
+pnpm lint         # eslint src/**/*.ts
+pnpm lint:fix     # eslint src/**/*.ts --fix
+pnpm typecheck    # tsc --noEmit
+pnpm test         # vitest run
+pnpm test:watch   # vitest (watch mode)
+pnpm test:coverage# vitest run --coverage
 ```
 
 Run `lint` and `typecheck` clean, and `test` green, before opening a PR.

@@ -4,9 +4,10 @@ node_modules
 dist
 coverage
 
-# npm artifacts — this project uses Bun (keep bun.lock for installs)
+# npm/yarn artifacts — this project uses pnpm (keep pnpm-lock.yaml for installs)
 
 package-lock.json
+yarn.lock
 
 # Secrets — never copy into the image
 
@@ -24,8 +25,6 @@ src/keys/rsa.public
 .claude
 plans
 docs
-postman
-scripts/postman
 
 # Tests are not needed in the production image
 

@@ -6,7 +6,7 @@ Opinionated Node.js + TypeScript backend built on Express 5. Production-grade st
 
 | Concern        | Choice                                                                                          |
 | -------------- | ----------------------------------------------------------------------------------------------- |
-| Runtime        | Node.js + TypeScript (dev/run via [Bun](https://bun.sh), Node-compatible)                       |
+| Runtime        | Node.js + TypeScript                                                          |
 | Framework      | Express 5                                                                                       |
 | Database       | MongoDB via Mongoose                                                                            |
 | Auth           | JWT access tokens (RS256, file keys) + refresh tokens (HS256 symmetric secret, httpOnly cookie) |
@@ -17,7 +17,7 @@ Opinionated Node.js + TypeScript backend built on Express 5. Production-grade st
 | Security       | helmet, cors, compression, cookie-parser, express-rate-limit                                    |
 | Passwords      | bcrypt                                                                                          |
 | Testing        | Vitest + supertest + `mongodb-memory-server` (no external Mongo needed)                         |
-| Build          | `tsc` + `tsc-alias` (or `swc` via `build:swc`)                                                  |
+| Build          | `tsc --noEmit` type-check + `swc`                                                                |
 | Lint           | ESLint flat config (typescript-eslint)                                                          |
 | API docs       | OpenAPI spec + Swagger UI at `/docs`                                                            |
 
@@ -25,13 +25,13 @@ Opinionated Node.js + TypeScript backend built on Express 5. Production-grade st
 
 ```sh
 cp .env.example .env          # then edit values
-bun install
-bun run dev
+pnpm install
+pnpm dev
 ```
 
-The first `bun run dev` runs `predev`, which executes `scripts/ensure-keys.mjs` to generate the
+The first `pnpm dev` runs `predev`, which executes `scripts/ensure-keys.mjs` to generate the
 RSA keypair (`src/keys/rsa.private` / `rsa.public`) used to sign access tokens. Both keys are
-gitignored — never commit `rsa.private`. Rotate with `bun run keys -- --force` (or `sh src/keys/setup.sh --force`).
+gitignored — never commit `rsa.private`. Rotate with `pnpm keys --force` (or `sh src/keys/setup.sh --force`).
 
 > Requires `openssl` (for key generation) and a running MongoDB at `MONGODB_URI`.
 > Redis is opt-in: leave `REDIS_ENABLED=false` to run fully without it.
@@ -74,11 +74,10 @@ The OpenAPI spec is available at `/docs/json`; Swagger UI is available at
 `/docs`. In development, Swagger signs "Try it out" requests automatically, so
 only a Bearer token is needed for protected routes. The server still enforces HMAC.
 
-- `dev` — watch-mode dev server (Bun)
-- `build` — `tsc -p tsconfig.build.json` + `tsc-alias`
-- `build:swc` — faster build via swc + `tsc-alias`
+- `dev` — watch-mode dev server (tsx)
+- `build` — type-check (`tsconfig.build.json`) then compile `src` to `dist` with swc
 - `typecheck` — `tsc --noEmit`
-- `start` — run the built server with Node (`node dist/server.js`); `start:bun` for Bun
+- `start` — run the built server with Node (`node dist/server.js`)
 - `lint` / `lint:fix` — ESLint
 - `test` / `test:watch` / `test:coverage` — Vitest
 

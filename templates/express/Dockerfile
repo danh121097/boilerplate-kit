@@ -1,29 +1,33 @@
-# Multi-stage build with Bun (the project's package manager + runtime).
-# Compiles TypeScript in a builder stage, ships only prod deps + dist/.
+# Multi-stage build on Node (pnpm via corepack).
+# Compiles TypeScript in a build stage, ships only prod deps + dist/.
 
-# ---- Builder: install all deps and compile src -> dist ----
-FROM oven/bun:1-alpine AS builder
+# ---- Build: install all deps and compile src -> dist ----
+FROM node:20.19-bookworm-slim AS build
 WORKDIR /usr/src/app
 
-# Install deps first for better layer caching (re-runs only when manifest changes).
-COPY package.json bun.lock* ./
-RUN bun install
+RUN corepack enable
 
-# Compile (tsc && tsc-alias) -> runnable CommonJS in dist/.
+# Install deps first for better layer caching (re-runs only when manifest changes).
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
+
+# Compile with swc -> runnable CommonJS in dist/ (build type-checks first).
 COPY tsconfig.json tsconfig.build.json .swcrc ./
 COPY src ./src
-RUN bun run build
+RUN pnpm build
 
-# ---- Runner: minimal image with prod deps + compiled output ----
-FROM oven/bun:1-alpine AS runner
+# ---- Runtime: minimal image with prod deps + compiled output ----
+FROM node:20.19-bookworm-slim AS runtime
 WORKDIR /usr/src/app
 ENV NODE_ENV=production
 
-# Only production dependencies in the final image.
-COPY package.json bun.lock* ./
-RUN bun install --production
+RUN corepack enable
 
-COPY --from=builder /usr/src/app/dist ./dist
+# Only production dependencies in the final image.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --prod --frozen-lockfile
+
+COPY --from=build /usr/src/app/dist ./dist
 
 # RSA signing keys are intentionally NOT baked into the image (they are secrets).
 # Mount them at runtime and point the env at the mounted paths, e.g.:
@@ -35,4 +39,4 @@ COPY --from=builder /usr/src/app/dist ./dist
 # (production env refuses to start without real key files — by design.)
 
 EXPOSE 3000
-CMD ["bun", "dist/server.js"]
+CMD ["node", "dist/server.js"]

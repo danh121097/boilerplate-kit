@@ -7,7 +7,7 @@ Guidance for Claude Code (and other coding agents) working in this repository.
 Node.js + Express + TypeScript backend starter — JWT access tokens + httpOnly
 refresh-token rotation, HMAC-signed request verification, MongoDB/Mongoose,
 Socket.IO, rate limiting, and a modular `controller/service/routes/validation`
-layout. Package manager: **bun**.
+layout. Package manager: **pnpm**.
 
 ## Start Here
 
@@ -33,12 +33,12 @@ Full standards: [docs/code-standards.md](./docs/code-standards.md).
 ## Scripts
 
 ```bash
-bun run dev          # bun --watch src/server.ts
-bun run build        # tsc -p tsconfig.build.json && tsc-alias
-bun run typecheck    # tsc --noEmit
-bun run test         # vitest run
-bun run lint         # eslint src/**/*.ts
-bun run start        # bun dist/server.js
+pnpm dev          # tsx watch src/server.ts
+pnpm build        # tsc --noEmit -p tsconfig.build.json && swc src -d dist
+pnpm typecheck    # tsc --noEmit
+pnpm test         # vitest run
+pnpm lint         # eslint src/**/*.ts
+pnpm start        # node dist/server.js
 ```
 
 ## Documentation

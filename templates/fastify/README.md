@@ -65,8 +65,7 @@ the secret is served to Swagger only in development.
 
 - `pnpm dev` — watch-mode Fastify server; generates local JWT keys first
 - `pnpm keys` — generate the local RSA keypair
-- `pnpm build` — TypeScript build + path-alias rewrite
-- `pnpm build:swc` — faster build via swc + path-alias rewrite
+- `pnpm build` — type-check (`tsconfig.build.json`) then compile `src` to `dist` with swc
 - `pnpm typecheck` — TypeScript check
 - `pnpm lint` / `pnpm lint:fix` — ESLint
 - `pnpm test` / `pnpm test:watch` / `pnpm test:coverage` — Vitest

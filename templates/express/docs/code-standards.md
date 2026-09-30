@@ -24,7 +24,7 @@ each topic links to a focused, concrete page under [`code-standards/`](./code-st
   well under this (the largest module file, `auth/service.ts`, is ~165 lines).
 - **`@/` import alias** — import from source roots via `@/`, never deep relative
   chains (`import { AppError } from "@/types"`). Configured in `tsconfig.json`
-  `paths` and resolved at build by `tsc-alias`, in tests by `vite-tsconfig-paths`.
+  `paths` and resolved at build by swc (`.swcrc` `jsc.paths`), in tests by `vite-tsconfig-paths`.
 - **Errors via `AppError`** — throw `AppError` with a `statusCode` + `errorType`;
   never `res.status(500)` ad hoc. The global error handler shapes the response.
 - **No auto-commit** — never run `git commit` / `git push` unless explicitly

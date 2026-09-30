@@ -19,7 +19,7 @@ limiting, and an optional Redis tier — all behind a declarative module pattern
 | Optional cache/state | Redis via ioredis (`src/config/redis.ts`)                                                                   |
 | Validation           | Zod 4 (`src/modules/*/validation.ts`)                                                                       |
 | Auth                 | JWT (RS256 access + HS256 refresh) + bcrypt + httpOnly cookies                                              |
-| Package manager      | bun (scripts call `bun`)                                                                                    |
+| Package manager      | pnpm                                                                                    |
 | Tests                | Vitest + supertest + `mongodb-memory-server`                                                                |
 | API docs             | OpenAPI generated from route declarations and Zod schemas; Swagger UI at `/docs` with dev-only HMAC signing |
 
@@ -53,13 +53,12 @@ on, Socket.IO also wires a pub/sub adapter for cross-instance emits.
 ## Scripts (`package.json`)
 
 ```bash
-bun run dev            # bun --watch src/server.ts (predev generates RSA keys if absent)
-bun run build          # tsc -p tsconfig.build.json && tsc-alias
-bun run build:swc      # swc src -d dist --config-file .swcrc && tsc-alias
-bun run typecheck      # tsc --noEmit
-bun run start          # node dist/server.js   (start:bun uses bun)
-bun run lint           # eslint src/**/*.ts   (lint:fix to autofix)
-bun run test           # vitest run           (test:watch, test:coverage)
+pnpm dev            # tsx watch src/server.ts (predev generates RSA keys if absent)
+pnpm build          # tsc --noEmit -p tsconfig.build.json && swc src -d dist
+pnpm typecheck      # tsc --noEmit
+pnpm start          # node dist/server.js
+pnpm lint           # eslint src/**/*.ts   (lint:fix to autofix)
+pnpm test           # vitest run           (test:watch, test:coverage)
 ```
 
 ## Environment (`.env.example`)

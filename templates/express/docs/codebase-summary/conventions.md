@@ -15,8 +15,8 @@ import { authenticate } from '@/middleware/auth';
 ```
 
 Declared in `tsconfig.json` (`paths: { "@/*": ["./src/*"] }`). Resolved at build
-by `tsc-alias` and in tests by `vite-tsconfig-paths`. The runtime entry
-(`bun --watch src/server.ts`) resolves it natively.
+by swc (`.swcrc` `jsc.paths`) and in tests by `vite-tsconfig-paths`. The runtime entry
+(`tsx watch src/server.ts`) resolves it via `tsconfig.json` paths.
 
 ## Barrels
 
@@ -101,7 +101,7 @@ verify with the public key without holding signing power:
   sign/verify **self-test** so a mismatched pair fails at boot, not at runtime.
 - **Fail-closed**: only `test` / `development` may fall back to an ephemeral
   in-memory keypair (per-process, non-persistent). Any other env throws.
-- Generate real keys with `pnpm keys` / `bun run keys` (`predev` does this
+- Generate real keys with `pnpm keys` (`predev` does this
   automatically if `rsa.private` is absent). Keep `rsa.private` out of git.
 
 **Refresh** tokens are HS256-signed with the symmetric secret `JWT_REFRESH_SECRET`

@@ -34,7 +34,7 @@ Socket.IO, rate limiting, optional Redis, Zod validation, and Swagger.
 
 ```bash
 pnpm dev          # tsx watch src/server.ts (generates local RSA keys first)
-pnpm build        # tsc -p tsconfig.build.json && tsc-alias
+pnpm build        # tsc --noEmit (build config) && swc src -d dist
 pnpm typecheck    # tsc --noEmit -p tsconfig.json
 pnpm test         # vitest run
 pnpm lint         # eslint src/**/*.ts

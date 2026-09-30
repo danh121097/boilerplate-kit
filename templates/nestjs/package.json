@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "NestJS + TypeScript backend starter — JWT, HMAC, MongoDB, Redis, Socket.IO, Swagger",
   "main": "dist/src/main.js",
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "scripts": {
     "keys": "node scripts/ensure-keys.mjs",
     "predev": "node scripts/ensure-keys.mjs",
@@ -10,7 +13,6 @@
     "build": "nest build",
     "typecheck": "tsc --noEmit -p tsconfig.test.json",
     "start": "node dist/src/main.js",
-    "start:prod": "node dist/src/main.js",
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "format": "prettier --write .",
@@ -76,7 +78,7 @@
     "prettier": "^3.8.3",
     "socket.io-client": "^4.8.3",
     "supertest": "^7.2.2",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.3",
     "typescript-eslint": "^8.57.1",
     "unplugin-swc": "^1.5.9",
     "vite-tsconfig-paths": "^6.1.1",

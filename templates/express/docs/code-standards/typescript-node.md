@@ -13,7 +13,7 @@ means no implicit `any`, strict null checks, etc. Consequences:
   leaking the Mongoose document type.
 - Annotate exported function return types (ESLint warns on missing ones via
   `explicit-function-return-type`). Async handlers return `Promise<void>`.
-- Imports use the `@/` alias, resolved by `tsc-alias` at build and
+- Imports use the `@/` alias, resolved by swc at build and
   `vite-tsconfig-paths` in tests.
 
 ## `AppError` for all failures

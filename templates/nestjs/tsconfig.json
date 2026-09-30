@@ -4,10 +4,11 @@
     "module": "commonjs",
     "lib": ["ES2022"],
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDir": ".",
     "paths": {
       "@/*": ["./src/*"]
     },
+    "types": ["node", "vitest/globals"],
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -17,14 +18,6 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true
   },
-  "include": ["src/**/*.ts"],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "test",
-    "src/__tests__",
-    "**/*.test.ts",
-    "**/*.spec.ts",
-    "**/*.e2e-spec.ts"
-  ]
+  "include": ["src/**/*.ts", "test/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
 }
