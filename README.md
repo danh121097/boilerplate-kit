@@ -24,7 +24,7 @@ npm create prism-app@latest
 | **Next.js 16** | App Router · TanStack Query · Zustand · shadcn/ui · Tailwind v4 |
 | **TanStack Start** | TanStack Ecosystem · Zustand · shadcn/ui · Tailwind v4 |
 | **React Native** | Expo · Expo Router · NativeWind · TanStack Query · Zustand · SecureStore · JWT auth |
-| **Express 5** | TypeScript · Mongoose · Socket.io · Redis · JWT auth · Postman |
+| **Express 5** | TypeScript · Mongoose · Socket.io · Redis · JWT auth · Swagger |
 | **Fastify 5** | TypeScript · Mongoose · Socket.io · Redis · JWT auth · Swagger |
 | **NestJS 11** | TypeScript · Mongoose · Socket.io · Redis · JWT auth · Swagger |
 

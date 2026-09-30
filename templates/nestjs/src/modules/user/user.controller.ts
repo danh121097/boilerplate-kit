@@ -1,6 +1,7 @@
 import { Roles } from "@/common/decorators/roles.decorator";
 import { UserService } from "@/modules/user/user.service";
 import { Controller, Get, HttpCode, Param, Query } from "@nestjs/common";
+import { ApiOperation, ApiParam, ApiQuery, ApiSecurity, ApiTags } from "@nestjs/swagger";
 
 /**
  * User controller — admin-gated list + get-by-id.
@@ -15,11 +16,26 @@ import { Controller, Get, HttpCode, Param, Query } from "@nestjs/common";
  */
 @Controller("users")
 @Roles("admin")
+@ApiTags("users")
+@ApiSecurity({ bearerAuth: [] })
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
   /** GET /users?page=&limit= — paginated user list, newest first. */
   @Get()
+  @ApiOperation({ summary: "List users" })
+  @ApiQuery({
+    name: "page",
+    required: false,
+    type: Number,
+    description: "Page number; values below 1 are treated as 1.",
+  })
+  @ApiQuery({
+    name: "limit",
+    required: false,
+    type: Number,
+    description: "Items per page; values are clamped to 1–100.",
+  })
   @HttpCode(200)
   async listUsers(
     @Query() query: Record<string, unknown>,
@@ -30,10 +46,14 @@ export class UserController {
 
   /** GET /users/:id — single user by ObjectId string. */
   @Get(":id")
+  @ApiOperation({ summary: "Get a user by ID" })
+  @ApiParam({
+    name: "id",
+    type: String,
+    description: "24-character hexadecimal MongoDB user ID.",
+  })
   @HttpCode(200)
-  async getUserById(
-    @Param("id") id: string,
-  ): Promise<{ status: string; data: unknown }> {
+  async getUserById(@Param("id") id: string): Promise<{ status: string; data: unknown }> {
     const user = await this.userService.getUserById(id);
     return { status: "success", data: user };
   }

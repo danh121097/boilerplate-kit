@@ -3,6 +3,7 @@ import { isRedisReady } from "@/redis/redis-ready.util";
 import { RedisService } from "@/redis/redis.service";
 import { Controller, Get } from "@nestjs/common";
 import { InjectConnection } from "@nestjs/mongoose";
+import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Connection } from "mongoose";
 
 /**
@@ -26,6 +27,7 @@ const DB_STATE_MAP = new Map<number, string>([
 ]);
 
 @Controller("health")
+@ApiTags("health")
 export class HealthController {
   constructor(
     @InjectConnection() private readonly connection: Connection,
@@ -34,6 +36,7 @@ export class HealthController {
 
   @Public()
   @Get()
+  @ApiOperation({ summary: "Check service, MongoDB, and Redis status" })
   async check(): Promise<{
     status: string;
     timestamp: string;

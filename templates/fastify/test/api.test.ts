@@ -220,13 +220,18 @@ describe("Fastify HTTP contract", () => {
     const docs = await app.inject({ method: "GET", url: "/docs/json" });
     expect(docs.statusCode).toBe(200);
     const spec = docs.json();
-    const hmacOnly = [{ hmacSignature: [], hmacTimestamp: [] }];
-    const hmacAndBearer = [{ hmacSignature: [], hmacTimestamp: [], bearerAuth: [] }];
-    expect(spec.security).toEqual(hmacOnly);
-    expect(spec.paths[`${API}/auth/register`].post.security ?? spec.security).toEqual(hmacOnly);
-    expect(spec.paths[`${API}/auth/me`].get.security).toEqual(hmacAndBearer);
-    expect(spec.paths[`${API}/users/`].get.security).toEqual(hmacAndBearer);
-    expect(spec.paths[`${API}/users/{id}`].get.security).toEqual(hmacAndBearer);
+    expect(spec.security).toBeUndefined();
+    expect(spec.components.securitySchemes).toEqual({
+      bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
+    });
+    expect(spec.paths[`${API}/auth/register`].post.security).toBeUndefined();
+    expect(spec.paths[`${API}/auth/me`].get.security).toEqual([{ bearerAuth: [] }]);
+    expect(spec.paths[`${API}/users/`].get.security).toEqual([{ bearerAuth: [] }]);
+    expect(spec.paths[`${API}/users/{id}`].get.security).toEqual([{ bearerAuth: [] }]);
+    expect((await app.inject({ method: "GET", url: "/docs/hmac-config" })).statusCode).toBe(404);
+
+    const unsigned = await app.inject({ method: "GET", url: `${API}/health` });
+    expect(unsigned.statusCode).toBe(401);
 
     const missing = await signedRequest({ method: "GET", url: `${API}/does-not-exist` });
     expect(missing.statusCode).toBe(404);

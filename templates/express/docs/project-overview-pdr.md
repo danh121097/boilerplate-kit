@@ -10,17 +10,18 @@ limiting, and an optional Redis tier — all behind a declarative module pattern
 
 ## Stack
 
-| Concern | Choice |
-| --- | --- |
-| Runtime / language | Node.js, TypeScript 5 (strict, `target` ES2022, `module` commonjs) |
-| Web framework | Express 5 (`src/app.ts`) |
-| Database | MongoDB via Mongoose 9 (`src/config/database.ts`, `src/models/*`) |
-| Realtime | Socket.IO 4 (`src/socket/*`) |
-| Optional cache/state | Redis via ioredis (`src/config/redis.ts`) |
-| Validation | Zod 4 (`src/modules/*/validation.ts`) |
-| Auth | JWT (RS256 access + HS256 refresh) + bcrypt + httpOnly cookies |
-| Package manager | bun (scripts call `bun`) |
-| Tests | Vitest + supertest + `mongodb-memory-server` |
+| Concern              | Choice                                                                                                      |
+| -------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Runtime / language   | Node.js, TypeScript 6 (strict, `target` ES2022, `module` commonjs)                                          |
+| Web framework        | Express 5 (`src/app.ts`)                                                                                    |
+| Database             | MongoDB via Mongoose 9 (`src/config/database.ts`, `src/models/*`)                                           |
+| Realtime             | Socket.IO 4 (`src/socket/*`)                                                                                |
+| Optional cache/state | Redis via ioredis (`src/config/redis.ts`)                                                                   |
+| Validation           | Zod 4 (`src/modules/*/validation.ts`)                                                                       |
+| Auth                 | JWT (RS256 access + HS256 refresh) + bcrypt + httpOnly cookies                                              |
+| Package manager      | bun (scripts call `bun`)                                                                                    |
+| Tests                | Vitest + supertest + `mongodb-memory-server`                                                                |
+| API docs             | OpenAPI generated from route declarations and Zod schemas; Swagger UI at `/docs` with dev-only HMAC signing |
 
 ## Auth Model
 
@@ -36,10 +37,11 @@ limiting, and an optional Redis tier — all behind a declarative module pattern
 ## HMAC Verification
 
 Every request under `API_PREFIX` (and every Socket.IO handshake) must carry `sig`
-+ `ctime` headers. The server recomputes an HMAC-SHA256 over
-`[method, contentType, ctime, path, ""].join("\n")` and compares in constant time;
-timestamps older than 5 minutes are rejected (bounds the replay window; no nonce). See
-`src/utils/hmac.ts` and `src/middleware/hmac.ts`.
+
+- `ctime` headers. The server recomputes an HMAC-SHA256 over
+  `[method, contentType, ctime, path, ""].join("\n")` and compares in constant time;
+  timestamps older than 5 minutes are rejected (bounds the replay window; no nonce). See
+  `src/utils/hmac.ts` and `src/middleware/hmac.ts`.
 
 ## Optional Redis Tier
 
@@ -55,10 +57,9 @@ bun run dev            # bun --watch src/server.ts (predev generates RSA keys if
 bun run build          # tsc -p tsconfig.build.json && tsc-alias
 bun run build:swc      # swc src -d dist --config-file .swcrc && tsc-alias
 bun run typecheck      # tsc --noEmit
-bun run start          # bun dist/server.js   (start:node uses node)
+bun run start          # node dist/server.js   (start:bun uses bun)
 bun run lint           # eslint src/**/*.ts   (lint:fix to autofix)
 bun run test           # vitest run           (test:watch, test:coverage)
-bun run postman:generate  # bun scripts/postman/sync.ts
 ```
 
 ## Environment (`.env.example`)
@@ -66,7 +67,7 @@ bun run postman:generate  # bun scripts/postman/sync.ts
 `APP_NAME`, `NODE_ENV`, `PORT`, `MONGODB_URI`, `CORS_ORIGIN`, `API_PREFIX`,
 `JWT_PRIVATE_KEY_PATH`, `JWT_PUBLIC_KEY_PATH`, `JWT_REFRESH_SECRET`,
 `JWT_ACCESS_EXPIRY`, `JWT_REFRESH_EXPIRY`, `HMAC_SECRET`, `REDIS_ENABLED`,
-`REDIS_URL`, `TRUST_PROXY` (optional), `POSTMAN_API_KEY`, `POSTMAN_COLLECTION_UID`.
+`REDIS_URL`, `TRUST_PROXY` (optional).
 
 `MONGODB_URI`, `HMAC_SECRET`, `JWT_REFRESH_SECRET` (symmetric secret, min 32
 chars), and the RSA key paths (`JWT_PRIVATE_KEY_PATH`, `JWT_PUBLIC_KEY_PATH`) are
@@ -87,4 +88,4 @@ are optional.
 - No user-update or delete endpoints (only list + get-by-id).
 - No file uploads, jobs/queues, or GraphQL.
 - No deployment manifests beyond the template's `Dockerfile` / `docker-compose.yml`.
-- No API docs generator beyond the Postman sync script.
+- OpenAPI paths, request bodies, and response schemas are derived from route metadata.

@@ -9,6 +9,7 @@ import { LoginDto } from "@/modules/auth/dto/login.dto";
 import { RefreshDto } from "@/modules/auth/dto/refresh.dto";
 import { RegisterDto } from "@/modules/auth/dto/register.dto";
 import { Body, Controller, Get, HttpCode, HttpException, Post, Req, Res } from "@nestjs/common";
+import { ApiOperation, ApiSecurity, ApiTags } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import type { Request, Response } from "express";
 
@@ -33,6 +34,7 @@ import type { Request, Response } from "express";
  *   me        → 200 { success:true, data:{ user } }
  */
 @Controller("auth")
+@ApiTags("auth")
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
@@ -42,6 +44,7 @@ export class AuthController {
   /** POST /auth/register — 201, public, auth throttle. */
   @Public()
   @Post("register")
+  @ApiOperation({ summary: "Register a user" })
   @HttpCode(201)
   @Throttle({ default: { limit: 100, ttl: 60_000 }, auth: { limit: 30, ttl: 900_000 } })
   async register(
@@ -60,6 +63,7 @@ export class AuthController {
   /** POST /auth/login — 200, public, login throttle. */
   @Public()
   @Post("login")
+  @ApiOperation({ summary: "Log in and create a session" })
   @HttpCode(200)
   @Throttle({ default: { limit: 100, ttl: 60_000 }, login: { limit: 30, ttl: 900_000 } })
   async login(
@@ -81,6 +85,7 @@ export class AuthController {
    */
   @Public()
   @Post("refresh")
+  @ApiOperation({ summary: "Rotate refresh and access tokens" })
   @HttpCode(200)
   @Throttle({ default: { limit: 100, ttl: 60_000 }, auth: { limit: 30, ttl: 900_000 } })
   async refresh(
@@ -127,6 +132,7 @@ export class AuthController {
    */
   @Public()
   @Post("logout")
+  @ApiOperation({ summary: "Revoke the current session" })
   @HttpCode(200)
   @Throttle({ default: { limit: 100, ttl: 60_000 }, auth: { limit: 30, ttl: 900_000 } })
   async logout(
@@ -147,6 +153,8 @@ export class AuthController {
 
   /** GET /auth/me — 200, JWT required (not @Public). */
   @Get("me")
+  @ApiOperation({ summary: "Get the current user" })
+  @ApiSecurity({ bearerAuth: [] })
   @HttpCode(200)
   async getMe(
     @CurrentUser() currentUser: JwtPayload,

@@ -18,7 +18,7 @@ empty element produces a final newline — it MUST be present:
 
 ```ts
 // common/services/hmac.service.ts
-[method.toUpperCase(), contentType, String(ctime), path, ""].join("\n")
+[method.toUpperCase(), contentType, String(ctime), path, ""].join("\n");
 ```
 
 The signature is `HMAC-SHA256(stringToSign, HMAC_SECRET)` **Base64-encoded**:
@@ -29,12 +29,12 @@ crypto.createHmac("sha256", config.hmacSecret).update(stringToSign).digest("base
 
 Fields:
 
-| Field | Value |
-| --- | --- |
-| `method` | HTTP verb, uppercased (`GET`, `POST`, …) |
-| `contentType` | the raw `Content-Type` header (empty string when none) |
-| `ctime` | client time, epoch **milliseconds** |
-| `path` | request path **after** the API prefix, **no** query string |
+| Field         | Value                                                      |
+| ------------- | ---------------------------------------------------------- |
+| `method`      | HTTP verb, uppercased (`GET`, `POST`, …)                   |
+| `contentType` | the raw `Content-Type` header (empty string when none)     |
+| `ctime`       | client time, epoch **milliseconds**                        |
+| `path`        | request path **after** the API prefix, **no** query string |
 
 ## The HMAC Step (in `SecurityGuard`)
 
@@ -65,9 +65,9 @@ inside a guard. So the guard derives the signed path manually with `derivePath`:
 // security.guard.ts — exported for unit testing
 export function derivePath(originalUrl: string, apiPrefix: string): string {
   const prefix = apiPrefix.startsWith("/") ? apiPrefix : `/${apiPrefix}`;
-  const withoutQuery = originalUrl.split("?")[0];   // 1. drop query string
+  const withoutQuery = originalUrl.split("?")[0]; // 1. drop query string
   return withoutQuery.startsWith(prefix)
-    ? (withoutQuery.slice(prefix.length) || "/")    // 2. strip the prefix
+    ? withoutQuery.slice(prefix.length) || "/" // 2. strip the prefix
     : withoutQuery;
 }
 // "/api/v1/auth/login?foo=bar"  →  "/auth/login"
@@ -127,9 +127,9 @@ Invariants that MUST stay aligned across templates:
 The client also sends an `x-version` header; the server does **not** include it
 in the signed string and ignores it for verification.
 
-> **Swagger note:** because HMAC guards every route, the in-browser "Try it out"
-> at `/docs` needs a valid `sig`/`ctime` header pair — generate them client-side
-> (or via the e2e helper) before calling protected endpoints.
+> **Swagger note:** development Swagger UI signs "Try it out" requests in the
+> browser, so protected routes only need a Bearer token entered through
+> "Authorize". Other environments do not serve the HMAC secret to Swagger.
 
 ## See Also
 

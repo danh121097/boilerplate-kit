@@ -6,8 +6,8 @@ import userGroup from "@/modules/user/routes";
 import healthGroup from "@/routes/health-check";
 
 // Order preserved (health → auth → user) to keep route precedence identical.
-// Exported so tooling (e.g. Postman collection generator) reuses the exact same
-// registry — adding a module here is the only place a new route group is declared.
+// Exported so the OpenAPI document uses the same registry as the live routes.
+// Adding a module here is the only place a new route group is declared.
 export const groups: RouteGroup[] = [healthGroup, authGroup, userGroup];
 
 const router: Router = Router();

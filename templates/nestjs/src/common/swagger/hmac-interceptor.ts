@@ -2,14 +2,14 @@
  * Dev-only Swagger HMAC auto-signing.
  *
  * Every API route requires `sig` + `ctime` HMAC headers, so Swagger "Try it out"
- * would 401 without signing. In NON-production we inject:
+ * would 401 without signing. In development we inject:
  *   1. a tiny bootstrap script (buildHmacBootstrapJs) that puts the HMAC secret +
  *      apiPrefix on `window.__HMAC_CFG__`, and
  *   2. a Swagger `requestInterceptor` (hmacRequestInterceptor) that signs each
  *      outgoing request in the browser via Web Crypto and sets the headers.
  *
- * SECURITY: this embeds the HMAC secret into the /docs page — acceptable for local
- * dev only. NEVER enable in production (the caller gates both on !isProduction).
+ * SECURITY: this embeds the HMAC secret into the /docs page — only enable this in
+ * development. Production and other environments must not serve the secret.
  *
  * The interceptor is serialized to the client via Function.prototype.toString(), so
  * it must NOT rely on closure variables — it reads everything from globalThis.
@@ -37,9 +37,13 @@ export const hmacRequestInterceptor = async (req: {
   const ctime = Date.now();
   // content-type = the exact header that will be sent (raw, or "" when absent) — matches the guard.
   const contentType = req.headers["Content-Type"] || req.headers["content-type"] || "";
-  const stringToSign = [String(req.method).toUpperCase(), contentType, String(ctime), path, ""].join(
-    "\n",
-  );
+  const stringToSign = [
+    String(req.method).toUpperCase(),
+    contentType,
+    String(ctime),
+    path,
+    "",
+  ].join("\n");
 
   const enc = new w.TextEncoder();
   const key = await w.crypto.subtle.importKey(

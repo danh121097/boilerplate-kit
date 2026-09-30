@@ -15,11 +15,13 @@ app.use(compression());                    // 3. response compression
 app.use(cors({ origin: config.corsOrigin, credentials: true })); // 4. CORS + cookies
 app.use(express.json());                   // 5. JSON body parser
 app.use(cookieParser());                   // 6. parse cookies (refresh/access cookie)
-app.use(config.apiPrefix, verifyHmacRequest);  // 7. HMAC gate, all API routes
-app.use(config.apiPrefix, globalRateLimiter);  // 8. 100/min default limiter
-app.use(config.apiPrefix, routes);             // 9. route registry
-app.use(notFoundHandler);                  // 10. 404 catch-all (must be after routes)
-app.use(errorHandler);                     // 11. error envelope (must be LAST)
+app.get("/docs/json", ...);                // 7. public OpenAPI document
+app.use("/docs", swaggerUi.serve, ...);    // 8. public Swagger UI
+app.use(config.apiPrefix, verifyHmacRequest);  // 9. HMAC gate, all API routes
+app.use(config.apiPrefix, globalRateLimiter);  // 10. 100/min default limiter
+app.use(config.apiPrefix, routes);             // 11. route registry
+app.use(notFoundHandler);                  // 12. 404 catch-all (must be after routes)
+app.use(errorHandler);                     // 13. error envelope (must be LAST)
 ```
 
 Key points:
@@ -42,12 +44,12 @@ exports a `RouteGroup` ([`src/types/routing.ts`](../../src/types/routing.ts)):
 
 ```ts
 const authGroup: RouteGroup = {
-  prefix: '/auth',
+  prefix: "/auth",
   routes: [
     {
-      method: 'post',
-      path: '/login',
-      bodySchema: loginSchema,                       // tooling hint (Postman gen)
+      method: "post",
+      path: "/login",
+      bodySchema: loginSchema, // OpenAPI request body schema
       middleware: [loginRateLimiter, validate(loginSchema)],
       handler: AuthController.login,
     },

@@ -37,7 +37,7 @@ const userRoutes: FastifyPluginAsync = async (fastify) => {
       schema: {
         tags: ["users"],
         summary: "List users",
-        security: [{ hmacSignature: [], hmacTimestamp: [], bearerAuth: [] }],
+        security: [{ bearerAuth: [] }],
         querystring: querySchema,
         response: { 200: listResponseSchema },
       },
@@ -51,7 +51,7 @@ const userRoutes: FastifyPluginAsync = async (fastify) => {
       schema: {
         tags: ["users"],
         summary: "Get a user by ID",
-        security: [{ hmacSignature: [], hmacTimestamp: [], bearerAuth: [] }],
+        security: [{ bearerAuth: [] }],
         params: paramsSchema,
         response: { 200: getResponseSchema },
       },

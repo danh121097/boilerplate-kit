@@ -56,14 +56,17 @@ and public auth routes, requires valid `sig` and `ctime` HMAC headers.
 | GET    | `/users`         | HMAC + admin         | Paginated user list                     |
 | GET    | `/users/:id`     | HMAC + admin         | Get a user by ID                        |
 
-OpenAPI is available at `/docs` and `/docs/json`. The HMAC secret is not exposed
-to the Swagger UI.
+OpenAPI is available at `/docs/json`, with the interactive Swagger UI at `/docs`.
+In development, Swagger signs "Try it out" requests automatically, so only a
+Bearer token is needed for protected routes. HMAC remains enforced by the server;
+the secret is served to Swagger only in development.
 
 ## Scripts
 
 - `pnpm dev` — watch-mode Fastify server; generates local JWT keys first
 - `pnpm keys` — generate the local RSA keypair
 - `pnpm build` — TypeScript build + path-alias rewrite
+- `pnpm build:swc` — faster build via swc + path-alias rewrite
 - `pnpm typecheck` — TypeScript check
 - `pnpm lint` / `pnpm lint:fix` — ESLint
 - `pnpm test` / `pnpm test:watch` / `pnpm test:coverage` — Vitest

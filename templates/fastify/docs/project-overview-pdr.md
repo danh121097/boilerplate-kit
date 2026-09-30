@@ -9,18 +9,18 @@ and Swagger/OpenAPI.
 
 ## Stack
 
-| Concern              | Choice                                                           |
-| -------------------- | ---------------------------------------------------------------- |
-| Runtime / language   | Node.js >=20.19.0, TypeScript 5, strict mode                     |
-| Web framework        | Fastify 5                                                        |
-| Database             | MongoDB via Mongoose                                             |
-| Realtime             | Socket.IO 4                                                      |
-| Optional state       | Redis via ioredis                                                |
-| Validation / schemas | Zod 4 + fastify-type-provider-zod                                |
-| Auth                 | RS256 access JWT + HS256 refresh JWT + bcrypt + httpOnly cookies |
-| Package manager      | pnpm                                                             |
-| Tests                | Vitest, fastify.inject(), and mongodb-memory-server              |
-| API docs             | Fastify Swagger and Swagger UI at /docs                          |
+| Concern              | Choice                                                                        |
+| -------------------- | ----------------------------------------------------------------------------- |
+| Runtime / language   | Node.js >=20.19.0, TypeScript 6, strict mode                                  |
+| Web framework        | Fastify 5                                                                     |
+| Database             | MongoDB via Mongoose                                                          |
+| Realtime             | Socket.IO 4                                                                   |
+| Optional state       | Redis via ioredis                                                             |
+| Validation / schemas | Zod 4 + fastify-type-provider-zod                                             |
+| Auth                 | RS256 access JWT + HS256 refresh JWT + bcrypt + httpOnly cookies              |
+| Package manager      | pnpm                                                                          |
+| Tests                | Vitest, fastify.inject(), and mongodb-memory-server                           |
+| API docs             | Fastify Swagger and Swagger UI at /docs; Try it out signs HMAC in development |
 
 ## Security Model
 

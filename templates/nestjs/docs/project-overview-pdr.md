@@ -11,19 +11,19 @@ module / controller / service / provider model with a single composite
 
 ## Stack
 
-| Concern | Choice |
-| --- | --- |
-| Runtime / language | Node.js, TypeScript 5 (strict, `target` ES2022, `module` commonjs, decorators on) |
-| Framework | NestJS 11 (`@nestjs/platform-express`) |
-| Database | MongoDB via `@nestjs/mongoose` (`src/database/*`, `src/schemas/*`) |
-| Realtime | Socket.IO 4 via `@nestjs/websockets` / `@nestjs/platform-socket.io` (`src/modules/realtime/*`) |
-| Optional cache/state | Redis via ioredis (`src/redis/*`) |
-| Validation | Zod 4 + `nestjs-zod` DTOs (`createZodDto`) + global `ZodValidationPipe` |
-| Auth | JWT (RS256 access + HS256 refresh) + bcrypt + httpOnly cookies |
-| Rate limiting | `@nestjs/throttler` (named throttlers; Redis storage when enabled) |
-| API docs | `@nestjs/swagger` — live OpenAPI UI at `/docs`, JSON at `/docs-json` |
-| Package manager | pnpm recommended (scripts are PM-agnostic — npm/yarn/bun work too) |
-| Tests | Vitest (via `unplugin-swc`) + supertest + socket.io-client + `mongodb-memory-server` |
+| Concern              | Choice                                                                                         |
+| -------------------- | ---------------------------------------------------------------------------------------------- |
+| Runtime / language   | Node.js, TypeScript 6 (strict, `target` ES2022, `module` commonjs, decorators on)              |
+| Framework            | NestJS 11 (`@nestjs/platform-express`)                                                         |
+| Database             | MongoDB via `@nestjs/mongoose` (`src/database/*`, `src/schemas/*`)                             |
+| Realtime             | Socket.IO 4 via `@nestjs/websockets` / `@nestjs/platform-socket.io` (`src/modules/realtime/*`) |
+| Optional cache/state | Redis via ioredis (`src/redis/*`)                                                              |
+| Validation           | Zod 4 + `nestjs-zod` DTOs (`createZodDto`) + global `ZodValidationPipe`                        |
+| Auth                 | JWT (RS256 access + HS256 refresh) + bcrypt + httpOnly cookies                                 |
+| Rate limiting        | `@nestjs/throttler` (named throttlers; Redis storage when enabled)                             |
+| API docs             | `@nestjs/swagger` — live OpenAPI UI at `/docs`, JSON at `/docs/json`                           |
+| Package manager      | pnpm recommended (scripts are PM-agnostic — npm/yarn/bun work too)                             |
+| Tests                | Vitest (via `unplugin-swc`) + supertest + socket.io-client + `mongodb-memory-server`           |
 
 ## Auth Model
 
@@ -70,7 +70,7 @@ cross-instance Socket.IO fan-out (`SocketIoAdapter` wires the Redis adapter; wit
 pnpm dev            # nest start --watch (predev generates RSA keys if absent)
 pnpm build          # nest build
 pnpm typecheck      # tsc --noEmit -p tsconfig.json
-pnpm start          # node dist/src/main.js  (start:prod identical)
+pnpm start          # node dist/src/main.js
 pnpm lint           # eslint "src/**/*.ts"   (lint:fix to autofix)
 pnpm format         # prettier --write .     (format:check to verify)
 pnpm test           # vitest run             (test:watch, test:coverage)
@@ -98,8 +98,8 @@ Redis vars are optional.
 - RSA key files are required: `AppConfigService` loads them and runs a
   sign/verify self-test (`src/config/keys.ts`); a mismatched pair fails at boot,
   not at runtime. Generate with `pnpm keys` or `src/keys/setup.sh`.
-- HMAC applies to **every** route — clients (and Swagger "Try it out") must send
-  a valid `sig`/`ctime` pair.
+- HMAC applies to **every** route. Swagger signs requests automatically in
+  development; all other clients must send a valid `sig`/`ctime` pair.
 
 ## What's NOT Included
 

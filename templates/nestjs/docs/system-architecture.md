@@ -7,17 +7,17 @@ focused page under [`system-architecture/`](./system-architecture/).
 
 ## Stack At A Glance
 
-| Concern | Choice |
-| --- | --- |
-| Runtime / language | Node.js + TypeScript (package manager: **pnpm**, PM-agnostic) |
-| Framework | NestJS 11 (`@nestjs/platform-express`) |
-| Data store | MongoDB via `@nestjs/mongoose` |
-| Access tokens | JWT **RS256** (RSA keypair), 15 min default |
-| Refresh tokens | JWT **HS256** (symmetric secret), 7 day default, httpOnly cookie, DB-tracked + rotated, reuse-detected |
-| Request signing | HMAC-SHA256 signature on every route (and socket handshake); anti-casual-abuse only |
-| Realtime | Socket.IO via `@nestjs/websockets` (HMAC + JWT gated handshake) |
-| API docs | `@nestjs/swagger` — live OpenAPI UI at `/docs` |
-| Optional cache / scale | Redis (throttler store, token revocation, cache, socket adapter) |
+| Concern                | Choice                                                                                                 |
+| ---------------------- | ------------------------------------------------------------------------------------------------------ |
+| Runtime / language     | Node.js + TypeScript (package manager: **pnpm**, PM-agnostic)                                          |
+| Framework              | NestJS 11 (`@nestjs/platform-express`)                                                                 |
+| Data store             | MongoDB via `@nestjs/mongoose`                                                                         |
+| Access tokens          | JWT **RS256** (RSA keypair), 15 min default                                                            |
+| Refresh tokens         | JWT **HS256** (symmetric secret), 7 day default, httpOnly cookie, DB-tracked + rotated, reuse-detected |
+| Request signing        | HMAC-SHA256 signature on every route (and socket handshake); anti-casual-abuse only                    |
+| Realtime               | Socket.IO via `@nestjs/websockets` (HMAC + JWT gated handshake)                                        |
+| API docs               | `@nestjs/swagger` — live OpenAPI UI at `/docs`                                                         |
+| Optional cache / scale | Redis (throttler store, token revocation, cache, socket adapter)                                       |
 
 ## Boot Sequence
 
@@ -34,7 +34,7 @@ focused page under [`system-architecture/`](./system-architecture/).
    pub/sub only when `REDIS_ENABLED`; must run before `listen()`, or it silently
    no-ops).
 3. `enableShutdownHooks()`.
-4. Mount Swagger at `/docs` (JSON at `/docs-json`).
+4. Mount Swagger at `/docs` (JSON at `/docs/json`).
 5. `app.listen(port)`.
 
 The global `SecurityGuard` + throttler guard (`APP_GUARD`), `ZodValidationPipe`
@@ -44,15 +44,15 @@ close Mongo, Redis, and the WS server gracefully.
 
 ## Topics
 
-| Page | Covers |
-| --- | --- |
-| [request-flow.md](./system-architecture/request-flow.md) | The composite `SecurityGuard` order, global pipe/filter, controller → service flow |
-| [auth-jwt-refresh.md](./system-architecture/auth-jwt-refresh.md) | RS256 access + HS256 httpOnly refresh-cookie rotation, reuse detection, RefreshToken model, revocation |
-| [hmac-verification.md](./system-architecture/hmac-verification.md) | The canonical signing string, `derivePath`, freshness + timing-safe compare, the client invariant |
-| [error-handling.md](./system-architecture/error-handling.md) | `AppException`, the `HttpExceptionFilter` envelope, 404 handling, validation errors |
-| [database-mongoose.md](./system-architecture/database-mongoose.md) | Mongoose schemas, `toJSON` transform, indexes, connection config |
-| [realtime-socket.md](./system-architecture/realtime-socket.md) | `@WebSocketGateway` setup, handshake gates, events, emit helpers, `SocketIoAdapter` |
-| [security-rate-limit.md](./system-architecture/security-rate-limit.md) | helmet, CORS-with-credentials, RBAC, named throttlers, Redis-backed store |
+| Page                                                                   | Covers                                                                                                 |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| [request-flow.md](./system-architecture/request-flow.md)               | The composite `SecurityGuard` order, global pipe/filter, controller → service flow                     |
+| [auth-jwt-refresh.md](./system-architecture/auth-jwt-refresh.md)       | RS256 access + HS256 httpOnly refresh-cookie rotation, reuse detection, RefreshToken model, revocation |
+| [hmac-verification.md](./system-architecture/hmac-verification.md)     | The canonical signing string, `derivePath`, freshness + timing-safe compare, the client invariant      |
+| [error-handling.md](./system-architecture/error-handling.md)           | `AppException`, the `HttpExceptionFilter` envelope, 404 handling, validation errors                    |
+| [database-mongoose.md](./system-architecture/database-mongoose.md)     | Mongoose schemas, `toJSON` transform, indexes, connection config                                       |
+| [realtime-socket.md](./system-architecture/realtime-socket.md)         | `@WebSocketGateway` setup, handshake gates, events, emit helpers, `SocketIoAdapter`                    |
+| [security-rate-limit.md](./system-architecture/security-rate-limit.md) | helmet, CORS-with-credentials, RBAC, named throttlers, Redis-backed store                              |
 
 ## Cross-Cutting Invariants
 

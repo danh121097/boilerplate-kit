@@ -72,7 +72,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       schema: {
         tags: ["auth"],
         summary: "Get the current user",
-        security: [{ hmacSignature: [], hmacTimestamp: [], bearerAuth: [] }],
+        security: [{ bearerAuth: [] }],
         response: { 200: meResponseSchema },
       },
     },

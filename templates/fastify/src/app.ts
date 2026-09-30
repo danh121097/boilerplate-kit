@@ -1,5 +1,6 @@
 import { config } from "@/config/environment";
 import { getRedis } from "@/config/redis";
+import { hmacRequestInterceptor } from "@/docs/hmac-interceptor";
 import { installErrorHandlers } from "@/plugins/error-handlers";
 import { installSecurityHooks } from "@/plugins/security";
 import { registerApi } from "@/routes";
@@ -60,24 +61,35 @@ export function buildApp(
     openapi: {
       info: {
         title: "Fastify Starter API",
-        description: "HMAC-signed API with JWT authentication",
+        description:
+          "All API requests require HMAC signatures. In development, Swagger Try it out signs requests automatically; protected routes still require a Bearer token.",
         version: "1.0.0",
       },
       components: {
         securitySchemes: {
           bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
-          hmacSignature: { type: "apiKey", in: "header", name: "sig" },
-          hmacTimestamp: { type: "apiKey", in: "header", name: "ctime" },
         },
       },
-      security: [{ hmacSignature: [], hmacTimestamp: [] }],
     },
     transform: jsonSchemaTransform,
   });
+
+  if (config.isDevelopment) {
+    app.get("/docs/hmac-config", async (_request, reply) => {
+      return reply
+        .header("cache-control", "no-store")
+        .send({ secret: config.hmacSecret, apiPrefix: config.apiPrefix });
+    });
+  }
+
   app.register(swaggerUi, {
     routePrefix: "/docs",
     staticCSP: true,
-    uiConfig: { deepLinking: false, docExpansion: "list" },
+    uiConfig: {
+      deepLinking: false,
+      docExpansion: "list",
+      ...(config.isDevelopment ? { requestInterceptor: hmacRequestInterceptor } : {}),
+    },
   });
 
   installErrorHandlers(app);

@@ -1,19 +1,23 @@
 import { config } from "@/config/environment";
+import { buildHmacBootstrapJs, hmacRequestInterceptor } from "@/docs/hmac-interceptor";
+import { createOpenApiDocument } from "@/docs/openapi";
 import { errorHandler } from "@/middleware/error-handler";
 import { verifyHmacRequest } from "@/middleware/hmac";
 import { notFoundHandler } from "@/middleware/not-found-handler";
 import { globalRateLimiter } from "@/middleware/rate-limit";
 import { verifyOrigin } from "@/middleware/verify-origin";
+import routes, { groups } from "@/routes";
 import { logger } from "@/utils/logger";
 import express, { type Express } from "express";
-import routes from "@/routes";
 import compression from "compression";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
+import swaggerUi from "swagger-ui-express";
 
 const app: Express = express();
+const openApiDocument = createOpenApiDocument(groups);
 
 // Only trust X-Forwarded-* when TRUST_PROXY is set (reverse proxy / load balancer).
 if (config.trustProxy !== undefined) app.set("trust proxy", config.trustProxy);
@@ -44,6 +48,29 @@ app.use(
 );
 app.use(express.json());
 app.use(cookieParser());
+
+// Keep interactive API documentation outside the API HMAC and rate-limit mounts.
+app.get("/docs/json", (_req, res) => res.json(openApiDocument));
+if (config.isDevelopment) {
+  app.get("/docs/hmac-config.js", (_req, res) => {
+    res
+      .set("Cache-Control", "no-store")
+      .type("application/javascript")
+      .send(buildHmacBootstrapJs(config.hmacSecret, config.apiPrefix));
+  });
+}
+app.use(
+  "/docs",
+  swaggerUi.serve,
+  swaggerUi.setup(openApiDocument, {
+    ...(config.isDevelopment
+      ? {
+          customJs: "/docs/hmac-config.js",
+          swaggerOptions: { requestInterceptor: hmacRequestInterceptor },
+        }
+      : {}),
+  }),
+);
 
 // HMAC signature verification for all API routes
 app.use(config.apiPrefix, verifyHmacRequest);

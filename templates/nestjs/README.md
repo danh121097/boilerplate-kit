@@ -9,22 +9,22 @@ sitting.
 
 ## Stack
 
-| Concern        | Choice                                                                 |
-| -------------- | ---------------------------------------------------------------------- |
-| Runtime        | Node.js + TypeScript (pnpm recommended; PM-agnostic)                   |
-| Framework      | NestJS 11 (`@nestjs/platform-express`)                                 |
-| Database       | MongoDB via `@nestjs/mongoose`                                         |
-| Auth           | JWT access tokens (RS256, file keys) + refresh tokens (HS256 symmetric secret, httpOnly cookie) |
-| Request signing| HMAC request signing on every route (composite `SecurityGuard`)        |
-| Realtime       | Socket.IO via `@nestjs/websockets` (+ optional `@socket.io/redis-adapter`) |
-| Cache / limits | Redis (optional) — distributed throttler store, cache, token revocation |
-| Validation     | Zod schemas + `nestjs-zod` DTOs + global `ZodValidationPipe`           |
-| Security       | helmet, CORS (credentials), compression, cookie-parser, `@nestjs/throttler` |
-| Passwords      | bcrypt                                                                  |
-| API docs       | `@nestjs/swagger` — live OpenAPI UI at `/docs`                         |
-| Testing        | Vitest (via `unplugin-swc`) + supertest + `mongodb-memory-server`      |
-| Build          | `nest build`                                                          |
-| Lint / format  | ESLint flat config + Prettier                                         |
+| Concern         | Choice                                                                                          |
+| --------------- | ----------------------------------------------------------------------------------------------- |
+| Runtime         | Node.js + TypeScript (pnpm recommended; PM-agnostic)                                            |
+| Framework       | NestJS 11 (`@nestjs/platform-express`)                                                          |
+| Database        | MongoDB via `@nestjs/mongoose`                                                                  |
+| Auth            | JWT access tokens (RS256, file keys) + refresh tokens (HS256 symmetric secret, httpOnly cookie) |
+| Request signing | HMAC request signing on every route (composite `SecurityGuard`)                                 |
+| Realtime        | Socket.IO via `@nestjs/websockets` (+ optional `@socket.io/redis-adapter`)                      |
+| Cache / limits  | Redis (optional) — distributed throttler store, cache, token revocation                         |
+| Validation      | Zod schemas + `nestjs-zod` DTOs + global `ZodValidationPipe`                                    |
+| Security        | helmet, CORS (credentials), compression, cookie-parser, `@nestjs/throttler`                     |
+| Passwords       | bcrypt                                                                                          |
+| API docs        | `@nestjs/swagger` — live OpenAPI UI at `/docs`                                                  |
+| Testing         | Vitest (via `unplugin-swc`) + supertest + `mongodb-memory-server`                               |
+| Build           | `nest build`                                                                                    |
+| Lint / format   | ESLint flat config + Prettier                                                                   |
 
 ## Setup
 
@@ -50,47 +50,47 @@ Both keys are gitignored — never commit `rsa.private`. Rotate with
 Once running:
 
 - API base: `http://localhost:3000/api/v1`
-- **Swagger UI: `http://localhost:3000/docs`** (OpenAPI JSON at `/docs-json`)
+- **Swagger UI: `http://localhost:3000/docs`** (OpenAPI JSON at `/docs/json`)
 
-> HMAC guards every route. In **dev**, Swagger "Try it out" **auto-signs** each
-> request (`sig`/`ctime` computed in the browser), so it works out of the box. The
-> auto-signing is disabled in production and the secret is never embedded in the page.
+> HMAC guards every route. In **development**, Swagger "Try it out" signs each
+> request in the browser, so only a Bearer token is needed for protected routes.
+> Auto-signing is disabled outside development and the secret is never served there.
 > See [docs/api-reference.md](./docs/api-reference.md).
 
 ## Environment
 
 All variables are documented in [`.env.example`](.env.example). Key ones:
 
-| Variable                | Purpose                                                    |
-| ----------------------- | ---------------------------------------------------------- |
-| `PORT`                  | HTTP port (default 3000)                                   |
-| `MONGODB_URI`           | MongoDB connection string (required)                       |
-| `API_PREFIX`            | Base path all routes mount under (default `/api/v1`)       |
-| `ENABLE_CSRF`           | Toggle the origin/CSRF guard step (default false)          |
-| `COOKIE_DOMAIN`         | Cookie domain for split-domain deploys (empty = host-only) |
-| `TRUST_PROXY`           | Behind a reverse proxy: `true`/`false`, a hop count, or a comma-separated list of IPs/subnets (unset = do not trust) |
-| `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH` | RS256 keypair file paths (access)        |
-| `JWT_REFRESH_SECRET`    | HS256 symmetric secret for refresh tokens (≥32 chars, required) |
-| `JWT_ACCESS_EXPIRY` / `JWT_REFRESH_EXPIRY` | Token lifetimes; also the cookie `maxAge` and refresh `expiresAt` |
-| `HMAC_SECRET`           | Secret for HMAC request signing (required)                 |
-| `REDIS_ENABLED` / `REDIS_URL` | Toggle + connection for Redis features               |
-| `LOG_LEVEL`             | `debug` / `info` / `warn` / `error` (defaults by env)      |
+| Variable                                       | Purpose                                                                                                              |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `PORT`                                         | HTTP port (default 3000)                                                                                             |
+| `MONGODB_URI`                                  | MongoDB connection string (required)                                                                                 |
+| `API_PREFIX`                                   | Base path all routes mount under (default `/api/v1`)                                                                 |
+| `ENABLE_CSRF`                                  | Toggle the origin/CSRF guard step (default false)                                                                    |
+| `COOKIE_DOMAIN`                                | Cookie domain for split-domain deploys (empty = host-only)                                                           |
+| `TRUST_PROXY`                                  | Behind a reverse proxy: `true`/`false`, a hop count, or a comma-separated list of IPs/subnets (unset = do not trust) |
+| `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH` | RS256 keypair file paths (access)                                                                                    |
+| `JWT_REFRESH_SECRET`                           | HS256 symmetric secret for refresh tokens (≥32 chars, required)                                                      |
+| `JWT_ACCESS_EXPIRY` / `JWT_REFRESH_EXPIRY`     | Token lifetimes; also the cookie `maxAge` and refresh `expiresAt`                                                    |
+| `HMAC_SECRET`                                  | Secret for HMAC request signing (required)                                                                           |
+| `REDIS_ENABLED` / `REDIS_URL`                  | Toggle + connection for Redis features                                                                               |
+| `LOG_LEVEL`                                    | `debug` / `info` / `warn` / `error` (defaults by env)                                                                |
 
 ## Routes
 
 Mounted under `API_PREFIX` (default `/api/v1`). The live reference is Swagger at
 `/docs`; full detail in [docs/api-reference.md](./docs/api-reference.md).
 
-| Method | Path             | Auth            | Description                       |
-| ------ | ---------------- | --------------- | -------------------------------- |
-| GET    | `/health`        | public (HMAC)   | Server, DB, and Redis liveness   |
-| POST   | `/auth/register` | public (HMAC)   | Create an account                |
-| POST   | `/auth/login`    | public (HMAC)   | Log in, set refresh cookie       |
-| POST   | `/auth/refresh`  | public (HMAC)   | Rotate access token (reuse-detected) |
-| POST   | `/auth/logout`   | public (HMAC)   | Revoke session / clear cookie    |
-| GET    | `/auth/me`       | access token    | Current user                     |
-| GET    | `/users`         | admin           | List users                       |
-| GET    | `/users/:id`     | admin           | Get user by ID                   |
+| Method | Path             | Auth          | Description                          |
+| ------ | ---------------- | ------------- | ------------------------------------ |
+| GET    | `/health`        | public (HMAC) | Server, DB, and Redis liveness       |
+| POST   | `/auth/register` | public (HMAC) | Create an account                    |
+| POST   | `/auth/login`    | public (HMAC) | Log in, set refresh cookie           |
+| POST   | `/auth/refresh`  | public (HMAC) | Rotate access token (reuse-detected) |
+| POST   | `/auth/logout`   | public (HMAC) | Revoke session / clear cookie        |
+| GET    | `/auth/me`       | access token  | Current user                         |
+| GET    | `/users`         | admin         | List users                           |
+| GET    | `/users/:id`     | admin         | Get user by ID                       |
 
 ## Scripts
 

@@ -7,12 +7,12 @@ How a feature is structured and how its routes reach the HTTP server.
 Each feature module under `src/modules/<name>/` splits into up to four files by
 responsibility:
 
-| File | Responsibility |
-| --- | --- |
-| `validation.ts` | Zod schemas + the `validate()` middleware factory |
-| `routes.ts` | A declarative `RouteGroup`: path, method, middleware, handler |
+| File            | Responsibility                                                     |
+| --------------- | ------------------------------------------------------------------ |
+| `validation.ts` | Zod schemas + the `validate()` middleware factory                  |
+| `routes.ts`     | A declarative `RouteGroup`: path, method, middleware, handler      |
 | `controller.ts` | HTTP layer: read `req`, call the service, set cookies, shape `res` |
-| `service.ts` | Business logic + persistence; throws `AppError`, no `req`/`res` |
+| `service.ts`    | Business logic + persistence; throws `AppError`, no `req`/`res`    |
 
 `user` has no `service.ts` or `validation.ts` — read-only endpoints query the
 model directly in the controller. Add those files only when the logic grows.
@@ -30,26 +30,33 @@ Routes are data, not imperative `router.get(...)` calls. The shape
 
 ```ts
 interface RouteConfig {
-  method: 'get' | 'post' | 'put' | 'patch' | 'delete';
-  path: string;            // relative to the group prefix, e.g. '/login', '/:id'
+  method: "get" | "post" | "put" | "patch" | "delete";
+  path: string; // relative to the group prefix, e.g. '/login', '/:id'
   middleware?: RequestHandler[];
   handler: RequestHandler;
-  bodySchema?: ZodType;    // tooling-only hint (Postman generator); not enforced
+  bodySchema?: ZodType; // documented in OpenAPI; validate() enforces it
+  documentation: RouteDocumentation; // Swagger summary, params, responses, auth
 }
-interface RouteGroup { prefix: string; routes: RouteConfig[]; }
+interface RouteGroup {
+  prefix: string;
+  routes: RouteConfig[];
+}
 ```
 
 A module exports one `RouteGroup` (`src/modules/auth/routes.ts`):
 
 ```ts
 const authGroup: RouteGroup = {
-  prefix: '/auth',
+  prefix: "/auth",
   routes: [
-    { method: 'post', path: '/login', bodySchema: loginSchema,
+    {
+      method: "post",
+      path: "/login",
+      bodySchema: loginSchema,
       middleware: [loginRateLimiter, validate(loginSchema)],
-      handler: AuthController.login },
-    { method: 'get', path: '/me',
-      middleware: [authenticate], handler: AuthController.getMe },
+      handler: AuthController.login,
+    },
+    { method: "get", path: "/me", middleware: [authenticate], handler: AuthController.getMe },
     // ...
   ],
 };
@@ -66,7 +73,7 @@ export default authGroup;
    ```
 
    Order is preserved (health → auth → user) to keep route precedence stable.
-   The exported `groups` array is reused by tooling (the Postman generator).
+   The exported `groups` array is reused by the OpenAPI document builder.
 
 2. **Registrar** — `src/utils/route-registrar.ts` turns a group into a Router.
    `method` is a constrained union, so `router[method]` matches Express overloads
@@ -82,13 +89,13 @@ export default authGroup;
    ```
 
 3. **Mount** — `src/app.ts` mounts the whole registry under `config.apiPrefix`,
-   *after* HMAC verification and the global rate limiter:
+   _after_ HMAC verification and the global rate limiter:
 
    ```ts
    app.use(config.apiPrefix, verifyHmacRequest);
    app.use(config.apiPrefix, globalRateLimiter);
-   app.use(config.apiPrefix, routes);          // from src/routes
-   app.use(notFoundHandler);                    // 404, then errorHandler last
+   app.use(config.apiPrefix, routes); // from src/routes
+   app.use(notFoundHandler); // 404, then errorHandler last
    ```
 
 So `POST /login` in `authGroup` (prefix `/auth`) under `API_PREFIX=/api/v1`
@@ -103,13 +110,13 @@ resolves to `POST /api/v1/auth/login`.
 
 ## Endpoints Today
 
-| Method | Path (under `API_PREFIX`) | Middleware | Notes |
-| --- | --- | --- | --- |
-| GET | `/health` | — | server + DB + Redis status |
-| POST | `/auth/register` | authRateLimiter, validate | sets token cookies |
-| POST | `/auth/login` | loginRateLimiter, validate | sets token cookies |
-| POST | `/auth/refresh` | authRateLimiter | rotates refresh token (reads cookie) |
-| POST | `/auth/logout` | authRateLimiter | revokes refresh + user access tokens |
-| GET | `/auth/me` | authenticate | current user profile |
-| GET | `/users` | authenticate, requireMinRole('admin') | list users |
-| GET | `/users/:id` | authenticate | user by id |
+| Method | Path (under `API_PREFIX`) | Middleware                            | Notes                                |
+| ------ | ------------------------- | ------------------------------------- | ------------------------------------ |
+| GET    | `/health`                 | —                                     | server + DB + Redis status           |
+| POST   | `/auth/register`          | authRateLimiter, validate             | sets token cookies                   |
+| POST   | `/auth/login`             | loginRateLimiter, validate            | sets token cookies                   |
+| POST   | `/auth/refresh`           | authRateLimiter                       | rotates refresh token (reads cookie) |
+| POST   | `/auth/logout`            | authRateLimiter                       | revokes refresh + user access tokens |
+| GET    | `/auth/me`                | authenticate                          | current user profile                 |
+| GET    | `/users`                  | authenticate, requireMinRole('admin') | list users                           |
+| GET    | `/users/:id`              | authenticate                          | user by id                           |
