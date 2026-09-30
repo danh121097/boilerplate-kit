@@ -37,6 +37,13 @@ const userRoutes: FastifyPluginAsync = async (fastify) => {
       schema: {
         tags: ["users"],
         summary: "List users",
+        docsResponses: {
+          "200": "Paginated users without password hashes",
+          "401": "A valid access token is required",
+          "403": "Admin role is required",
+          "429": "Too many requests",
+          "500": "The server could not complete the request",
+        },
         security: [{ bearerAuth: [] }],
         querystring: querySchema,
         response: { 200: listResponseSchema },
@@ -51,6 +58,14 @@ const userRoutes: FastifyPluginAsync = async (fastify) => {
       schema: {
         tags: ["users"],
         summary: "Get a user by ID",
+        docsResponses: {
+          "200": "User without a password hash",
+          "401": "A valid access token is required",
+          "403": "Admin role is required",
+          "404": "User not found",
+          "429": "Too many requests",
+          "500": "The server could not complete the request",
+        },
         security: [{ bearerAuth: [] }],
         params: paramsSchema,
         response: { 200: getResponseSchema },

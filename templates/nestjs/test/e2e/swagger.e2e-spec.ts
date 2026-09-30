@@ -27,6 +27,9 @@ describe("Swagger documentation", () => {
     expect(document.status).toBe(200);
     expect(document.body.paths["/api/v1/auth/register"].post.tags).toContain("auth");
     expect(document.body.security).toBeUndefined();
+    expect(document.body.paths["/api/v1/auth/me"].get.responses["401"].description).toBe(
+      "A valid access token is required",
+    );
     expect(document.body.components.securitySchemes).toEqual({
       bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
     });

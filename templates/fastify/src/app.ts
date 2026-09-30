@@ -1,16 +1,13 @@
 import { config } from "@/config/environment";
 import { getRedis } from "@/config/redis";
 import { hmacRequestInterceptor } from "@/docs/hmac-interceptor";
+import { docsTransform, docsTransformObject } from "@/docs/response-descriptions";
 import { installErrorHandlers } from "@/plugins/error-handlers";
 import { installSecurityHooks } from "@/plugins/security";
 import { registerApi } from "@/routes";
 import { closeSocket, initSocket } from "@/socket";
 import Fastify, { type FastifyInstance, type RawServerDefault } from "fastify";
-import {
-  jsonSchemaTransform,
-  serializerCompiler,
-  validatorCompiler,
-} from "fastify-type-provider-zod";
+import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import compress from "@fastify/compress";
 import cookie from "@fastify/cookie";
@@ -62,7 +59,7 @@ export function buildApp(
       info: {
         title: "Fastify Starter API",
         description:
-          "All API requests require HMAC signatures. In development, Swagger Try it out signs requests automatically; protected routes still require a Bearer token.",
+          "All API routes require HMAC signatures. In development, Swagger Try it out signs requests automatically; protected routes still require a Bearer token.",
         version: "1.0.0",
       },
       components: {
@@ -71,7 +68,8 @@ export function buildApp(
         },
       },
     },
-    transform: jsonSchemaTransform,
+    transform: docsTransform,
+    transformObject: docsTransformObject,
   });
 
   // Off in production unless DOCS_ENABLED=true.

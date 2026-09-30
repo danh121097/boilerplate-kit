@@ -31,6 +31,12 @@ const healthRoutes: FastifyPluginAsync = async (app) => {
       schema: {
         tags: ["health"],
         summary: "Check service, MongoDB, and Redis status",
+        docsResponses: {
+          "200": "Service health status",
+          "401": "Valid HMAC signature headers are required",
+          "429": "Too many requests",
+          "500": "The server could not complete the request",
+        },
         response: { 200: healthResponseSchema },
       },
     },

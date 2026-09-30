@@ -39,6 +39,8 @@ export class HealthController {
   @ApiOperation({ summary: "Check service, MongoDB, and Redis status" })
   @ApiResponse({ status: 200, description: "Service health status" })
   @ApiResponse({ status: 401, description: "Valid HMAC signature headers are required" })
+  @ApiResponse({ status: 429, description: "Too many requests" })
+  @ApiResponse({ status: 500, description: "The server could not complete the request" })
   async check(): Promise<{
     status: string;
     timestamp: string;

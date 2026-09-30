@@ -34,6 +34,8 @@ export class UserController {
   @ApiResponse({ status: 200, description: "Paginated users without password hashes" })
   @ApiResponse({ status: 401, description: "A valid access token is required" })
   @ApiResponse({ status: 403, description: "Admin role is required" })
+  @ApiResponse({ status: 429, description: "Too many requests" })
+  @ApiResponse({ status: 500, description: "The server could not complete the request" })
   @ApiQuery({
     name: "page",
     required: false,
@@ -61,6 +63,8 @@ export class UserController {
   @ApiResponse({ status: 401, description: "A valid access token is required" })
   @ApiResponse({ status: 403, description: "Admin role is required" })
   @ApiResponse({ status: 404, description: "User not found" })
+  @ApiResponse({ status: 429, description: "Too many requests" })
+  @ApiResponse({ status: 500, description: "The server could not complete the request" })
   @ApiParam({
     name: "id",
     type: String,

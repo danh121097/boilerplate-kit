@@ -9,7 +9,7 @@ import { LoginDto } from "@/modules/auth/dto/login.dto";
 import { RefreshDto } from "@/modules/auth/dto/refresh.dto";
 import { RegisterDto } from "@/modules/auth/dto/register.dto";
 import { Body, Controller, Get, HttpCode, HttpException, Post, Req, Res } from "@nestjs/common";
-import { ApiOperation, ApiResponse, ApiSecurity, ApiTags } from "@nestjs/swagger";
+import { ApiBody, ApiOperation, ApiResponse, ApiSecurity, ApiTags } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import type { Request, Response } from "express";
 
@@ -49,6 +49,7 @@ export class AuthController {
   @ApiResponse({ status: 400, description: "The request body is invalid" })
   @ApiResponse({ status: 409, description: "An account with this email already exists" })
   @ApiResponse({ status: 429, description: "Too many registration attempts" })
+  @ApiResponse({ status: 500, description: "The server could not complete the request" })
   @HttpCode(201)
   @Throttle({ default: { limit: 100, ttl: 60_000 }, auth: { limit: 30, ttl: 900_000 } })
   async register(
@@ -72,6 +73,7 @@ export class AuthController {
   @ApiResponse({ status: 400, description: "The request body is invalid" })
   @ApiResponse({ status: 401, description: "The email or password is invalid" })
   @ApiResponse({ status: 429, description: "Too many login attempts" })
+  @ApiResponse({ status: 500, description: "The server could not complete the request" })
   @HttpCode(200)
   @Throttle({ default: { limit: 100, ttl: 60_000 }, login: { limit: 30, ttl: 900_000 } })
   async login(
@@ -94,12 +96,19 @@ export class AuthController {
   @Public()
   @Post("refresh")
   @ApiOperation({ summary: "Rotate refresh and access tokens" })
+  @ApiBody({
+    type: RefreshDto,
+    required: false,
+    description: "Optional when the refresh-token cookie is present.",
+  })
   @ApiResponse({ status: 200, description: "Tokens refreshed successfully" })
+  @ApiResponse({ status: 400, description: "The request body is invalid" })
   @ApiResponse({
     status: 401,
     description: "The refresh token is missing, invalid, expired, or reused",
   })
   @ApiResponse({ status: 429, description: "Too many refresh attempts" })
+  @ApiResponse({ status: 500, description: "The server could not complete the request" })
   @HttpCode(200)
   @Throttle({ default: { limit: 100, ttl: 60_000 }, auth: { limit: 30, ttl: 900_000 } })
   async refresh(
@@ -147,8 +156,15 @@ export class AuthController {
   @Public()
   @Post("logout")
   @ApiOperation({ summary: "Revoke the current session" })
+  @ApiBody({
+    type: RefreshDto,
+    required: false,
+    description: "Optional when the refresh-token cookie is present.",
+  })
   @ApiResponse({ status: 200, description: "Session revoked and authentication cookies cleared" })
+  @ApiResponse({ status: 400, description: "The request body is invalid" })
   @ApiResponse({ status: 429, description: "Too many logout attempts" })
+  @ApiResponse({ status: 500, description: "The server could not complete the request" })
   @HttpCode(200)
   @Throttle({ default: { limit: 100, ttl: 60_000 }, auth: { limit: 30, ttl: 900_000 } })
   async logout(
@@ -170,9 +186,11 @@ export class AuthController {
   /** GET /auth/me — 200, JWT required (not @Public). */
   @Get("me")
   @ApiOperation({ summary: "Get the current user" })
-  @ApiSecurity({ bearerAuth: [] })
   @ApiResponse({ status: 200, description: "Current user profile" })
   @ApiResponse({ status: 401, description: "A valid access token is required" })
+  @ApiResponse({ status: 429, description: "Too many requests" })
+  @ApiResponse({ status: 500, description: "The server could not complete the request" })
+  @ApiSecurity({ bearerAuth: [] })
   @HttpCode(200)
   async getMe(
     @CurrentUser() currentUser: JwtPayload,

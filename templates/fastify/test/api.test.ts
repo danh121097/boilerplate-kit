@@ -221,6 +221,12 @@ describe("Fastify HTTP contract", () => {
     expect(docs.statusCode).toBe(200);
     const spec = docs.json();
     expect(spec.security).toBeUndefined();
+    expect(spec.paths[`${API}/auth/me`].get.responses["401"].description).toBe(
+      "A valid access token is required",
+    );
+    expect(spec.paths[`${API}/auth/me`].get.responses["401"].content).toBeUndefined();
+    expect(spec.paths[`${API}/auth/refresh`].post.requestBody.required).toBe(false);
+    expect(spec.paths[`${API}/auth/register`].post.requestBody.required).toBe(true);
     expect(spec.components.securitySchemes).toEqual({
       bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
     });

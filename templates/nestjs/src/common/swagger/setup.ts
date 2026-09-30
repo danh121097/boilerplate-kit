@@ -21,13 +21,9 @@ export function setupSwagger(app: NestExpressApplication, config: AppConfigServi
   const builder = new DocumentBuilder()
     .setTitle(config.appName || "NestJS Starter API")
     .setDescription(
-      "JWT (RS256 access + refresh rotation), HMAC-signed requests, RBAC, Socket.IO. " +
-        "All API routes require `sig` + `ctime` HMAC headers; protected routes also require a Bearer access token." +
-        (config.isDevelopment
-          ? " Development mode: Swagger signs Try it out requests automatically, so only a Bearer token is needed for protected routes."
-          : ""),
+      "All API routes require HMAC signatures. In development, Swagger Try it out signs requests automatically; protected routes still require a Bearer token.",
     )
-    .setVersion("1.0")
+    .setVersion("1.0.0")
     .addBearerAuth({ type: "http", scheme: "bearer", bearerFormat: "JWT" }, "bearerAuth")
     .build();
   const document = SwaggerModule.createDocument(app, builder);
