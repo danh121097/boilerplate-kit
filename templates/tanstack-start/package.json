@@ -1,7 +1,7 @@
 {
   "name": "tanstack-start-starter",
   "description": "TanStack Start + TypeScript SSR starter — Router, Query, Zustand, shadcn/ui, Tailwind v4, JWT auth",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {

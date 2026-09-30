@@ -1,7 +1,7 @@
 {
   "name": "reactjs-starter",
   "description": "React 19 + TypeScript SPA starter — Vite, TanStack Router/Query, Zustand, shadcn/ui, Tailwind v4, JWT auth",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {

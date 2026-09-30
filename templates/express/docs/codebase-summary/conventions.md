@@ -9,9 +9,9 @@ conventions.)
 Import from source roots via `@/`, never deep relative chains:
 
 ```ts
-import { AppError } from '@/types';
-import { config } from '@/config/environment';
-import { authenticate } from '@/middleware/auth';
+import { AppError } from "@/types";
+import { config } from "@/config/environment";
+import { authenticate } from "@/middleware/auth";
 ```
 
 Declared in `tsconfig.json` (`paths: { "@/*": ["./src/*"] }`). Resolved at build
@@ -37,9 +37,9 @@ Never `res.status(500).json(...)` ad hoc in business logic. Throw `AppError`
 
 ```ts
 throw new AppError({
-  message: 'Email already registered!',
+  message: "Email already registered!",
   statusCode: 409,
-  errorType: 'CONFLICT',
+  errorType: "CONFLICT",
 });
 ```
 
@@ -50,8 +50,14 @@ The global handler (`src/middleware/error-handler.ts`) catches it and emits one
 shape for every error:
 
 ```json
-{ "success": false, "status": "error", "errorType": "...",
-  "message": "...", "error_code": 401, "error_message": "..." }
+{
+  "success": false,
+  "status": "error",
+  "errorType": "...",
+  "message": "...",
+  "error_code": 401,
+  "error_message": "..."
+}
 ```
 
 `stack` is included only in development. Express 5 forwards thrown errors from
@@ -62,7 +68,9 @@ async handlers automatically — no `try/catch` wrapper needed in controllers.
 Body validation is a middleware factory in each module's `validation.ts`:
 
 ```ts
-export function validate(schema: z.ZodSchema) { /* safeParse → AppError on fail */ }
+export function validate(schema: z.ZodSchema) {
+  /* safeParse → AppError on fail */
+}
 ```
 
 It throws `AppError({ errorType: 'VALIDATION_ERROR' })` and replaces `req.body`
@@ -83,8 +91,10 @@ missing `MONGODB_URI` / `HMAC_SECRET` / RSA key paths), and exports a
 typed `config: EnvironmentConfig`. Everywhere else:
 
 ```ts
-import { config } from '@/config/environment';
-if (config.isProduction) { /* ... */ }
+import { config } from "@/config/environment";
+if (config.isProduction) {
+  /* ... */
+}
 app.use(config.apiPrefix, routes);
 ```
 

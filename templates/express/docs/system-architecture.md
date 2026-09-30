@@ -7,16 +7,16 @@ to a focused page under [`system-architecture/`](./system-architecture/).
 
 ## Stack At A Glance
 
-| Concern | Choice |
-| --- | --- |
-| Runtime / language | Node.js + TypeScript (package manager: **pnpm**) |
-| HTTP framework | Express 5 |
-| Data store | MongoDB via Mongoose |
-| Access tokens | JWT **RS256** (RSA keypair), 15 min default |
-| Refresh tokens | JWT **HS256** (symmetric secret), 7 day default, httpOnly cookie, DB-tracked + rotated |
-| Request signing | HMAC-SHA256 signature on every API route (and socket handshake); anti-casual-abuse only |
-| Realtime | Socket.IO (HMAC + JWT gated handshake) |
-| Optional cache / scale | Redis (rate-limit store, token revocation, cache, socket adapter) |
+| Concern                | Choice                                                                                  |
+| ---------------------- | --------------------------------------------------------------------------------------- |
+| Runtime / language     | Node.js + TypeScript (package manager: **pnpm**)                                        |
+| HTTP framework         | Express 5                                                                               |
+| Data store             | MongoDB via Mongoose                                                                    |
+| Access tokens          | JWT **RS256** (RSA keypair), 15 min default                                             |
+| Refresh tokens         | JWT **HS256** (symmetric secret), 7 day default, httpOnly cookie, DB-tracked + rotated  |
+| Request signing        | HMAC-SHA256 signature on every API route (and socket handshake); anti-casual-abuse only |
+| Realtime               | Socket.IO (HMAC + JWT gated handshake)                                                  |
+| Optional cache / scale | Redis (rate-limit store, token revocation, cache, socket adapter)                       |
 
 ## Boot Sequence
 
@@ -35,15 +35,15 @@ only when every step closed cleanly, 1 otherwise or when shutdown exceeds 10 s.
 
 ## Topics
 
-| Page | Covers |
-| --- | --- |
-| [request-flow.md](./system-architecture/request-flow.md) | The `app.ts` middleware pipeline, declarative route registry, controller → service flow |
-| [auth-jwt-refresh.md](./system-architecture/auth-jwt-refresh.md) | RS256 access + HS256 httpOnly refresh-cookie rotation, RefreshToken model, revocation |
-| [hmac-verification.md](./system-architecture/hmac-verification.md) | The canonical signing string, freshness + timing-safe compare, the client invariant |
-| [error-handling.md](./system-architecture/error-handling.md) | `AppError`, the error-handler envelope, not-found handler, validation errors |
-| [database-mongoose.md](./system-architecture/database-mongoose.md) | Mongoose models, `toJSON` transform, indexes, connection config |
-| [realtime-socket.md](./system-architecture/realtime-socket.md) | Socket.IO setup, handshake gates, events, emit helpers |
-| [security-rate-limit.md](./system-architecture/security-rate-limit.md) | helmet, CORS-with-credentials, rate limiters, Redis-backed store |
+| Page                                                                   | Covers                                                                                  |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| [request-flow.md](./system-architecture/request-flow.md)               | The `app.ts` middleware pipeline, declarative route registry, controller → service flow |
+| [auth-jwt-refresh.md](./system-architecture/auth-jwt-refresh.md)       | RS256 access + HS256 httpOnly refresh-cookie rotation, RefreshToken model, revocation   |
+| [hmac-verification.md](./system-architecture/hmac-verification.md)     | The canonical signing string, freshness + timing-safe compare, the client invariant     |
+| [error-handling.md](./system-architecture/error-handling.md)           | `AppError`, the error-handler envelope, not-found handler, validation errors            |
+| [database-mongoose.md](./system-architecture/database-mongoose.md)     | Mongoose models, `toJSON` transform, indexes, connection config                         |
+| [realtime-socket.md](./system-architecture/realtime-socket.md)         | Socket.IO setup, handshake gates, events, emit helpers                                  |
+| [security-rate-limit.md](./system-architecture/security-rate-limit.md) | helmet, CORS-with-credentials, rate limiters, Redis-backed store                        |
 
 ## Cross-Cutting Invariants
 

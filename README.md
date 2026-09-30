@@ -16,17 +16,17 @@ npm create prism-app@latest
 
 ## Stacks
 
-| Stack | Highlights |
-| ----- | ---------- |
-| **Vue 3** | Vite · Vue Router · Pinia · TanStack Query · Reka UI · Tailwind v4 |
-| **Nuxt 4** | Pinia · TanStack Query · Reka UI · Tailwind v4 |
-| **React 19** | Vite · TanStack Router · TanStack Query · Zustand · shadcn/ui · Tailwind v4 |
-| **Next.js 16** | App Router · TanStack Query · Zustand · shadcn/ui · Tailwind v4 |
-| **TanStack Start** | TanStack Ecosystem · Zustand · shadcn/ui · Tailwind v4 |
-| **React Native** | Expo · Expo Router · NativeWind · TanStack Query · Zustand · SecureStore · JWT auth |
-| **Express 5** | TypeScript · Mongoose · Socket.io · Redis · JWT auth · Swagger |
-| **Fastify 5** | TypeScript · Mongoose · Socket.io · Redis · JWT auth · Swagger |
-| **NestJS 11** | TypeScript · Mongoose · Socket.io · Redis · JWT auth · Swagger |
+| Stack              | Highlights                                                                          |
+| ------------------ | ----------------------------------------------------------------------------------- |
+| **Vue 3**          | Vite · Vue Router · Pinia · TanStack Query · Reka UI · Tailwind v4                  |
+| **Nuxt 4**         | Pinia · TanStack Query · Reka UI · Tailwind v4                                      |
+| **React 19**       | Vite · TanStack Router · TanStack Query · Zustand · shadcn/ui · Tailwind v4         |
+| **Next.js 16**     | App Router · TanStack Query · Zustand · shadcn/ui · Tailwind v4                     |
+| **TanStack Start** | TanStack Ecosystem · Zustand · shadcn/ui · Tailwind v4                              |
+| **React Native**   | Expo · Expo Router · NativeWind · TanStack Query · Zustand · SecureStore · JWT auth |
+| **Express 5**      | TypeScript · Mongoose · Socket.io · Redis · JWT auth · Swagger                      |
+| **Fastify 5**      | TypeScript · Mongoose · Socket.io · Redis · JWT auth · Swagger                      |
+| **NestJS 11**      | TypeScript · Mongoose · Socket.io · Redis · JWT auth · Swagger                      |
 
 Backends share the same security model — RS256 JWT access + refresh rotation
 (reuse-detected), HMAC-signed requests, RBAC, optional Redis, and Socket.io.
@@ -57,17 +57,17 @@ npm create prism-app@latest -- \
 
 ## Options
 
-| Flag | Description |
-| ---- | ----------- |
-| `--name <dir>` | Target directory (also the project name) |
-| `--template <id>` | `vuejs` · `nuxtjs` · `reactjs` · `nextjs` · `tanstack-start` · `react-native` · `express` · `fastify` · `nestjs` |
-| `--pm <manager>` | `pnpm` · `bun` · `yarn` · `npm` |
-| `--git` / `--no-git` | Initialize a git repository (default: prompt) |
-| `--install` / `--no-install` | Install dependencies after scaffolding |
-| `--force` | Scaffold into a non-empty directory |
-| `--ref <branch\|tag\|sha>` | Template ref to fetch (default: `master`) |
-| `--latest` | Bump every dependency to its newest version before install |
-| `--version` / `--help` | Print version / usage |
+| Flag                         | Description                                                                                                      |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `--name <dir>`               | Target directory (also the project name)                                                                         |
+| `--template <id>`            | `vuejs` · `nuxtjs` · `reactjs` · `nextjs` · `tanstack-start` · `react-native` · `express` · `fastify` · `nestjs` |
+| `--pm <manager>`             | `pnpm` · `bun` · `yarn` · `npm`                                                                                  |
+| `--git` / `--no-git`         | Initialize a git repository (default: prompt)                                                                    |
+| `--install` / `--no-install` | Install dependencies after scaffolding                                                                           |
+| `--force`                    | Scaffold into a non-empty directory                                                                              |
+| `--ref <branch\|tag\|sha>`   | Template ref to fetch (default: `master`)                                                                        |
+| `--latest`                   | Bump every dependency to its newest version before install                                                       |
+| `--version` / `--help`       | Print version / usage                                                                                            |
 
 Requires **Node.js >= 20**.
 

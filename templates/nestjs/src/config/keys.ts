@@ -47,7 +47,6 @@ export function loadRsaKeyPair(
     );
   }
 
-   
   console.warn(
     "[keys] RSA key files missing — generating ephemeral keypair (single-process, non-persistent)",
   );
