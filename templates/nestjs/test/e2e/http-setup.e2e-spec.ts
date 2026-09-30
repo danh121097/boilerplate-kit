@@ -4,6 +4,7 @@
  *   - body-parser failures (too large, malformed JSON) answer 413 / 400 in the
  *     standard error envelope, not 500, and are not logged at error level
  *   - Zod validation failures carry the issue messages joined with ", "
+ *   - unmatched routes answer 404 in the standard envelope
  *   - bodyless refresh/logout behave like `{}`; an empty body token falls back to the cookie
  *   - the test server is bound to loopback, so supertest never opens a wildcard
  *     port per request that a foreign 127.0.0.1 listener could shadow
@@ -126,6 +127,16 @@ describe("validation messages", () => {
     expect(res.body.message).toBe(
       "Invalid email format, Password must be at least 8 characters, Name is required",
     );
+  });
+});
+
+describe("unmatched routes", () => {
+  it("answer 404 NOT_FOUND in the standard envelope", async () => {
+    const h = buildHmacHeaders("GET", "/no-such-route");
+    const res = await req.get("/api/v1/no-such-route").set("sig", h.sig).set("ctime", h.ctime);
+
+    expect(res.status).toBe(404);
+    expect(res.body).toMatchObject({ ...ENVELOPE, errorType: "NOT_FOUND", error_code: 404 });
   });
 });
 

@@ -40,7 +40,7 @@ export default tseslint.config(
   {
     // Tests favour terse mocks and inline assertions — explicit `any` and
     // return-type annotations add noise without value here.
-    files: ["src/**/__tests__/**/*.ts", "src/**/*.test.ts"],
+    files: ["test/**/*.ts", "src/**/*.test.ts"],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/explicit-function-return-type": "off",

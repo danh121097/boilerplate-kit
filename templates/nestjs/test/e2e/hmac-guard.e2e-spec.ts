@@ -98,6 +98,8 @@ describe("GET /health — @Public but HMAC required", () => {
     expect(res.body).toHaveProperty("status", "ok");
     expect(res.body).toHaveProperty("database");
     expect(res.body).toHaveProperty("redis");
+    expect(res.body).toMatchObject({ database: "connected", redis: "disabled" });
+    expect(res.body.uptime).toBeGreaterThan(0);
   });
 });
 
