@@ -25,7 +25,7 @@ describe("template-registry", () => {
     );
   });
 
-  it("exports exactly the 8 known templates", () => {
+  it("exports exactly the 9 known templates", () => {
     expect([...TEMPLATES]).toEqual([
       "vuejs",
       "nuxtjs",
@@ -34,6 +34,7 @@ describe("template-registry", () => {
       "tanstack-start",
       "react-native",
       "express",
+      "fastify",
       "nestjs",
     ]);
   });

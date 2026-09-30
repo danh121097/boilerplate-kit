@@ -25,6 +25,7 @@ npm create prism-app@latest
 | **TanStack Start** | TanStack Ecosystem · Zustand · shadcn/ui · Tailwind v4 |
 | **React Native** | Expo · Expo Router · NativeWind · TanStack Query · Zustand · SecureStore · JWT auth |
 | **Express 5** | TypeScript · Mongoose · Socket.io · Redis · JWT auth · Postman |
+| **Fastify 5** | TypeScript · Mongoose · Socket.io · Redis · JWT auth · Swagger |
 | **NestJS 11** | TypeScript · Mongoose · Socket.io · Redis · JWT auth · Swagger |
 
 Backends share the same security model — RS256 JWT access + refresh rotation
@@ -59,7 +60,7 @@ npm create prism-app@latest -- \
 | Flag | Description |
 | ---- | ----------- |
 | `--name <dir>` | Target directory (also the project name) |
-| `--template <id>` | `vuejs` · `nuxtjs` · `reactjs` · `nextjs` · `tanstack-start` · `react-native` · `express` · `nestjs` |
+| `--template <id>` | `vuejs` · `nuxtjs` · `reactjs` · `nextjs` · `tanstack-start` · `react-native` · `express` · `fastify` · `nestjs` |
 | `--pm <manager>` | `pnpm` · `bun` · `yarn` · `npm` |
 | `--git` / `--no-git` | Initialize a git repository (default: prompt) |
 | `--install` / `--no-install` | Install dependencies after scaffolding |
@@ -92,7 +93,7 @@ The collection is designed to grow. A new stack is just a folder under
 2. Register the key in `src/types.ts` (`TEMPLATES`) and label it in `src/wizard/prompt-template.ts`.
 3. Update the registry test in `src/__tests__/template-registry.test.ts`.
 
-See an existing backend (`templates/nestjs`) or frontend (`templates/reactjs`)
+See an existing backend (`templates/fastify`) or frontend (`templates/reactjs`)
 for the conventions, then open a PR.
 
 ## Development

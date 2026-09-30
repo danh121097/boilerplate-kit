@@ -6,6 +6,7 @@ export const TEMPLATES = [
   "tanstack-start",
   "react-native",
   "express",
+  "fastify",
   "nestjs",
 ] as const;
 export type Template = (typeof TEMPLATES)[number];

@@ -1,0 +1,9 @@
+{
+  // Run ESLint auto-fix (incl. perfectionist import sorting) on every save.
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  // Flat config (eslint.config.mjs); lint TS/JS source.
+  "eslint.useFlatConfig": true,
+  "eslint.validate": ["javascript", "typescript"]
+}

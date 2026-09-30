@@ -10,6 +10,7 @@ const LABELS: Record<Template, string> = {
   "tanstack-start": "TanStack Start · TanStack Ecosystem · Zustand · shadcn/ui",
   "react-native": "React Native · Expo Router · NativeWind · TanStack Query · Zustand · SecureStore",
   express: "Express · Mongoose · Socket.io · JWT · Redis · Postman",
+  fastify: "Fastify · Mongoose · Socket.io · JWT · Redis · Swagger",
   nestjs: "NestJS · Mongoose · Socket.io · JWT · Redis · Swagger",
 };
 
