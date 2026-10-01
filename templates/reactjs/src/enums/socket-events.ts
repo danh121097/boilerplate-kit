@@ -6,10 +6,8 @@
 export const SOCKET_EVENT = {
   /** Server → client, emitted once the handshake auth succeeds. */
   AUTHENTICATED: "authenticated",
-  /** Server → client, a user-targeted notification. */
-  NOTIFICATION: "notification",
-  /** Server → client, emitted when the server rejects an authenticated session. */
-  UNAUTHORIZED: "unauthorized",
+  /** Server → client heartbeat event. */
+  PING: "ping",
   /** Built-in socket.io event fired when an established connection drops. */
   DISCONNECT: "disconnect",
   /** Built-in socket.io event fired when a connection attempt fails. */

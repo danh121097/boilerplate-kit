@@ -1,6 +1,6 @@
 import { installLocalStorage } from "@/__tests__/helpers/fake-storage";
 import { httpError, makeClient, ok } from "@/__tests__/helpers/http-mocks";
-import { Api, onSessionEnded } from "@/services/core";
+import { Api, isUnauthorizedError, onSessionEnded } from "@/services/core";
 import {
   getAccessToken,
   getRefreshToken,
@@ -31,6 +31,12 @@ function refreshError(failure: { status?: number; code?: string }) {
     response: failure.status ? { status: failure.status, data: {} } : undefined,
   });
 }
+
+const HMAC_BODY = {
+  success: false,
+  errorType: "HMAC_ERROR",
+  message: "HMAC verification failed: timestamp expired!",
+};
 
 function setup() {
   const reload = vi.fn();
@@ -179,5 +185,78 @@ describe("refresh outcomes", () => {
 
     await expect(http.get("/users")).resolves.toMatchObject({ data: [1] });
     expect(getAccessToken()).toBe("NEW");
+  });
+
+  it("a request answered 401 HMAC_ERROR is not refreshed, retried or treated as a session end", async () => {
+    persistAccessToken("OLD");
+    persistRefreshToken("RT");
+    const { post, client } = setup();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const ended = vi.fn();
+    onTestFinished(onSessionEnded(ended));
+    let calls = 0;
+    const http = client(async (config) => {
+      calls += 1;
+      return httpError(config, 401, HMAC_BODY);
+    });
+
+    await expect(http.get("/users")).rejects.toMatchObject({
+      errorType: "HMAC_ERROR",
+      message: HMAC_BODY.message,
+    });
+    expect(calls).toBe(1);
+    expect(post).not.toHaveBeenCalled();
+    expect(getAccessToken()).toBe("OLD");
+    expect(getRefreshToken()).toBe("RT");
+    expect(ended).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("a refresh answered 401 HMAC_ERROR keeps the session and rejects without an expired-session 401", async () => {
+    persistAccessToken("OLD");
+    persistRefreshToken("RT");
+    const { post, client } = setup();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    post.mockRejectedValue(
+      Object.assign(new Error("refresh failed"), {
+        isAxiosError: true,
+        response: { status: 401, data: HMAC_BODY },
+      }),
+    );
+    const ended = vi.fn();
+    onTestFinished(onSessionEnded(ended));
+    const http = client(async (config) => httpError(config, 401));
+
+    const error = await http.get("/users").catch((e: unknown) => e);
+
+    expect(error).toMatchObject({
+      errorType: "HMAC_ERROR",
+      error_code: 401,
+      message: HMAC_BODY.message,
+      retryable: true,
+    });
+    expect(isUnauthorizedError(error)).toBe(false);
+    expect(ended).not.toHaveBeenCalled();
+    expect(getAccessToken()).toBe("OLD");
+    expect(getRefreshToken()).toBe("RT");
+  });
+
+  it("a refresh answered 401 AUTHENTICATION_ERROR still ends the session", async () => {
+    persistAccessToken("OLD");
+    persistRefreshToken("RT");
+    const { post, client } = setup();
+    post.mockRejectedValue(
+      Object.assign(new Error("refresh failed"), {
+        isAxiosError: true,
+        response: { status: 401, data: { success: false, errorType: "AUTHENTICATION_ERROR" } },
+      }),
+    );
+    const ended = vi.fn();
+    onTestFinished(onSessionEnded(ended));
+    const http = client(async (config) => httpError(config, 401));
+
+    await expect(http.get("/users")).rejects.toMatchObject({ error_code: 401 });
+    expect(ended).toHaveBeenCalledWith("expired", "MAIN");
+    expect(getRefreshToken()).toBeNull();
   });
 });
