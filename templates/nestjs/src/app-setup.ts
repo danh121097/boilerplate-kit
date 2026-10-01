@@ -1,7 +1,9 @@
+import { mapBodyParserError } from "@/common/filters/map-body-parser-error";
 import { AppConfigService } from "@/config/app-config.service";
 import { SocketIoAdapter } from "@/modules/realtime/socket-io.adapter";
 import { RedisService } from "@/redis/redis.service";
 import type { NestExpressApplication } from "@nestjs/platform-express";
+import type { NextFunction, Request, Response } from "express";
 import compression from "compression";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
@@ -26,9 +28,19 @@ export function configureApp(app: NestExpressApplication): void {
   app.use(helmet());
   app.use(compression());
   app.use(cookieParser());
+  // Before the body parser, so 400/413 parse errors still carry CORS headers.
+  app.enableCors({ origin: config.corsOrigins, credentials: true });
+
+  // Register the JSON parser here (Nest skips its own once a `jsonParser` layer exists)
+  // so a parse error can be mapped right after it: Nest rewrites any SyntaxError into
+  // BadRequestException(err.message), which drops the body-parser `type` and echoes
+  // the raw parser text to the client.
+  app.useBodyParser("json");
+  app.use((err: unknown, _req: Request, _res: Response, next: NextFunction) => {
+    next(mapBodyParserError(err) ?? err);
+  });
 
   app.setGlobalPrefix(config.apiPrefix);
-  app.enableCors({ origin: config.corsOrigins, credentials: true });
 
   // Socket.IO adapter with shared CORS options; Redis pub/sub only when enabled.
   const redisClient = config.redisEnabled ? app.get(RedisService).getClient() : null;

@@ -11,7 +11,7 @@ import { z } from "zod";
 const refreshSchema = z.preprocess(
   (body) => body ?? {},
   z.object({
-    refreshToken: z.string().optional(),
+    refreshToken: z.string("refreshToken must be a string").optional(),
   }),
 );
 

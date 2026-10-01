@@ -12,7 +12,9 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import supertest from "supertest";
 
+import { AppModule } from "@/app.module";
 import { AppLogger } from "@/common/logger/app-logger.service";
+import { NotFoundModule } from "@/modules/not-found/not-found.module";
 import { INestApplication } from "@nestjs/common";
 import { createTestApp, TEST_HOST } from "../helpers/create-test-app";
 import { buildHmacHeaders } from "../helpers/sign-request";
@@ -37,6 +39,7 @@ function signedPost(path: string, body?: unknown) {
     : request.set("Content-Type", "application/json").send(body as object);
 }
 
+const ALLOWED_ORIGIN = "http://localhost:5173";
 const ENVELOPE = { success: false, status: "error" };
 
 describe("Test server binding", () => {
@@ -69,13 +72,16 @@ describe("body-parser errors", () => {
     try {
       const res = await req
         .post("/api/v1/auth/login")
+        .set("Origin", ALLOWED_ORIGIN)
         .set("Content-Type", "application/json")
         .send(JSON.stringify({ email: "a@example.com", password: "x".repeat(200_000) }));
 
       expect(res.status).toBe(413);
+      expect(res.headers["access-control-allow-origin"]).toBe(ALLOWED_ORIGIN);
       expect(res.body).toMatchObject({
         ...ENVELOPE,
         errorType: "VALIDATION_ERROR",
+        message: "Request body is too large!",
         error_code: 413,
       });
       expect(res.body.error_message).toBe(res.body.message);
@@ -90,13 +96,16 @@ describe("body-parser errors", () => {
     try {
       const res = await req
         .post("/api/v1/auth/login")
+        .set("Origin", ALLOWED_ORIGIN)
         .set("Content-Type", "application/json")
         .send('{"email": ');
 
       expect(res.status).toBe(400);
+      expect(res.headers["access-control-allow-origin"]).toBe(ALLOWED_ORIGIN);
       expect(res.body).toMatchObject({
         ...ENVELOPE,
         errorType: "VALIDATION_ERROR",
+        message: "Malformed JSON request body!",
         error_code: 400,
       });
       expect(errorLog).not.toHaveBeenCalled();
@@ -131,16 +140,88 @@ describe("validation messages", () => {
 });
 
 describe("unmatched routes", () => {
-  it("answer 404 NOT_FOUND in the standard envelope", async () => {
-    const h = buildHmacHeaders("GET", "/no-such-route");
-    const res = await req.get("/api/v1/no-such-route").set("sig", h.sig).set("ctime", h.ctime);
+  it("catch-all module is the last AppModule import, so it never shadows another module", () => {
+    const imports = Reflect.getMetadata("imports", AppModule) as unknown[];
+    expect(imports.at(-1)).toBe(NotFoundModule);
+  });
+
+  it.each(["GET", "POST"] as const)(
+    "%s signed answers 404 NOT_FOUND with the express message",
+    async (method) => {
+      const h = buildHmacHeaders(method, "/no-such-route");
+      const res = await req[method.toLowerCase() as "get" | "post"]("/api/v1/no-such-route")
+        .set("sig", h.sig)
+        .set("ctime", h.ctime);
+
+      expect(res.status).toBe(404);
+      expect(res.body).toMatchObject({
+        ...ENVELOPE,
+        errorType: "NOT_FOUND",
+        message: "Resource not found!",
+        error_message: "Resource not found!",
+        error_code: 404,
+      });
+    },
+  );
+
+  it.each(["/api/v1", "/api/v1/"])("%s unsigned answers 401 HMAC_ERROR", async (url) => {
+    const res = await req.get(url);
+
+    expect(res.status).toBe(401);
+    expect(res.body).toMatchObject({ ...ENVELOPE, errorType: "HMAC_ERROR" });
+  });
+
+  it.each(["get", "post", "delete"] as const)(
+    "bare prefix %s signed answers 404 NOT_FOUND with the express message",
+    async (method) => {
+      const h = buildHmacHeaders(method, "/");
+      const res = await req[method]("/api/v1").set("sig", h.sig).set("ctime", h.ctime);
+
+      expect(res.status).toBe(404);
+      expect(res.body).toMatchObject({
+        ...ENVELOPE,
+        errorType: "NOT_FOUND",
+        message: "Resource not found!",
+      });
+    },
+  );
+
+  it("outside the API prefix answers the express message, not Nest's Cannot GET", async () => {
+    const res = await req.get("/no-such-route");
 
     expect(res.status).toBe(404);
-    expect(res.body).toMatchObject({ ...ENVELOPE, errorType: "NOT_FOUND", error_code: 404 });
+    expect(res.body).toMatchObject({
+      ...ENVELOPE,
+      errorType: "NOT_FOUND",
+      message: "Resource not found!",
+      error_message: "Resource not found!",
+      error_code: 404,
+    });
+  });
+
+  it("unsigned answers 401 HMAC_ERROR, not a 404 that leaks which routes exist", async () => {
+    const res = await req.get("/api/v1/no-such-route");
+
+    expect(res.status).toBe(401);
+    expect(res.body).toMatchObject({ ...ENVELOPE, errorType: "HMAC_ERROR", error_code: 401 });
   });
 });
 
 describe("refresh / logout body handling", () => {
+  it.each(["/auth/refresh", "/auth/logout"])(
+    "%s rejects a non-string refreshToken with the shared message",
+    async (path) => {
+      const res = await signedPost(path, { refreshToken: 123 });
+
+      expect(res.status).toBe(400);
+      expect(res.body).toMatchObject({
+        ...ENVELOPE,
+        errorType: "VALIDATION_ERROR",
+        message: "refreshToken must be a string",
+      });
+    },
+  );
+
   it("bodyless refresh uses the refresh cookie", async () => {
     const reg = await signedPost("/auth/register", {
       email: "bodyless@example.com",

@@ -16,7 +16,7 @@ import { getModelToken } from "@nestjs/mongoose";
 import type { Model } from "mongoose";
 import supertest from "supertest";
 import { createTestApp } from "../helpers/create-test-app";
-import { countActiveInFamily } from "../helpers/refresh-token-db";
+import { countActiveInFamily, findStoredToken } from "../helpers/refresh-token-db";
 import { buildHmacHeaders } from "../helpers/sign-request";
 
 let app: INestApplication;
@@ -89,6 +89,8 @@ describe("revoke racing a rotation", () => {
     hookBeforeInsert(() => sessions.logout(a));
 
     await expectRefused(sessions.refresh(a));
+    // Logout deleted P, so the post-insert guard finds no rotatedAt and revokes N.
+    expect(await findStoredToken(app, a)).toBeNull();
     expect(await countActiveInFamily(app, a)).toBe(0);
   });
 

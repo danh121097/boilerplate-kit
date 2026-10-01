@@ -2,8 +2,8 @@ import { AppException } from "@/common/exceptions/app.exception";
 
 /** body-parser `type` → client-safe status + message (never echo the raw parser message). */
 const BODY_PARSER_ERRORS: Record<string, { status: number; message: string }> = {
-  "entity.too.large": { status: 413, message: "Request body too large!" },
-  "entity.parse.failed": { status: 400, message: "Malformed request body!" },
+  "entity.too.large": { status: 413, message: "Request body is too large!" },
+  "entity.parse.failed": { status: 400, message: "Malformed JSON request body!" },
   "entity.verify.failed": { status: 400, message: "Malformed request body!" },
   "request.aborted": { status: 400, message: "Request aborted!" },
   "request.size.invalid": { status: 400, message: "Invalid request size!" },

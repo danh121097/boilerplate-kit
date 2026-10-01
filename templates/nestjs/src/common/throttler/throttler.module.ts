@@ -45,6 +45,20 @@ export class AppThrottlerGuard extends ThrottlerGuard {
   }
 
   /**
+   * Counter key per throttler name + client, ignoring controller and handler.
+   * The library default also hashes class and handler names, which gives every
+   * route its own counters; express shares one `auth` bucket across
+   * register/refresh/logout and one global `default` bucket per client.
+   */
+  protected override generateKey(
+    _context: ExecutionContext,
+    tracker: string,
+    throttlerName: string,
+  ): string {
+    return `${throttlerName}:${tracker}`;
+  }
+
+  /**
    * Fail-open: if the storage backend (Redis) throws during the rate-limit
    * increment, catch and return true (allow the request through).
    * Mirrors express `passOnStoreError: true` on all three limiters.
@@ -67,10 +81,14 @@ export class AppThrottlerGuard extends ThrottlerGuard {
    */
   protected override async throwThrottlingException(
     _context: ExecutionContext,
-    _throttlerLimitDetail: Parameters<ThrottlerGuard["throwThrottlingException"]>[1],
+    throttlerLimitDetail: Parameters<ThrottlerGuard["throwThrottlingException"]>[1],
   ): Promise<void> {
+    // generateKey puts the throttler name first, so the key says which cap tripped.
+    const isLogin = throttlerLimitDetail.key.startsWith("login:");
     throw new AppException({
-      message: "Too many requests, please try again later!",
+      message: isLogin
+        ? "Too many login attempts, please try again later!"
+        : "Too many requests, please try again later!",
       statusCode: 429,
       errorType: "RATE_LIMIT",
     });

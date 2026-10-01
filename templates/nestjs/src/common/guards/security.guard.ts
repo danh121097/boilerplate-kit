@@ -83,6 +83,9 @@ export class SecurityGuard implements CanActivate {
    * and verifies freshness + signature. Path is derived by stripping the API
    * prefix (set via setGlobalPrefix) from req.originalUrl.
    *
+   * Rejections use errorType HMAC_ERROR (still 401) so clients can tell a bad
+   * signature or clock skew apart from a bad session.
+   *
    * Content-type is taken verbatim from the request header or "" when absent.
    * DEFAULT_CONTENT_TYPE is socket-only — never used here.
    */
@@ -94,7 +97,7 @@ export class SecurityGuard implements CanActivate {
       throw new AppException({
         message: "HMAC signature and timestamp headers are required!",
         statusCode: 401,
-        errorType: "AUTHENTICATION_ERROR",
+        errorType: "HMAC_ERROR",
       });
     }
 
@@ -113,7 +116,7 @@ export class SecurityGuard implements CanActivate {
       throw new AppException({
         message: `HMAC verification failed: ${reason}!`,
         statusCode: 401,
-        errorType: "AUTHENTICATION_ERROR",
+        errorType: "HMAC_ERROR",
       });
     }
   }

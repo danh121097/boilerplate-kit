@@ -89,7 +89,7 @@ describe("GET /health — @Public but HMAC required", () => {
   it("unsigned request → 401 (HMAC step fires even on @Public routes)", async () => {
     const res = await req.get("/api/v1/health");
     expect(res.status).toBe(401);
-    expect(res.body.errorType).toBe("AUTHENTICATION_ERROR");
+    expect(res.body.errorType).toBe("HMAC_ERROR");
   });
 
   it("signed request → 200 with health envelope", async () => {
@@ -105,13 +105,13 @@ describe("GET /health — @Public but HMAC required", () => {
 
 // ── HMAC failure cases ─────────────────────────────────────────────────────
 
-describe("HMAC failures — all return 401 AUTHENTICATION_ERROR", () => {
+describe("HMAC failures — all return 401 HMAC_ERROR", () => {
   it("missing sig and ctime headers → 401", async () => {
     const res = await req
       .get("/api/v1/health")
       .set("Content-Type", "application/json");
     expect(res.status).toBe(401);
-    expect(res.body.errorType).toBe("AUTHENTICATION_ERROR");
+    expect(res.body.errorType).toBe("HMAC_ERROR");
   });
 
   it("sig present but ctime missing → 401", async () => {
@@ -133,7 +133,7 @@ describe("HMAC failures — all return 401 AUTHENTICATION_ERROR", () => {
       .set("sig", h.sig)
       .set("ctime", h.ctime);
     expect(res.status).toBe(401);
-    expect(res.body.errorType).toBe("AUTHENTICATION_ERROR");
+    expect(res.body.errorType).toBe("HMAC_ERROR");
     expect(res.body.message).toMatch(/HMAC verification failed/i);
   });
 
@@ -144,7 +144,32 @@ describe("HMAC failures — all return 401 AUTHENTICATION_ERROR", () => {
       .set("sig", h.sig)
       .set("ctime", h.ctime);
     expect(res.status).toBe(401);
+    expect(res.body.errorType).toBe("HMAC_ERROR");
     expect(res.body.message).toMatch(/timestamp expired/i);
+  });
+
+  it("HMAC failures stay HMAC_ERROR even with a valid session (not a session failure)", async () => {
+    const token = await registerAndLogin("hmac-with-session");
+    const cookie = `accessToken=${token}`;
+    const bad = buildBadSignatureHeaders("GET", "/auth/me");
+    const stale = buildExpiredHmacHeaders("GET", "/auth/me");
+
+    const unsigned = await req.get("/api/v1/auth/me").set("Cookie", cookie);
+    const badSig = await req
+      .get("/api/v1/auth/me")
+      .set("Cookie", cookie)
+      .set("sig", bad.sig)
+      .set("ctime", bad.ctime);
+    const expired = await req
+      .get("/api/v1/auth/me")
+      .set("Cookie", cookie)
+      .set("sig", stale.sig)
+      .set("ctime", stale.ctime);
+
+    for (const res of [unsigned, badSig, expired]) {
+      expect(res.status).toBe(401);
+      expect(res.body.errorType).toBe("HMAC_ERROR");
+    }
   });
 });
 
@@ -162,7 +187,7 @@ describe("Guard ordering — HMAC → JWT → Roles", () => {
 
     expect(res.status).toBe(401);
     // Must be HMAC failure — not JWT failure. Proves HMAC runs first.
-    expect(res.body.errorType).toBe("AUTHENTICATION_ERROR");
+    expect(res.body.errorType).toBe("HMAC_ERROR");
     expect(res.body.message).toMatch(/HMAC signature and timestamp headers are required/i);
   });
 

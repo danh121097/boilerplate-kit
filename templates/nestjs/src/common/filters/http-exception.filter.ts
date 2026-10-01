@@ -25,7 +25,8 @@ import type { Request, Response } from "express";
  * mapped to 400/409 first, body-parser errors (too large, malformed JSON) to
  * 413/400; any other non-HTTP error is a generic 500. Zod validation failures
  * render the issue messages joined with ", ", like the express validator.
- * 5xx → logger.error with stack; 4xx → logger.warn.
+ * 5xx → logger.error with stack; 4xx → logger.warn. The stack is added to the
+ * body only when NODE_ENV is "development" and the status is 5xx (fastify policy).
  * Unmatched routes produce Nest's default NotFoundException (404) which is
  * caught here and rendered with NOT_FOUND errorType — matching not-found-handler.ts.
  */
@@ -40,8 +41,6 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const res = ctx.getResponse<Response>();
     const req = ctx.getRequest<Request>();
-
-    const isDev = process.env.NODE_ENV !== "production";
 
     let statusCode: number;
     let message: string;
@@ -62,7 +61,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
       statusCode = exception.getStatus();
       // Nest wraps messages in { message, statusCode } objects — unwrap to string.
       const resp = exception.getResponse();
-      if (typeof resp === "string") {
+      if (isRouterNotFound(exception, req)) {
+        // Unmatched route outside the API prefix: Nest's default "Cannot GET /x".
+        message = "Resource not found!";
+      } else if (typeof resp === "string") {
         message = resp;
       } else if (typeof resp === "object" && resp !== null && "message" in resp) {
         const raw = (resp as { message: unknown }).message;
@@ -96,7 +98,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message,
       error_code: statusCode,
       error_message: message,
-      ...(isDev && stack ? { stack } : {}),
+      ...(process.env.NODE_ENV === "development" && statusCode >= 500 && stack ? { stack } : {}),
     });
   }
 }
@@ -126,4 +128,15 @@ function mapHttpStatusToErrorType(status: number): ErrorType {
     default:
       return status >= 500 ? "INTERNAL_ERROR" : "VALIDATION_ERROR";
   }
+}
+
+/**
+ * True only for the 404 Nest's router raises for an unmatched path
+ * (`Cannot <METHOD> <url>`), so handler-thrown NotFoundExceptions keep their message.
+ */
+function isRouterNotFound(exception: HttpException, req: Request): boolean {
+  if (exception.getStatus() !== 404 || exception instanceof AppException) return false;
+  const text = `Cannot ${req.method} `;
+  const message = exception.message;
+  return message === `${text}${req.originalUrl}` || message === `${text}${req.url}`;
 }

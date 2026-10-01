@@ -77,10 +77,12 @@ export class RefreshSessionService {
   }
 
   /**
-   * Logout — end this device's whole session chain: revoke every token of the
-   * presented token's family and clear their rotatedAt, so a graced predecessor
-   * cannot resurrect it. Other families (other devices) stay logged in; legacy
-   * tokens without a familyId revoke only themselves. Then revoke the user's
+   * Logout — end this device's whole session chain: delete every token of the
+   * presented token's family, so neither a graced predecessor nor a replayed
+   * token can resurrect it (a deleted token is simply unknown: 401, and it does
+   * not trip reuse detection against the user's other devices). Other families
+   * (other devices) stay logged in; legacy tokens without a familyId delete only
+   * themselves. Then revoke the user's
    * access tokens and disconnect their sockets. Graceful when the token is
    * unknown. The user id comes from the DB record, never the raw token.
    */
@@ -91,10 +93,7 @@ export class RefreshSessionService {
     if (!stored) return;
 
     const filter = stored.familyId ? { familyId: stored.familyId } : { _id: stored._id };
-    await this.refreshTokenModel.updateMany(filter, {
-      $set: { isRevoked: true },
-      $unset: { rotatedAt: 1 },
-    });
+    await this.refreshTokenModel.deleteMany(filter);
 
     const userId = String(stored.userId);
     await this.tokenRevocationService.revokeUserTokens(userId);
@@ -105,7 +104,7 @@ export class RefreshSessionService {
    * Classify a refresh token that could not be claimed:
    *   no record                        → 401 invalid
    *   revoked by a rotation ≤ grace    → benign retry: issue a fresh pair (no revoke)
-   *   revoked otherwise                → reuse/theft: revoke the whole family → 401
+   *   revoked otherwise                → reuse/theft: revoke every token of the user → 401
    *   not revoked (so expired)         → deleteOne → 401
    */
   private async resolveUnclaimableToken(hashedToken: string): Promise<AuthTokens> {
@@ -139,7 +138,7 @@ export class RefreshSessionService {
     });
   }
 
-  /** Rotated (not logged-out) token, unexpired, replayed inside the grace window. */
+  /** Rotated token, unexpired, replayed inside the grace window. */
   private isWithinReuseGrace(token: { rotatedAt?: Date; expiresAt: Date }): boolean {
     if (!token.rotatedAt) return false;
     const now = Date.now();
@@ -150,7 +149,7 @@ export class RefreshSessionService {
 
   /**
    * Revoke every refresh token of the user, clear rotatedAt so a graced replay
-   * cannot resurrect the family, then revoke access tokens and drop sockets.
+   * cannot resurrect a session, then revoke access tokens and drop sockets.
    */
   private async revokeFamily(userId: Types.ObjectId): Promise<void> {
     await this.refreshTokenModel.updateMany(
@@ -164,10 +163,11 @@ export class RefreshSessionService {
   /**
    * Issue the successor N of a consumed token P (the one just claimed, or the
    * graced one). N is inserted first, then P is re-read: every revoke path
-   * (family logout, user-wide reuse) $unsets P's rotatedAt, so a missing rotatedAt
-   * means a revoke landed before N existed and could not cover it. N is then
+   * (user-wide reuse) $unsets P's rotatedAt and family logout deletes P, so a
+   * missing P or rotatedAt means a revoke landed before N existed and could not
+   * cover it. N is then
    * revoked and the refresh refused. A revoke after N's insert already covers N
-   * through its updateMany.
+   * through its updateMany/deleteMany.
    */
   private async issueSuccessor(predecessor: {
     _id: Types.ObjectId;

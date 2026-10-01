@@ -3,9 +3,10 @@
  *
  * A rotated refresh token replayed within REFRESH_REUSE_GRACE_MS is a benign
  * retry/race: the caller gets a fresh pair and no session is revoked. Outside the
- * window, or for a token revoked by logout, replay is reuse: every refresh token
- * of the user is revoked. A family revoke clears rotatedAt so a later replay of a
- * recently rotated token cannot resurrect the family.
+ * window, replay is reuse: every refresh token of the user is revoked (and rotatedAt
+ * cleared so a later replay of a recently rotated token cannot resurrect the
+ * family). Logout deletes the device's family, so a replayed token is unknown (a
+ * generic 401) and other devices are untouched.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
@@ -104,41 +105,47 @@ describe("Refresh reuse grace window", () => {
     expect(await countActiveInFamily(app, r1)).toBe(0);
   });
 
-  it("a token revoked by logout is reuse, not a graced retry", async () => {
-    const r1 = await startSession();
-    expect((await signedPost("/auth/logout", { refreshToken: r1 })).status).toBe(200);
-    expect((await findStoredToken(app, r1))?.rotatedAt).toBeUndefined();
+  it("a logged-out token is unknown: generic 401, no reuse detection, other devices keep refreshing", async () => {
+    const email = "logout-a-b@example.com";
+    const password = "LogoutTest1!";
+    await signedPost("/auth/register", { email, password, name: "Logout" });
+    const a = tokenOf(await signedPost("/auth/login", { email, password }));
+    const b = tokenOf(await signedPost("/auth/login", { email, password }));
 
-    const replay = await signedPost("/auth/refresh", { refreshToken: r1 });
-    expect(replay.status).toBe(401);
-    expect(replay.body.message).toMatch(/reuse detected/i);
-  });
+    expect((await signedPost("/auth/logout", { refreshToken: a })).status).toBe(200);
+    expect(await findStoredToken(app, a)).toBeNull();
 
-  it("logout ends the whole chain: a graced predecessor cannot resurrect it, other devices stay logged in", async () => {
-    const email = "chain@example.com";
-    const password = "ChainTest1!";
-    await signedPost("/auth/register", { email, password, name: "Chain" });
-    const loginA = await signedPost("/auth/login", { email, password });
-    const a = tokenOf(loginA);
-    const b = tokenOf(await signedPost("/auth/refresh", { refreshToken: a }));
-
-    expect((await signedPost("/auth/logout", { refreshToken: b })).status).toBe(200);
-
-    // A was rotated moments ago but logout revoked its family and cleared rotatedAt.
     const replay = await signedPost("/auth/refresh", { refreshToken: a });
     expect(replay.status).toBe(401);
-    expect((await findStoredToken(app, a))?.rotatedAt).toBeUndefined();
+    expect(replay.body.message).toMatch(/invalid refresh token/i);
+    expect(replay.body.message).not.toMatch(/reuse/i);
+
+    expect((await signedPost("/auth/refresh", { refreshToken: b })).status).toBe(200);
   });
 
-  it("logout leaves another family refreshable", async () => {
-    const email = "chain-other@example.com";
+  it("logout ends the whole chain: a rotated predecessor cannot resurrect it, other devices stay logged in", async () => {
+    const email = "chain@example.com";
     const password = "ChainTest1!";
     await signedPost("/auth/register", { email, password, name: "Chain" });
     const a = tokenOf(await signedPost("/auth/login", { email, password }));
     const other = tokenOf(await signedPost("/auth/login", { email, password }));
+    const rotated = tokenOf(await signedPost("/auth/refresh", { refreshToken: a }));
 
-    expect((await signedPost("/auth/logout", { refreshToken: a })).status).toBe(200);
+    expect((await signedPost("/auth/logout", { refreshToken: rotated })).status).toBe(200);
+
+    // A was rotated moments ago (inside the grace window) but logout deleted its family.
+    const replay = await signedPost("/auth/refresh", { refreshToken: a });
+    expect(replay.status).toBe(401);
+    expect(await findStoredToken(app, a)).toBeNull();
+    expect(await findStoredToken(app, rotated)).toBeNull();
+
     expect((await signedPost("/auth/refresh", { refreshToken: other })).status).toBe(200);
+  });
+
+  it("logging out twice is a no-op", async () => {
+    const r1 = await startSession();
+    expect((await signedPost("/auth/logout", { refreshToken: r1 })).status).toBe(200);
+    expect((await signedPost("/auth/logout", { refreshToken: r1 })).status).toBe(200);
   });
 
   it("rotation and graced re-issue inherit the familyId; each login starts a new one", async () => {

@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { skipUnlessOptedIn } from "@/common/throttler/throttler.module";
+import { AppThrottlerGuard, skipUnlessOptedIn } from "@/common/throttler/throttler.module";
 import { ExecutionContext } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 
@@ -36,5 +36,31 @@ describe("skipUnlessOptedIn", () => {
 
   it("skips a handler opted in to a different throttler", () => {
     expect(skipUnlessOptedIn("login")(contextFor(FixtureController.prototype.optedIn))).toBe(true);
+  });
+});
+
+describe("AppThrottlerGuard.generateKey", () => {
+  const guard = Object.create(AppThrottlerGuard.prototype) as {
+    generateKey: (context: ExecutionContext, tracker: string, name: string) => string;
+  };
+
+  it("keys by throttler name and client only, so counters are shared across routes", () => {
+    const key = (handler: () => void, name: string) =>
+      guard.generateKey(contextFor(handler), "10.0.0.1", name);
+
+    expect(key(FixtureController.prototype.optedIn, "auth")).toBe("auth:10.0.0.1");
+    expect(key(FixtureController.prototype.plain, "auth")).toBe(
+      key(FixtureController.prototype.optedIn, "auth"),
+    );
+  });
+
+  it("keeps throttler names and clients apart", () => {
+    const ctx = contextFor(FixtureController.prototype.plain);
+    expect(guard.generateKey(ctx, "10.0.0.1", "auth")).not.toBe(
+      guard.generateKey(ctx, "10.0.0.1", "login"),
+    );
+    expect(guard.generateKey(ctx, "10.0.0.1", "auth")).not.toBe(
+      guard.generateKey(ctx, "10.0.0.2", "auth"),
+    );
   });
 });

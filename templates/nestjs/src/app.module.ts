@@ -5,6 +5,7 @@ import { AppConfigModule } from "@/config/config.module";
 import { DatabaseModule } from "@/database/database.module";
 import { AuthModule } from "@/modules/auth/auth.module";
 import { HealthModule } from "@/modules/health/health.module";
+import { NotFoundModule } from "@/modules/not-found/not-found.module";
 import { RealtimeModule } from "@/modules/realtime/realtime.module";
 import { UserModule } from "@/modules/user/user.module";
 import { RedisModule } from "@/redis/redis.module";
@@ -33,6 +34,10 @@ import { APP_GUARD } from "@nestjs/core";
     RealtimeModule,
     // Registers ThrottlerModule + AppThrottlerGuard as APP_GUARD.
     ThrottlerConfigModule,
+    // Catch-all 404 behind HMAC. MUST stay the LAST entry: its `{*path}` route matches
+    // everything, so any module imported after it gets all its routes answered 404.
+    // A unit test pins this; add new feature modules ABOVE this line.
+    NotFoundModule,
   ],
   providers: [
     // Composite security guard: HMAC → origin/CSRF → JWT → roles.

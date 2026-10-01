@@ -95,6 +95,16 @@ afterAll(async () => {
 
 // ── tests ──────────────────────────────────────────────────────────────────
 
+describe("GET /users/:id — unauthenticated", () => {
+  it("returns 401 for a malformed id, not a 400 validation error", async () => {
+    const h = buildHmacHeaders("GET", "/users/bad");
+    const res = await req.get("/api/v1/users/bad").set("sig", h.sig).set("ctime", h.ctime);
+
+    expect(res.status).toBe(401);
+    expect(res.body.errorType).toBe("AUTHENTICATION_ERROR");
+  });
+});
+
 describe("GET /users — role=user (403)", () => {
   it("returns 403 AUTHORIZATION_ERROR for regular user", async () => {
     const res = await signedGetAuthed("/users", userToken);
@@ -169,6 +179,7 @@ describe("GET /users/:id — admin access", () => {
     const res = await signedGetAuthed(`/users/${fakeId}`, adminToken);
     expect(res.status).toBe(404);
     expect(res.body.errorType).toBe("NOT_FOUND");
+    expect(res.body.message).toBe("User not found!");
   });
 
   it("returns 403 for regular user trying to access by id", async () => {

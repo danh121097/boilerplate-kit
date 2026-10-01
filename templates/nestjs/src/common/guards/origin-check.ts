@@ -21,6 +21,12 @@ function resolveOrigin(req: Request): string | undefined {
 /**
  * Origin/CSRF check: when enableCsrf is on, every non-safe request must come from an
  * allow-listed origin (Origin header, else Referer). Throws 403 otherwise.
+ *
+ * Exemption: a request carrying no Cookie, no Origin and no Referer header has no
+ * ambient credentials to forge, so it passes (native/non-browser clients). Browsers
+ * always send Origin on cross-site POSTs, so browser CSRF stays closed. Raw header
+ * presence is tested, not the parsed origin, so a malformed Referer is not mistaken
+ * for an absent one.
  */
 export function assertAllowedOrigin(
   req: Request,
@@ -28,6 +34,7 @@ export function assertAllowedOrigin(
 ): void {
   if (!config.enableCsrf) return;
   if (SAFE_METHODS.has(req.method)) return;
+  if (!req.headers.cookie && !req.headers.origin && !req.headers.referer) return;
 
   const origin = resolveOrigin(req);
   if (!origin || !config.corsOrigins.includes(origin)) {

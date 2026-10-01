@@ -19,14 +19,32 @@ describe("assertAllowedOrigin", () => {
   });
 
   it.each(["POST", "PUT", "PATCH", "DELETE", "PROPFIND"])(
-    "rejects %s without an allow-listed origin",
+    "rejects %s from a disallowed Origin",
     (method) => {
-      expect(() => assertAllowedOrigin(req(method), config)).toThrow(AppException);
       expect(() =>
         assertAllowedOrigin(req(method, { origin: "http://evil.example" }), config),
       ).toThrow(AppException);
     },
   );
+
+  it.each(["POST", "PUT", "PATCH", "DELETE", "PROPFIND"])(
+    "lets %s through when it carries no Cookie, Origin or Referer (native client)",
+    (method) => {
+      expect(() => assertAllowedOrigin(req(method), config)).not.toThrow();
+    },
+  );
+
+  it("rejects a non-safe method with a Cookie but no Origin or Referer", () => {
+    expect(() => assertAllowedOrigin(req("POST", { cookie: "refreshToken=abc" }), config)).toThrow(
+      AppException,
+    );
+  });
+
+  it("does not treat a malformed Referer as an absent one", () => {
+    expect(() => assertAllowedOrigin(req("POST", { referer: "not a url" }), config)).toThrow(
+      AppException,
+    );
+  });
 
   it("accepts a non-safe method from an allow-listed Origin or Referer", () => {
     expect(() =>
