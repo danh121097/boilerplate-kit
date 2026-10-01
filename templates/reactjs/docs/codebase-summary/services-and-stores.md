@@ -13,10 +13,10 @@ src/services/
 │   ├── refresh-token-manager.ts  # Single-flight + cross-tab (Web Lock) refresh, withSessionLock
 │   ├── session.ts          # Per-service epoch/logout-pending, onSessionEnded / endSession,
 │   │                       #   syncAuthAcrossTabs, redirectOnSessionExpired, safeRedirect
-│   ├── api-errors.ts       # toApiError, isRefreshRefused, refreshUnavailable, SessionEndedError…
+│   ├── api-errors.ts       # toApiError, isRefreshRefused, isSessionGoneError, refreshUnavailable, SessionEndedError…
 │   ├── app-prefix.ts       # getAppPrefix — storage key / lock-name prefix
 │   ├── auth-refresh-client.ts    # Bare axios refresh call (no interceptors), REFRESH_TIMEOUT_MS
-│   ├── auth-token-storage.ts     # Per-service localStorage token registry + onTokensChanged
+│   ├── auth-token-storage.ts     # Per-service localStorage token registry (unregistered service fails closed) + onTokensChanged
 │   ├── query-client.ts     # resetQueriesToSignedOut / resetQueriesOnSessionEnd / resyncQueriesAfterLogin
 │   ├── headers-utils.ts    # HeadersUtils.setAuthHeaders / addAuthorizationHeader
 │   ├── hmac-signature.ts   # HMACSignatureGenerator.signRequest / generateSignature, resolveContentType
@@ -29,9 +29,9 @@ src/services/
 │   └── index.ts
 ├── auth/
 │   ├── auth.ts             # AuthModel (getMe, getSession → AuthUser | null, logout, isLoggingOut, revokeSession) + useMeQuery, mutations
-│   ├── schema/login.ts  # loginSchema (zod; messages are i18n keys) + LoginFormValues
+│   ├── schema/login.ts  # loginSchema (zod; password min(1); messages are i18n keys) + LoginFormValues
 │   ├── data/mock-auth*.ts  # Dev-only mock auth adapter (VITE_AUTH_MOCK)
-│   ├── types/auth.ts       # AuthUser (= User), AuthResult, LoginPayload, RegisterPayload
+│   ├── types/auth.ts       # AuthUser (= User, full shape with Role), AuthResult, LoginPayload, RegisterPayload
 │   └── index.ts
 └── users/
     ├── users.ts            # UsersModel (list → PaginatedResponse<User>, get → User) + useUsersListQuery

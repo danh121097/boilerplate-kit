@@ -13,6 +13,11 @@ Both keys carry the app prefix (`${APP_PREFIX}_ACCESS_TOKEN`,
 collide. `getAppPrefix()` (`services/core/app-prefix.ts`) returns the prefix
 (`VITE_APP_NAME`, default `PRISM_APP`).
 
+A service that is not registered (`registerServiceToken`) fails closed: reads
+return `null`, `persistAccessToken` / `persistRefreshToken` throw, and clears
+remove nothing. Only `MAIN` is registered by default, so one service's request
+can never carry another's Bearer or refresh token.
+
 The backend rotates the pair on every refresh and also sets an httpOnly refresh
 cookie (`withCredentials: true` keeps it working). Keeping the refresh token in
 `localStorage` makes it readable by any XSS; if your threat model needs more,
@@ -20,7 +25,9 @@ drop it from storage and rely on the cookie alone.
 
 ## HMAC request signing
 
-Every request is signed when `VITE_HMAC_SECRET` is set.
+Every request is signed when `VITE_HMAC_SECRET` is set. The bundled backends
+require it, so with the mock off an empty secret makes every request 401; dev
+builds log one `console.warn` for that (never the secret).
 
 Canonical string (identical to backend `verifyHmac`):
 ```
@@ -59,11 +66,20 @@ The bare refresh client (`auth-refresh-client.ts`) signs its own request with
 including its JSON body's `application/json` Content-Type. Its timeout is
 `REFRESH_TIMEOUT_MS` (15 s).
 
-**HMAC here is anti-casual-abuse only, not authentication.** `VITE_*` variables
-are inlined into the bundle, so anyone can read the secret and sign requests.
-It stops drive-by scripts and naive replays, nothing more. Access control must
-rely on the JWT; if you need a real client-integrity guarantee, sign on a server
-you control (proxy) with a server-only secret.
+**HMAC is an anti-abuse / light-integrity layer, not a security boundary.**
+`VITE_*` variables are inlined into the bundle, so the secret is public and
+anyone can sign requests. The signature covers method, Content-Type, `ctime`
+and path only: no body hash and no nonce, so a captured request can be replayed
+within the backend's ±5 minute `ctime` window. It stops drive-by scripts, nothing
+more. Access control relies on the JWT; for a real client-integrity guarantee,
+sign on a server you control (proxy) with a server-only secret.
+
+A bad signature or a clock skew beyond the window comes back as `401` with
+`errorType: "HMAC_ERROR"` (`isHmacError`). That is not a session problem: the
+interceptor does not refresh or replay, the session is kept, and the boot read
+treats it as transient (retry banner). A refresh call rejected the same way
+rejects with a retryable error and keeps the tokens. Dev builds log a hint to
+check the device clock and that the secret matches the backend.
 
 ## Single-flight + cross-tab refresh
 
@@ -119,7 +135,7 @@ Implementation: `beforeLoad` in `routes/users.tsx` (protected, `staticData.requi
 
 ## Boot hydration
 
-`useAuthStore.hydrate()` restores the profile once on boot. A `401` ends the session
+`useAuthStore.hydrate()` restores the profile once on boot. A `401` or `404` ends the session
 as expired (normal logged-out flow). A network error, timeout or 5xx keeps the session
 and sets `hydrateError`, which shows the `session.unavailable` banner with a retry
 button (`retryHydrate()`); see [state-management](./state-management.md#session-state--auth-store).
@@ -160,21 +176,25 @@ without a response>, message, retryable? }`; `retryable` is set for no response,
 408, 429 and 5xx.
 
 These helpers live in `services/core/api-errors.ts` (`toApiError`,
-`isTransientHttpError`, `isUnauthorizedError`, `isRefreshRefused`,
+`isTransientHttpError`, `isUnauthorizedError`, `isSessionGoneError`, `isRefreshRefused`,
 `refreshUnavailable`, `getApiErrorMessage`, `SessionEndedError`).
 
-On boot, `hydrate()` signs out only when `/auth/me` ends in a 401, through
-`AuthModel.revokeSession(epoch)` (see below). A network error, 5xx or retryable
-refresh failure keeps the tokens — the session may still be valid.
-`useMeQuery` reads the same endpoint through `AuthModel.getSession()`, which
-revokes the same way and resolves `null` on a 401, and rejects on anything else.
+On boot, `hydrate()` signs out only when `/auth/me` ends in a 401 or a 404
+(`isSessionGoneError`), through `AuthModel.revokeSession(epoch)` (see below).
+The backend answers 404 "User not found!" for a deleted or deactivated account,
+which no retry fixes. Trade-off: it sends the same 404 for a wrong route, so a
+misconfigured `VITE_API_PREFIX` or gateway that 404s `/auth/me` also signs the
+user out. A network error, 5xx or retryable refresh failure keeps the tokens —
+the session may still be valid. `useMeQuery` reads the same endpoint through
+`AuthModel.getSession()`, which revokes the same way and resolves `null` on a
+401 or 404, and rejects on anything else.
 
 ## Two ways a session ends
 
 - `AuthModel.logout()` — only when the user signs out in this tab. Ends the
   session as `"logout"`: the login page gets no `redirect`.
 - `AuthModel.revokeSession(sinceEpoch?)` — the server rejected the session
-  outside a refused refresh (a 401 on the session read). When the epoch moved
+  outside a refused refresh (a 401 or 404 on the session read). When the epoch moved
   since `sinceEpoch` (the request started) it resolves `false` at once.
   Otherwise concurrent calls share one in-flight revoke — one POST, one event —
   which runs the same steps as logout below (best effort, never rejects), ends
@@ -286,8 +306,9 @@ and `mock-auth-responses.ts` (backend-shaped replies), plus
 - **Session.** Persisted exactly like the real mode: opaque
   `mock-access|…` / `mock-refresh|…` tokens go to the same localStorage slots,
   so a reload keeps the session, an invalid access token refreshes through the
-  mock, cross-tab sync and logout work. The token carries the user, so `me` and
-  `refresh` need no server state.
+  mock, cross-tab sync and logout work. The token carries the user (the full
+  `User` shape with a valid `Role`; anything else reads as signed out), so `me`
+  and `refresh` need no server state.
 - **Credentials.** One login pair, signed in as an `admin` so the built-in
   users screen works. `register` signs up any user, who stays signed in but
   cannot log in again (no user store) and is a plain `user`.

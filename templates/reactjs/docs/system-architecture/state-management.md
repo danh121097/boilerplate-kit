@@ -39,8 +39,8 @@ boot from the root layout:
 
 - No stored session → `hydrated: true`, signed out.
 - Profile loads → `user` set.
-- `401` (refused refresh) → the session is revoked and ends as expired: the normal
-  logged-out flow, **no** banner.
+- `401` or `404` on `/auth/me` (`isSessionGoneError`) → the session is revoked and ends
+  as expired: the normal logged-out flow, **no** banner.
 - Network error, timeout or 5xx → the stored session is kept, the user stays
   signed in and `hydrateError` is set. The root layout shows a `role="alert"`
   banner (`session.unavailable`) with a `session.retry` button that calls

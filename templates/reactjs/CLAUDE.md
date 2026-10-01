@@ -6,7 +6,8 @@ Guidance for Claude Code (and other coding agents) working in this repository.
 
 React 19 + TypeScript SPA starter — Vite, TanStack Router (file-based routes),
 TanStack React Query, Zustand, shadcn/ui + Tailwind v4, an axios service layer
-with JWT bearer + httpOnly refresh-token rotation + HMAC-signed requests,
+with JWT bearer + refresh-token rotation (refresh token in localStorage, sent in the
+request body) + HMAC-signed requests,
 react-i18next (en/ja). Package manager: **pnpm**.
 
 ## Start Here

@@ -11,7 +11,7 @@ React 19 + TypeScript SPA starter built with Vite. Production-grade structure mi
 | Routing       | TanStack Router (file-based)                                           |
 | Client state  | Zustand                                                                |
 | Server state  | TanStack React Query + `defineQuery`/`defineMutation` helpers          |
-| HTTP          | Axios + class-based `Api` + interceptors (JWT refresh, optional HMAC)  |
+| HTTP          | Axios + class-based `Api` + interceptors (JWT refresh, HMAC signing)  |
 | UI primitives | shadcn/ui (Radix) — `Button`, `Card`, `Input`, `FormField`, `Badge`, `Dialog` |
 | Styles        | Tailwind v4 (`@tailwindcss/vite`) with shadcn tokens                   |
 | Forms         | react-hook-form + zod via `@hookform/resolvers`                        |
@@ -53,11 +53,15 @@ Copy `.env.example` → `.env` and fill in the values.
 | `VITE_API_PREFIX`         | `/api/v1`               | API path prefix                                                          |
 | `VITE_APP_NAME`           | `PRISM_APP`             | Prefix for localStorage keys and lock names                              |
 | `VITE_LANGUAGE_CODE`      | `en`                    | Fallback locale when nothing is saved in `localStorage`                  |
-| `VITE_HMAC_SECRET`        | unset                   | Optional. Enables HMAC-signed requests; must match backend `HMAC_SECRET` |
+| `VITE_HMAC_SECRET`        | unset                   | Required by the bundled backends; must equal the backend `HMAC_SECRET`   |
 | `VITE_BUILD_VERSION`      | `1.0.0`                 | Optional. Sent as `x-version` when signing; injected by CI               |
 | `VITE_AUTH_MOCK`          | unset                   | Optional, dev only. `true` answers `/auth/*` and `/users` in the browser |
 | `VITE_AUTH_MOCK_EMAIL`    | `demo@example.com`      | Optional, dev only. Demo account email                                   |
 | `VITE_AUTH_MOCK_PASSWORD` | `password`              | Optional, dev only. Demo account password                                |
+
+Real backend checklist: `VITE_AUTH_MOCK` off, `VITE_APP_ENDPOINT` / `VITE_API_PREFIX` pointing at it,
+and `VITE_HMAC_SECRET` set to the backend's `HMAC_SECRET`. In dev, an empty secret with the mock off logs
+one `console.warn` ("all requests will 401").
 
 ## Structure
 
@@ -97,7 +101,7 @@ src/
 `src/services/core/` mirrors a production setup:
 
 - `Api` — class-based axios client with multi-service support, lazy interceptor registration and `get` / `paginate` / `cursorPaginate` / `post` / `put` / `patch` / `delete` helpers.
-- `ApiInterceptors` — request interceptor injects the bearer token + optional HMAC headers; response interceptor unwraps `{ success, data, ... }` envelopes and, on 401, refreshes once (single-flight, cross-tab locked) and replays; login/register/logout 401s are never refreshed, and a refused refresh routes to `/login` instead of reloading.
+- `ApiInterceptors` — request interceptor injects the bearer token + HMAC headers; response interceptor unwraps `{ success, data, ... }` envelopes and, on 401, refreshes once (single-flight, cross-tab locked) and replays; login/register/logout 401s are never refreshed, and a refused refresh routes to `/login` instead of reloading.
 - `HMACSignatureGenerator` — produces `sig` / `ctime` / `x-version` headers on HTTP requests, and `sig` / `ctime` on the socket handshake, only when `VITE_HMAC_SECRET` is set. The secret ships in the bundle, so this is anti-casual-abuse only, not authentication.
 - `Model` — base class for domain models; subclass and call `Model.setup({ path, service })`.
 - `defineQuery` / `defineMutation` — typed wrappers around TanStack React Query with a consistent error type.
@@ -118,7 +122,7 @@ export const useUsersListQuery = defineQuery<PaginatedResponse<User>>({
 
 Pages read `data.data` and render `users.empty` when the list is empty.
 
-Session restore: if reading the profile at boot fails for a reason other than a 401 (offline, timeout, 5xx), the session is kept, `useAuthStore` sets `hydrateError`, and the root layout shows a `role="alert"` banner (`session.unavailable`) with a `session.retry` button that calls `retryHydrate()`. A 401 is the normal logged-out flow and shows no banner.
+Session restore: if reading the profile at boot fails for a reason other than a 401 or 404 (offline, timeout, 5xx), the session is kept, `useAuthStore` sets `hydrateError`, and the root layout shows a `role="alert"` banner (`session.unavailable`) with a `session.retry` button that calls `retryHydrate()`. A 401 or 404 (the account is gone) is the normal logged-out flow and shows no banner.
 
 ## i18n
 

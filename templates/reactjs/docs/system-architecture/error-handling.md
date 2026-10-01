@@ -53,7 +53,7 @@ No global error boundary is wired by default. Add React's `<ErrorBoundary>` from
 
 `react-hook-form` + `zod` + `@hookform/resolvers` handle field-level errors.
 Schemas carry i18n keys as messages (`loginSchema` in `services/auth/schema/login.ts`:
-`validation.email`, `validation.password_min`); the page translates them with `t()`
+`validation.email`, `validation.password_required`; login only requires a non-empty password, the backend judges it); the page translates them with `t()`
 before passing them to `FormField`, which renders the message inline below the input
 and links it to the input with `aria-describedby`. Schema validation
 runs on submit (or on change if `mode: "onChange"` is passed).

@@ -21,7 +21,7 @@ const HANDSHAKE_REJECTED = "Unauthorized!";
 /**
  * Build the per-handshake `{ sig, ctime }` expected by HMAC-protected backends,
  * signed by the same generator as the HTTP requests. Empty when `VITE_HMAC_SECRET`
- * is not set — the server can then accept the bare bearer token alone (or reject).
+ * is not set — the bundled backends then reject the handshake.
  *
  * SECURITY: a `VITE_*` env var is exposed to every browser client. Production
  * deployments should sign on the server (a dedicated API route or a BFF
