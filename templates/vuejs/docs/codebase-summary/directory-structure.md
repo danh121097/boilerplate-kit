@@ -8,6 +8,7 @@ src/
 ├── main.ts                      App entry: initServices() → registerPlugins() → mount
 ├── App.vue                      Root layout: nav + <RouterView> + locale toggle
 ├── components/
+│   ├── mock-auth-badge.vue      "Mock auth" badge, dev only (imported outside production)
 │   ├── socket-status.vue        Header realtime dot; mounts useSocketIO while signed in
 │   └── ui/                      Auto-registered UI primitives (only this dir)
 │       ├── Button.vue           CVA-styled button
@@ -24,7 +25,7 @@ src/
 │   └── v-track.ts               Demo v-track click-tracking directive
 ├── enums/
 │   ├── index.ts                 Barrel
-│   ├── socket-events.ts         SOCKET_EVENT registry + unauthorized message
+│   ├── socket-events.ts         SOCKET_EVENT registry (authenticated, ping, disconnect, connect_error)
 │   └── storage-keys.ts          STORAGE_KEYS (app-prefixed localStorage keys)
 ├── i18n/
 │   └── locales/                 en.ts, ja.ts message catalogs
@@ -33,9 +34,11 @@ src/
 │   ├── i18n.ts                  vue-i18n instance + setLocale()
 │   ├── pinia.ts                 createPinia() instance
 │   ├── vue-query.ts             QueryClient + VueQueryPlugin setup
-│   └── directives.ts            Registers app.directive("track", ...)
+│   ├── directives.ts            Registers app.directive("track", ...)
+│   └── session-expiry.ts        Routes to /login?redirect=… when a session ends (needs pinia + router)
 ├── router/
-│   └── index.ts                 vue-router with lazy routes and a not-found catch-all
+│   ├── index.ts                 vue-router with lazy routes and a not-found catch-all
+│   └── auth-guard.ts            Global beforeEach: requiresAuth / guestOnly route meta
 ├── scss/
 │   ├── tailwind.css             Tailwind v4 entry + theme tokens
 │   └── main.scss                Global resets, safe-area vars, body styles
@@ -46,6 +49,7 @@ src/
 │   ├── auth/                    Auth model + mutations/queries + types
 │   └── users/                   Users model + query + types
 ├── stores/
+│   ├── auth.ts                  Session store: user, isAuthenticated, hydrate/retryHydrate
 │   ├── counter.ts               Demo Pinia store
 │   └── socket-io.ts             Holds the live Socket instance + auth flag
 ├── utils/

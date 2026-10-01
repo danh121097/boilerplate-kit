@@ -11,7 +11,7 @@ Opinionated Vue 3 starter built with Vite. Production-grade structure mirroring 
 | Routing       | Vue Router                                                                   |
 | Client state  | Pinia                                                                        |
 | Server state  | TanStack Vue Query + `defineQuery`/`defineMutation` helpers                  |
-| HTTP          | Axios + class-based `Api` + interceptors (optional HMAC signing)             |
+| HTTP          | Axios + class-based `Api` + interceptors (HMAC signing)                      |
 | UI primitives | Reka UI (headless)                                                           |
 | UI components | Pre-built `Button`, `Card`, `Input`, `Badge` with `class-variance-authority` |
 | Styles        | Tailwind v4 + SCSS (`@tailwindcss/vite`, `sass-embedded`)                    |
@@ -53,11 +53,13 @@ The first `pnpm dev` regenerates `auto-imports.d.ts` and `components.d.ts` — b
 | `VITE_APP_ENDPOINT`       | `http://localhost:3000` | Backend origin                                                                           |
 | `VITE_API_PREFIX`         | `/api/v1`               | API path prefix                                                                          |
 | `VITE_LANGUAGE_CODE`      | `en`                    | Fallback locale when nothing is saved in `localStorage`                                  |
-| `VITE_HMAC_SECRET`        | unset                   | Optional. Enables HMAC-signed requests; the secret ships in the bundle                   |
+| `VITE_HMAC_SECRET`        | unset                   | Required by the bundled backends; must equal the backend `HMAC_SECRET`. Ships in the bundle |
 | `VITE_BUILD_VERSION`      | `1.0.0`                 | Optional. Sent as `x-version` when signing                                               |
 | `VITE_AUTH_MOCK`          | unset                   | Optional, dev only. `true` answers `/auth/*` and `/users` in the browser                 |
 | `VITE_AUTH_MOCK_EMAIL`    | `demo@example.com`      | Optional, dev only. Demo account email                                                   |
 | `VITE_AUTH_MOCK_PASSWORD` | `password`              | Optional, dev only. Demo account password                                                |
+
+Real backend checklist: `VITE_AUTH_MOCK` off, `VITE_APP_ENDPOINT` / `VITE_API_PREFIX` pointing at it, and `VITE_HMAC_SECRET` equal to the backend `HMAC_SECRET`.
 
 ## Structure
 
@@ -75,8 +77,8 @@ src/
 ├── enums/                        # STORAGE_KEYS (prefixed by VITE_APP_NAME) + other shared enums
 ├── i18n/
 │   └── locales/                  # en.ts, ja.ts
-├── plugins/                      # pinia, vue-query, i18n, directives, index
-├── router/index.ts
+├── plugins/                      # pinia, vue-query, i18n, directives, session-expiry, index
+├── router/                       # index.ts (routes) + auth-guard.ts
 ├── scss/
 │   ├── tailwind.css              # @import "tailwindcss" + @theme tokens
 │   └── main.scss                 # project SCSS resets + safe-area vars
@@ -102,12 +104,12 @@ src/
 `src/services/core/` mirrors a production setup:
 
 - `Api` — class-based axios client with multi-service support (`MAIN` / `AUX`), lazy interceptor registration, in-flight request counter, and `get` / `paginate` / `cursorPaginate` / `post` / `put` / `patch` / `delete` helpers.
-- `ApiInterceptors` — request interceptor injects auth + optional HMAC headers; response interceptor unwraps `{ success, data, ... }` envelopes and, on 401, refreshes once (single-flight, cross-tab locked) and replays; login/register/logout 401s are never refreshed, and a refused refresh routes to `/login` instead of reloading.
-- `HMACSignatureGenerator` — produces `sig` / `ctime` / `x-version` headers on HTTP requests, and `sig` / `ctime` on the socket handshake, only when `VITE_HMAC_SECRET` is set. The secret ships in the bundle, so this is anti-casual-abuse only, not authentication. Safe to delete if your backend doesn't sign.
+- `ApiInterceptors` — request interceptor injects auth + HMAC headers; response interceptor unwraps `{ success, data, ... }` envelopes and, on 401, refreshes once (single-flight, cross-tab locked) and replays; login/register/logout 401s are never refreshed, and a refused refresh routes to `/login` instead of reloading.
+- `HMACSignatureGenerator` — produces `sig` / `ctime` / `x-version` headers on HTTP requests, and `sig` / `ctime` on the socket handshake, when `VITE_HMAC_SECRET` is set (the bundled backends require it; with it empty a dev build warns once and every request gets a 401). The secret ships in the bundle, so this is an anti-abuse / light-integrity layer, not authentication or a security boundary. Safe to delete if your backend doesn't sign.
 - `Model` — base class for domain models; subclass and call `Model.setup({ path, service })`.
 - `defineQuery` / `defineMutation` — typed wrappers around TanStack Vue Query with consistent error type.
 
-Example domain service in `src/services/users/users.ts`. `list` returns the backend's paginated envelope (`PaginatedResponse<User>`: `{ success, data, meta }`); `get` / `update` return the unwrapped `User`:
+Example domain service in `src/services/users/users.ts`. `list` returns the backend's paginated envelope (`PaginatedResponse<User>`: `{ success, data, meta }`); `get` returns the unwrapped `User`:
 
 ```ts
 export class UsersModel extends Model {
@@ -123,7 +125,7 @@ export const useUsersListQuery = defineQuery<PaginatedResponse<User>>({
 
 Pages read `data.data` and render `users.empty` when the list is empty.
 
-Session restore: if reading the profile at boot fails for a reason other than a 401 (offline, timeout, 5xx), the session is kept, `useAuthStore().hydrateError` is set, and `App.vue` shows a `role="alert"` banner (`session.unavailable`) with a `session.retry` button that calls `retryHydrate()`. A 401 is the normal logged-out flow and shows no banner.
+Session restore: if reading the profile at boot fails for a reason other than a 401 (offline, timeout, 5xx), the session is kept, `useAuthStore().hydrateError` is set, and `App.vue` shows a `role="alert"` banner (`session.unavailable`) with a `session.retry` button that calls `retryHydrate()`. A 401 (or a 404 on the profile read: the account was deleted) is the normal logged-out flow and shows no banner.
 
 ## i18n
 
@@ -131,7 +133,7 @@ Locale stored in `localStorage.language` (access is wrapped in try/catch), falli
 
 ## Forms
 
-`vee-validate` + `zod` via `@vee-validate/zod`. See `views/login-view.vue` and `views/form-view.vue` for the canonical pattern (`useForm`, `defineField`, `toTypedSchema`). The shared schema in `services/auth/schema/login.ts` carries i18n keys as messages; `VeeInput` translates them when rendering, so errors follow a locale switch.
+`vee-validate` + `zod` via `@vee-validate/zod`. See `views/login-view.vue` and `views/form-view.vue` for the canonical pattern (`useForm`, `defineField`, `toTypedSchema`). The login schema in `services/auth/schema/login.ts` only requires an email and a non-empty password (the backend owns the strength rule, so a legacy short password can still sign in); it carries i18n keys as messages and `VeeInput` translates them when rendering, so errors follow a locale switch.
 
 ## UI components
 
@@ -150,7 +152,7 @@ Want more? Run `npx shadcn-vue@latest add <component>` — `components.json` is 
 ## Routes
 
 - `/` — Reka UI dialog demo
-- `/counter` — Pinia store demo (`useCounterStore` auto-imported)
+- `/counter` — Pinia store demo (`useCounterStore`, imported explicitly)
 - `/users` — protected; TanStack Query demo via `UsersModel.list()` + `Badge`, with an empty state
 - `/form` — vee-validate + zod demo with the `Button` + `Input` + `Card` + `Badge` components
 - `/login` — guests only; vee-validate + zod, server error shown in a `role="alert"` element

@@ -12,6 +12,8 @@ interface ApiResponseError {
   message: string;
   error_code: number;
   error_message: string;
+  errorType?: string;   // backend category, e.g. "HMAC_ERROR"
+  retryable?: boolean;  // transient failure: session kept, a retry may succeed
   data?: Record<string, unknown>;
 }
 ```
@@ -53,7 +55,8 @@ Two doors lead to the same recovery logic:
 1. **HTTP 401** — caught in `onError` (`error.response?.status === 401`).
 2. **Envelope-level 401** — `body.error_code === 401` inside a 2xx body.
 
-Both call `refreshAndRetry`. If eligible (a session is stored, not the refresh
+Both call `refreshAndRetry`. A 401 whose `errorType` is `HMAC_ERROR` is skipped
+entirely (see below). If eligible (a session is stored, not the refresh
 endpoint or a `skipPaths` entry such as login, not already replayed) the request
 is refreshed and replayed; otherwise the 401 rejects as-is and nothing is
 cleared (a login 401 is a wrong password). Only the refresh call decides that a
@@ -82,6 +85,19 @@ return Promise.reject(toApiError(error));
 with the HTTP status in `error_code` (`0` when there is no response), so callers
 can tell a rejected session (`isUnauthorizedError` → 401) from an outage.
 
+Two refinements, both in `api-errors.ts`:
+
+- `isHmacError` — an `errorType: "HMAC_ERROR"` 401 (bad signature or clock skew)
+  is **not** a session problem. `isUnauthorizedError` and `isRefreshRefused` are
+  false for it: no refresh, no replay, the session is kept (a dev build logs a
+  hint to check the device clock and `VITE_HMAC_SECRET`).
+- `isSessionGoneError` — for the `/auth/me` read only (`AuthModel.getSession`,
+  `hydrate`): a 401 **or a 404** (the account behind the token was deleted) ends
+  the session. Network errors, timeouts and 5xx stay transient (`hydrateError`
+  and the retry banner). Trade-off: the backend sends the same `NOT_FOUND` for a
+  deleted user and for a wrong route, so a misconfigured `VITE_API_PREFIX` or
+  gateway that 404s `/auth/me` also signs the user out.
+
 ## Blob Errors
 
 Binary downloads (`responseType: "blob"`) can't carry a JSON envelope, so they are
@@ -108,9 +124,11 @@ every other error uses, instead of handing back an unreadable error blob.
 
 | Failure | Where | Result |
 | --- | --- | --- |
-| Envelope `status: "error"` | `onSuccess` | reject with the envelope as `ApiResponseError` |
+| Envelope `success: false` | `onSuccess` | reject with the envelope as `ApiResponseError` |
 | Envelope/HTTP 401 (eligible) | `onSuccess`/`onError` | refresh + replay |
 | Envelope/HTTP 401 (ineligible: credential call, anonymous, replayed, no refresh config) | `onSuccess`/`onError` | reject as-is (no refresh, session kept) |
+| `HMAC_ERROR` 401 | `refreshAndRetry` | no refresh, no replay; reject as-is, session kept (dev hint logged) |
+| `/auth/me` 401 or 404 | `AuthModel.getSession` / `hydrate` | `revokeSession`, signed out (`isSessionGoneError`) |
 | Refresh refused (401/403) | `RefreshTokenManager` | clear tokens; `endSession("expired")` → `/login`; reject the original 401 |
 | Refresh failed otherwise (network, timeout, 400, 408, 429, 5xx, malformed body) | `refreshAndRetry` | reject `refreshUnavailable` (`retryable: true`); session kept |
 | Network / blocked | `onError` | log; reject `{ message, error_code: 0 }` |

@@ -16,7 +16,8 @@ patterns present in the template — not features that don't exist.
   `disabled:pointer-events-none` so disabled controls are not interactive.
 - **Icon labeling**: decorative icons are marked `aria-hidden` (e.g. the Button
   spinner); the password toggle button has `aria-label` from the `input.toggle_password` locale key.
-- **Validation messages**: the login schema (`services/auth/schema/login.ts`)
+- **Validation messages**: the login schema (`services/auth/schema/login.ts`: valid
+  email, non-empty password)
   carries i18n keys; `VeeInput` translates them at render, so a locale switch
   updates visible errors.
 - **Keyboard-neutral affordances**: in-field affordances (password toggle, clear,

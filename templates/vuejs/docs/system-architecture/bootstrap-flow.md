@@ -28,25 +28,27 @@ fires a request.
 ## Phase 1 — `initServices()` (`src/services/init-services.ts`)
 
 Declares every backend in one `SERVICES` table. For each entry with a non-empty
-base URL it: sets the base URL, registers the localStorage token slot, and (if a
-`refresh` block is present) opts that service into auto-refresh.
+base URL it: sets the base URL, registers the localStorage token slots (`tokenKeys`: one for the access
+token, one for the refresh token), and (if a `refresh` block is present) opts that
+service into auto-refresh.
 
 ```ts
 const SERVICES = [
   {
     name: "MAIN",
     baseURL: getApiBaseUrl(), // VITE_APP_ENDPOINT + /api/v1
-    tokenKey: STORAGE_KEYS.AUTH_TOKEN,
-    refresh: { endpoint: "/auth/refresh" },
+    tokenKeys: { access: STORAGE_KEYS.ACCESS_TOKEN, refresh: STORAGE_KEYS.REFRESH_TOKEN },
+    refresh: { endpoint: authContract.paths.refresh, skipPaths: [/* login, register, logout */] },
   },
 ];
 
 export function initServices(): void {
+  getMockAuth();                                      // dev-only mock auth: one boot warning
   const refreshByService: Record<string, ServiceRefreshConfig> = {};
   for (const svc of SERVICES) {
     if (!svc.baseURL) continue;                       // empty URL = dormant service
     Api.setBaseURL(svc.baseURL, svc.name);
-    registerServiceToken(svc.name, svc.tokenKey);
+    registerServiceToken(svc.name, svc.tokenKeys);
     if (svc.refresh) refreshByService[svc.name] = svc.refresh;
   }
   Api.registerInterceptors(new ApiInterceptors(refreshByService));
@@ -70,6 +72,7 @@ export function registerPlugins(app: App) {
   app.use(router);        // vue-router, createWebHistory, lazy route components
   setupVueQuery(app);     // TanStack Vue Query plugin + shared QueryClient
   registerDirectives(app);// custom directives, e.g. v-track
+  setupSessionExpiry(router, pinia); // session end → /login?redirect=…
 }
 ```
 
@@ -77,9 +80,10 @@ export function registerPlugins(app: App) {
 | --- | --- | --- |
 | i18n | `plugins/i18n.ts` | `createI18n` (Composition mode, `legacy: false`), `en`/`ja` messages, fallback `en`. Locale persisted to `STORAGE_KEYS.LANGUAGE` via `setLocale`. |
 | pinia | `plugins/pinia.ts` | A single `createPinia()` instance for all stores. |
-| router | `router/index.ts` | `createWebHistory` SPA routing; home/counter/users/form/login routes are lazy `import()`s; `/:pathMatch(.*)*` renders `not-found-view.vue`. |
+| router | `router/index.ts` | `createWebHistory` SPA routing; home/counter/users/form/login routes are lazy `import()`s; `/:pathMatch(.*)*` renders `not-found-view.vue`; `router/auth-guard.ts` gates `requiresAuth` / `guestOnly` routes. |
 | vue-query | `plugins/vue-query.ts` | One `QueryClient` (`retry: false`, `refetchOnWindowFocus: true`, `staleTime: 60_000`, `keepPreviousData`); exported for direct use. |
 | directives | `plugins/directives.ts` | Registers app-wide directives (`v-track` from `@/directives`). |
+| session-expiry | `plugins/session-expiry.ts` | After pinia and the router are installed: sends the user to `/login?redirect=<current path>` when a session expires. |
 
 ## Mount
 
@@ -96,6 +100,7 @@ main.ts
   ├─ createApp(App)
   ├─ registerPlugins(app)
   │     ├─ installI18n      ├─ pinia   ├─ router
-  │     ├─ setupVueQuery    └─ registerDirectives
+  │     ├─ setupVueQuery    ├─ registerDirectives
+  │     └─ setupSessionExpiry
   └─ app.mount("#app")
 ```

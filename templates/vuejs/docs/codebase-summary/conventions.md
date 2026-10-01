@@ -36,15 +36,16 @@ rather than one large file.
 Constant maps with `as const` plus a derived union type, referenced instead of
 string literals so names stay consistent across the codebase.
 
-- `socket-events.ts` — `SOCKET_EVENT` (e.g. `AUTHENTICATED`, `UNAUTHORIZED`,
-  `CONNECT_ERROR`, `DISCONNECT`) + `SocketEvent` type.
-- `storage-keys.ts` — `STORAGE_KEYS` (`AUTH_TOKEN`, `LANGUAGE`, `THEME`) prefixed
-  by `VITE_APP_NAME`, so one rename ripples cleanly:
+- `socket-events.ts` — `SOCKET_EVENT` (`AUTHENTICATED`, `PING`, `DISCONNECT`,
+  `CONNECT_ERROR`) + `SocketEvent` type.
+- `storage-keys.ts` — `STORAGE_KEYS` (`ACCESS_TOKEN`, `REFRESH_TOKEN`, `LANGUAGE`,
+  `THEME`) prefixed by `VITE_APP_NAME`, so one rename ripples cleanly:
 
 ```ts
-const APP_PREFIX = import.meta.env.VITE_APP_NAME || "PRISM_APP";
+export const APP_PREFIX = import.meta.env.VITE_APP_NAME || "PRISM_APP";
 export const STORAGE_KEYS = {
-  AUTH_TOKEN: `${APP_PREFIX}_AUTH_TOKEN`,
+  ACCESS_TOKEN: `${APP_PREFIX}_ACCESS_TOKEN`,
+  REFRESH_TOKEN: `${APP_PREFIX}_REFRESH_TOKEN`,
   // ...
 } as const;
 ```

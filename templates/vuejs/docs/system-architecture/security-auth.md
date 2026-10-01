@@ -30,6 +30,12 @@ clearAuthTokens()             // drop EVERY registered service's pair (logout)
 onTokensChanged(listener)     // localStorage is not reactive — writers notify here
 ```
 
+A service must be registered (`registerServiceToken`, called by `initServices()`
+for every row of `SERVICES`) before it has slots. An unregistered service **fails
+closed** and never falls back to the MAIN slots: reads return `null` (so no
+Bearer or refresh token is sent), `persistAccessToken` / `persistRefreshToken`
+throw, and the clears remove nothing.
+
 The auth store mirrors token presence into a `hasToken` ref through
 `onTokensChanged`, so `isAuthenticated` updates on login, refresh, logout and
 interceptor-driven clears. Cross-tab sync goes through
@@ -54,8 +60,12 @@ call and persists nothing if it changed meanwhile — see
 
 ## HMAC Request Signing (`hmac-signature.ts`)
 
-Active only when `VITE_HMAC_SECRET` is set; otherwise `generateSignature` returns
-`null` and signing is skipped entirely.
+The bundled backends require a signature on every request, and `VITE_HMAC_SECRET`
+must equal the backend `HMAC_SECRET`. With the secret empty `generateSignature`
+returns `null` and nothing is signed, so every request gets a 401: a dev build
+logs `VITE_HMAC_SECRET is empty; the backend requires it, all requests will 401.`
+once (not when mock auth is on, never in a production build, and the secret is
+never printed).
 
 ```ts
 // generateSignature(config) — the axios adapter
@@ -100,11 +110,21 @@ Attached on the request interceptor via `HeadersUtils.setAuthHeaders`. The
 Socket.IO handshake signs the same way over `GET /socket` (see
 [Networking & Realtime](./networking-realtime.md)).
 
-> **Security note:** a `VITE_*` value is compiled into the bundle and shipped to
-> every browser, so the client HMAC is an **anti-casual-abuse** measure (it stops
-> naive scripted calls and replay after 5 minutes), **not** authentication and not
-> a secret. Anyone can read it from the JS. Authorization must rest on the
-> tokens; if the signature must be unforgeable, sign server-side (BFF/proxy).
+> **Security note:** HMAC here is an anti-abuse / light-integrity layer, **not** a
+> security boundary. A `VITE_*` value is compiled into the bundle and shipped to
+> every browser, so the secret is public: anyone can read it from the JS and
+> sign requests. The signature covers the method, content type, timestamp and
+> path only: no body hash and no nonce, so a request can be replayed inside the
+> backend's 5-minute window (`ctime` within ±5 minutes of the server clock).
+> Authorization rests on the tokens; if the signature must be unforgeable, sign
+> server-side (BFF/proxy).
+>
+> **`HMAC_ERROR`.** The backend answers a bad signature or a `ctime` outside the
+> window (a skewed device clock) with a 401 whose `errorType` is `HMAC_ERROR`.
+> The client treats it as neither a rejected session nor an expired token: it
+> does not refresh, replay or sign out (`isHmacError`), keeps the session, and a
+> dev build logs a hint to check the clock and the secret. Boot hydration then
+> shows the retryable "session unavailable" banner instead of a login screen.
 
 ## The Refresh Flow
 
@@ -253,12 +273,13 @@ Implementation: `router/auth-guard.ts` (`authGuard`, a global `beforeEach`) read
 ## Boot Hydration and Logout (`stores/auth.ts`)
 
 - `hydrate()` resolves the profile when a token is stored. On a 401 (after the
-  refresh attempt) it calls `AuthModel.revokeSession(sinceEpoch)` and resets
-  local state (see "Revoking a rejected session" below). A network error, timeout or 5xx keeps the tokens and sets
+  refresh attempt) or a 404 (`isSessionGoneError`: the account was deleted; see
+  [Error Handling](./error-handling.md)) it calls `AuthModel.revokeSession(sinceEpoch)` and resets
+  local state (see "Revoking a rejected session" below). A network error, timeout, 5xx or `HMAC_ERROR` keeps the tokens and sets
   `hydrateError` (`retryable: true`); `App.vue` shows a `role="alert"` banner
   (`session.unavailable`) with a `session.retry` button that calls
   `retryHydrate()`, and the banner disappears once the restore succeeds. A 401
-  never sets `hydrateError`: it is the normal logged-out flow.
+  or 404 never sets `hydrateError`: it is the normal logged-out flow.
 - Logout is `useLogoutMutation` in `App.vue` (the button is disabled while it is
   pending). `AuthModel.logout()` posts `{ refreshToken }` to `/auth/logout` (so
   the backend revokes it), clears tokens and ends the session as `"logout"`,
@@ -286,8 +307,9 @@ Implementation: `router/auth-guard.ts` (`authGuard`, a global `beforeEach`) read
 ### Revoking a rejected session
 
 `AuthModel.revokeSession(sinceEpoch?): Promise<boolean>` handles a session the
-server rejects outside a refused refresh — a 401 on the session read (`hydrate`,
-or `getSession` behind `useMeQuery`) that survived a successful refresh. It
+server rejects outside a refused refresh — a 401 or 404 on the session read
+(`hydrate`, or `getSession` behind `useMeQuery`; a 401 only after it survived a
+successful refresh). It
 shares `logout`'s internals (the private `endServerSession(reason,
 sinceEpoch?)`: token capture, lock, epoch bump, `POST /auth/logout`, clear) but
 ends the session as `"expired"`, so the expiry redirect keeps a return path.

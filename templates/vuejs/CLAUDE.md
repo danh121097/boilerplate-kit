@@ -5,8 +5,8 @@ Guidance for Claude Code (and other coding agents) working in this repository.
 ## Project Overview
 
 Vue 3.5 + TypeScript SPA starter — Vite 8, Pinia, TanStack Vue Query, Reka UI +
-Tailwind v4, an axios service layer with JWT bearer + httpOnly refresh-token
-rotation + HMAC-signed requests, Socket.IO, and vue-i18n. Package manager: **pnpm**.
+Tailwind v4, an axios service layer with JWT bearer + refresh-token rotation
+(refresh token in localStorage, sent in the body) + HMAC-signed requests, Socket.IO, and vue-i18n. Package manager: **pnpm**.
 
 ## Start Here
 

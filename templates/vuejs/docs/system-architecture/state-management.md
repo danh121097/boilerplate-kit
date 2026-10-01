@@ -11,7 +11,12 @@ A single `QueryClient` is created in `plugins/vue-query.ts` and installed app-wi
 ```ts
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { retry: false, refetchOnWindowFocus: true, placeholderData: keepPreviousData },
+    queries: {
+      retry: false,
+      refetchOnWindowFocus: true,
+      staleTime: 60_000,
+      placeholderData: keepPreviousData,
+    },
   },
 });
 ```
@@ -49,24 +54,22 @@ export const useLoginMutation = defineMutation<AuthResult, LoginPayload>({
 ```
 
 - `mutator` performs the write; `mutationKey` is `[key]`.
-- Optional `invalidates: string[]` — on success the wrapper invalidates each
-  listed key via the shared `queryClient`:
+- Optional `invalidates: (string | QueryKey)[]` — a string is a key prefix, an
+  array targets exactly that key. The wrapper invalidates each entry through the
+  mutation's `QueryClient` (`tanstack-mutation.ts`) and awaits it before the
+  success callbacks:
 
 ```ts
-onSuccess: async (...args) => {
-  if (queryClient && config.invalidates) {
-    await Promise.all(config.invalidates.map(
-      (k) => queryClient.invalidateQueries({ queryKey: [k] }),
-    ));
-  }
-  await options?.onSuccess?.(...args);     // definition-level hook
-  await overrides.onSuccess?.(...args);    // per-call hook
-};
+await Promise.all(
+  (config.invalidates ?? []).map((key) =>
+    client.invalidateQueries({ queryKey: typeof key === "string" ? [key] : key }),
+  ),
+);
+// then the definition-level hook, then the per-call hook
 ```
 
 So a mutation that edits a user can declare `invalidates: ["users.list"]` and the
-list refetches automatically. `useQueryClient()` is only pulled in when there is
-something to invalidate.
+list refetches automatically.
 
 ### Key Conventions
 
@@ -79,6 +82,11 @@ Keys are dotted namespaces matching the domain: `auth.login`, `auth.register`,
 A single `createPinia()` (`plugins/pinia.ts`) backs all stores. Stores use the
 setup syntax and are imported **explicitly** (never auto-imported) per project
 convention: `import { useSocketIOStore } from "@/stores/socket-io"`.
+
+### Session Store (`stores/auth.ts`)
+
+`useAuthStore` holds the signed-in `user`, `isAuthenticated`, `hydrate()` /
+`retryHydrate()` and `hydrateError`; see [Security & Auth](./security-auth.md).
 
 ### Example — Socket Store (`stores/socket-io.ts`)
 
@@ -102,4 +110,4 @@ whole app reuses one connection (see
 | --- | --- |
 | Anything fetched from a backend | TanStack Vue Query (`defineQuery`/`defineMutation`) |
 | The live socket, auth/session UI flags, transient UI state | Pinia store |
-| Locale / theme / auth-token persistence | localStorage via `STORAGE_KEYS` helpers |
+| Locale / theme / auth-token persistence | localStorage via `STORAGE_KEYS` |
