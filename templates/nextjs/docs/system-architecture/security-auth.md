@@ -118,7 +118,7 @@ server (only `/users` prefetches, via `HydratedQueries`). A 401 or 404
 (`isSessionGoneError`) ends the session; a network error, timeout, 5xx or
 `HMAC_ERROR` keeps the hint and surfaces a retryable error. Express answers a
 deleted user and an unknown route with the same `NOT_FOUND`, so a misrouted API
-prefix or a gateway 404 also signs the user out.
+prefix or a gateway 404 also signs the user out. The session end also posts `/auth/logout`, which revokes the user's access tokens on every device (Redis on), so that misconfiguration can sign the user out elsewhere too.
 
 ## Session Hint
 
