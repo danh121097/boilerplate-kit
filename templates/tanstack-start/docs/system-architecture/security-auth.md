@@ -19,7 +19,10 @@ request, no reload). Server functions read the same cookie.
 
 ## HMAC request signing
 
-Every request is signed when `VITE_HMAC_SECRET` is set.
+Every request is signed when `VITE_HMAC_SECRET` is set. The bundled backends
+require it, and it must equal the backend `HMAC_SECRET`. With an empty secret
+nothing is signed, every request is rejected, and dev builds log one
+`console.warn` (never the secret; skipped while mock auth is on).
 
 Canonical string (identical to backend `verifyHmac`):
 ```
@@ -50,11 +53,22 @@ core. The bare refresh client (`auth-refresh-client.ts`) signs through it itself
 so it signs an empty Content-Type. `src/server/server-api.ts` signs its SSR
 fetches through it too.
 
-**HMAC here is anti-casual-abuse only, not authentication.** `VITE_*` variables
-are inlined into the client bundle, so anyone can read the secret and sign
-requests. It stops drive-by scripts and naive replays, nothing more. Access
-control relies on the JWT cookies; for a real integrity guarantee, sign in a
-server function with a server-only secret.
+**HMAC here is anti-abuse and light integrity, not a security boundary.**
+`VITE_*` variables are inlined into the client bundle, so the secret ships
+publicly to the browser and anyone can sign requests. The signature covers
+method, content type, time and path only: no body hash and no nonce, and the
+backend accepts a ±5 minute window of `ctime`, so a captured request can be
+replayed within it. It stops drive-by scripts, nothing more. Access control
+relies on the JWT cookies; for a real integrity guarantee, sign in a server
+function with a server-only secret.
+
+A 401 with `errorType: "HMAC_ERROR"` means the signature was rejected (wrong
+secret or clock skew), not that the session is bad. The session is kept and no
+refresh is attempted (`isHmacError`); the error is `retryable: true`. In SSR,
+`server-api.ts` returns `ServerUnauthorized` with `hmacRejected: true`, logs one
+server-side warning per process, and `withSessionRefresh` rejects with a
+`retryable` `HMAC_ERROR` instead of refreshing, which shows the
+session-unavailable banner.
 
 ## Single-flight + cross-tab refresh
 
@@ -137,8 +151,21 @@ Implementation: `services/core/route-guard.ts` (`requireSession`, `redirectIfSig
 ## Boot
 
 `auth.me` is read on boot (server function during SSR, then axios in the
-browser). Only a 401 ends the session; a network error or 5xx keeps the hint and
-surfaces a retryable error.
+browser). `isSessionGoneError` decides: a 401 or a 404 (the account was deleted)
+means signed out; a network error or 5xx keeps the hint and surfaces a retryable
+error. Trade-off: a 404 from a wrong `VITE_API_PREFIX` or a gateway also signs
+the user out.
+
+`AuthUser` is the `User` type (`services/users/types/user.ts`), with
+`Role = "user" | "admin" | "super_admin"`.
+
+## Tokens in the response body
+
+In cookie mode the backend still returns `accessToken` and `refreshToken` in the
+JSON body of login, register and refresh. The client ignores them, but script
+running in the page (XSS) can call `POST /auth/refresh` with the cookies and read
+a fresh refresh token from the response. This is an accepted risk; the mitigation
+(an opt-in backend setting that omits tokens from the body) is a backlog item.
 
 ## Revoking a rejected session
 

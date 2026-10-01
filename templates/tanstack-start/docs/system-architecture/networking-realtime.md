@@ -54,7 +54,18 @@ export const useUsersListQuery = defineQuery<PaginatedResponse<User>>({
 `useSocketIO` (`src/hooks/useSocketIO.ts`) signs the handshake with the core
 `HMACSignatureGenerator.signRequest` (`GET /socket`), the same signer the axios
 interceptor uses, so there is one HMAC implementation. `socket.io-client` is
-imported lazily inside an effect, which keeps it out of the SSR bundle.
+imported lazily inside an effect, which keeps it out of the SSR bundle. The
+client connects to the bare backend origin (`getApiOrigin()`).
+
+### Handshake auth
+
+`auth` is a callback, so every connect and reconnect attempt signs a fresh
+`ctime` and `sig` (a stale `ctime` would fall outside the backend's window). The
+payload is only `{ sig, ctime }`: no `role`, and no `token`, because in cookie
+mode the httpOnly `accessToken` cookie travels with the handshake
+(`withCredentials: true`). With an empty `VITE_HMAC_SECRET` the payload is `{}`.
+The server events used are `authenticated`, `connect_error` and `disconnect`
+(`SOCKET_EVENT`); the old `unauthorized` and `notification` events no longer exist.
 
 ### Connection state
 
@@ -70,16 +81,23 @@ with a `connect_error` message `Unauthorized!`.
 
 - If `socket.active` is `true`, socket.io is already reconnecting (network error,
   server down) and nothing extra is scheduled.
-- If `socket.active` is `false`, the handshake was rejected: one manual retry is
-  scheduled (errors while it is pending do not reschedule) after
+- If `socket.active` is `false` and the message is `Unauthorized!`, the access
+  cookie is probably expired: the hook calls `refreshSession()` once, then
+  `connect()` on the same socket with a freshly signed handshake. A refused
+  refresh (or a session already ended) disconnects and stops; a transient refresh
+  failure falls back to the backoff below.
+- At most `MAX_REFRESH_ATTEMPTS = 3` refreshes run per outage (the counter resets
+  when `authenticated` arrives). After that, and for any other rejection, one
+  manual retry is scheduled (errors while it is pending do not reschedule) after
   `Math.min(RECONNECT_BASE_MS * 2 ** attempt, RECONNECT_MAX_MS)` with
   `RECONNECT_BASE_MS = 2000` and `RECONNECT_MAX_MS = 30_000`, so 2 s, 4 s, 8 s,
-  16 s, 30 s, 30 s, and so on. The retry rebuilds `socket.auth` (fresh HMAC `sig` and
-  `ctime`) and calls `connect()` on the same socket.
+  16 s, 30 s, 30 s, and so on. Each retry signs a fresh `sig` and `ctime`.
 - A `disconnect` with reason `io server disconnect` (the server closed the socket, e.g. a graceful restart; socket.io does not reconnect on its own) schedules the same retry.
 - `attempt` resets to 0 when `authenticated` arrives.
-- A server `unauthorized` event destroys the socket. Unmounting clears a pending
-  retry, and nothing connects afterwards.
+- Unmounting (or `destroySocket`) clears a pending retry and cancels an in-flight
+  refresh, and nothing connects afterwards.
+- Residual: once the refresh budget is spent, an idle socket keeps retrying with
+  backoff but is rejected until an HTTP call refreshes the access token.
 
 ### Lifecycle and header status
 

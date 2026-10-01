@@ -107,7 +107,7 @@ All env vars use the `VITE_` prefix (TanStack Start uses Vite internally):
 VITE_APP_ENDPOINT    — backend origin (getApiBaseUrl appends /api/v1; Socket.IO uses it bare)
 VITE_APP_NAME        — localStorage key prefix
 VITE_LANGUAGE_CODE   — default locale
-VITE_HMAC_SECRET     — HMAC signing secret (client-readable, soft layer)
+VITE_HMAC_SECRET     — HMAC secret; required by the bundled backends, must equal backend HMAC_SECRET (client-readable, not a security boundary)
 VITE_BUILD_VERSION   — injected by CI for x-version header
 VITE_AUTH_MOCK       — dev only: `true`/`1` answers `/auth/*` and `/users` (browser and SSR); ignored in production builds
 VITE_AUTH_MOCK_EMAIL / VITE_AUTH_MOCK_PASSWORD — mock login credentials (default demo@example.com / password)

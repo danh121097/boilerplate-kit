@@ -89,10 +89,13 @@ The `useTranslation()` hook re-renders components reactively on language change.
 ## Storage keys
 
 `STORAGE_KEYS` in `src/enums/storage-keys.ts` is the single source of truth for
-all `localStorage` keys, prefixed with `VITE_APP_NAME` to prevent collisions:
+the cookie and `localStorage` keys, prefixed with `VITE_APP_NAME` to prevent collisions:
 
 ```ts
-AUTH_TOKEN: `${APP_PREFIX}_AUTH_TOKEN`
-LANGUAGE:   `${APP_PREFIX}_LANGUAGE`
-THEME:      `${APP_PREFIX}_THEME`
+LANGUAGE:  `${APP_PREFIX}_LANGUAGE`   // cookie
+THEME:     `${APP_PREFIX}_THEME`      // cookie (reserved)
+SESSION:   `${APP_PREFIX}_SESSION`    // readable session hint cookie
+AUTH_SYNC: `${APP_PREFIX}_AUTH_SYNC`  // localStorage, cross-tab login/logout
 ```
+
+No token is stored client-side: both live in httpOnly cookies.

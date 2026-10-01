@@ -33,9 +33,13 @@ the session: offline, timeout, 5xx, or a transient refresh failure. Those errors
 carry `retryable: true` (`isSessionUnavailable(error)`, `services/auth/session.ts`).
 The user keeps their current state and the root layout shows a banner
 (`role="alert"`, `session.unavailable`) with a `session.retry` button that
-refetches the session query; the banner disappears once it succeeds. A 401 or a
-refused refresh is not this case: `fetchSession` resolves it to signed out, so no
-banner shows and the normal logged-out flow runs.
+refetches the session query; the banner disappears once it succeeds. A 401, a 404
+(`isSessionGoneError`) or a refused refresh is not this case: `fetchSession`
+resolves it to signed out, so no banner shows and the normal logged-out flow runs.
+
+A 401 with `errorType: "HMAC_ERROR"` (bad secret or clock skew) is a rejected
+signature, not a judged session: it is `retryable: true`, keeps the session and
+never triggers a refresh. See [security-auth](./security-auth.md#hmac-request-signing).
 
 ## Not found
 
@@ -53,8 +57,9 @@ No global error boundary is wired by default. Add React's `<ErrorBoundary>` from
 `react-hook-form` + `zod` + `@hookform/resolvers` handle field-level errors.
 `FormField` renders the error inline below the input. The login and demo forms
 share `loginSchema` (`services/auth/schema/login.ts`): `email` must be a valid
-email and `password` at least 8 characters. Schema messages are i18n keys
-(`validation.email`, `validation.password_min`) translated where they render, and
+email and `password` non-empty. Strength rules belong on register, not login.
+Schema messages are i18n keys (`validation.email`,
+`validation.password_required`) translated where they render, and
 forms use `noValidate` so the browser's native message never replaces them.
 Validation runs on submit. A server failure on login is shown in a `role="alert"`
 element as `getApiErrorMessage(error, t("login.error"))`.

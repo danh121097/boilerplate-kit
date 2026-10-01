@@ -31,8 +31,8 @@ export interface RefreshedTokens {
 
 /**
  * Resolved refresh config for one service. The refresh token itself lives in an
- * httpOnly cookie owned by the backend — only the short-lived access token is
- * managed client-side.
+ * httpOnly cookie owned by the backend, and so is the access token; the client
+ * only tracks a readable session hint and never reads either token.
  */
 export interface RefreshOptions {
   /** Refresh endpoint, relative to the owning service's baseURL. */

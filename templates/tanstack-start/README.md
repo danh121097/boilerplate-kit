@@ -25,8 +25,11 @@ and a battle-tested client service layer.
 ```bash
 pnpm install
 cp .env.example .env   # fill in VITE_APP_ENDPOINT etc.
-pnpm dev               # SSR dev server on http://localhost:3000
+pnpm dev               # SSR dev server on http://localhost:5173
 ```
+
+Run one starter at a time: `reactjs` also uses port 5173, and the bundled backends'
+dev CORS list allows only 5173, 9000 and 4321.
 
 ## Scripts
 
@@ -52,7 +55,7 @@ Copy `.env.example` to `.env`. `VITE_*` values are inlined at build time.
 | `VITE_APP_ENDPOINT`        | Backend origin (REST base = origin + prefix; Socket.IO uses it bare)    |
 | `VITE_API_PREFIX`          | REST prefix, default `/api/v1`                                          |
 | `VITE_LANGUAGE_CODE`       | Default locale (`en`) when no language cookie is set                    |
-| `VITE_HMAC_SECRET`         | HMAC signing secret (must match the backend)                            |
+| `VITE_HMAC_SECRET`         | Required by the bundled backends; must equal the backend `HMAC_SECRET` (empty logs a dev warning) |
 | `VITE_BUILD_VERSION`       | Injected by CI for the `x-version` header                               |
 | `VITE_AUTH_MOCK`           | Optional, dev only: `true` answers `/auth/*` and `/users` without a backend |
 | `VITE_AUTH_MOCK_EMAIL`     | Optional, dev only: demo user email (`demo@example.com`)                |
@@ -97,10 +100,13 @@ fetch data directly without the client token registry.
 
 ## Session and users behavior
 
-- The login form validates with zod (`email`, `password` of at least 8 characters),
-  shows messages from i18n, and shows a server failure in a `role="alert"` element.
+- The login form validates with zod (`email`, a non-empty `password`; strength rules
+  belong on register), shows messages from i18n, and shows a server failure in a
+  `role="alert"` element.
 - If restoring the session fails for a transient reason (offline, timeout, 5xx), the
-  user keeps their state and a banner offers a retry; a 401 is a normal sign-out.
+  user keeps their state and a banner offers a retry; a 401 or 404 on `/auth/me` is a
+  normal sign-out (see [Boot](./docs/system-architecture/security-auth.md#boot)).
+- `AuthUser` is the `User` type; `Role` is `"user" | "admin" | "super_admin"`.
 - `UsersModel`-backed `useUsersListQuery` returns the paginated envelope
   (`{ data, meta }`); `/users` shows an empty state when the list is empty.
 

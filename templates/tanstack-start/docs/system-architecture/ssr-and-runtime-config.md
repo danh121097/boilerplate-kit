@@ -16,7 +16,7 @@ changing one means rebuilding.
 | `VITE_APP_ENDPOINT` | Backend origin (REST base = origin + prefix; Socket.IO uses it bare) |
 | `VITE_API_PREFIX` | REST prefix, default `/api/v1` |
 | `VITE_LANGUAGE_CODE` | Default locale when there is no LANGUAGE cookie |
-| `VITE_HMAC_SECRET` | HMAC signing secret; must match the backend |
+| `VITE_HMAC_SECRET` | HMAC signing secret; required by the bundled backends and must equal the backend `HMAC_SECRET` |
 | `VITE_BUILD_VERSION` | Value of the `x-version` header |
 | `VITE_AUTH_MOCK*` | Dev-only mock auth; ignored in production builds |
 
