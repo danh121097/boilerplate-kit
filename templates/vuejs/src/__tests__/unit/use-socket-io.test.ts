@@ -7,12 +7,12 @@ import * as vue from "vue";
 
 /**
  * Socket lifecycle through the public composable, with `socket.io-client`
- * replaced by an in-memory socket. The composable relies on auto-imported Vue
+ * replaced by an in-memory socket; the retry / refresh rules live in
+ * `socket-connection.test.ts`. The composable relies on auto-imported Vue
  * APIs, provided as globals; it is run inside an effect scope, and
  * `connectSocket` is called directly (no component, so `onMounted` never fires).
  */
 class FakeSocket {
-  auth: Record<string, unknown> = {};
   active = false;
   connected = false;
   connect = vi.fn();
@@ -30,6 +30,9 @@ class FakeSocket {
     this.listeners.get(event)?.delete(cb);
     return this;
   }
+  events() {
+    return [...this.listeners].filter(([, cbs]) => cbs.size > 0).map(([event]) => event);
+  }
   emit(event: string, ...args: unknown[]) {
     for (const cb of this.listeners.get(event) ?? []) cb(...args);
   }
@@ -46,8 +49,6 @@ vi.mock("socket.io-client", () => ({
 
 let useSocketIO: typeof import("@/composables/useSocketIO").useSocketIO;
 
-/** Backoff the composable is expected to use: 2s doubling, capped at 30s. */
-const RECONNECT_BASE_MS = 2000;
 const RECONNECT_MAX_MS = 30_000;
 let useSocketIOStore: typeof import("@/stores/socket-io").useSocketIOStore;
 
@@ -97,98 +98,26 @@ describe("useSocketIO", () => {
     expect(store.ioStore.authenticated).toBe(false);
   });
 
-  it("retries a rejected handshake at 2s then 4s on the same socket with fresh auth", () => {
-    const { api, socket, store } = mount();
-    api.connectSocket();
-    socket.connect.mockClear();
-
-    socket.emit(SOCKET_EVENT.CONNECT_ERROR, new Error("Unauthorized!"));
-    socket.emit(SOCKET_EVENT.CONNECT_ERROR, new Error("Unauthorized!")); // pending: no reschedule
-    expect(store.ioStore.authenticated).toBe(false);
-    vi.advanceTimersByTime(RECONNECT_BASE_MS - 1);
-    expect(socket.connect).not.toHaveBeenCalled();
-
-    persistAccessToken("AT2", "MAIN");
-    vi.advanceTimersByTime(1);
-    expect(socket.connect).toHaveBeenCalledTimes(1);
-    expect(socket.auth).toMatchObject({ token: "Bearer AT2" });
-
-    socket.emit(SOCKET_EVENT.CONNECT_ERROR, new Error("Unauthorized!"));
-    vi.advanceTimersByTime(RECONNECT_BASE_MS * 2 - 1);
-    expect(socket.connect).toHaveBeenCalledTimes(1);
-    vi.advanceTimersByTime(1);
-    expect(socket.connect).toHaveBeenCalledTimes(2);
-    expect(sockets).toHaveLength(1);
-  });
-
-  it("retries after the server closes the socket, but not after a client disconnect", () => {
-    const { api, socket, store } = mount();
-    api.connectSocket();
-    socket.emit(SOCKET_EVENT.AUTHENTICATED);
-    socket.connect.mockClear();
-
-    socket.emit(SOCKET_EVENT.DISCONNECT, "io client disconnect");
-    vi.advanceTimersByTime(RECONNECT_MAX_MS * 2);
-    expect(socket.connect).not.toHaveBeenCalled();
-
-    socket.emit(SOCKET_EVENT.DISCONNECT, "io server disconnect");
-    expect(store.ioStore.authenticated).toBe(false);
-    vi.advanceTimersByTime(RECONNECT_BASE_MS);
-    expect(socket.connect).toHaveBeenCalledTimes(1);
-  });
-
-  it("caps the retry delay at the maximum", () => {
+  it("does not connect while signed out", () => {
+    localStorage.clear();
     const { api, socket } = mount();
-    api.connectSocket();
-    // 2s, 4s, 8s, 16s, then 30s.
-    for (const delay of [2000, 4000, 8000, 16000, RECONNECT_MAX_MS]) {
-      socket.connect.mockClear();
-      socket.emit(SOCKET_EVENT.CONNECT_ERROR, new Error("Unauthorized!"));
-      vi.advanceTimersByTime(delay - 1);
-      expect(socket.connect).not.toHaveBeenCalled();
-      vi.advanceTimersByTime(1);
-      expect(socket.connect).toHaveBeenCalledTimes(1);
-    }
-  });
 
-  it("leaves reconnecting to socket.io while the socket is active", () => {
-    const { api, socket } = mount();
     api.connectSocket();
-    socket.connect.mockClear();
-    socket.active = true;
-
-    socket.emit(SOCKET_EVENT.CONNECT_ERROR, new Error("xhr poll error"));
-    vi.advanceTimersByTime(RECONNECT_MAX_MS * 2);
 
     expect(socket.connect).not.toHaveBeenCalled();
-  });
-
-  it("resets the backoff after authenticated", () => {
-    const { api, socket } = mount();
-    api.connectSocket();
-    socket.emit(SOCKET_EVENT.CONNECT_ERROR, new Error("Unauthorized!"));
-    vi.advanceTimersByTime(RECONNECT_BASE_MS);
-    socket.emit(SOCKET_EVENT.CONNECT_ERROR, new Error("Unauthorized!"));
-    vi.advanceTimersByTime(RECONNECT_BASE_MS * 2);
-
-    socket.emit(SOCKET_EVENT.AUTHENTICATED);
-    socket.connect.mockClear();
-    socket.emit(SOCKET_EVENT.CONNECT_ERROR, new Error("Unauthorized!"));
-
-    vi.advanceTimersByTime(RECONNECT_BASE_MS);
-    expect(socket.connect).toHaveBeenCalledTimes(1);
   });
 
   it("unmount cancels a pending retry", () => {
     const { api, socket, unmount } = mount();
     api.connectSocket();
     socket.connect.mockClear();
-    socket.emit(SOCKET_EVENT.CONNECT_ERROR, new Error("Unauthorized!"));
+    socket.emit(SOCKET_EVENT.CONNECT_ERROR, new Error("boom"));
 
     unmount();
     vi.advanceTimersByTime(RECONNECT_MAX_MS * 2);
 
     expect(socket.connect).not.toHaveBeenCalled();
     expect(socket.disconnect).toHaveBeenCalled();
+    expect(socket.events()).toHaveLength(0);
   });
 });

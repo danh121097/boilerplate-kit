@@ -1,4 +1,5 @@
 import { installLocalStorage } from "@/__tests__/helpers/fake-storage";
+import { httpError, makeClient } from "@/__tests__/helpers/http-mocks";
 import { AuthModel } from "@/services/auth/auth";
 import {
   clearAuthTokens,
@@ -10,6 +11,7 @@ import {
   persistRefreshToken,
 } from "@/services/core";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
+import axios from "axios";
 import * as pinia from "pinia";
 import * as vue from "vue";
 
@@ -90,6 +92,28 @@ describe("auth store", () => {
 
     expect(store.hydrateError).toBeNull();
     expect(store.user).toBeNull();
+  });
+
+  it("a 401 HMAC_ERROR on hydrate keeps a valid session: no refresh, no logout", async () => {
+    const post = vi.spyOn(axios, "post");
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const client = makeClient(async (config) =>
+      httpError(config, 401, { success: false, errorType: "HMAC_ERROR", message: "clock skew" }),
+    );
+    vi.spyOn(AuthModel, "getMe").mockImplementation(() => client.get("/auth/me"));
+    const revoke = vi.spyOn(AuthModel, "revokeSession");
+    const ended = vi.fn();
+    onTestFinished(onSessionEnded(ended));
+    const store = useAuthStore();
+
+    await store.hydrate();
+
+    expect(post).not.toHaveBeenCalled();
+    expect(revoke).not.toHaveBeenCalled();
+    expect(ended).not.toHaveBeenCalled();
+    expect(getAccessToken("MAIN")).toBe("AT");
+    expect(store.isAuthenticated).toBe(true);
+    expect(store.hydrateError).toMatchObject({ errorType: "HMAC_ERROR", retryable: true });
   });
 
   it("a late hydrate success after logout does not resurrect the user", async () => {

@@ -109,6 +109,8 @@ export interface ApiResponseError {
   message: string;
   error_code: number;
   error_message: string;
+  /** Backend error category (e.g. `HMAC_ERROR`, `AUTHENTICATION_ERROR`) when it sent one. */
+  errorType?: string;
   /** Set on transient failures (offline, timeout, 429, 5xx): the session is
    * kept and the call may succeed if retried. */
   retryable?: boolean;
