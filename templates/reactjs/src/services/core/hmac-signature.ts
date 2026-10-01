@@ -1,3 +1,4 @@
+import { isMockAuthEnabled } from "@/services/auth/data/mock-auth-config";
 import type { HMACSignatureData } from "@/services/core/types";
 import type { InternalAxiosRequestConfig } from "axios";
 import Base64 from "crypto-js/enc-base64";
@@ -42,14 +43,19 @@ export function resolveContentType(config: InternalAxiosRequestConfig): string {
   return "application/json";
 }
 
+let warnedEmptySecret = false;
+
+/** Dev-only, once: an empty secret against a real backend means every request is rejected. */
+function warnEmptySecret(): void {
+  if (warnedEmptySecret || !import.meta.env.DEV || isMockAuthEnabled()) return;
+  warnedEmptySecret = true;
+  console.warn("VITE_HMAC_SECRET is empty; the backend requires it, all requests will 401.");
+}
+
 /**
  * HMAC signature generator for API request authentication. Only active when
  * `VITE_HMAC_SECRET` is set. `signRequest` is the pure core (the bare refresh
  * client uses it directly); `generateSignature` adapts an axios request config.
- *
- * Not covered: multipart uploads. The browser sends
- * `multipart/form-data; boundary=…` with a boundary the client cannot know when
- * signing, so upload routes need a backend-side exemption or normalization.
  */
 export class HMACSignatureGenerator {
   /** The path the backend verifies: leading "/", no query string or hash (it
@@ -72,7 +78,10 @@ export class HMACSignatureGenerator {
     ctime = Date.now(),
   }: SignRequestInput): HMACSignatureData | null {
     const secret = import.meta.env.VITE_HMAC_SECRET;
-    if (!secret) return null;
+    if (!secret) {
+      warnEmptySecret();
+      return null;
+    }
 
     const xVersion = import.meta.env.VITE_BUILD_VERSION || "1.0.0";
     const stringToSign = [

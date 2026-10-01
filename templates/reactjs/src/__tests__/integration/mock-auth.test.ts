@@ -40,7 +40,13 @@ describe("mock auth", () => {
     const app = await boot();
     const result = await app.AuthModel.login(DEMO);
 
-    expect(result.user).toMatchObject({ email: DEMO.email, role: "admin" });
+    expect(result.user).toMatchObject({
+      email: DEMO.email,
+      role: "admin",
+      isActive: true,
+      createdAt: expect.any(String),
+      updatedAt: expect.any(String),
+    });
     expect(app.getAccessToken("MAIN")).toBe(result.tokens.accessToken);
     expect(app.getRefreshToken("MAIN")).toBe(result.tokens.refreshToken);
     await expect(app.AuthModel.getMe()).resolves.toEqual(result.user);
@@ -108,8 +114,27 @@ describe("mock auth", () => {
       name: "New User",
     });
 
-    expect(user).toMatchObject({ email: "new@example.com", name: "New User" });
+    expect(user).toMatchObject({
+      email: "new@example.com",
+      name: "New User",
+      role: "user",
+      isActive: true,
+      createdAt: expect.any(String),
+      updatedAt: expect.any(String),
+    });
     await expect(app.AuthModel.getMe()).resolves.toEqual(user);
+  });
+
+  it("does not sign in a token whose user has a role outside the backend's union", async () => {
+    const app = await boot();
+    const user = (await app.AuthModel.login(DEMO)).user;
+    app.persistAccessToken(
+      `mock-access|${encodeURIComponent(JSON.stringify({ ...user, role: "root" }))}|x`,
+      "MAIN",
+    );
+    app.persistRefreshToken("garbage", "MAIN");
+
+    await expect(app.AuthModel.getSession()).resolves.toBeNull();
   });
 
   it("clears the session on logout", async () => {

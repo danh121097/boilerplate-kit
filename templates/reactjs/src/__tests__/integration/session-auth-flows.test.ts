@@ -136,7 +136,15 @@ describe("session auth flows", () => {
   it("boot: a transient failure raises hydrateError, retryHydrate clears it once the profile loads", async () => {
     persistAccessToken("AT");
     persistRefreshToken("RT");
-    const user = { _id: "u1", email: "a@b.co", name: "A", role: "user" };
+    const user = {
+      _id: "u1",
+      email: "a@b.co",
+      name: "A",
+      role: "user" as const,
+      isActive: true,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
     const getMe = vi
       .spyOn(AuthModel, "getMe")
       .mockRejectedValueOnce({ message: "Network Error" })
@@ -171,6 +179,36 @@ describe("session auth flows", () => {
       hydrated: true,
       hydrateError: null,
     });
+  });
+
+  it("boot: a 404 (the account is gone) signs out like a 401, not a retry banner", async () => {
+    persistAccessToken("AT");
+    persistRefreshToken("RT");
+    vi.spyOn(AuthModel, "getMe").mockRejectedValue({ status: "error", error_code: 404 });
+    vi.spyOn(AuthModel, "revokeSession").mockResolvedValue(true);
+
+    await useAuthStore.getState().hydrate();
+
+    expect(AuthModel.revokeSession).toHaveBeenCalledTimes(1);
+    expect(useAuthStore.getState()).toMatchObject({
+      user: null,
+      isAuthenticated: false,
+      hydrated: true,
+      hydrateError: null,
+    });
+  });
+
+  it("getSession: a 404 from /auth/me ends the session and resolves null; a 500 rejects", async () => {
+    persistAccessToken("AT");
+    persistRefreshToken("RT");
+    vi.spyOn(AuthModel, "revokeSession").mockResolvedValue(true);
+    const getMe = vi.spyOn(AuthModel, "getMe").mockRejectedValueOnce({ error_code: 404 });
+
+    await expect(AuthModel.getSession()).resolves.toBeNull();
+    expect(AuthModel.revokeSession).toHaveBeenCalledTimes(1);
+
+    getMe.mockRejectedValueOnce({ error_code: 500 });
+    await expect(AuthModel.getSession()).rejects.toMatchObject({ error_code: 500 });
   });
 
   it("boot: a profile that resolves after a logout does not resurrect the user", async () => {

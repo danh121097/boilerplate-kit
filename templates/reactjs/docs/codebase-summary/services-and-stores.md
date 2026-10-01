@@ -31,11 +31,11 @@ src/services/
 │   ├── auth.ts             # AuthModel (getMe, getSession → AuthUser | null, logout, isLoggingOut, revokeSession) + useMeQuery, mutations
 │   ├── schema/login.ts  # loginSchema (zod; messages are i18n keys) + LoginFormValues
 │   ├── data/mock-auth*.ts  # Dev-only mock auth adapter (VITE_AUTH_MOCK)
-│   ├── types/auth.ts       # AuthUser, AuthResult, LoginPayload, RegisterPayload
+│   ├── types/auth.ts       # AuthUser (= User), AuthResult, LoginPayload, RegisterPayload
 │   └── index.ts
 └── users/
-    ├── users.ts            # UsersModel (list → PaginatedResponse<User>, get/update → User) + useUsersListQuery
-    ├── types/user.ts       # User, UpdateUserPayload
+    ├── users.ts            # UsersModel (list → PaginatedResponse<User>, get → User) + useUsersListQuery
+    ├── types/user.ts       # Role, User
     └── index.ts
 ```
 

@@ -12,7 +12,7 @@ import {
   getSessionEpoch,
   hasStoredSession,
   isLogoutPending,
-  isUnauthorizedError,
+  isSessionGoneError,
   Model,
   persistAccessToken,
   persistRefreshToken,
@@ -155,7 +155,7 @@ export class AuthModel extends Model {
     return res.data.user;
   }
 
-  /** The signed-in user, or `null` when the session is gone (401 — a session
+  /** The signed-in user, or `null` when the session is gone (401 or 404 — a session
    * the server rejected without a refused refresh is revoked first). Any other
    * failure (network, 5xx, refresh unavailable) rejects — the session may
    * still be valid. */
@@ -164,7 +164,7 @@ export class AuthModel extends Model {
     try {
       return await this.getMe();
     } catch (error) {
-      if (!isUnauthorizedError(error)) throw error;
+      if (!isSessionGoneError(error)) throw error;
       await this.revokeSession(epoch);
       return null;
     }

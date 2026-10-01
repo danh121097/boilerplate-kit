@@ -47,6 +47,60 @@ describe("hmac-signature", () => {
     expect(HMACSignatureGenerator.generateSignature(configFor("/users", "get"))).toBeNull();
   });
 
+  describe("empty secret warning", () => {
+    const MESSAGE = "VITE_HMAC_SECRET is empty; the backend requires it, all requests will 401.";
+
+    /** A fresh module graph, so the once-per-load flag starts unset. */
+    async function load() {
+      vi.resetModules();
+      const { HMACSignatureGenerator: Fresh } = await import("@/services/core/hmac-signature");
+      return Fresh;
+    }
+    const sign = (gen: typeof HMACSignatureGenerator) =>
+      gen.signRequest({ method: "get", path: "/users" });
+
+    it("warns once in a dev build when the secret is empty and mock auth is off", async () => {
+      vi.stubEnv("VITE_HMAC_SECRET", "");
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const gen = await load();
+
+      expect(sign(gen)).toBeNull();
+      sign(gen);
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(MESSAGE);
+    });
+
+    it("stays silent in a production build", async () => {
+      vi.stubEnv("VITE_HMAC_SECRET", "");
+      vi.stubEnv("DEV", false);
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      sign(await load());
+
+      expect(warn).not.toHaveBeenCalledWith(MESSAGE);
+    });
+
+    it("stays silent when mock auth is on", async () => {
+      vi.stubEnv("VITE_HMAC_SECRET", "");
+      vi.stubEnv("VITE_AUTH_MOCK", "true");
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      sign(await load());
+
+      expect(warn).not.toHaveBeenCalledWith(MESSAGE);
+    });
+
+    it("stays silent, and never prints the secret, when one is set", async () => {
+      vi.stubEnv("VITE_HMAC_SECRET", "s3cret-value");
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      expect(sign(await load())).not.toBeNull();
+
+      expect(warn).not.toHaveBeenCalled();
+    });
+  });
+
   it("signs '' (empty contentType) for bodyless GET — matches server canonical string", () => {
     vi.stubEnv("VITE_HMAC_SECRET", "shared-secret");
     // GET with no body → contentType signed as "" (axios omits Content-Type on bodyless requests)

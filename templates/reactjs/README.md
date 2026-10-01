@@ -102,7 +102,7 @@ src/
 - `Model` — base class for domain models; subclass and call `Model.setup({ path, service })`.
 - `defineQuery` / `defineMutation` — typed wrappers around TanStack React Query with a consistent error type.
 
-Example domain service in `src/services/users/users.ts`. `list` returns the backend's paginated envelope (`PaginatedResponse<User>`: `{ success, data, meta }`); `get` / `update` return the unwrapped `User`:
+Example domain service in `src/services/users/users.ts`. `list` returns the backend's paginated envelope (`PaginatedResponse<User>`: `{ success, data, meta }`); `get` returns the unwrapped `User`:
 
 ```ts
 export class UsersModel extends Model {
