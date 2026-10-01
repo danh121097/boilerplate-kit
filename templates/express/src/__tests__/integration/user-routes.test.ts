@@ -103,4 +103,10 @@ describe("User Routes — GET /users (offset pagination)", () => {
     const res = await request(server).get(url).set("Authorization", `Bearer ${accessToken}`);
     expect(res.status).toBe(401);
   });
+
+  it("answers a non-ObjectId id with 401 (not 400) when unauthenticated", async () => {
+    const badUrl = "/api/v1/users/bad";
+    const res = await request(server).get(badUrl).set(signHmac("GET", badUrl));
+    expect(res.status).toBe(401);
+  });
 });

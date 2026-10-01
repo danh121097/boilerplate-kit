@@ -314,4 +314,40 @@ describe("Auth Routes", () => {
     const res = await request(server).get("/api/v1/auth/me");
     expect(res.status).toBe(401);
   });
+
+  describe("HMAC rejections report HMAC_ERROR, not a session failure", () => {
+    const url = "/api/v1/auth/me";
+    const badHmacHeaders: Record<string, () => Record<string, string>> = {
+      unsigned: () => ({}),
+      "stale ctime": () => {
+        const old = (Date.now() - 10 * 60 * 1000).toString();
+        const { sig } = signHmac("GET", url);
+        return { sig, ctime: old };
+      },
+      "bad signature": () => ({ sig: "bm90LXRoZS1zaWduYXR1cmU=", ctime: Date.now().toString() }),
+    };
+
+    it.each(Object.keys(badHmacHeaders))("401 HMAC_ERROR — %s", async (kind) => {
+      const res = await request(server).get(url).set(badHmacHeaders[kind]());
+      expect(res.status).toBe(401);
+      expect(res.body).toMatchObject({
+        success: false,
+        errorType: "HMAC_ERROR",
+        error_code: 401,
+      });
+    });
+
+    it.each(Object.keys(badHmacHeaders))(
+      "401 HMAC_ERROR with a valid session cookie — %s",
+      async (kind) => {
+        const regCookies = await registerUser();
+        const res = await request(server)
+          .get(url)
+          .set(badHmacHeaders[kind]())
+          .set("Cookie", toCookieHeader(regCookies));
+        expect(res.status).toBe(401);
+        expect(res.body.errorType).toBe("HMAC_ERROR");
+      },
+    );
+  });
 });

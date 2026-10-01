@@ -7,8 +7,6 @@ import rateLimit, { type RateLimitRequestHandler, type Store } from "express-rat
 import { RedisStore } from "rate-limit-redis";
 import type { NextFunction, Request, Response } from "express";
 
-const isTest = config.isTest;
-
 /**
  * RedisStore loads its Lua scripts in `init()`, which express-rate-limit calls at
  * startup, before Redis is ready (or while it is down). A failure there must not be an
@@ -62,7 +60,8 @@ function buildLimiter(
     max,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: () => isTest,
+    // Read per request so tests can switch limiting on by flipping config.isTest.
+    skip: () => config.isTest,
     store: makeStore(prefix),
     // Fail-open: a Redis outage must not 500 the endpoint.
     passOnStoreError: true,

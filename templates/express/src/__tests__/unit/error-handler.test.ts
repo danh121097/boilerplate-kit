@@ -43,34 +43,74 @@ describe("errorHandler", () => {
     expect(res.status).toHaveBeenCalledWith(500);
   });
 
-  it("includes stack trace in development mode", () => {
+  it("includes stack trace for a 5xx in development mode", () => {
     const original = config.isDevelopment;
     config.isDevelopment = true;
-    const res = createMockRes();
-    const err = new AppError({
-      message: "dev error!",
-      statusCode: 400,
-      errorType: "VALIDATION_ERROR",
-    });
-    errorHandler(err, mockReq, res, mockNext);
-    const jsonArg = res.json.mock.calls[0][0];
-    expect(jsonArg.stack).toBeDefined();
-    config.isDevelopment = original;
+    try {
+      const res = createMockRes();
+      errorHandler(new Error("dev boom") as any, mockReq, res, mockNext);
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json.mock.calls[0][0].stack).toBeDefined();
+    } finally {
+      config.isDevelopment = original;
+    }
   });
 
-  it("excludes stack trace in production mode", () => {
+  it("excludes stack trace for a 4xx in development mode", () => {
+    const original = config.isDevelopment;
+    config.isDevelopment = true;
+    try {
+      const res = createMockRes();
+      const err = new AppError({
+        message: "dev error!",
+        statusCode: 400,
+        errorType: "VALIDATION_ERROR",
+      });
+      errorHandler(err, mockReq, res, mockNext);
+      expect(res.json.mock.calls[0][0].stack).toBeUndefined();
+    } finally {
+      config.isDevelopment = original;
+    }
+  });
+
+  it("excludes stack trace for a 5xx outside development mode", () => {
     const original = config.isDevelopment;
     config.isDevelopment = false;
+    try {
+      const res = createMockRes();
+      errorHandler(new Error("prod boom") as any, mockReq, res, mockNext);
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json.mock.calls[0][0].stack).toBeUndefined();
+    } finally {
+      config.isDevelopment = original;
+    }
+  });
+
+  it("maps a body-parser parse failure to 400 without echoing parser text", () => {
     const res = createMockRes();
-    const err = new AppError({
-      message: "prod error!",
+    const err = Object.assign(new SyntaxError("Unexpected token 's' in JSON at position 1"), {
       statusCode: 400,
-      errorType: "VALIDATION_ERROR",
+      type: "entity.parse.failed",
     });
-    errorHandler(err, mockReq, res, mockNext);
+    errorHandler(err as any, mockReq, res, mockNext);
+    expect(res.status).toHaveBeenCalledWith(400);
     const jsonArg = res.json.mock.calls[0][0];
-    expect(jsonArg.stack).toBeUndefined();
-    config.isDevelopment = original;
+    expect(jsonArg.errorType).toBe("VALIDATION_ERROR");
+    expect(jsonArg.message).toBe("Malformed JSON request body!");
+    expect(jsonArg.error_message).toBe("Malformed JSON request body!");
+  });
+
+  it("maps a body-parser size failure to 413 VALIDATION_ERROR", () => {
+    const res = createMockRes();
+    const err = Object.assign(new Error("request entity too large"), {
+      statusCode: 413,
+      type: "entity.too.large",
+    });
+    errorHandler(err as any, mockReq, res, mockNext);
+    expect(res.status).toHaveBeenCalledWith(413);
+    const jsonArg = res.json.mock.calls[0][0];
+    expect(jsonArg.errorType).toBe("VALIDATION_ERROR");
+    expect(jsonArg.message).toBe("Request body is too large!");
   });
 
   it('falls back to "Internal Server Error" when no message', () => {

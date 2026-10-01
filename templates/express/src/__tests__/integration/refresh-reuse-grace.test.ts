@@ -87,14 +87,19 @@ describe("refresh reuse grace window", () => {
     expect(await RefreshToken.countDocuments({ rotatedAt: { $exists: true } })).toBe(0);
   });
 
-  it("does not grace a token revoked by logout", async () => {
+  it("does not grace a token ended by logout, and the replay revokes nothing else", async () => {
     const { userId, tokens } = await signUp();
+    const other = await login(creds.email, creds.password);
     await logout(tokens.refreshToken);
     expect(disconnectUserSockets).toHaveBeenCalledWith(userId);
     vi.mocked(disconnectUserSockets).mockClear();
 
-    await expect(refresh(tokens.refreshToken)).rejects.toMatchObject({ statusCode: 401 });
-    expect(disconnectUserSockets).toHaveBeenCalledWith(userId);
+    await expect(refresh(tokens.refreshToken)).rejects.toMatchObject({
+      statusCode: 401,
+      message: "Invalid refresh token!",
+    });
+    expect(disconnectUserSockets).not.toHaveBeenCalled();
+    await expect(refresh(other.tokens.refreshToken)).resolves.toBeDefined();
   });
 
   it("does not grace a rotated token that has since expired", async () => {
@@ -148,15 +153,48 @@ describe("logout ends the whole session chain", () => {
     expect(new Set(ids).size).toBe(1);
   });
 
-  it("legacy tokens without familyId: logout revokes only the presented token", async () => {
+  it("legacy tokens without familyId: logout deletes only the presented token", async () => {
     const { tokens } = await signUp();
     await RefreshToken.collection.updateMany({}, { $unset: { familyId: 1 } });
     const other = await login(creds.email, creds.password);
     await logout(tokens.refreshToken);
 
-    const stored = await RefreshToken.findOne({ token: hashToken(tokens.refreshToken) });
-    expect(stored!.isRevoked).toBe(true);
+    expect(await RefreshToken.findOne({ token: hashToken(tokens.refreshToken) })).toBeNull();
     await expect(refresh(other.tokens.refreshToken)).resolves.toBeDefined();
+  });
+
+  it("replaying A's refresh token after logout is a plain 401 and B stays logged in", async () => {
+    const { tokens: a } = await signUp();
+    const b = await login(creds.email, creds.password);
+    await logout(a.refreshToken);
+
+    await expect(refresh(a.refreshToken)).rejects.toMatchObject({
+      statusCode: 401,
+      message: "Invalid refresh token!",
+    });
+    await expect(refresh(b.tokens.refreshToken)).resolves.toBeDefined();
+  });
+
+  it("replaying the OLD rotated token after logout is a plain 401 and B stays logged in", async () => {
+    const { tokens: a } = await signUp();
+    const b = await login(creds.email, creds.password);
+    const rotated = await refresh(a.refreshToken);
+    await logout(rotated.refreshToken);
+
+    await expect(refresh(a.refreshToken)).rejects.toMatchObject({
+      statusCode: 401,
+      message: "Invalid refresh token!",
+    });
+    await expect(refresh(b.tokens.refreshToken)).resolves.toBeDefined();
+  });
+
+  it("logging out twice is a no-op the second time", async () => {
+    const { tokens } = await signUp();
+    await logout(tokens.refreshToken);
+    vi.mocked(disconnectUserSockets).mockClear();
+
+    await expect(logout(tokens.refreshToken)).resolves.toBeUndefined();
+    expect(disconnectUserSockets).not.toHaveBeenCalled();
   });
 });
 

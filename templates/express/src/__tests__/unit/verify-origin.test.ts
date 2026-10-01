@@ -39,9 +39,18 @@ describe("verifyOrigin (CSRF Origin allow-list)", () => {
     );
   });
 
-  it("rejects a mutating request with no Origin and no Referer", () => {
+  it("allows a mutating request with no Cookie, Origin or Referer (non-browser client)", () => {
+    const next = vi.fn();
     const mw = createVerifyOrigin({ enabled: true, allowList: ALLOW });
-    expect(() => mw(reqOf("DELETE", {}), res, vi.fn())).toThrow(AppError);
+    mw(reqOf("DELETE", {}), res, next);
+    expect(next).toHaveBeenCalledOnce();
+  });
+
+  it("rejects a mutating request that carries a Cookie but no Origin or Referer", () => {
+    const mw = createVerifyOrigin({ enabled: true, allowList: ALLOW });
+    expect(() => mw(reqOf("DELETE", { cookie: "refreshToken=abc" }), res, vi.fn())).toThrow(
+      AppError,
+    );
   });
 
   it("falls back to Referer origin when Origin header is absent", () => {

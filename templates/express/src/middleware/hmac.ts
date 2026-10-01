@@ -5,7 +5,9 @@ import { NextFunction, Request, Response } from "express";
 /**
  * Verify the HMAC signature on the `sig` + `ctime` headers. The signed string is
  *   [method, contentType, ctime, path, ""].join("\n")
- * and the signature is Base64 — both must match the client exactly.
+ * and the signature is Base64 — both must match the client exactly. Rejections use
+ * `HMAC_ERROR` (still 401) so clients can tell a bad signature or clock skew from a
+ * bad session and do not discard a valid session.
  */
 export function verifyHmacRequest(req: Request, _res: Response, next: NextFunction): void {
   const sig = req.headers["sig"] as string | undefined;
@@ -15,7 +17,7 @@ export function verifyHmacRequest(req: Request, _res: Response, next: NextFuncti
     throw new AppError({
       message: "HMAC signature and timestamp headers are required!",
       statusCode: 401,
-      errorType: "AUTHENTICATION_ERROR",
+      errorType: "HMAC_ERROR",
     });
   }
 
@@ -35,7 +37,7 @@ export function verifyHmacRequest(req: Request, _res: Response, next: NextFuncti
     throw new AppError({
       message: `HMAC verification failed: ${reason}!`,
       statusCode: 401,
-      errorType: "AUTHENTICATION_ERROR",
+      errorType: "HMAC_ERROR",
     });
   }
 

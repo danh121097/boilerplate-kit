@@ -13,6 +13,11 @@ import { NextFunction, Request, Response } from "express";
  * Gated by ENABLE_CSRF (default OFF) so it is backward-compatible: the
  * same-origin reverse-proxy deployment already closes CSRF via SameSite=strict;
  * turn this on for defense-in-depth or split-domain deployments.
+ *
+ * Non-browser clients (native apps, server-to-server) are exempt when the request
+ * carries no `Cookie`, `Origin` or `Referer` header: with no ambient credentials
+ * there is nothing for a forged request to ride on, and browsers always send
+ * `Origin` on a cross-site mutating request, so browser CSRF stays closed.
  */
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -38,6 +43,12 @@ function resolveOrigin(req: Request): string | undefined {
 export function createVerifyOrigin(opts: VerifyOriginOptions) {
   return function verifyOrigin(req: Request, _res: Response, next: NextFunction): void {
     if (!opts.enabled || SAFE_METHODS.has(req.method)) {
+      next();
+      return;
+    }
+
+    // Raw header presence (not resolveOrigin) so a malformed Referer is not treated as absent.
+    if (!req.headers.cookie && !req.headers.origin && !req.headers.referer) {
       next();
       return;
     }

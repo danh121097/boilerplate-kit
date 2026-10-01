@@ -116,9 +116,10 @@ export async function refresh(rawRefreshToken: string): Promise<AuthTokens> {
   const tokens = await issueTokens(user, storedToken.familyId);
 
   // A family/user revoke that ran between the claim (or grace check) and the insert
-  // above missed the new token, but it always $unsets the predecessor's `rotatedAt`
-  // (both claim and graced retry require it to be set). Predecessor no longer
-  // carrying it => revoked meanwhile: kill the new token and refuse.
+  // above missed the new token. A logout deletes the predecessor and a reuse revoke
+  // $unsets its `rotatedAt` (both claim and graced retry require it to be set).
+  // Predecessor gone or no longer carrying it => revoked meanwhile: kill the new
+  // token and refuse.
   const stillValid = await RefreshToken.exists({
     _id: storedToken._id,
     rotatedAt: { $exists: true },
@@ -136,18 +137,20 @@ export async function refresh(rawRefreshToken: string): Promise<AuthTokens> {
 }
 
 /**
- * Logout: end this device's whole session chain (every token of the presented
- * token's family, clearing `rotatedAt` so a graced predecessor cannot resurrect it),
- * invalidate the user's access tokens and drop their sockets. Other families (other
- * devices) stay logged in. Tokens issued before families existed fall back to
- * revoking just the presented token.
+ * Logout: end this device's whole session chain by deleting every token of the
+ * presented token's family, invalidate the user's access tokens and drop their
+ * sockets. Deleting (not flagging revoked) means a later replay of any token in the
+ * chain is simply unknown (plain 401) instead of looking like reuse of a revoked
+ * token, which would revoke the user's other devices. Other families (other devices)
+ * stay logged in. Tokens issued before families existed fall back to deleting just
+ * the presented token.
  */
 export async function logout(rawRefreshToken: string): Promise<void> {
   const stored = await RefreshToken.findOne({ token: hashToken(rawRefreshToken) });
   if (!stored) return;
 
   const filter = stored.familyId ? { familyId: stored.familyId } : { _id: stored._id };
-  await RefreshToken.updateMany(filter, { $set: { isRevoked: true }, $unset: { rotatedAt: 1 } });
+  await RefreshToken.deleteMany(filter);
 
   // userId comes from the stored record, so we never trust an unverified token.
   const userId = String(stored.userId);
