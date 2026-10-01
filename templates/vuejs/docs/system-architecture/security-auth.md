@@ -279,7 +279,7 @@ Implementation: `router/auth-guard.ts` (`authGuard`, a global `beforeEach`) read
   `hydrateError` (`retryable: true`); `App.vue` shows a `role="alert"` banner
   (`session.unavailable`) with a `session.retry` button that calls
   `retryHydrate()`, and the banner disappears once the restore succeeds. A 401
-  or 404 never sets `hydrateError`: it is the normal logged-out flow.
+  or 404 never sets `hydrateError`: it is the normal logged-out flow. A 404 from a wrong `VITE_API_PREFIX` or a gateway counts too, and the revoke posts `/auth/logout`, which revokes the user's access tokens on every device (Redis on).
 - Logout is `useLogoutMutation` in `App.vue` (the button is disabled while it is
   pending). `AuthModel.logout()` posts `{ refreshToken }` to `/auth/logout` (so
   the backend revokes it), clears tokens and ends the session as `"logout"`,
