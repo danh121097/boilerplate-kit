@@ -154,7 +154,7 @@ Implementation: `services/core/route-guard.ts` (`requireSession`, `redirectIfSig
 browser). `isSessionGoneError` decides: a 401 or a 404 (the account was deleted)
 means signed out; a network error or 5xx keeps the hint and surfaces a retryable
 error. Trade-off: a 404 from a wrong `VITE_API_PREFIX` or a gateway also signs
-the user out.
+the user out. The session end also posts `/auth/logout`, which revokes the user's access tokens on every device (Redis on), so that misconfiguration can sign the user out elsewhere too.
 
 `AuthUser` is the `User` type (`services/users/types/user.ts`), with
 `Role = "user" | "admin" | "super_admin"`.
