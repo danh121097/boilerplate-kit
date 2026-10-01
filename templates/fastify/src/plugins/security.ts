@@ -36,7 +36,7 @@ export function installSecurityHooks(
       throw new AppError({
         message: "HMAC signature and timestamp headers are required!",
         statusCode: 401,
-        errorType: "AUTHENTICATION_ERROR",
+        errorType: "HMAC_ERROR",
       });
     }
 
@@ -52,13 +52,19 @@ export function installSecurityHooks(
       throw new AppError({
         message: `HMAC verification failed: ${reason}!`,
         statusCode: 401,
-        errorType: "AUTHENTICATION_ERROR",
+        errorType: "HMAC_ERROR",
       });
     }
   });
 
   app.addHook("onRequest", async (request) => {
     if (!config.enableCsrf || SAFE_METHODS.has(request.method)) return;
+    // Native/non-browser clients send no ambient credentials (no Cookie) and no
+    // Origin/Referer, so there is nothing to forge. Checked on raw header presence,
+    // not a parsed origin, so a malformed Referer is not mistaken for absent.
+    // Browsers always attach Origin to cross-site writes, which keeps CSRF closed.
+    const { cookie, origin: originHeader, referer } = request.headers;
+    if (!cookie && !originHeader && !referer) return;
     const origin = requestOrigin(request);
     if (!origin || !config.corsOrigins.includes(origin)) {
       throw new AppError({

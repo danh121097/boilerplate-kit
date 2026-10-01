@@ -55,7 +55,9 @@ const userRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get<{ Params: UserIdParams }>(
     "/:id",
     {
-      preHandler: [authenticate, requireMinRole("admin")],
+      // preValidation: auth and role win over params validation, but run after the global
+      // rate limiter's onRequest hook so rejected anonymous requests still count.
+      preValidation: [authenticate, requireMinRole("admin")],
       schema: {
         tags: ["users"],
         summary: "Get a user by ID",

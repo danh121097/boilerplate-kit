@@ -1,8 +1,8 @@
 import { config } from "@/config/environment";
-import { getRedis } from "@/config/redis";
 import { hmacRequestInterceptor } from "@/docs/hmac-interceptor";
 import { docsTransform, docsTransformObject } from "@/docs/response-descriptions";
 import { installErrorHandlers } from "@/plugins/error-handlers";
+import { globalRateLimitOptions } from "@/plugins/rate-limit";
 import { installSecurityHooks } from "@/plugins/security";
 import { registerApi } from "@/routes";
 import { closeSocket, initSocket } from "@/socket";
@@ -96,16 +96,7 @@ export function buildApp(
   installErrorHandlers(app);
   installSecurityHooks(app);
 
-  app.register(rateLimit, {
-    global: true,
-    max: 100,
-    timeWindow: 60_000,
-    skipOnError: true,
-    allowList: (request) =>
-      config.isTest ||
-      !(request.url === config.apiPrefix || request.url.startsWith(`${config.apiPrefix}/`)),
-    redis: getRedis() ?? undefined,
-  });
+  app.register(rateLimit, globalRateLimitOptions());
   registerApi(app);
 
   if (options.sockets !== false) {

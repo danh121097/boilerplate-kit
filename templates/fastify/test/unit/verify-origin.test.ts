@@ -51,8 +51,18 @@ describe("CSRF origin allow-list", () => {
       expect(res.json().message).toMatch(/CSRF/);
     });
 
-    it("rejects a mutating request with no Origin and no Referer", async () => {
-      expect((await send("DELETE")).statusCode).toBe(403);
+    it("allows a mutating request with no Cookie, Origin or Referer (native client)", async () => {
+      expect((await send("DELETE")).statusCode).toBe(200);
+    });
+
+    it("rejects a mutating request with a Cookie but no Origin and no Referer", async () => {
+      const res = await send("DELETE", { cookie: "refreshToken=abc" });
+      expect(res.statusCode).toBe(403);
+      expect(res.json()).toMatchObject({ errorType: "AUTHORIZATION_ERROR" });
+    });
+
+    it("rejects a cookie-less request whose Origin is not allow-listed", async () => {
+      expect((await send("POST", { origin: "https://evil.com" })).statusCode).toBe(403);
     });
 
     it("falls back to the Referer origin when Origin is absent", async () => {

@@ -1,5 +1,6 @@
 import { buildApp } from "@/app";
 import { RefreshToken } from "@/models/refresh-token";
+import { computeSignature } from "@/utils/hmac";
 import { hashToken } from "@/utils/jwt";
 import { signHeaders } from "../helpers/sign-request";
 import { API, createSignedRequest } from "../helpers/signed-request";
@@ -276,6 +277,7 @@ describe("Auth routes", () => {
     });
     expect(res.statusCode).toBe(401);
     expect(res.json().message).toMatch(/HMAC signature/i);
+    expect(res.json().errorType).toBe("HMAC_ERROR");
   });
 
   it("GET /auth/me: 401 for an HMAC signed over a different path", async () => {
@@ -286,5 +288,39 @@ describe("Auth routes", () => {
     });
     expect(res.statusCode).toBe(401);
     expect(res.json().message).toMatch(/HMAC verification failed/i);
+    expect(res.json().errorType).toBe("HMAC_ERROR");
+  });
+
+  describe("HMAC rejections carry errorType HMAC_ERROR, even with a valid session cookie", () => {
+    const staleCtime = (): Record<string, string> => {
+      // Correctly signed over the stale timestamp, so only freshness fails.
+      const ctime = (Date.now() - 10 * 60_000).toString();
+      const sig = computeSignature({
+        method: "POST",
+        contentType: "",
+        ctime,
+        path: "/auth/refresh",
+      });
+      return { sig, ctime };
+    };
+
+    it.each([
+      ["unsigned", () => ({}), /HMAC signature/i],
+      ["stale ctime", staleCtime, /HMAC verification failed/i],
+      ["bad signature", () => ({ ...signHeaders("POST", "/auth/refresh"), sig: "AAAA" }), /HMAC/i],
+    ])("%s", async (_name, headers, message) => {
+      const registered = await registerUser();
+      for (const cookies of [undefined, toCookies(registered)]) {
+        const res = await app.inject({
+          method: "POST",
+          url: `${API}/auth/refresh`,
+          headers: headers(),
+          cookies,
+        });
+        expect(res.statusCode).toBe(401);
+        expect(res.json()).toMatchObject({ errorType: "HMAC_ERROR", error_code: 401 });
+        expect(res.json().message).toMatch(message);
+      }
+    });
   });
 });

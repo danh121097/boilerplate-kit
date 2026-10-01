@@ -36,7 +36,7 @@ describe("GET /api/v1/health", () => {
     expect(res.json()).toMatchObject({
       success: false,
       status: "error",
-      errorType: "AUTHENTICATION_ERROR",
+      errorType: "HMAC_ERROR",
       error_code: 401,
     });
   });

@@ -1,4 +1,5 @@
 import { buildApp } from "@/app";
+import { config } from "@/config/environment";
 import { User } from "@/models/user";
 import { serializeUser } from "@/modules/user/serialize-user";
 import { createTestUser } from "../helpers/create-test-user";
@@ -143,6 +144,34 @@ describe("User routes", () => {
       const res = await get("/not-an-id", token);
       expect(res.statusCode).toBe(400);
       expect(res.json().errorType).toBe("VALIDATION_ERROR");
+      expect(res.json().message).toBe("Invalid user ID!");
+    });
+
+    it("401 before validation for an unauthenticated malformed id", async () => {
+      const res = await get("/bad");
+      expect(res.statusCode).toBe(401);
+      expect(res.json().errorType).toBe("AUTHENTICATION_ERROR");
+    });
+
+    it("403 before validation for a non-admin with a malformed id", async () => {
+      const { accessToken } = await createTestUser({ email: "plain@test.com", role: "user" });
+      const res = await get("/bad", accessToken);
+      expect(res.statusCode).toBe(403);
+      expect(res.json().errorType).toBe("AUTHORIZATION_ERROR");
+    });
+
+    it("counts unauthenticated requests toward the global rate limit", async () => {
+      config.isTest = false;
+      try {
+        for (let i = 0; i < 100; i++) {
+          expect((await get("/bad")).statusCode).toBe(401);
+        }
+        const res = await get("/bad");
+        expect(res.statusCode).toBe(429);
+        expect(res.json().errorType).toBe("RATE_LIMIT");
+      } finally {
+        config.isTest = true;
+      }
     });
 
     it("403 for a non-admin user", async () => {
