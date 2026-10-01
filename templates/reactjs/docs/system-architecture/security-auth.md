@@ -184,7 +184,7 @@ On boot, `hydrate()` signs out only when `/auth/me` ends in a 401 or a 404
 The backend answers 404 "User not found!" for a deleted or deactivated account,
 which no retry fixes. Trade-off: it sends the same 404 for a wrong route, so a
 misconfigured `VITE_API_PREFIX` or gateway that 404s `/auth/me` also signs the
-user out. A network error, 5xx or retryable refresh failure keeps the tokens —
+user out. The session end also posts `/auth/logout`, which revokes the user's access tokens on every device (Redis on), so that misconfiguration can sign the user out elsewhere too. A network error, 5xx or retryable refresh failure keeps the tokens —
 the session may still be valid. `useMeQuery` reads the same endpoint through
 `AuthModel.getSession()`, which revokes the same way and resolves `null` on a
 401 or 404, and rejects on anything else.
