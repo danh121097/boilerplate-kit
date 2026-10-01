@@ -48,8 +48,9 @@ the values at build time:
 | `NEXT_PUBLIC_AUTH_MOCK`     | `mock-auth-config.ts` — dev only: `true`/`1` answers `/auth/*` and `/users`. Ignored in production builds       |
 | `NEXT_PUBLIC_AUTH_MOCK_EMAIL` / `NEXT_PUBLIC_AUTH_MOCK_PASSWORD` | `mock-auth-config.ts` — mock login credentials (default `demo@example.com` / `password`) |
 
-**Note:** `NEXT_PUBLIC_HMAC_SECRET` is client-readable. For a stronger guarantee,
-move signing into a Next.js Route Handler and keep the secret server-only
+**Note:** `NEXT_PUBLIC_HMAC_SECRET` is required by the bundled backends and must
+equal the backend `HMAC_SECRET`. It is client-readable, so it is anti-abuse only.
+For a stronger guarantee, move signing into a Next.js Route Handler and keep the secret server-only
 (no `NEXT_PUBLIC_` prefix). The starter uses the simpler approach for parity
 with the reactjs/vuejs templates.
 

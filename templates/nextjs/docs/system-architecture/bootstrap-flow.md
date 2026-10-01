@@ -7,12 +7,13 @@ Next.js build
   └── src/app/layout.tsx         (RSC — server component, suppressHydrationWarning)
         └── <Providers>          ("use client" boundary)
               ├── initI18n()     (i18next setup, SSR-safe)
-              ├── initServices() (called in useEffect — browser only)
+              ├── initServices() (module load behind `typeof window` — browser only)
               │     ├── Api.setBaseURL(getApiBaseUrl(), "MAIN")  // NEXT_PUBLIC_APP_ENDPOINT + /api/v1
-              │     └── Api.registerInterceptors(new ApiInterceptors({
+              │     ├── Api.registerInterceptors(new ApiInterceptors({
               │           MAIN: { endpoint: "/auth/refresh", skipPaths: [login, register, logout],
               │                   hasSession: hasSessionHint }
               │         }))
+              │     └── registerSessionRefresher(...)  // lets the socket hook refresh the session
               ├── QueryClientProvider
               └── I18nextProvider
                     ├── <SiteHeader>     (nav, active link, locale toggle, logout)

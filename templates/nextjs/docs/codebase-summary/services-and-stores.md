@@ -21,12 +21,13 @@ never touches `localStorage` or reads tokens directly.
 | File                       | Purpose                                                            |
 | -------------------------- | ------------------------------------------------------------------ |
 | `api.ts`                   | `Api` class — axios wrapper, `withCredentials: true`; `paginate` / `cursorPaginate` return the full `{ data, meta }` envelope |
-| `api-errors.ts`            | `toApiError`, `isUnauthorizedError`, `isRefreshRefused`, `refreshUnavailable`, `SessionEndedError`, `getApiErrorMessage` |
+| `api-errors.ts`            | `toApiError`, `isUnauthorizedError`, `isRefreshRefused`, `isHmacError` / `HMAC_ERROR_TYPE`, `isSessionGoneError` (401 or 404), `refreshUnavailable`, `refreshHmacRejected`, `SessionEndedError`, `getApiErrorMessage` |
 | `app-prefix.ts`            | `getAppPrefix()` — prefix for lock and storage keys                |
 | `auth-refresh-client.ts`   | `createTokenRefresher` — bare axios refresh call (no interceptors), `REFRESH_TIMEOUT_MS` |
-| `hmac-signature.ts`        | HMAC-SHA256 signing via `NEXT_PUBLIC_HMAC_SECRET`; `signRequest`, `resolveContentType` |
+| `hmac-signature.ts`        | HMAC-SHA256 signing via `NEXT_PUBLIC_HMAC_SECRET`; `signRequest`, `resolveContentType`; dev warning once when the secret is empty |
 | `headers-utils.ts`         | Attach HMAC headers to requests (no Bearer — cookies auto-sent)    |
 | `interceptors.ts`          | Request/response interceptors + 401 → refresh → replay             |
+| `session-refresher.ts`     | `registerSessionRefresher` / `refreshSession` — lets the socket hook refresh through the interceptors |
 | `model.ts`                 | Base `Model` class — subclass + call `Model.setup()`               |
 | `refresh-token-manager.ts` | Single-flight + cross-tab (Web Lock) refresh, `withSessionLock`    |
 | `session.ts`               | Per-service epoch + logout-pending, session hint, `onSessionEnded` / `endSession(reason, service)`, `syncAuthAcrossTabs`, `redirectOnSessionExpired`, `safeRedirect` |
@@ -39,9 +40,10 @@ never touches `localStorage` or reads tokens directly.
 ### auth/
 
 - `contract.ts` — endpoint paths + React Query keys (single source of truth)
-- `AuthModel` — login, register, logout, revokeSession, getMe, getSession (401 → null; a live session is revoked first)
+- `AuthModel` — login, register, logout, revokeSession, getMe, getSession (401 or 404 → null via `isSessionGoneError`; a live session is revoked first)
 - `useLoginMutation`, `useRegisterMutation`, `useLogoutMutation`, `useMeQuery`
-- `schema/login.ts` — zod `loginSchema`; `data/mock-auth*.ts` — dev-only mock auth
+- `types/auth.ts` — `AuthUser = User` (the users `User` shape; `Role = "user" | "admin" | "super_admin"`, from `users/types/user.ts`)
+- `schema/login.ts` — zod `loginSchema` (email, password non-empty); `data/mock-auth*.ts` — dev-only mock auth
 - `session.ts` — `useAuth()` hook (derives from useMeQuery): `user`, `isAuthenticated`, `isLoading`, `sessionUnavailable`, `retrySession`; `isSessionUnavailable(error)`
 
 ### users/

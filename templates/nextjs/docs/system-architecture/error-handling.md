@@ -11,9 +11,14 @@ The `ApiInterceptors` response interceptor handles every non-2xx response:
    page never reloads.
 3. **Refused refresh** (401/403 from `/auth/refresh`) — the session is over:
    `endSession("expired")`, and `Providers` routes to `/login?redirect=…`.
-4. **Transient failure** (offline, timeout, 408, 429, 5xx, or a refresh that
+4. **`HMAC_ERROR`** (401 with `errorType: "HMAC_ERROR"`: wrong secret or clock
+   skew over 5 minutes) — never refreshed; the session is kept and the error is
+   `retryable: true`. A refresh call rejected this way is also kept
+   (`refreshHmacRejected`), not treated as revoked. A dev build warns once when
+   the secret is empty.
+5. **Transient failure** (offline, timeout, 408, 429, 5xx, or a refresh that
    failed transiently) — reject with `retryable: true`. The session is kept.
-5. **Anything else** — reject with `toApiError(error)`.
+6. **Anything else** — reject with `toApiError(error)`.
 
 Rejections are plain `ApiResponseError` objects (`{ status, message,
 error_message, error_code, retryable? }`), not `Error`s. `error_code` carries the
@@ -26,7 +31,8 @@ HTTP status (`0` without a response). The helpers live in
 
 `server/server-api.ts` follows the same shape: every failure **rejects** with an
 `ApiResponseError` (401 for a missing or expired access cookie, `0` when the
-backend is unreachable, `retryable` on 0/408/429/5xx) and never resolves to an
+backend is unreachable, `retryable` on 0/408/429/5xx and on `HMAC_ERROR`, which keeps its
+`errorType`; logged once per process) and never resolves to an
 empty value. A rejecting prefetch is not dehydrated, so the client query fetches
 on mount through axios, which can refresh. See
 [security-auth.md](./security-auth.md#ssr-data-fetching).
@@ -39,8 +45,13 @@ Restoring the session (`useMeQuery` → `AuthModel.getSession`) has three outcom
 | ---------------------------------------- | ------------------------------------------------------- |
 | no session hint (anonymous)              | resolves `null` with no request: no banner              |
 | success                                  | signed in                                               |
-| 401 (anonymous or refused refresh)       | resolves `null`: normal signed-out flow, no banner      |
+| 401 or 404 (`isSessionGoneError`)        | resolves `null`: normal signed-out flow, no banner      |
 | transient (network, timeout, 5xx)        | query error with `retryable: true`: **banner + Retry**  |
+| `HMAC_ERROR` (browser or SSR read)       | session kept, no refresh, `retryable: true`: **banner + Retry** |
+
+A 404 signs out because the bundled backends answer a deleted user and an unknown
+route with the same `NOT_FOUND`; a misrouted API prefix or gateway 404 therefore
+signs the user out too.
 
 `useAuth()` exposes `sessionUnavailable` (`isSessionUnavailable(error)`) and
 `retrySession()`. The root layout renders `<SessionAlert />` above the page

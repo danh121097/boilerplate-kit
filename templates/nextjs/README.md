@@ -52,7 +52,7 @@ Copy `.env.example` to `.env.local` and fill in:
 | `NEXT_PUBLIC_API_PREFIX`    | REST version prefix appended to the endpoint (default `/api/v1`)             |
 | `NEXT_PUBLIC_APP_NAME`      | Prefix for cookie, storage and lock keys (default `PRISM_APP`)               |
 | `NEXT_PUBLIC_LANGUAGE_CODE` | Default locale (`en` or `ja`) when no language cookie is set                 |
-| `NEXT_PUBLIC_HMAC_SECRET`   | HMAC signing secret (must match backend)                                     |
+| `NEXT_PUBLIC_HMAC_SECRET`   | Required by the bundled backends; must equal the backend `HMAC_SECRET` (empty = every request 401s) |
 | `NEXT_PUBLIC_BUILD_VERSION` | Version string sent as `x-version` header                                    |
 | `NEXT_PUBLIC_AUTH_MOCK`     | Optional, dev only: `true` answers `/auth/*` and `/users` before the backend exists (ignored in production builds) |
 | `NEXT_PUBLIC_AUTH_MOCK_EMAIL` / `NEXT_PUBLIC_AUTH_MOCK_PASSWORD` | Mock login credentials (default `demo@example.com` / `password`) |
@@ -64,7 +64,7 @@ src/
 ├── app/           # App Router: layout, providers, pages (/, /counter, /login, /users, /form), not-found
 ├── proxy.ts       # Route guard (guest → /login?redirect=…)
 ├── components/    # site-header, socket-status, session-banner, ui/ (shadcn primitives incl. dialog)
-├── server/        # SSR helpers (RSC only): server-api, session, hydrated queries
+├── server/        # SSR helpers (RSC only): server-api, hydrated queries
 ├── services/      # Axios service layer (client only): core, auth, users
 ├── stores/        # Zustand stores (counter, socket-io)
 ├── hooks/         # useSocketIO (opened by SocketStatus while signed in)
@@ -80,7 +80,7 @@ src/
 | ---------- | --------------------------------------------------------------------------- |
 | `/`        | Home + dialog demo (`@radix-ui/react-dialog` via shadcn `dialog.tsx`)        |
 | `/counter` | Zustand counter (client)                                                    |
-| `/login`   | Sign in — react-hook-form + zod (email, password ≥ 8), server error alert    |
+| `/login`   | Sign in — react-hook-form + zod (email, password non-empty), server error alert    |
 | `/users`   | Guarded user list — server prefetch + hydrate, `PaginatedResponse<User>`, empty state |
 | `/form`    | react-hook-form + zod validation                                            |
 | other      | Localized "Page not found" (`app/not-found.tsx`)                             |
@@ -100,7 +100,18 @@ through axios, which can refresh.
 If restoring the session fails for a transient reason (network error, timeout,
 5xx), the user stays as they were and a banner (`session.unavailable`, with a
 `session.retry` button) appears above the page; it disappears once a retry
-succeeds. A 401 is the normal signed-out flow and shows no banner.
+succeeds. A 401 (or 404 on `/auth/me`) is the normal signed-out flow and shows no
+banner. A 404 also signs out on a misrouted API prefix or gateway, because the
+bundled backends answer a deleted user and an unknown route with the same
+`NOT_FOUND`. An `HMAC_ERROR` (secret mismatch or clock skew over 5 minutes) keeps
+the session, never refreshes, and shows the banner.
+
+## Real backend checklist
+
+1. Turn mock auth off (`NEXT_PUBLIC_AUTH_MOCK` unset or not `true`/`1`).
+2. Set `NEXT_PUBLIC_APP_ENDPOINT` and `NEXT_PUBLIC_API_PREFIX` to the backend.
+3. Set `NEXT_PUBLIC_HMAC_SECRET` to the backend `HMAC_SECRET` value. The dev
+   console warns once when it is empty.
 
 ## Architecture
 

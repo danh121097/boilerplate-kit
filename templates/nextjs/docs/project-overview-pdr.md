@@ -44,7 +44,7 @@ pnpm format       # prettier --write
 
 - No `any` without explicit justification comment.
 - `strict: true`, `noUncheckedIndexedAccess`, `noFallthroughCasesInSwitch` and `verbatimModuleSyntax` in tsconfig (type-only imports use `import type`); `isolatedModules: true` for Next.js compatibility.
-- HMAC secret must match backend `HMAC_SECRET`; leave empty for backends without HMAC.
+- `NEXT_PUBLIC_HMAC_SECRET` is required by the bundled backends and must equal the backend `HMAC_SECRET`; empty makes every request 401 (the dev console warns once).
 - Both tokens (accessToken + refreshToken) are httpOnly cookies, server-managed. Client never reads them.
 - Service layer is client-side only — never call service methods in RSC or server actions.
 - Server Components use `serverApiGet()` helpers for auth-protected data (forwards cookies + HMAC).

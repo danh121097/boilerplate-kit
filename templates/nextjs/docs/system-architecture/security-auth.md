@@ -113,9 +113,12 @@ trailing slash). Anything else falls back to `/`.
 
 ## Boot
 
-The profile (`auth.me`) is prefetched on the server and read again in the
-browser. Only a 401 ends the session; a network error or 5xx keeps the hint and
-surfaces a retryable error.
+The profile (`auth.me`) is read in the browser only; nothing prefetches it on the
+server (only `/users` prefetches, via `HydratedQueries`). A 401 or 404
+(`isSessionGoneError`) ends the session; a network error, timeout, 5xx or
+`HMAC_ERROR` keeps the hint and surfaces a retryable error. Express answers a
+deleted user and an unknown route with the same `NOT_FOUND`, so a misrouted API
+prefix or a gateway 404 also signs the user out.
 
 ## Session Hint
 
@@ -161,7 +164,10 @@ Both are guarded for SSR and tests.
 
 ## HMAC Request Signing
 
-Every request gets three headers when `NEXT_PUBLIC_HMAC_SECRET` is set:
+`NEXT_PUBLIC_HMAC_SECRET` is required by the bundled backends and must equal the
+backend `HMAC_SECRET`. With it empty no signature is sent, every request gets
+401 `HMAC_ERROR`, and a dev build warns once (mock auth off). Otherwise every
+request gets three headers:
 
 | Header      | Value                                         |
 | ----------- | --------------------------------------------- |
@@ -189,6 +195,13 @@ ctime\n
   `application/x-www-form-urlencoded`, anything else → `application/json`.
 - `multipart/form-data` is **not supported** with HMAC on: the browser appends a
   generated `boundary` after signing, so the signature cannot match.
+- The backend accepts `ctime` within ±5 minutes (`MAX_TIMESTAMP_AGE_MS`); no body
+  hash and no nonce, so a signature can be replayed inside that window.
+- On a 401 with `errorType: "HMAC_ERROR"` (wrong secret or clock skew) the
+  interceptor does not refresh and keeps the session: the error is `retryable`
+  and the "session unavailable" banner shows. A refresh call rejected with
+  `HMAC_ERROR` is treated the same way (`refreshHmacRejected`), not as a revoked
+  session.
 - `HMACSignatureGenerator.signRequest({ method, path, contentType })` is the
   shared core: the interceptor, the bare refresh client (bodyless → `""`) and
   `server/server-api.ts` all sign through it.
@@ -215,7 +228,11 @@ A 401 on service ADMIN only triggers ADMIN's refresh; MAIN is unaffected.
 | accessToken | httpOnly cookie | 15m | No (server-managed) |
 | refreshToken | httpOnly cookie | 7d | No (server-managed) |
 
-httpOnly cookies are inaccessible to JavaScript — no XSS exfiltration risk.
+httpOnly cookies are inaccessible to JavaScript, so XSS cannot read them
+directly. Accepted risk: the backend also returns the tokens in the JSON body of
+login, register and refresh, even in cookie mode. Script running on the page can
+call `/auth/refresh` and read a fresh refresh token from the response. Opt-in
+backlog item: have the backend omit tokens from the body for cookie clients.
 The client never reads or stores tokens; it only sends requests with
 `withCredentials: true`, and the browser auto-includes the cookies.
 
@@ -235,6 +252,10 @@ would trigger reuse detection (all sessions revoked). Instead:
 
 - missing/expired access cookie or backend 401 → rejects with an
   `ApiResponseError` `{ error_code: 401 }`;
+- backend 401 `HMAC_ERROR` → rejects with an `ApiResponseError` keeping
+  `errorType: "HMAC_ERROR"` and `retryable: true`, logged once per server process
+  (check the server clock and that the secret matches). The session is kept: no
+  refresh, and the client shows the "session unavailable" banner;
 - any other failure → rejects with an `ApiResponseError` (`error_code` = HTTP
   status, 0 when unreachable; `retryable` on 0/408/429/5xx) — never `null` or
   an empty list.
@@ -244,11 +265,14 @@ through axios, which refreshes and replays.
 
 ## Security Notes
 
-- HMAC is anti-casual-abuse only, not authentication: `NEXT_PUBLIC_HMAC_SECRET`
-  is inlined into the client bundle, so anyone can read it and sign requests.
-  Access control relies on the JWT cookies. For a real integrity guarantee,
-  proxy through a Next.js Route Handler that signs with a server-only secret.
-- Tokens are httpOnly cookies (no XSS risk from client JavaScript).
+- HMAC is anti-abuse / light integrity only, not a security boundary:
+  `NEXT_PUBLIC_HMAC_SECRET` is inlined into the client bundle, so anyone can read
+  it and sign requests; there is no body hash or nonce and the window is ±5
+  minutes. Access control relies on the JWT cookies. For a real integrity
+  guarantee, proxy through a Next.js Route Handler that signs with a server-only
+  secret.
+- Tokens are httpOnly cookies, but the backend also returns them in the response
+  body (see Cookie Storage Model): XSS can obtain a fresh refresh token.
 - No server actions in the starter — all auth mutations go through the axios client.
 
 ## Query cache on session end
