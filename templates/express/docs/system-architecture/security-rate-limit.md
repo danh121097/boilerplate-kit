@@ -79,6 +79,11 @@ each one counts:
 - **Login bucket (30 / 15 min)** — `login` only, its own counter; login attempts do
   not consume the auth bucket and the reverse.
 
+Behind a reverse proxy or NAT without a correct `TRUST_PROXY` every client shares the
+proxy's IP, hence one bucket, and the shared auth bucket (30 / 15 min) can be
+exhausted for all users. Set `TRUST_PROXY` to the hop count (preferred) or proxy
+IPs/subnets so `req.ip` is the real client.
+
 All limiters:
 
 - `standardHeaders: true`, `legacyHeaders: false` (emit `RateLimit-*` headers).
