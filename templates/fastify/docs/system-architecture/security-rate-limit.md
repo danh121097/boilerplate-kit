@@ -46,7 +46,10 @@ errorType HMAC_ERROR.
 
 TRUST_PROXY is unset by default. Fastify 5.12 accepts true/false or explicit
 IP/CIDR ranges. Hop-count-only trust is intentionally not supported because it
-cannot establish that the immediate peer is trusted.
+cannot establish that the immediate peer is trusted. The rate limiters key on
+client IP, so behind a reverse proxy or NAT without a correct TRUST_PROXY all
+clients share one bucket and the shared auth bucket (30 per 15 minutes) can be
+exhausted for everyone.
 
 ## Authentication and authorization
 
