@@ -21,6 +21,8 @@ interface SharedGroup {
 
 const REACT_ROOTS = ["tanstack-start/src", "reactjs/src", "react-native/src", "nextjs/src"];
 const VUE_ROOTS = ["vuejs/src", "nuxtjs/app"];
+const ALL_FRONTEND_ROOTS = [...REACT_ROOTS, ...VUE_ROOTS];
+const BACKEND_ROOTS = ["express", "fastify"];
 
 /** jest (react-native) → vitest: drop the vitest import, use `vi` for mocks. */
 const asVitest = (source: string) =>
@@ -64,6 +66,36 @@ const GROUPS: SharedGroup[] = [
     files: ["services/core/tanstack-mutation.ts", "services/core/tanstack-optimistic.ts"],
     roots: ["tanstack-start/src", "vuejs/src"],
     normalize: asReactQuery,
+  },
+  {
+    // interceptors.ts is left out on purpose: it differs from nextjs only by the dev-mode check
+    // and the env-var name in a warning (import.meta.env.DEV / VITE_* vs process.env / NEXT_PUBLIC_*).
+    name: "React cookie-mode auth core",
+    files: [
+      "services/core/refresh-token-manager.ts",
+      "services/core/session.ts",
+      "services/core/api-errors.ts",
+      "services/core/types.ts",
+      "services/core/auth-refresh-client.ts",
+      "services/core/headers-utils.ts",
+    ],
+    roots: ["tanstack-start/src", "nextjs/src"],
+  },
+  {
+    // Token-mode web clients (bearer + body tokens) share these; the cookie-mode copies differ on purpose.
+    name: "Token-mode web transport",
+    files: ["services/core/api.ts", "services/core/socket-connection.ts"],
+    roots: ["reactjs/src", "vuejs/src"],
+  },
+  {
+    name: "Socket events enum",
+    files: ["enums/socket-events.ts"],
+    roots: ALL_FRONTEND_ROOTS,
+  },
+  {
+    name: "Backend auth and HMAC",
+    files: ["src/modules/auth/refresh-session.ts", "src/utils/hmac.ts"],
+    roots: BACKEND_ROOTS,
   },
 ];
 
