@@ -363,7 +363,7 @@ list or its error (a 401 renders loading and the browser refreshes). `serverApi*
 unreachable, 408, 429 and 5xx) instead of returning `null`. SSR never calls
 `/auth/refresh`. A 404 from `/auth/me` counts as signed out like a 401 (the
 account is gone); the trade-off is that a 404 from a wrong `API_PREFIX` or
-gateway signs the user out too. An `HMAC_ERROR` keeps the session and shows the
+gateway signs the user out too. The session end also posts `/auth/logout`, which revokes the user's access tokens on every device (Redis on), so that misconfiguration can sign the user out elsewhere too. An `HMAC_ERROR` keeps the session and shows the
 banner. Only a 401/404 ends the session on boot: a retryable failure keeps
 the session and `layouts/default.vue` shows a `role="alert"` banner
 (`session.unavailable`) with a Retry button (`session.retry`, `refetchSession()`);
