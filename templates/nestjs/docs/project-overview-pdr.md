@@ -55,7 +55,10 @@ recomputes an HMAC-SHA256 over `[method, contentType, ctime, path, ""].join("\n"
 and compares in constant time; timestamps older than 5 minutes are rejected
 (bounds the replay window; no nonce). The signed `path` is derived by stripping the global API
 prefix from `req.originalUrl` (`derivePath`). See `src/common/services/hmac.service.ts`
-and `src/common/guards/security.guard.ts`.
+and `src/common/guards/security.guard.ts`. Failures are `401` with `errorType:
+"HMAC_ERROR"`. HMAC is an anti-abuse layer, not a security boundary: a secret
+shipped to a browser or app is public (details in
+`docs/system-architecture/hmac-verification.md`).
 
 ## Optional Redis Tier
 

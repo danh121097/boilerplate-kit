@@ -80,7 +80,9 @@ is ever mounted under an adapter that does not install the middleware.
 
 ### 1. HMAC gate
 
-Reads `sig` and `ctime` from the handshake `auth` payload and verifies a
+Reads only `sig` and `ctime` from the handshake `auth` payload (the server reads
+nothing else from the client, and takes the role from the JWT, never the payload)
+and verifies a
 **fixed** contract:
 
 ```ts
@@ -115,7 +117,9 @@ client.emit(SOCKET_EVENT.AUTHENTICATED);
 
 Same `verifyAccessToken` + user-level revocation check as the HTTP JWT step
 (revocation is no-op / fail-open when Redis is off). On success
-`socket.data.user` is populated; the gateway then joins the per-user room.
+`socket.data.user` (the JWT payload, including `role`) is populated; the gateway
+then joins `user:<userId>`. The only event the backend emits on connect is
+`authenticated`; there are no `unauthorized` / `notification` events.
 
 ## Events
 
@@ -143,8 +147,8 @@ emitBroadcast(event, payload); // gateway.server?.emit(...)
 `emitToUser` targets the per-user room joined on connection. Inject
 `SocketEmitService` anywhere it is needed (it is exported from `RealtimeModule`).
 `disconnectUser(userId)` force-disconnects all of a user's sockets (across instances
-with Redis); auth calls it on logout and when reuse detection revokes a session
-family. It is a no-op when the socket server is not initialised.
+with Redis); auth calls it on logout and when reuse detection revokes all of the
+user's tokens. It is a no-op when the socket server is not initialised.
 
 ## See Also
 

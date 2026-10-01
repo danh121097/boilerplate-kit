@@ -1,5 +1,5 @@
 /**
- * E2E — a family revoke racing a rotation must never leave a live token.
+ * E2E — a revoke-all racing a rotation must never leave a live token.
  *
  * The successor N is inserted first, then the predecessor P is re-read; a revoke
  * that removed P's rotatedAt before that re-read makes the refresh revoke N and

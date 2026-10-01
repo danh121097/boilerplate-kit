@@ -7,17 +7,17 @@ focused page under [`system-architecture/`](./system-architecture/).
 
 ## Stack At A Glance
 
-| Concern                | Choice                                                                                                 |
-| ---------------------- | ------------------------------------------------------------------------------------------------------ |
-| Runtime / language     | Node.js + TypeScript (package manager: **pnpm**, PM-agnostic)                                          |
-| Framework              | NestJS 11 (`@nestjs/platform-express`)                                                                 |
-| Data store             | MongoDB via `@nestjs/mongoose`                                                                         |
-| Access tokens          | JWT **RS256** (RSA keypair), 15 min default                                                            |
-| Refresh tokens         | JWT **HS256** (symmetric secret), 7 day default, httpOnly cookie, DB-tracked + rotated, reuse-detected |
-| Request signing        | HMAC-SHA256 signature on every route (and socket handshake); anti-casual-abuse only                    |
-| Realtime               | Socket.IO via `@nestjs/websockets` (HMAC + JWT gated handshake)                                        |
-| API docs               | `@nestjs/swagger` — live OpenAPI UI at `/docs`                                                         |
-| Optional cache / scale | Redis (throttler store, token revocation, cache, socket adapter)                                       |
+| Concern                | Choice                                                                                                                   |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Runtime / language     | Node.js + TypeScript (package manager: **pnpm**, PM-agnostic)                                                            |
+| Framework              | NestJS 11 (`@nestjs/platform-express`)                                                                                   |
+| Data store             | MongoDB via `@nestjs/mongoose`                                                                                           |
+| Access tokens          | JWT **RS256** (RSA keypair), 15 min default                                                                              |
+| Refresh tokens         | JWT **HS256** (symmetric secret), 7 day default, httpOnly cookie, DB-tracked + rotated, reuse-detected                   |
+| Request signing        | HMAC-SHA256 signature on every route (and socket handshake); anti-abuse / light integrity layer, not a security boundary |
+| Realtime               | Socket.IO via `@nestjs/websockets` (HMAC + JWT gated handshake)                                                          |
+| API docs               | `@nestjs/swagger` — live OpenAPI UI at `/docs`                                                                           |
+| Optional cache / scale | Redis (throttler store, token revocation, cache, socket adapter)                                                         |
 
 ## Boot Sequence
 

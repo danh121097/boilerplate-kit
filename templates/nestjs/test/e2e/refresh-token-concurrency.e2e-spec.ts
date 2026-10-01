@@ -37,7 +37,7 @@ function signedPost(path: string, body: object) {
 }
 
 describe("Refresh token concurrency", () => {
-  it("parallel refreshes with one token claim it once and never revoke the family", async () => {
+  it("parallel refreshes with one token claim it once and never revoke anything", async () => {
     const reg = await signedPost("/auth/register", {
       email: "race@example.com",
       password: "RaceTest1!",

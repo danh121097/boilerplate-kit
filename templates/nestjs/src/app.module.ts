@@ -19,8 +19,8 @@ import { APP_GUARD } from "@nestjs/core";
  *   1. SecurityGuard  — composite HMAC → origin/CSRF → JWT → roles (ordered internally).
  *   2. AppThrottlerGuard — rate limiting (registered via ThrottlerConfigModule).
  *
- * Internal ordering within SecurityGuard is deterministic and not affected by
- * APP_GUARD array position. Throttler is order-independent (it only counts).
+ * Internal ordering within SecurityGuard is deterministic. SecurityGuard runs before
+ * the throttler, so requests it rejects (HMAC, CSRF, JWT, role) are not counted.
  */
 @Module({
   imports: [

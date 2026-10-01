@@ -120,6 +120,13 @@ variables accept only a positive integer followed by `s`, `m`, `h` or `d`
 `clearTokenCookies` clears both. Because `refresh` and `logout` accept the token
 from the request body too, non-browser / SSR clients work without cookies.
 
+**Tokens in the body are by design.** register / login / refresh also return
+`{ accessToken, refreshToken }` in the JSON body, because token-mode clients (and
+native apps) have no cookie jar. Consequence, accepted: a cookie-mode browser
+client with an XSS hole can call `/auth/refresh` and read a fresh refresh token
+from the response, which httpOnly alone does not prevent. Mitigation (an opt-in
+body-less mode) is backlog.
+
 ## Auth Flows
 
 All flows live in
@@ -139,11 +146,13 @@ All flows live in
   (today always 401; a 403 from a future guard is handled the same) clears both
   token cookies (same options as set) before the unchanged error is returned;
   5xx/429 do not. See rotation below.
-- **logout** (`POST /auth/logout`, `@Public`) — revoke every token of the
-  presented token's `familyId` (the device session chain) and clear their
-  `rotatedAt`, so a graced predecessor cannot resurrect it; other families
-  (devices) stay logged in, and a legacy token without `familyId` revokes only
-  itself. Then call `revokeUserTokens(userId)` (Redis
+- **logout** (`POST /auth/logout`, `@Public`) — delete every token of the
+  presented token's `familyId` (the device session chain), so neither a graced
+  predecessor nor a replay can resurrect it; other families (devices) keep their
+  refresh tokens (with Redis on, the cutoff below still invalidates their access
+  tokens until they refresh), and a legacy token without `familyId` deletes only itself. A deleted token
+  is simply unknown, so replaying it is a plain `401` that does not trip reuse
+  detection. Then call `revokeUserTokens(userId)` (Redis
   access-token cutoff), disconnect the user's sockets, clear cookies. Graceful
   when no token is present. A bodyless request works like `{}`.
 - **getMe** (`GET /auth/me`) — JWT required; returns the user resolved from
@@ -151,7 +160,7 @@ All flows live in
 
 ### Refresh Rotation + Reuse Detection
 
-`AuthService.refresh` looks the token up by **hash** (no signature verify on the
+`RefreshSessionService.refresh` looks the token up by **hash** (no signature verify on the
 hot path) and **claims it atomically**, so concurrent refreshes with the same
 token produce exactly one `200`:
 
@@ -166,7 +175,7 @@ if (!claimed) return this.resolveUnclaimableToken(hashedToken); // 2. re-lookup 
 //   unknown → 401
 //   revoked by a rotation ≤ REFRESH_REUSE_GRACE_MS ago, unexpired → benign retry:
 //               issue a fresh pair (200), revoke nothing
-//   otherwise revoked → REUSE DETECTED: updateMany({ userId },
+//   otherwise revoked → REUSE DETECTED (revokeAllUserTokens): updateMany({ userId },
 //               { $set: { isRevoked: true }, $unset: { rotatedAt: 1 } })
 //               + revokeUserTokens(userId) + disconnect sockets → 401 "Refresh token reuse detected — …"
 //   expired → deleteOne → 401
@@ -187,17 +196,21 @@ response, parallel tabs) from theft. A token consumed by a rotation records
 fresh cookies, same body) without revoking anything — a refused refresh would
 clear the cookies the first response just set and kill the winner's session.
 `familyId` is new on register/login and inherited by every rotation and graced
-re-issue. Logout revokes the family and clears `rotatedAt`, so replaying a
-logged-out chain is always reuse. A reuse-detected revoke clears `rotatedAt` on
+re-issue. Logout deletes the family, so replaying a logged-out token finds no
+record and gets a plain `401` (no user-wide refresh-token revoke; other
+families keep their refresh tokens, though logout's Redis cutoff makes their
+access tokens `401` until refreshed). Only reuse of a _rotated_ token past the grace window revokes every
+token of the user. That revoke clears `rotatedAt` on
 every token of the user, so a graced replay cannot resurrect it. See
 `test/e2e/refresh-token-reuse-grace.e2e-spec.ts`.
 
 **Revoke racing a rotation.** Both the normal and the graced path insert the
-successor N first, then re-read the predecessor P by `_id`. Every revoke path
-(family logout, user-wide reuse) `$unset`s `rotatedAt`, so a missing `rotatedAt`
-means a revoke landed before N existed and could not cover it: N is revoked and
-the refresh is refused with the normal 401 (cookies cleared). A revoke after N's
-insert already covers N through its `updateMany`. Either ordering leaves no live
+successor N first, then re-read the predecessor P by `_id`. Both revoke paths
+remove P's `rotatedAt` (user-wide reuse `$unset`s it, family logout deletes P), so
+a missing P or `rotatedAt` means a revoke landed before N existed and could not
+cover it: N is revoked and the refresh is refused with the normal 401 (cookies
+cleared). A revoke after N's insert already covers N through its `updateMany` /
+`deleteMany`. Either ordering leaves no live
 token; see `test/e2e/refresh-rotation-revoke-race.e2e-spec.ts`. A stolen token replayed within the window is
 indistinguishable from a retry: it mints another live token for that family.
 Clients should still single-flight refreshes (the frontend templates lock across tabs).

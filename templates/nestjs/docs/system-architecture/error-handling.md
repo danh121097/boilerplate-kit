@@ -57,22 +57,27 @@ res.status(statusCode).json({
   message,
   error_code: statusCode, // mirrored under the client's field names
   error_message: message,
-  ...(isDev && stack ? { stack } : {}), // stack only outside production
+  ...(isDev && status >= 500 && stack ? { stack } : {}), // dev + 5xx only
 });
 ```
 
 - `error_code` / `error_message` mirror the status + message under the field
   names the client error type expects (keeps the contract stable for the
   frontend).
-- The stack is included **only** when `NODE_ENV !== "production"`.
+- The stack is included **only** when `NODE_ENV === "development"` and the status
+  is `>= 500`.
 - Severity mirrors the status: 5xx → `logger.error` (with stack), 4xx →
   `logger.warn`.
 
 ## Not-Found (unmatched routes)
 
-There is no separate not-found handler. An unmatched route produces Nest's
-default `NotFoundException` (404), which the global filter catches and renders
-with `errorType: "NOT_FOUND"` — the same envelope as every other error.
+Unmatched routes under the API prefix are answered by `NotFoundModule`'s
+catch-all controller (`modules/not-found`), registered last so it only matches
+what no other route does. It sits behind `SecurityGuard`: unsigned requests get
+`401 HMAC_ERROR`, signed ones get `404 NOT_FOUND` "Resource not found!". A router
+404 that still reaches the filter (a path outside the prefix) carries Nest's
+"Cannot GET …" text, which the filter rewrites to "Resource not found!", while
+handler-thrown `NotFoundException`s keep their message.
 
 ## Status → ErrorType Mapping
 

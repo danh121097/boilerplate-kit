@@ -25,7 +25,7 @@ global `ZodValidationPipe`, and live Swagger docs at `/docs`. Package manager:
 ## Conventions Quick Reference
 
 - **Module pattern**: each feature = a Nest module with `*.controller.ts` +
-  `*.service.ts` (+ `dto/*.dto.ts`); register it in `app.module.ts` `imports[]`.
+  `*.service.ts` (+ `dto/*.dto.ts`); register it in `app.module.ts` `imports[]` **above** `NotFoundModule` (it must stay the last import).
   Routes are decorator-driven (`@Controller`/`@Get`/`@Post`) — no manual registry.
 - **Security**: one composite `SecurityGuard` runs HMAC → origin/CSRF → JWT →
   roles. Declare intent per route with `@Public()` / `@Roles('admin')` /

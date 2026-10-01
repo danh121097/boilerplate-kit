@@ -4,8 +4,8 @@
  * A rotated refresh token replayed within REFRESH_REUSE_GRACE_MS is a benign
  * retry/race: the caller gets a fresh pair and no session is revoked. Outside the
  * window, replay is reuse: every refresh token of the user is revoked (and rotatedAt
- * cleared so a later replay of a recently rotated token cannot resurrect the
- * family). Logout deletes the device's family, so a replayed token is unknown (a
+ * cleared so a later replay of a recently rotated token cannot resurrect a
+ * session). Logout deletes the device's family, so a replayed token is unknown (a
  * generic 401) and other devices are untouched.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -89,12 +89,12 @@ describe("Refresh reuse grace window", () => {
     expect(successor.status).toBe(401);
   });
 
-  it("after a family revoke, replaying a recently rotated token is rejected (no resurrection)", async () => {
+  it("after a revoke-all, replaying a recently rotated token is rejected (no resurrection)", async () => {
     const r1 = await startSession();
     const r2 = tokenOf(await signedPost("/auth/refresh", { refreshToken: r1 }));
     const r3 = tokenOf(await signedPost("/auth/refresh", { refreshToken: r2 }));
 
-    // r1 replayed after the window nukes the family, including the freshly rotated r2.
+    // r1 replayed after the window revokes every token of the user, including the freshly rotated r2.
     await backdateRotation(app, r1, REFRESH_REUSE_GRACE_MS + 1_000);
     expect((await signedPost("/auth/refresh", { refreshToken: r1 })).status).toBe(401);
     expect((await findStoredToken(app, r2))?.rotatedAt).toBeUndefined();

@@ -61,8 +61,9 @@ async canActivate(context: ExecutionContext): Promise<boolean> {
   is off), and sets `req.user`.
 - **Role** compares `ROLE_RANK[user.role]` against the minimum from `@Roles`.
 
-The throttler (`AppThrottlerGuard`) is a separate `APP_GUARD` — order-independent
-because it only counts. See
+The throttler (`AppThrottlerGuard`) is a separate `APP_GUARD` that runs after
+`SecurityGuard`: a request rejected by HMAC, CSRF, JWT or roles is never counted.
+See
 [security-rate-limit.md](./security-rate-limit.md).
 
 ## Decorated Routes (no manual registry)
@@ -82,7 +83,7 @@ export class AuthController {
 ```
 
 A `@Post('login')` in `@Controller('auth')` under `API_PREFIX=/api/v1` resolves
-to `POST /api/v1/auth/login`. Adding a module = import it in `app.module.ts`.
+to `POST /api/v1/auth/login`. Adding a module = import it in `app.module.ts` above `NotFoundModule`, which must stay the last import.
 
 ## Controller → Service → Response
 

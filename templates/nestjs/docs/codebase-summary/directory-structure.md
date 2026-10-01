@@ -36,7 +36,7 @@ src/
 │   │   └── throttler.module.ts         # named-throttler config (default / auth / strict tiers)
 │   ├── guards/
 │   │   ├── security.guard.ts  # Composite guard: HMAC → origin/CSRF → JWT → role
-│   │   ├── origin-check.ts    # assertAllowedOrigin: deny-by-default CSRF origin check (GET/HEAD/OPTIONS exempt)
+│   │   ├── origin-check.ts    # assertAllowedOrigin: deny-by-default CSRF origin check (GET/HEAD/OPTIONS and cookie-/origin-/referer-less requests exempt)
 │   │   └── derive-path.ts     # derivePath: strip apiPrefix + query to get the signed path
 │   ├── decorators/
 │   │   ├── public.decorator.ts      # @Public() → IS_PUBLIC_KEY (skip JWT step)
@@ -82,6 +82,9 @@ src/
 │   │   ├── user.controller.ts  # @Controller('users'): list (@Roles admin) + get-by-id
 │   │   ├── user.service.ts     # listUsers (offset pagination) + getUserById
 │   │   └── serialize-user.ts   # serializeUser allowlist → PublicUser (the response contract)
+│   ├── not-found/
+│   │   ├── not-found.module.ts # must stay the LAST AppModule import
+│   │   └── not-found.controller.ts # @Public catch-all: unsigned 401 HMAC_ERROR, signed 404 "Resource not found!"
 │   ├── health/
 │   │   ├── health.module.ts    # HealthController
 │   │   └── health.controller.ts # GET /health (@Public): server + DB + Redis status

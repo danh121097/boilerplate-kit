@@ -122,7 +122,7 @@ export class RefreshSessionService {
       if (this.isWithinReuseGrace(storedToken)) {
         return this.issueSuccessor(storedToken);
       }
-      await this.revokeFamily(storedToken.userId);
+      await this.revokeAllUserTokens(storedToken.userId);
       throw new AppException({
         message: "Refresh token reuse detected — all sessions have been revoked!",
         statusCode: 401,
@@ -151,7 +151,7 @@ export class RefreshSessionService {
    * Revoke every refresh token of the user, clear rotatedAt so a graced replay
    * cannot resurrect a session, then revoke access tokens and drop sockets.
    */
-  private async revokeFamily(userId: Types.ObjectId): Promise<void> {
+  private async revokeAllUserTokens(userId: Types.ObjectId): Promise<void> {
     await this.refreshTokenModel.updateMany(
       { userId },
       { $set: { isRevoked: true }, $unset: { rotatedAt: 1 } },

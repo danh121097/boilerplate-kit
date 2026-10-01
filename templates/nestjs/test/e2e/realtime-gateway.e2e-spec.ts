@@ -6,7 +6,7 @@
  *   - Unsigned handshake → refused at the handshake (connect_error, never connected).
  *   - HMAC signed but no Bearer token → refused at the handshake.
  *   - Polling handshake from an allowed Origin carries CORS headers (Redis off).
- *   - Logout and a reuse-detected family revoke disconnect the user's sockets.
+ *   - Logout and a reuse-detected revoke-all disconnect the user's sockets.
  *
  * The socket test boots its own app instance; createTestApp binds its HTTP
  * server to a loopback port, which Socket.IO needs (supertest alone would not).
@@ -140,7 +140,11 @@ describe("Socket.IO gateway handshake", () => {
 
   afterEach(() => {
     for (const s of openSockets) {
-      try { if (s.connected) s.disconnect(); } catch { /* ignore */ }
+      try {
+        if (s.connected) s.disconnect();
+      } catch {
+        /* ignore */
+      }
     }
     openSockets.length = 0;
   });
@@ -151,9 +155,7 @@ describe("Socket.IO gateway handshake", () => {
       const accessToken = await getAccessToken();
       const { sig, ctime } = signSocketHandshake();
 
-      const { socket, event } = await connectAndWait(
-        { sig, ctime, token: accessToken },
-      );
+      const { socket, event } = await connectAndWait({ sig, ctime, token: accessToken });
       openSockets.push(socket);
 
       expect(event).toBe("authenticated");
@@ -218,7 +220,7 @@ describe("Socket.IO gateway handshake", () => {
   );
 
   it.skipIf(SKIP)(
-    "a reuse-detected family revoke disconnects the user's sockets",
+    "a reuse-detected revoke-all disconnects the user's sockets",
     async () => {
       const { accessToken, refreshToken } = await getTokens();
       const socket = await connectAuthenticated(accessToken);

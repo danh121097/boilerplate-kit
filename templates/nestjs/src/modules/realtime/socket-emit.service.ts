@@ -52,8 +52,8 @@ export class SocketEmitService {
   }
 
   /**
-   * Force-disconnect every socket of a user, e.g. after logout or a revoked session
-   * family. Local sockets go first so this instance honors the revoke even when the
+   * Force-disconnect every socket of a user, e.g. after logout or a reuse-triggered
+   * revoke-all. Local sockets go first so this instance honors the revoke even when the
    * Redis adapter is down; the cluster-wide call then reaches other instances.
    * No-op when the server is not initialized.
    */

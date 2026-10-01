@@ -63,7 +63,7 @@ any other thrown error — and emits one shape:
 }
 ```
 
-`stack` is included only in development. Throwing inside an async handler is
+`stack` is included only when `NODE_ENV=development` and the status is `>= 500`. Throwing inside an async handler is
 forwarded to the filter automatically — no `try/catch` wrapper needed unless you
 are translating a low-level error.
 

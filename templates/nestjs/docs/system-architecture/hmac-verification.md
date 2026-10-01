@@ -6,10 +6,16 @@ and bound how long a captured signature stays usable. Source:
 [`common/services/hmac.service.ts`](../../src/common/services/hmac.service.ts),
 [`common/guards/security.guard.ts`](../../src/common/guards/security.guard.ts).
 
-> **Scope:** this is anti-casual-abuse only, not integrity or replay protection.
-> The body and query string are not signed, there is no nonce (a captured
-> signature replays freely inside the 5-minute window), and browser/mobile
-> clients necessarily ship the secret. Authorization rests on the JWT.
+> **Scope:** HMAC is an anti-abuse / light-integrity layer, **not a security
+> boundary**. A secret shipped into a browser bundle or a mobile app is public, so
+> anyone can sign requests. The body and query string are not signed and there is
+> no nonce: a captured signature replays freely inside the ±5-minute window.
+> Authorization rests on the JWT.
+>
+> **Failures:** a missing, malformed, stale or wrong signature is a `401` with
+> `errorType: "HMAC_ERROR"` (distinct from `AUTHENTICATION_ERROR`, so clients can
+> tell a signing problem from a bad session and should not try to refresh). A
+> client clock more than 5 minutes off the server fails as `timestamp expired`.
 
 ## The Canonical String
 
@@ -40,7 +46,7 @@ Fields:
 
 There is no separate HMAC middleware — it is **step 1** of the composite
 `SecurityGuard`, so it runs for **every** route (including `@Public` and
-`/health`). It reads two headers — `sig` and `ctime` — and 401s if either is
+`/health`). It reads two headers — `sig` and `ctime` — and 401s (`HMAC_ERROR`) if either is
 missing:
 
 ```ts
@@ -52,7 +58,7 @@ const reason = this.hmacService.verifyHmac({
   path,
   sig,
 });
-if (reason) throw new AppException({ statusCode: 401, errorType: "AUTHENTICATION_ERROR", ... });
+if (reason) throw new AppException({ statusCode: 401, errorType: "HMAC_ERROR", ... });
 ```
 
 ### Path derivation (the NestJS subtlety)

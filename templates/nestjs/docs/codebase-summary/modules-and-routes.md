@@ -86,7 +86,7 @@ Route-level metadata read by the global guards:
 1. `nest g module <name>` (or hand-write `<name>.module.ts`).
 2. Add `<name>.controller.ts` (+ `<name>.service.ts`, `dto/` as needed).
 3. `MongooseModule.forFeature([...])` for any schema the service injects.
-4. Import the module in `app.module.ts` `imports[]` — the only wiring step.
+4. Import the module in `app.module.ts` `imports[]`, **above** `NotFoundModule`, which must stay the last import (its `{*path}` catch-all answers 404 for any route registered after it). An e2e test pins this. That is the only wiring step.
 
 The global `SecurityGuard`, `ZodValidationPipe`, and `HttpExceptionFilter` apply
 automatically; no per-route security wiring is needed beyond
@@ -94,15 +94,15 @@ automatically; no per-route security wiring is needed beyond
 
 ## Endpoints Today
 
-| Method | Path (under `API_PREFIX`) | Guards / Decorators                         | Notes                                  |
-| ------ | ------------------------- | ------------------------------------------- | -------------------------------------- |
-| GET    | `/health`                 | `@Public` (HMAC still enforced)             | server + DB + Redis status             |
-| POST   | `/auth/register`          | `@Public`, `@Throttle(auth)`, `RegisterDto` | sets token cookies                     |
-| POST   | `/auth/login`             | `@Public`, `@Throttle(login)`, `LoginDto`   | sets token cookies                     |
-| POST   | `/auth/refresh`           | `@Public`, `@Throttle(auth)`, `RefreshDto`  | rotates refresh token (body or cookie) |
-| POST   | `/auth/logout`            | `@Public`, `@Throttle(auth)`, `RefreshDto`  | revokes refresh + user access tokens   |
-| GET    | `/auth/me`                | JWT (no `@Public`), `@CurrentUser`          | current user profile                   |
-| GET    | `/users`                  | JWT + `@Roles('admin')`                     | list users (offset pagination)         |
-| GET    | `/users/:id`              | JWT + `@Roles('admin')`                     | user by id                             |
+| Method | Path (under `API_PREFIX`) | Guards / Decorators                         | Notes                                                           |
+| ------ | ------------------------- | ------------------------------------------- | --------------------------------------------------------------- |
+| GET    | `/health`                 | `@Public` (HMAC still enforced)             | server + DB + Redis status                                      |
+| POST   | `/auth/register`          | `@Public`, `@Throttle(auth)`, `RegisterDto` | sets token cookies                                              |
+| POST   | `/auth/login`             | `@Public`, `@Throttle(login)`, `LoginDto`   | sets token cookies                                              |
+| POST   | `/auth/refresh`           | `@Public`, `@Throttle(auth)`, `RefreshDto`  | rotates refresh token (body or cookie)                          |
+| POST   | `/auth/logout`            | `@Public`, `@Throttle(auth)`, `RefreshDto`  | deletes the device's refresh family, revokes user access tokens |
+| GET    | `/auth/me`                | JWT (no `@Public`), `@CurrentUser`          | current user profile                                            |
+| GET    | `/users`                  | JWT + `@Roles('admin')`                     | list users (offset pagination)                                  |
+| GET    | `/users/:id`              | JWT + `@Roles('admin')`                     | user by id                                                      |
 
 The live, always-accurate version of this table is the Swagger UI at `/docs`.

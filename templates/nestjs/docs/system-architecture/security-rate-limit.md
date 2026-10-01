@@ -54,6 +54,12 @@ every other method is checked
 request's `Origin` (falling back to the `Referer` origin) must be in the allowed
 CORS origins, else `403 AUTHORIZATION_ERROR`. Disabled by default.
 
+**Exemption:** a request with no `Cookie`, no `Origin` and no `Referer` header is
+let through. CSRF forges a browser's ambient credentials; a request that carries
+none (a native app or server client) has nothing to forge, and browsers always
+send `Origin` on cross-site POSTs, so browser CSRF stays closed. The raw header
+presence is tested, so a malformed `Referer` is not mistaken for an absent one.
+
 ## Rate Limiting
 
 [`throttler.module.ts`](../../src/common/throttler/throttler.module.ts) configures
@@ -65,6 +71,19 @@ CORS origins, else `403 AUTHORIZATION_ERROR`. Disabled by default.
 | `default`      | 60 s   | 100 | all routes (global cap)                           |
 | `auth`         | 15 min | 30  | `/auth/register`, `/auth/refresh`, `/auth/logout` |
 | `login`        | 15 min | 30  | `/auth/login` (brute-force protection)            |
+
+Counters are keyed by throttler name + client, not by route: `register`,
+`refresh` and `logout` draw from **one** `auth` bucket, `login` has its own, and
+`default` is one bucket per client across every route
+(`generateKey` in `AppThrottlerGuard`; pinned by
+`test/e2e/rate-limit-throttler.e2e-spec.ts`).
+
+What is counted: `AppThrottlerGuard` runs **after** `SecurityGuard`, so a request
+that `SecurityGuard` rejects (unsigned/stale HMAC, CSRF origin, missing or bad JWT,
+role) never reaches the throttler and is **not** counted, notably a request with a
+bad JWT does not consume the 100/min `default` cap. Express and Fastify do count
+such requests; this difference is accepted. A signed request to an unknown route
+passes the guard via `NotFoundModule` and is counted against `default`.
 
 Rate limits key on the client IP. Behind a reverse proxy set `TRUST_PROXY`
 (`true`/`false`, a hop count such as `1`, or a comma-separated list of
