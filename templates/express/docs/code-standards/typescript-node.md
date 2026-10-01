@@ -60,7 +60,7 @@ not call `next(err)` or wrap everything in try/catch.**
 
 - The global `errorHandler` (`src/middleware/error-handler.ts`) is registered
   **last** and renders the response envelope (and the stack only in
-  development). `notFoundHandler` handles unmatched routes.
+  development for 5xx). `notFoundHandler` handles unmatched routes.
 
 ## Zod validation middleware
 

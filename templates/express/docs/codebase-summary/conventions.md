@@ -46,7 +46,7 @@ throw new AppError({
 ```
 
 `errorType` is a fixed union: `VALIDATION_ERROR | AUTHENTICATION_ERROR |
-AUTHORIZATION_ERROR | NOT_FOUND | CONFLICT | RATE_LIMIT | INTERNAL_ERROR`.
+AUTHORIZATION_ERROR | HMAC_ERROR | NOT_FOUND | CONFLICT | RATE_LIMIT | INTERNAL_ERROR`.
 
 The global handler (`src/middleware/error-handler.ts`) catches it and emits one
 shape for every error:
@@ -62,7 +62,7 @@ shape for every error:
 }
 ```
 
-`stack` is included only in development. Success responses use
+`stack` is included only in development for 5xx responses. Success responses use
 `{ success: true, message?, data, meta? }`; the health route keeps `{ status: "ok", ... }`.
 User records are always projected through `serializeUser` (allowlist), never
 returned as raw documents. Express 5 forwards thrown errors from

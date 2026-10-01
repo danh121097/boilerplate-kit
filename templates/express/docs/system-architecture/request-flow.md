@@ -35,6 +35,10 @@ Key points:
   default) — so they only guard API routes, and `req.url` inside the HMAC
   middleware is already prefix-stripped by the mount (matters for path signing,
   see [hmac-verification.md](./hmac-verification.md)).
+- **The JSON body parser runs before HMAC**, so an unsigned request with a
+  malformed or oversize body fails as `400`/`413` before it can be rejected as
+  `401 HMAC_ERROR` (Fastify checks HMAC first). The body is not signed, so this
+  has no security impact.
 - **`notFoundHandler` then `errorHandler` are last.** Express 5 forwards thrown
   errors (including from `async` handlers) straight to the 4-arg error handler.
 

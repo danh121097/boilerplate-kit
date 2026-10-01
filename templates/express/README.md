@@ -10,7 +10,7 @@ Opinionated Node.js + TypeScript backend built on Express 5. Production-grade st
 | Framework      | Express 5                                                                                       |
 | Database       | MongoDB via Mongoose                                                                            |
 | Auth           | JWT access tokens (RS256, file keys) + refresh tokens (HS256 symmetric secret, httpOnly cookie) |
-| API signing    | Optional HMAC request signing (`src/middleware/hmac.ts`)                                        |
+| API signing    | HMAC request signing, required (`src/middleware/hmac.ts`)                                       |
 | Realtime       | Socket.io (+ optional `@socket.io/redis-adapter`)                                               |
 | Cache / limits | Redis (optional) — distributed rate-limit, cache, token revocation                              |
 | Validation     | Zod schemas per module + `validate()` middleware                                                |
@@ -40,37 +40,37 @@ gitignored — never commit `rsa.private`. Rotate with `pnpm keys --force` (or `
 
 All variables are documented in [`.env.example`](.env.example). Key ones:
 
-| Variable                                       | Purpose                                                                                                                                                                                                   |
-| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PORT`                                         | HTTP port (default 3000)                                                                                                                                                                                  |
-| `MONGODB_URI`                                  | MongoDB connection string                                                                                                                                                                                 |
-| `API_PREFIX`                                   | Base path all routes mount under (default `/api/v1`)                                                                                                                                                      |
-| `ENABLE_CSRF`                                  | Optional. `true` turns on the Origin allow-list guard for mutating methods (default off). Allowed origins are the hard-coded `corsOrigins` list in `src/config/environment.ts` — edit it before deploying |
-| `COOKIE_DOMAIN`                                | Optional. Cookie `Domain` for split-domain deploys. Unset = host-only cookie                                                                                                                              |
-| `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH` | RS256 key file paths (access)                                                                                                                                                                             |
-| `JWT_REFRESH_SECRET`                           | HS256 symmetric secret for refresh tokens (required; use ≥32 random chars — length is not enforced)                                                                                                       |
-| `JWT_ACCESS_EXPIRY` / `JWT_REFRESH_EXPIRY`     | Token lifetimes                                                                                                                                                                                           |
-| `HMAC_SECRET`                                  | Secret for HMAC request signing                                                                                                                                                                           |
-| `REDIS_ENABLED` / `REDIS_URL`                  | Toggle + connection for Redis features                                                                                                                                                                    |
-| `TRUST_PROXY`                                  | Optional. Behind a reverse proxy/LB: a hop count (`1`, preferred over `true`), or a comma-separated IP/subnet list. Unset = trust nothing                                                                 |
-| `LOG_LEVEL`                                    | Optional. `debug` / `info` / `warn` / `error`. Unset = `debug` in development, `info` in production                                                                                                       |
-| `APP_NAME`                                     | Optional. Swagger title; unset = default title                                                                                                                                                            |
-| `DOCS_ENABLED`                                 | Optional. Swagger UI + OpenAPI at `/docs`. Unset = on outside production, off in production; `true`/`false` overrides                                                                                     |
+| Variable                                       | Purpose                                                                                                                                                                                                                                                                                                                                                               |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PORT`                                         | HTTP port (default 3000)                                                                                                                                                                                                                                                                                                                                              |
+| `MONGODB_URI`                                  | MongoDB connection string                                                                                                                                                                                                                                                                                                                                             |
+| `API_PREFIX`                                   | Base path all routes mount under (default `/api/v1`)                                                                                                                                                                                                                                                                                                                  |
+| `ENABLE_CSRF`                                  | Optional. `true` turns on the Origin allow-list guard for mutating methods (default off). Allowed origins are the hard-coded `corsOrigins` list in `src/config/environment.ts` — edit it before deploying. Requests with no `Cookie`, `Origin` and `Referer` header (native apps, server-to-server) are exempt: with no ambient credentials there is nothing to forge |
+| `COOKIE_DOMAIN`                                | Optional. Cookie `Domain` for split-domain deploys. Unset = host-only cookie                                                                                                                                                                                                                                                                                          |
+| `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH` | RS256 key file paths (access)                                                                                                                                                                                                                                                                                                                                         |
+| `JWT_REFRESH_SECRET`                           | HS256 symmetric secret for refresh tokens (required; use ≥32 random chars — length is not enforced)                                                                                                                                                                                                                                                                   |
+| `JWT_ACCESS_EXPIRY` / `JWT_REFRESH_EXPIRY`     | Token lifetimes                                                                                                                                                                                                                                                                                                                                                       |
+| `HMAC_SECRET`                                  | Required. Secret for HMAC request signing; must equal the secret the client signs with. Anti-abuse only: a secret shipped to a browser or app is public                                                                                                                                                                                                               |
+| `REDIS_ENABLED` / `REDIS_URL`                  | Toggle + connection for Redis features                                                                                                                                                                                                                                                                                                                                |
+| `TRUST_PROXY`                                  | Optional. Behind a reverse proxy/LB: a hop count (`1`, preferred over `true`), or a comma-separated IP/subnet list. Unset = trust nothing                                                                                                                                                                                                                             |
+| `LOG_LEVEL`                                    | Optional. `debug` / `info` / `warn` / `error`. Unset = `debug` in development, `info` in production                                                                                                                                                                                                                                                                   |
+| `APP_NAME`                                     | Optional. Swagger title; unset = default title                                                                                                                                                                                                                                                                                                                        |
+| `DOCS_ENABLED`                                 | Optional. Swagger UI + OpenAPI at `/docs`. Unset = on outside production, off in production; `true`/`false` overrides                                                                                                                                                                                                                                                 |
 
 ## Routes
 
 Mounted under `API_PREFIX` (default `/api/v1`):
 
-| Method | Path             | Auth           | Description                    |
-| ------ | ---------------- | -------------- | ------------------------------ |
-| GET    | `/health`        | public         | Server, DB, and Redis liveness |
-| POST   | `/auth/register` | public         | Create an account              |
-| POST   | `/auth/login`    | public         | Log in, set refresh cookie     |
-| POST   | `/auth/refresh`  | refresh cookie | Rotate access token            |
-| POST   | `/auth/logout`   | public         | Revoke session / clear cookie  |
-| GET    | `/auth/me`       | access token   | Current user                   |
-| GET    | `/users`         | admin          | List users                     |
-| GET    | `/users/:id`     | admin          | Get user by ID                 |
+| Method | Path             | Auth          | Description                    |
+| ------ | ---------------- | ------------- | ------------------------------ |
+| GET    | `/health`        | public        | Server, DB, and Redis liveness |
+| POST   | `/auth/register` | public        | Create an account              |
+| POST   | `/auth/login`    | public        | Log in, set refresh cookie     |
+| POST   | `/auth/refresh`  | refresh token | Rotate access token            |
+| POST   | `/auth/logout`   | public        | Revoke session / clear cookie  |
+| GET    | `/auth/me`       | access token  | Current user                   |
+| GET    | `/users`         | admin         | List users                     |
+| GET    | `/users/:id`     | admin         | Get user by ID                 |
 
 OpenAPI JSON is served at `/docs/json` and Swagger UI at `/docs`. In
 development, Swagger UI signs "Try it out" requests automatically, so only a

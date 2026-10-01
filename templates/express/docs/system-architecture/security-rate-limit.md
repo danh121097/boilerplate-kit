@@ -28,7 +28,12 @@ app.use(cors({ origin: config.corsOrigins, credentials: true }));
   [`middleware/verify-origin.ts`](../../src/middleware/verify-origin.ts) rejects
   mutating methods (anything but GET/HEAD/OPTIONS) whose `Origin` (or `Referer`
   origin) is not in `corsOrigins` with `403 AUTHORIZATION_ERROR`. It mounts on
-  `apiPrefix` right after HMAC; off by default.
+  `apiPrefix` right after HMAC; off by default. A request carrying **none** of
+  `Cookie`, `Origin` or `Referer` is exempt (native apps, server-to-server): CSRF
+  forges a browser's ambient credentials, and a request with no cookie has none to
+  ride on, while browsers always send `Origin` on a cross-site write. Presence is
+  checked on the raw headers, so a malformed `Referer` is not treated as absent, and
+  a `Cookie` without `Origin` or `Referer` is still `403`.
 
 ## Authentication & Authorization
 
@@ -60,7 +65,21 @@ limiters via `express-rate-limit`:
 | `loginRateLimiter`  | 15 min | 30  | `/auth/login` (own bucket, brute-force protection) |
 
 Stricter auth/login limiters layer **on top of** the global one via the route
-`middleware` chain. All limiters:
+`middleware` chain. Counters are per client IP (`req.ip`; see `TRUST_PROXY`). What
+each one counts:
+
+- **Global (100/min)** — every request under `apiPrefix` that passes HMAC and the
+  origin guard: all routes including `register`/`login`/`refresh`/`logout`, requests
+  with a bad or expired JWT (`authenticate` runs after the limiter), validation
+  failures, and signed requests to unknown paths (the 404). Not counted: requests
+  rejected by HMAC (`401`) or by the origin guard (`403`), and requests whose JSON
+  body fails to parse (`400`/`413`), because those reject before the limiter.
+- **Auth bucket (30 / 15 min)** — `register`, `refresh` and `logout` **share** one
+  counter, so 31 mixed calls from one client trip `429` on the 31st.
+- **Login bucket (30 / 15 min)** — `login` only, its own counter; login attempts do
+  not consume the auth bucket and the reverse.
+
+All limiters:
 
 - `standardHeaders: true`, `legacyHeaders: false` (emit `RateLimit-*` headers).
 - **`skip: () => isTest`** — disabled under `NODE_ENV=test`.
@@ -112,8 +131,8 @@ Socket.IO adapter.
   lowercase, uppercase, digit, and special char on register.
 - **bcrypt** (cost 12) for password storage; `select: false` keeps the hash out of
   query results.
-- **HMAC** request signing on every API route — see
-  [hmac-verification.md](./hmac-verification.md).
+- **HMAC** request signing on every API route (anti-abuse, not a security
+  boundary) — see [hmac-verification.md](./hmac-verification.md).
 - **Secrets via env** — `HMAC_SECRET` and `JWT_REFRESH_SECRET` (use ≥32 random
   chars; length is not enforced) are required
   (`getRequiredEnvVar` throws if missing); never commit them.

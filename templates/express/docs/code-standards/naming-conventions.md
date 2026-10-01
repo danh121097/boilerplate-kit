@@ -27,6 +27,7 @@ Back to [Code Standards](../code-standards.md). Filenames are covered in
     | "VALIDATION_ERROR"
     | "AUTHENTICATION_ERROR"
     | "AUTHORIZATION_ERROR"
+    | "HMAC_ERROR"
     | "NOT_FOUND"
     | "CONFLICT"
     | "RATE_LIMIT"

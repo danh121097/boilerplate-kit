@@ -52,8 +52,8 @@ only when every step closed cleanly, 1 otherwise or when shutdown exceeds 10 s.
   fails open on Redis errors — an outage never locks users out or 500s a route.
 - **HMAC contract is shared with the frontend.** The canonical string and
   Base64-HMAC-SHA256 encoding in `src/utils/hmac.ts` MUST byte-match the client
-  signer (`templates/vuejs` / `templates/nuxtjs`
-  `src/services/core/hmac-signature.ts`). See
+  signer (every frontend template's `services/core/hmac-signature.ts`, under
+  `src/` or `app/`). See
   [hmac-verification.md](./system-architecture/hmac-verification.md).
 - **One error envelope.** All errors flow through `AppError` and the global
   error-handler, emitting a single response shape the client error type expects.

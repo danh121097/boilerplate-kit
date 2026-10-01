@@ -40,7 +40,9 @@ Every request under `API_PREFIX` (and every Socket.IO handshake) must carry `sig
 
 - `ctime` headers. The server recomputes an HMAC-SHA256 over
   `[method, contentType, ctime, path, ""].join("\n")` and compares in constant time;
-  timestamps older than 5 minutes are rejected (bounds the replay window; no nonce). See
+  timestamps more than 5 minutes off server time are rejected (bounds the replay window; no
+  nonce, no body hash). HTTP failures are `401 HMAC_ERROR`. It is an anti-abuse layer, not a
+  security boundary: a secret shipped to a browser or app is public. See
   `src/utils/hmac.ts` and `src/middleware/hmac.ts`.
 
 ## Optional Redis Tier

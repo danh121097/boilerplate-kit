@@ -115,13 +115,13 @@ resolves to `POST /api/v1/auth/login`.
 
 ## Endpoints Today
 
-| Method | Path (under `API_PREFIX`) | Middleware                            | Notes                                |
-| ------ | ------------------------- | ------------------------------------- | ------------------------------------ |
-| GET    | `/health`                 | —                                     | server + DB + Redis status           |
-| POST   | `/auth/register`          | authRateLimiter, validate             | sets token cookies                   |
-| POST   | `/auth/login`             | loginRateLimiter, validate            | sets token cookies                   |
-| POST   | `/auth/refresh`           | authRateLimiter                       | rotates refresh token (reads cookie) |
-| POST   | `/auth/logout`            | authRateLimiter                       | revokes refresh + user access tokens |
-| GET    | `/auth/me`                | authenticate                          | current user profile                 |
-| GET    | `/users`                  | authenticate, requireMinRole('admin') | list users                           |
-| GET    | `/users/:id`              | authenticate, requireMinRole('admin') | user by id                           |
+| Method | Path (under `API_PREFIX`) | Middleware                            | Notes                                                 |
+| ------ | ------------------------- | ------------------------------------- | ----------------------------------------------------- |
+| GET    | `/health`                 | —                                     | server + DB + Redis status                            |
+| POST   | `/auth/register`          | authRateLimiter, validate             | sets token cookies                                    |
+| POST   | `/auth/login`             | loginRateLimiter, validate            | sets token cookies                                    |
+| POST   | `/auth/refresh`           | authRateLimiter, validate             | rotates refresh token (body or cookie)                |
+| POST   | `/auth/logout`            | authRateLimiter, validate             | deletes the token family, cuts off user access tokens |
+| GET    | `/auth/me`                | authenticate                          | current user profile                                  |
+| GET    | `/users`                  | authenticate, requireMinRole('admin') | list users                                            |
+| GET    | `/users/:id`              | authenticate, requireMinRole('admin') | user by id                                            |

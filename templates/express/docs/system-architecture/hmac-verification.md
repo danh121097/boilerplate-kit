@@ -6,10 +6,14 @@ shared secret and bound how long a captured signature stays usable. Source:
 [`utils/hmac.ts`](../../src/utils/hmac.ts),
 [`middleware/hmac.ts`](../../src/middleware/hmac.ts).
 
-> **Scope:** this is anti-casual-abuse only, not integrity or replay protection.
-> The body and query string are not signed, there is no nonce (a captured
-> signature replays freely inside the 5-minute window), and browser/mobile
-> clients necessarily ship the secret. Authorization rests on the JWT.
+> **Scope:** HMAC is an anti-abuse and light integrity layer, **not a security
+> boundary**. A secret shipped into a browser or app bundle is public. There is no
+> body hash and no nonce, and the query string is not signed, so a captured
+> signature replays freely inside the ±5 minute `ctime` window. Authorization rests
+> on the JWT. A failed check answers `401` with `errorType: "HMAC_ERROR"` (distinct
+> from `AUTHENTICATION_ERROR`, so a client does not treat a bad signature or clock
+> skew as a dead session); a client whose clock is more than 5 minutes off gets
+> `HMAC_ERROR` on every request until the clock is fixed.
 
 ## The Canonical String
 
@@ -40,7 +44,7 @@ Fields:
 
 [`middleware/hmac.ts`](../../src/middleware/hmac.ts) mounts on `config.apiPrefix`
 in `app.ts`, so it runs for all API routes. It reads two headers — `sig` and
-`ctime` — and 401s if either is missing:
+`ctime` — and 401s with `HMAC_ERROR` if either is missing:
 
 ```ts
 const reason = verifyHmac({
@@ -50,7 +54,7 @@ const reason = verifyHmac({
   ctime,
   sig,
 });
-if (reason) throw new AppError({ statusCode: 401, errorType: 'AUTHENTICATION_ERROR', ... });
+if (reason) throw new AppError({ statusCode: 401, errorType: 'HMAC_ERROR', ... });
 ```
 
 Two subtleties that make signatures match:
@@ -80,8 +84,9 @@ reason string:
 ## Cross-Template Invariant (CRITICAL)
 
 The server signer and the **frontend** signer must produce byte-identical
-signatures. The Vue/Nuxt clients sign with CryptoJS in
-`templates/vuejs` (and `templates/nuxtjs`) `src/services/core/hmac-signature.ts`:
+signatures. The bundled web and mobile clients sign with CryptoJS in
+`templates/<frontend>/.../services/core/hmac-signature.ts` (under `src/`, or
+`app/` in nuxtjs):
 
 ```ts
 // client (CryptoJS)
@@ -97,15 +102,20 @@ Invariants that MUST stay aligned across templates:
 - **Same encoding** — Base64 of the HMAC-SHA256 digest.
 - **Same `path`** — relative to the API base (no `/api/v1` prefix, no query).
 - **Same `ctime` unit** — epoch **milliseconds**.
-- **Same secret** — server `HMAC_SECRET` == client `VITE_HMAC_SECRET`.
+- **Same secret** — server `HMAC_SECRET` == the client's build-time copy (for
+  example `VITE_HMAC_SECRET`); the bundled frontends need it set to talk to this backend.
 - The client default Content-Type is `application/json`; the server signs the raw
   header value (`''` when absent). For requests with a JSON body these coincide.
 
 > Change the canonical string on one side and **all** signed requests fail with
-> `401 HMAC verification failed` until the other side matches.
+> `401 HMAC_ERROR` ("HMAC verification failed…") until the other side matches.
 
 The client also sends an `x-version` header; the server does **not** include it
 in the signed string and ignores it for verification.
+
+The Socket.IO handshake uses the same primitive but rejects with the generic
+`Unauthorized!` connect error, not `HMAC_ERROR` (see
+[realtime-socket.md](./realtime-socket.md)).
 
 ## See Also
 

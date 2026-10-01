@@ -27,9 +27,12 @@ export class AppError extends Error {
 `ErrorType` is a closed union the client can branch on:
 
 ```
-VALIDATION_ERROR | AUTHENTICATION_ERROR | AUTHORIZATION_ERROR
+VALIDATION_ERROR | AUTHENTICATION_ERROR | AUTHORIZATION_ERROR | HMAC_ERROR
 | NOT_FOUND | CONFLICT | RATE_LIMIT | INTERNAL_ERROR
 ```
+
+`HMAC_ERROR` (status `401`) is thrown by the HMAC gate only, so a client can tell a
+bad signature or clock skew from an invalid session.
 
 Services and middleware throw `AppError` rather than calling `res.status(...)` ad
 hoc. Express 5 forwards thrown errors (including from `async` handlers) to the
@@ -48,7 +51,7 @@ res.status(statusCode).json({
   message,
   error_code: statusCode, // mirrored under the client's field names
   error_message: message,
-  ...(config.isDevelopment && { stack: err.stack }), // stack only in development
+  ...(config.isDevelopment && statusCode >= 500 && { stack: err.stack }), // dev + 5xx only
 });
 ```
 
@@ -60,7 +63,14 @@ res.status(statusCode).json({
   its raw message is only logged.
 - `error_code` / `error_message` mirror the status + message under the field names
   the client error type expects (keeps the contract stable for the frontend).
-- The stack is included **only** in `development`.
+- The stack is included **only** when `NODE_ENV=development` **and** the status is
+  `>= 500`; 4xx never carry one.
+- Body-parser failures (`express.json()` runs before HMAC) are mapped to fixed
+  client-safe messages, never the parser's own text: invalid JSON →
+  `400 VALIDATION_ERROR` "Malformed JSON request body!", oversize →
+  `413 VALIDATION_ERROR` "Request body is too large!". So an unsigned request with
+  a bad body gets `400`/`413` here, where Fastify answers `401` (HMAC first); HMAC
+  does not cover the body, so the order has no security impact.
 - Every error is logged through the app `logger`: `error` level (with the
   stack) for 5xx, `warn` for 4xx.
 
@@ -68,7 +78,9 @@ res.status(statusCode).json({
 
 [`middleware/not-found-handler.ts`](../../src/middleware/not-found-handler.ts) is a
 catch-all mounted after the routes (before the error handler). It returns the same
-envelope shape for unmatched routes:
+envelope shape for unmatched routes. Under `apiPrefix` an unsigned request never
+gets this far (`401 HMAC_ERROR` first); a signed one reaches it and counts against
+the global limiter:
 
 ```ts
 res.status(404).json({
