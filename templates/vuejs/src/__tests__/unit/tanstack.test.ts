@@ -55,18 +55,6 @@ describe("defineQuery", () => {
   });
 });
 
-describe("defineQuery serverFetcher", () => {
-  // `isServerRender` is false outside a Nuxt server render (browser, SPA, unit tests): `fetcher` runs.
-  it("runs the browser fetcher outside SSR", async () => {
-    const fetcher = vi.fn(async () => "client");
-    const serverFetcher = vi.fn(async () => "server");
-    const useRead = defineQuery<string>({ key: "read", fetcher, serverFetcher });
-    const opts = useRead.queryOptions();
-    expect(await (opts.queryFn as (c: unknown) => Promise<unknown>)({ signal })).toBe("client");
-    expect(serverFetcher).not.toHaveBeenCalled();
-  });
-});
-
 describe("defineMutation", () => {
   const useUpdate = defineMutation<string, number>({
     key: "users.update",

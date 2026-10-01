@@ -56,12 +56,7 @@ const GROUPS: SharedGroup[] = [
   },
   {
     name: "Vue query core",
-    files: [
-      "services/core/tanstack.ts",
-      "services/core/tanstack-mutation.ts",
-      "services/core/tanstack-optimistic.ts",
-      "__tests__/unit/tanstack.test.ts",
-    ],
+    files: ["services/core/tanstack-mutation.ts", "services/core/tanstack-optimistic.ts"],
     roots: VUE_ROOTS,
   },
   {

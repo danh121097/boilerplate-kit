@@ -1,4 +1,3 @@
-import { isServerRender } from "@/services/core/render-env";
 import { useQuery } from "@tanstack/vue-query";
 import type { ApiResponseError } from "@/services/core/types";
 import type {
@@ -51,14 +50,8 @@ function fetcherContext(context: QueryFetcherContext): QueryFetcherContext {
 
 interface DefineQueryConfig<TData, TParams = void> extends QueryDefOpts<TData, TParams> {
   key: string;
-  /** Browser read (axios Model: refreshes-and-retries on 401). */
+  /** axios Model read: refreshes-and-retries on 401. */
   fetcher: QueryFetcher<TData, TParams>;
-  /**
-   * SSR read (`serverApiGet` & co. with the forwarded cookie; never refreshes). Used instead of `fetcher`
-   * while `isServerRender` (Nuxt only; the SPA never uses it); omitted, `fetcher` runs on both sides.
-   * Must resolve to the same `TData`, so the dehydrated cache matches what the browser would fetch.
-   */
-  serverFetcher?: QueryFetcher<TData, TParams>;
 }
 
 /** Plain (unref'd) query options: key, fetcher and the definition's own options (`staleTime`, …). */
@@ -81,15 +74,9 @@ export interface QueryDefinition<TData, TParams = void> {
 /**
  * Declare one query: `key` is the prefix (`["users.list"]` invalidates every param variant),
  * params extend it (`["users.detail", { id }]`). `params` may be a ref or getter; the key follows it.
- * Nuxt: a page resolves it during SSR with `useServerRenderedQuery` (`tanstack-ssr.ts`).
  */
 export function defineQuery<TData, TParams = void>(config: DefineQueryConfig<TData, TParams>) {
-  const { fetcher: clientFetcher, key, serverFetcher, ...defaults } = config;
-
-  const fetcher: QueryFetcher<TData, TParams> = (params, context) =>
-    isServerRender && serverFetcher
-      ? serverFetcher(params, context)
-      : clientFetcher(params, context);
+  const { fetcher, key, ...defaults } = config;
 
   function queryKey(params?: TParams): QueryDefinitionKey<TParams> {
     return params !== undefined ? [key, params] : [key];

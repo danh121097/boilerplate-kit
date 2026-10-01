@@ -87,8 +87,6 @@ export const useUsersListQuery = defineQuery<PaginatedResponse<User>>({
 - `defineQuery` returns a callable that also exposes `.key` and
   `.queryKey(params)`. The query key is reactive: `[key]` or `[key, params]`,
   recomputed from a `MaybeRefOrGetter` `params`.
-- `serverFetcher` (optional) is never called here: `isServerRender` (`render-env.ts`) is `false` in
-  this SPA. The option exists because `tanstack.ts` is shared verbatim with the Nuxt template.
 - `.queryOptions(params?)` — plain options (key, fetcher, `staleTime`, `select`, …) for
   `ensureQueryData` / prefetch. The fetcher receives `(params, { signal })`; pass `signal` to the
   request to cancel it.

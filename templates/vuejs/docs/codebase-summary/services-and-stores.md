@@ -46,7 +46,6 @@ startup via `initServices()`.
 | `tanstack.ts` | `defineQuery()` factory typed against `ApiResponseError` |
 | `tanstack-mutation.ts` | `defineMutation()` (`invalidates`, opt-in `optimistic`, `.mutationOptions()`) |
 | `tanstack-optimistic.ts` | Optimistic snapshot / rollback helpers |
-| `render-env.ts` | `isServerRender` — always `false` in the SPA (Nuxt sets it from `import.meta.server`) |
 | `types.ts` | Shared types (`ApiService`, `ApiResponse`, `ApiResponseError`, `RefreshOptions`, …) + axios module augmentation (`serviceType`, `_retry`) |
 
 ### `init-services.ts`
