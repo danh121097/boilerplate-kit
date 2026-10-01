@@ -35,8 +35,8 @@ errors, catch in `useEffect` and navigate to an error screen.
 ## Form validation
 
 `react-hook-form` (with `Controller`) + `zod` 4 + `@hookform/resolvers` handle
-field-level errors. The login schema is `email` (`z.email`) + `password` (min 8);
-its messages are i18n keys (`validation.email`, `validation.password_min`) that the
+field-level errors. The login schema is `email` (`z.email`) + `password` (min 1: login
+never judges strength, the server does); its messages are i18n keys (`validation.email`, `validation.password_required`) that the
 screen translates when rendering the `Input` error. Validation runs on submit.
 
 A failed login shows `getApiErrorMessage(err, t("login.error"))` (the server message,

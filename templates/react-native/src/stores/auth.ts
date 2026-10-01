@@ -3,7 +3,7 @@ import { AuthModel, authContract } from "@/services/auth";
 import {
   getSessionEpoch,
   hasStoredSession,
-  isUnauthorizedError,
+  isSessionGoneError,
   onSessionEnded,
   resetQueriesOnSessionEnd,
   resetQueriesToSignedOut,
@@ -137,10 +137,11 @@ async function loadUserOnce(epoch: number): Promise<void> {
     useAuthStore.setState({ user, isAuthenticated: true, hydrateError: null });
   } catch (error) {
     if (isStale()) return;
-    if (isUnauthorizedError(error)) {
-      // The session query itself was refused: the session is over. Revoke it as
-      // expired — unless it already ended (logout in progress, refused refresh):
-      // then only reset local state.
+    if (isSessionGoneError(error)) {
+      // The session query itself was refused (401), or the backend no longer
+      // knows the user (404, e.g. the account was deleted): the session is over.
+      // Revoke it as expired — unless it already ended (logout in progress,
+      // refused refresh): then only reset local state.
       if (!(error instanceof SessionEndedError)) await AuthModel.revokeSession(epoch);
       useAuthStore.setState({ user: null, isAuthenticated: false, hydrateError: null });
       return;

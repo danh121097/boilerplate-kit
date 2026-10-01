@@ -18,7 +18,7 @@ import type { Href } from "expo-router";
 // Messages are i18n keys, translated where they are rendered.
 const schema = z.object({
   email: z.email("validation.email"),
-  password: z.string().min(8, "validation.password_min"),
+  password: z.string().min(1, "validation.password_required"),
 });
 
 type FormValues = z.infer<typeof schema>;

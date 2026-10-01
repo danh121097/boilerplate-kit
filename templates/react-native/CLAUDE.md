@@ -40,7 +40,6 @@ Full standards: [docs/code-standards.md](./docs/code-standards.md).
 pnpm dev          # expo start (Metro dev server)
 pnpm ios          # open iOS simulator
 pnpm android      # open Android emulator
-pnpm web          # run in browser (react-native-web)
 pnpm typecheck    # tsc --noEmit
 pnpm test         # jest-expo
 pnpm lint         # eslint + prettier --check (read-only)

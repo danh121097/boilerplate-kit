@@ -58,10 +58,9 @@ against the API; authorization must still be enforced server-side by the JWT.
 The bare refresh client (`auth-refresh-client.ts`) signs its own request with
 `signRequest` (it bypasses the app interceptors to prevent refresh recursion).
 
-**Multipart is unsupported with HMAC on.** `postFormData` pins
-`multipart/form-data`, but the header actually sent carries a boundary the signer
-never sees, so the backend rejects the signature. Upload through an unsigned
-route or sign on a server.
+**Multipart is unsupported with HMAC on.** A `multipart/form-data` request carries
+a boundary in the header actually sent that the signer never sees, so the backend
+rejects the signature. Upload through an unsigned route or sign on a server.
 
 ## Single-flight refresh
 

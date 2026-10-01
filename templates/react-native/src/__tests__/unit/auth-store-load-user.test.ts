@@ -61,6 +61,45 @@ describe("auth store loadUser", () => {
       expect(useAuthStore.getState()).toMatchObject({ user: USER, isAuthenticated: true });
     });
 
+    it("a 404 from /auth/me (user gone) signs out like a 401 and clears the tokens", async () => {
+      await persistAccessToken("AT", "MAIN");
+      await persistRefreshToken("RT", "MAIN");
+      useAuthStore.setState({ isAuthenticated: true, hydrated: true });
+      jest
+        .spyOn(AuthModel, "getMe")
+        .mockRejectedValue({ status: "error", error_code: 404, message: "User not found!" });
+      const post = jest.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
+
+      await useAuthStore.getState().loadUser();
+
+      expect(post).toHaveBeenCalledTimes(1);
+      expect(useAuthStore.getState()).toMatchObject({
+        user: null,
+        isAuthenticated: false,
+        hydrateError: null,
+      });
+      expect(await getAccessToken("MAIN")).toBeNull();
+    });
+
+    it.each([
+      ["a 500", { status: "error", error_code: 500, message: "boom", retryable: true }],
+      ["a timeout", { ...REFRESH_UNAVAILABLE, message: "timeout of 30000ms exceeded" }],
+    ])("%s on /auth/me stays signed in with a retryable hydrateError", async (_l, err) => {
+      await persistAccessToken("AT", "MAIN");
+      await persistRefreshToken("RT", "MAIN");
+      useAuthStore.setState({ isAuthenticated: true, hydrated: true });
+      jest.spyOn(AuthModel, "getMe").mockRejectedValue(err);
+
+      await useAuthStore.getState().loadUser();
+
+      expect(useAuthStore.getState()).toMatchObject({
+        user: null,
+        isAuthenticated: true,
+        hydrateError: { retryable: true },
+      });
+      expect(await getAccessToken("MAIN")).toBe("AT");
+    });
+
     it("a mid-session 401 on the profile retry revokes the session as expired", async () => {
       await persistAccessToken("AT", "MAIN");
       useAuthStore.setState({ isAuthenticated: true, hydrated: true });

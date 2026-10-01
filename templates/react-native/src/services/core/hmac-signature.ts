@@ -1,3 +1,4 @@
+import { getMockAuth } from "@/services/auth/data/mock-auth-config";
 import type { HMACSignatureData } from "@/services/core/types";
 import type { InternalAxiosRequestConfig } from "axios";
 import Base64 from "crypto-js/enc-base64";
@@ -52,6 +53,16 @@ export function resolveContentType(config: InternalAxiosRequestConfig): string {
   return "application/json";
 }
 
+let warnedEmptySecret = false;
+
+/** Dev builds only, once per launch: the backend requires the signature, so an
+ * empty secret (with the mock off) means every request will 401. Never logs the secret. */
+function warnEmptySecret(): void {
+  if (warnedEmptySecret || !__DEV__ || getMockAuth()) return;
+  warnedEmptySecret = true;
+  console.warn("EXPO_PUBLIC_HMAC_SECRET is empty; the backend requires it, all requests will 401.");
+}
+
 /**
  * HMAC signature generator for API request authentication.
  * Computes a signature header set; only active when `EXPO_PUBLIC_HMAC_SECRET` is set.
@@ -85,7 +96,10 @@ export class HMACSignatureGenerator {
     ctime = Date.now(),
   }: SignRequestInput): HMACSignatureData | null {
     const secret = process.env.EXPO_PUBLIC_HMAC_SECRET;
-    if (!secret) return null;
+    if (!secret) {
+      warnEmptySecret();
+      return null;
+    }
 
     const xVersion = process.env.EXPO_PUBLIC_BUILD_VERSION || "1.0.0";
     const stringToSign = [

@@ -27,7 +27,15 @@ jest.mock("react-i18next", () => ({ useTranslation: () => ({ t: (k: string) => k
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import LoginScreen from "../../../app/(auth)/login";
 
-const USER = { _id: "u1", email: "a@b.com", name: "A", role: "user" };
+const USER = {
+  _id: "u1",
+  email: "a@b.com",
+  name: "A",
+  role: "user",
+  isActive: true,
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
+};
 
 // Fixed metrics so SafeAreaProvider renders synchronously without native measure.
 const METRICS = {
@@ -53,12 +61,24 @@ describe("LoginScreen", () => {
   it("validates with zod and does not call the auth service on invalid input", async () => {
     renderLogin();
     fireEvent.changeText(screen.getByTestId("login-email"), "not-an-email");
-    fireEvent.changeText(screen.getByTestId("login-password"), "short");
+    fireEvent.changeText(screen.getByTestId("login-password"), "");
     fireEvent.press(screen.getByTestId("login-submit"));
 
     await waitFor(() => expect(screen.getByText("validation.email")).toBeTruthy());
-    expect(screen.getByText("validation.password_min")).toBeTruthy();
+    expect(screen.getByText("validation.password_required")).toBeTruthy();
     expect(mockMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("lets a legacy short password through: login leaves strength to the server", async () => {
+    mockMutateAsync.mockResolvedValue({ user: USER, tokens: { accessToken: "AT" } });
+    renderLogin();
+    fireEvent.changeText(screen.getByTestId("login-email"), "a@b.com");
+    fireEvent.changeText(screen.getByTestId("login-password"), "abc");
+    fireEvent.press(screen.getByTestId("login-submit"));
+
+    await waitFor(() =>
+      expect(mockMutateAsync).toHaveBeenCalledWith({ email: "a@b.com", password: "abc" }),
+    );
   });
 
   it("labels and autofill-hints both fields", () => {

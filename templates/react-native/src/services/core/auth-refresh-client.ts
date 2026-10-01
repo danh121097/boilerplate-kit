@@ -21,8 +21,7 @@ export const REFRESH_TIMEOUT_MS = 15_000;
  * tokens, which are handed back to the single-flight manager to persist (it
  * guards the write with the session epoch). Failures are rethrown as the raw
  * axios error: the manager classifies them with `isRefreshRefused` (only 401/403
- * end the session). (`withCredentials` is kept so a backend that prefers an
- * httpOnly refresh cookie still works without code changes.)
+ * end the session).
  */
 
 /** Tolerates the common envelope shapes a backend may wrap the new tokens in. */
@@ -85,7 +84,7 @@ export function createTokenRefresher(endpoint: string, service: ApiService): Tok
       `${Api.getBaseURL(service)}${endpoint}`,
       body,
       {
-        withCredentials: true,
+        withCredentials: false,
         headers,
         timeout: REFRESH_TIMEOUT_MS,
         // Dev-only mock auth answers this call in the app; undefined otherwise.

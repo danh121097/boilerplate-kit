@@ -30,7 +30,7 @@ equivalents. Kept lean enough to read in one sitting.
 ```sh
 cp .env.example .env          # then edit values
 pnpm install
-pnpm dev                      # expo start — press i / a / w for iOS / Android / web
+pnpm dev                      # expo start — press i / a for iOS / Android
 ```
 
 Point `EXPO_PUBLIC_APP_ENDPOINT` at a running backend (the `express` or `nestjs`
@@ -39,12 +39,13 @@ into the JS bundle at build time — never put real secrets there.
 
 ## Scripts
 
+Native only (iOS and Android): there is no web target.
+
 | Script           | Does                                                     |
 | ---------------- | -------------------------------------------------------- |
 | `pnpm dev`       | `expo start` (Metro dev server)                          |
 | `pnpm ios`       | open in the iOS simulator                                |
 | `pnpm android`   | open in an Android emulator                              |
-| `pnpm web`       | run in the browser (react-native-web)                    |
 | `pnpm test`      | run the jest-expo suite                                  |
 | `pnpm test:watch`| jest watch mode                                          |
 | `pnpm typecheck` | `tsc --noEmit`                                           |
@@ -119,7 +120,7 @@ a state reset through `watchSessionEnd` (an `onSessionEnded` listener), and the
 ## Behavior notes
 
 - **Users contract**: `UsersModel.list(params?)` returns `PaginatedResponse<User>`
-  (`{ data, meta }`, same as the backend); `get` / `update` return the unwrapped
+  (`{ data, meta }`, same as the backend); `get` returns the unwrapped
   `User`. The home screen reads `data.data` and shows `users.empty` for an empty list.
 - **Session unavailable banner**: when restoring the session fails transiently
   (offline, timeout, 5xx) the user stays signed in and a bottom banner

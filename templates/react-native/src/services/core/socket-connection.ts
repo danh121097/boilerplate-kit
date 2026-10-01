@@ -61,7 +61,6 @@ export function createSocket(): Socket {
       buildAuth().then(cb, () => cb({}));
     },
     transports: ["websocket"],
-    withCredentials: true,
     autoConnect: false,
     forceBase64: true,
   });

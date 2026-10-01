@@ -46,7 +46,7 @@ Never rely on auto-import or global registration.
 - Access via `useTranslation()` hook from react-i18next.
 - The chosen language is saved under `STORAGE_KEYS.LANGUAGE` (SecureStore); resolution order saved > device > `EXPO_PUBLIC_LANGUAGE_CODE` > `en`.
 - Switch locale via `setLocale()` from `@/i18n/i18n` (the profile screen has the EN/JA toggle).
-- Validation messages are i18n keys (`validation.email`, `validation.password_min`) in the zod schema, translated where rendered.
+- Validation messages are i18n keys (`validation.email`, `validation.password_required`) in the zod schema, translated where rendered.
 
 ## Commits
 

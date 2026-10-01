@@ -11,7 +11,7 @@ import {
   getRefreshToken,
   getSessionEpoch,
   isLogoutPending,
-  isUnauthorizedError,
+  isSessionGoneError,
   Model,
   persistAccessToken,
   persistRefreshToken,
@@ -164,13 +164,13 @@ export class AuthModel extends Model {
     return res.data.user;
   }
 
-  /** The signed-in user, or null when the session is rejected (401). Any other
+  /** The signed-in user, or null when the session is gone (401, or 404 for a deleted account). Any other
    * failure (offline, 5xx, a transient refresh failure) rejects. */
   static async getSession(): Promise<AuthUser | null> {
     try {
       return await this.getMe();
     } catch (error) {
-      if (isUnauthorizedError(error)) return null;
+      if (isSessionGoneError(error)) return null;
       throw error;
     }
   }

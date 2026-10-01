@@ -53,8 +53,8 @@ export const useUsersListQuery = defineQuery<PaginatedResponse<User>>({
 `services/core/types.ts` defines `OffsetMeta`, `CursorMeta`, `PaginatedResponse<T>`,
 `CursorResponse<T>`, `PaginationParams` and `CursorParams`; `Api.paginate<T>()` /
 `Api.cursorPaginate<T>()` return the backend list envelope (`{ success, data, meta }`)
-as is. `UsersModel.list(params?)` returns `PaginatedResponse<User>`; `get(id)` and
-`update(id, payload)` return the unwrapped `User`. Screens read `data.data`, show
+as is. `UsersModel.list(params?)` returns `PaginatedResponse<User>`; `get(id)` returns
+the unwrapped `User`. Screens read `data.data`, show
 `users.error` on failure and `users.empty` for an empty list. The query key
 (`users.list`) is unchanged.
 

@@ -38,7 +38,8 @@ export class Api {
     this.service = config.service ?? "MAIN";
     this.http = axios.create({
       headers: { "Content-Type": "application/json", Accept: "*/*" },
-      withCredentials: true,
+      // Bearer + body tokens only: keep the native cookie jar out of it.
+      withCredentials: false,
       timeout: 30_000,
       ...(config.adapter ? { adapter: config.adapter } : {}),
     });
@@ -89,12 +90,6 @@ export class Api {
   }
   post<T>(config: ApiRequestConfig = {}) {
     return this.makeRequest<T>("post", config);
-  }
-  postFormData<T>(config: ApiRequestConfig = {}) {
-    return this.makeRequest<T>("post", {
-      ...config,
-      customHeaders: { "Content-Type": "multipart/form-data" },
-    });
   }
   put<T>(config: ApiRequestConfig = {}) {
     return this.makeRequest<T>("put", config);

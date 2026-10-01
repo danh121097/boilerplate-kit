@@ -15,10 +15,9 @@
 ## Scripts
 
 ```
-pnpm dev         → expo start (Metro dev server, press i/a/w for iOS/Android/web)
+pnpm dev         → expo start (Metro dev server, press i/a for iOS/Android)
 pnpm ios         → expo start --ios (open iOS simulator)
 pnpm android     → expo start --android (open Android emulator)
-pnpm web         → expo start --web (run in browser via react-native-web)
 pnpm typecheck   → tsc --noEmit
 pnpm test        → jest-expo
 pnpm test:watch  → jest-expo --watch

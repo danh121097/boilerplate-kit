@@ -222,6 +222,13 @@ describe("AuthModel", () => {
     await expect(AuthModel.getSession()).resolves.toBeNull();
   });
 
+  it("getSession resolves null when the user is gone (404)", async () => {
+    jest
+      .spyOn(AuthModel.api, "get")
+      .mockRejectedValue({ status: "error", error_code: 404, message: "User not found!" });
+    await expect(AuthModel.getSession()).resolves.toBeNull();
+  });
+
   it("getSession rejects on a transient failure", async () => {
     const offline = { status: "error", error_code: 0, message: "offline", retryable: true };
     jest.spyOn(AuthModel.api, "get").mockRejectedValue(offline);

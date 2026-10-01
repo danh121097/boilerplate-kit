@@ -30,9 +30,9 @@ src/services/
 │   ├── types/auth.ts       # AuthUser, AuthResult, LoginPayload, RegisterPayload
 │   └── index.ts
 └── users/
-    ├── users.ts            # UsersModel (list → PaginatedResponse<User>, get/update → User) + useUsersListQuery
+    ├── users.ts            # UsersModel (list → PaginatedResponse<User>, get → User) + useUsersListQuery
     ├── data/mock-users.ts  # Dev-only mock /users fixture (EXPO_PUBLIC_AUTH_MOCK)
-    ├── types/user.ts       # User, UpdateUserPayload
+    ├── types/user.ts       # Role, User
     └── index.ts
 ```
 

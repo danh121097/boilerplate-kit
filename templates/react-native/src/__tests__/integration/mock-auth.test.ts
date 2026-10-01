@@ -192,7 +192,10 @@ describe("mock auth", () => {
 
       await expect(app.AuthModel.login(DEMO)).resolves.toEqual(REAL_RESULT);
       expect(backend).toHaveBeenCalledTimes(1);
-      expect(console.warn).not.toHaveBeenCalled();
+      const mockWarnings = jest
+        .mocked(console.warn)
+        .mock.calls.filter(([m]) => /mock-auth/.test(m));
+      expect(mockWarnings).toHaveLength(0);
     });
 
     it.each(["TRUE", " true", "true ", "yes", "on", "0"])(

@@ -13,10 +13,6 @@
     "android": {
       "edgeToEdgeEnabled": true
     },
-    "web": {
-      "bundler": "metro",
-      "output": "static"
-    },
     "plugins": ["expo-router", "expo-secure-store", "expo-localization"],
     "experiments": {
       "typedRoutes": true

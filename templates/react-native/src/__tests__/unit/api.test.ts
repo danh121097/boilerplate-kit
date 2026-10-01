@@ -26,12 +26,12 @@ describe("Api", () => {
   });
 
   describe("request routing", () => {
-    it("sends GET to the path with the resolved baseURL and credentials", async () => {
+    it("sends GET to the path with the resolved baseURL and no cookie jar", async () => {
       await new Api({ path: "/items" }).get({ adapter: capture });
       expect(captured?.method).toBe("get");
       expect(captured?.url).toBe("/items");
       expect(captured?.baseURL).toBe("http://main");
-      expect(captured?.withCredentials).toBe(true);
+      expect(captured?.withCredentials).toBe(false);
     });
 
     it("routes the second service to its own baseURL", async () => {
@@ -52,11 +52,6 @@ describe("Api", () => {
         adapter: capture,
       });
       expect(String(captured?.headers["X-Trace"])).toBe("42");
-    });
-
-    it("postFormData routes as POST", async () => {
-      await new Api({ path: "/up" }).postFormData({ data: {}, adapter: capture });
-      expect(captured?.method).toBe("post");
     });
   });
 });

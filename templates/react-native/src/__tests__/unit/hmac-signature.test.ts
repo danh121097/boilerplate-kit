@@ -151,6 +151,65 @@ describe("hmac-signature", () => {
     expect(sig!["x-version"]).toBe("9.9.9");
   });
 
+  describe("empty secret warning", () => {
+    let mockSnapshot: string | undefined;
+
+    const MESSAGE =
+      "EXPO_PUBLIC_HMAC_SECRET is empty; the backend requires it, all requests will 401.";
+    const setDev = (value: boolean) => Object.assign(globalThis, { __DEV__: value });
+    const sign = (g: typeof HMACSignatureGenerator) =>
+      g.signRequest({ method: "GET", path: "/users" });
+
+    /** A fresh module instance, so the once-per-launch guard starts unset. */
+    function freshSigner() {
+      jest.resetModules();
+      return require("@/services/core/hmac-signature")
+        .HMACSignatureGenerator as typeof HMACSignatureGenerator;
+    }
+
+    beforeEach(() => {
+      mockSnapshot = process.env.EXPO_PUBLIC_AUTH_MOCK;
+      delete process.env.EXPO_PUBLIC_AUTH_MOCK;
+      delete process.env.EXPO_PUBLIC_HMAC_SECRET;
+    });
+    afterEach(() => {
+      setDev(true);
+      if (mockSnapshot === undefined) delete process.env.EXPO_PUBLIC_AUTH_MOCK;
+      else process.env.EXPO_PUBLIC_AUTH_MOCK = mockSnapshot;
+      jest.restoreAllMocks();
+    });
+
+    it("warns once in a dev build when the secret is empty and the mock is off", () => {
+      const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+      const signer = freshSigner();
+      expect(sign(signer)).toBeNull();
+      sign(signer);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(MESSAGE);
+    });
+
+    it("stays quiet in a production build", () => {
+      const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+      setDev(false);
+      sign(freshSigner());
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it("stays quiet when mock auth is on (it answers without the backend)", () => {
+      const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+      process.env.EXPO_PUBLIC_AUTH_MOCK = "true";
+      sign(freshSigner());
+      expect(warn).not.toHaveBeenCalledWith(MESSAGE);
+    });
+
+    it("stays quiet, and never prints the secret, when one is set", () => {
+      const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+      process.env.EXPO_PUBLIC_HMAC_SECRET = "shared-secret";
+      sign(freshSigner());
+      expect(warn).not.toHaveBeenCalled();
+    });
+  });
+
   it("the refresh client signs application/json because it always sends a JSON body", async () => {
     process.env.EXPO_PUBLIC_HMAC_SECRET = "shared-secret";
     jest.resetModules();
@@ -166,6 +225,8 @@ describe("hmac-signature", () => {
     await createTokenRefresher("/auth/refresh", "MAIN")();
 
     const [, body, opts] = post.mock.calls[0]!;
+    // Bearer + body tokens only: the native cookie jar stays out of the refresh call.
+    expect((opts as { withCredentials?: boolean }).withCredentials).toBe(false);
     const headers = (opts as { headers: Record<string, string | number> }).headers;
     expect(body).toEqual({ refreshToken: undefined });
     expect(headers["Content-Type"]).toBe("application/json");
