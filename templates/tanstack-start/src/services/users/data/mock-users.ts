@@ -75,7 +75,15 @@ export const MOCK_SAMPLE_USERS: User[] = [
 
 /** The user a demo login signs in as. An admin, so `/users` is reachable. */
 export function mockDemoUser(mock: MockAuthConfig): AuthUser {
-  return { _id: "mock-user", email: mock.email, name: "Demo User", role: "admin" };
+  return {
+    _id: "mock-user",
+    email: mock.email,
+    name: "Demo User",
+    role: "admin",
+    isActive: true,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  };
 }
 
 /** Every listed user, newest first (the backend sorts by `_id` descending). */

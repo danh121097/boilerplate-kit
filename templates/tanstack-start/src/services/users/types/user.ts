@@ -1,17 +1,15 @@
 /** Domain types for the Users service. */
 
-/** A user as the backend returns it (password stripped). */
+/** Backend user role (mirrors the express `Role`). */
+export type Role = "user" | "admin" | "super_admin";
+
+/** A user as the backend returns it (password stripped) — the express `PublicUser`. */
 export interface User {
   _id: string;
   name: string;
   email: string;
-  role: string;
+  role: Role;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
-}
-
-export interface UpdateUserPayload {
-  name?: string;
-  email?: string;
 }

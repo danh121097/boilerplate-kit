@@ -6,15 +6,16 @@ describe("loginSchema", () => {
   const messages = (input: unknown) =>
     loginSchema.safeParse(input).error?.issues.map((issue) => issue.message) ?? [];
 
-  it("accepts a valid email and an 8+ character password", () => {
+  it("accepts any non-empty password, so a legacy short one still reaches the backend", () => {
     expect(loginSchema.safeParse({ email: "a@b.co", password: "12345678" }).success).toBe(true);
+    expect(loginSchema.safeParse({ email: "a@b.co", password: "x" }).success).toBe(true);
   });
 
   it("rejects a malformed email with validation.email", () => {
     expect(messages({ email: "nope", password: "12345678" })).toEqual(["validation.email"]);
   });
 
-  it("rejects a short password with validation.password_min", () => {
-    expect(messages({ email: "a@b.co", password: "1234567" })).toEqual(["validation.password_min"]);
+  it("rejects an empty password with validation.password_required", () => {
+    expect(messages({ email: "a@b.co", password: "" })).toEqual(["validation.password_required"]);
   });
 });

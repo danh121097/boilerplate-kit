@@ -1,7 +1,10 @@
+import { isMockAuthEnabled } from "@/services/auth/data/mock-auth-config";
 import type { HMACSignatureData } from "@/services/core/types";
 import type { InternalAxiosRequestConfig } from "axios";
 import Base64 from "crypto-js/enc-base64";
 import HmacSHA256 from "crypto-js/hmac-sha256";
+
+let emptySecretWarned = false;
 
 export interface SignRequestInput {
   method: string;
@@ -65,6 +68,14 @@ export class HMACSignatureGenerator {
     return Base64.stringify(HmacSHA256(stringToSign, secret));
   }
 
+  /** Dev builds only, once: an empty secret means the backend will reject every request
+   * (unless the dev-only mock auth answers them). Never prints the secret. */
+  private static warnEmptySecret(): void {
+    if (emptySecretWarned || import.meta.env.PROD || isMockAuthEnabled()) return;
+    emptySecretWarned = true;
+    console.warn("VITE_HMAC_SECRET is empty; the backend requires it, all requests will 401.");
+  }
+
   /** Pure signer. Returns null when no secret is configured. */
   static signRequest({
     method,
@@ -73,7 +84,10 @@ export class HMACSignatureGenerator {
     ctime = Date.now(),
   }: SignRequestInput): HMACSignatureData | null {
     const secret = import.meta.env.VITE_HMAC_SECRET;
-    if (!secret) return null;
+    if (!secret) {
+      this.warnEmptySecret();
+      return null;
+    }
 
     const xVersion = import.meta.env.VITE_BUILD_VERSION || "1.0.0";
     const stringToSign = [

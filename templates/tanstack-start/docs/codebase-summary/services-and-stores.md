@@ -34,7 +34,7 @@ src/services/
 │   └── index.ts
 └── users/
     ├── users.ts            # UsersModel + useUsersListQuery
-    ├── types/user.ts       # User, UpdateUserPayload
+    ├── types/user.ts       # User, Role
     └── index.ts
 ```
 

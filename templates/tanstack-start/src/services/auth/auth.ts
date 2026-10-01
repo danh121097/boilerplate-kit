@@ -8,7 +8,7 @@ import {
   getSessionEpoch,
   hasSessionHint,
   isLogoutPending,
-  isUnauthorizedError,
+  isSessionGoneError,
   Model,
   startSession,
   withSessionLock,
@@ -130,7 +130,7 @@ export class AuthModel extends Model {
     return res.data.user;
   }
 
-  /** Current user, or null when signed out. A 401 resolves to null; while the
+  /** Current user, or null when signed out. A 401 or 404 resolves to null; while the
    * session is still live (hint set, not ended meanwhile) it is revoked first
    * (`revokeSession`, ends as "expired"). Other failures (network/5xx) still
    * throw so they are not cached as "signed out". Browser-only (axios client);
@@ -140,7 +140,7 @@ export class AuthModel extends Model {
     try {
       return await this.getMe();
     } catch (error) {
-      if (!isUnauthorizedError(error)) throw error;
+      if (!isSessionGoneError(error)) throw error;
       await this.revokeSession(epoch);
       return null;
     }

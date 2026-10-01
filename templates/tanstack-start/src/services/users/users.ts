@@ -3,7 +3,7 @@ import { mockAuthAdapter } from "@/services/auth/data/mock-auth";
 import { defineQuery, Model, withSessionRefresh } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
 import { usersContract } from "@/services/users/contract";
-import type { UpdateUserPayload, User } from "@/services/users/types/user";
+import type { User } from "@/services/users/types/user";
 
 export class UsersModel extends Model {
   static {
@@ -17,11 +17,6 @@ export class UsersModel extends Model {
 
   static async get(id: string): Promise<User> {
     const res = await this.api.get<User>({ url: usersContract.paths.byId(id) });
-    return res.data;
-  }
-
-  static async update(id: string, payload: UpdateUserPayload): Promise<User> {
-    const res = await this.api.patch<User>({ url: usersContract.paths.byId(id), data: payload });
     return res.data;
   }
 }

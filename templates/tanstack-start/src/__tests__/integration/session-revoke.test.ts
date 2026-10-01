@@ -61,6 +61,28 @@ describe("revoking a server-rejected session", () => {
     expect(document.cookie).not.toContain(HINT);
   });
 
+  it("a boot 404 (the account is gone) is treated like a 401: revoked and signed out", async () => {
+    vi.spyOn(AuthModel.api, "get").mockRejectedValue({ ...UNAUTHORIZED, error_code: 404 });
+    const post = vi.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
+    const { ended } = observeSessionEnd();
+
+    await expect(AuthModel.getSession()).resolves.toBeNull();
+
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(ended).toHaveBeenCalledWith("expired", "MAIN");
+  });
+
+  it("a boot 500 is not a sign-out: it rethrows and the session stays", async () => {
+    vi.spyOn(AuthModel.api, "get").mockRejectedValue({ ...UNAUTHORIZED, error_code: 500 });
+    const post = vi.spyOn(AuthModel.api, "post");
+    const { ended } = observeSessionEnd();
+
+    await expect(AuthModel.getSession()).rejects.toMatchObject({ error_code: 500 });
+
+    expect(post).not.toHaveBeenCalled();
+    expect(ended).not.toHaveBeenCalled();
+  });
+
   it("a revoke whose logout request fails still ends the session", async () => {
     vi.spyOn(AuthModel.api, "get").mockRejectedValue(UNAUTHORIZED);
     vi.spyOn(AuthModel.api, "post").mockRejectedValue({ error_code: 0, message: "offline" });

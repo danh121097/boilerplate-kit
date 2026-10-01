@@ -4,7 +4,7 @@ import {
   defineQuery,
   getSessionEpoch,
   hasSessionHint,
-  isUnauthorizedError,
+  isSessionGoneError,
   withSessionRefresh,
 } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
@@ -24,7 +24,7 @@ export async function fetchSession(): Promise<AuthUser | null> {
   try {
     return await withSessionRefresh(() => getMeServerFn());
   } catch (error) {
-    if (!isUnauthorizedError(error)) throw error; // network/5xx or "deferred to the browser" — never cached as signed out
+    if (!isSessionGoneError(error)) throw error; // network/5xx or "deferred to the browser" — never cached as signed out
     await AuthModel.revokeSession(epoch); // resolves false during SSR
     return null;
   }

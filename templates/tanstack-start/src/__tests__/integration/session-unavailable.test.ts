@@ -36,6 +36,15 @@ describe("session unavailable state", () => {
     expect(retried.data).toEqual(USER);
   });
 
+  it("a 404 from the session read resolves to signed out as well", async () => {
+    getMe.mockRejectedValue({ status: "error", error_code: 404 });
+
+    const result = await observe().refetch();
+
+    expect(result.data).toBeNull();
+    expect(isSessionUnavailable(result.error)).toBe(false);
+  });
+
   it("a 401 resolves to signed out without raising it", async () => {
     getMe.mockResolvedValue({ unauthorized: true, hasSession: false });
 

@@ -94,13 +94,6 @@ export class Api {
     return this.makeRequest<T>("post", config);
   }
 
-  postFormData<T>(config: ApiRequestConfig = {}) {
-    return this.makeRequest<T>("post", {
-      ...config,
-      customHeaders: { "Content-Type": "multipart/form-data" },
-    });
-  }
-
   put<T>(config: ApiRequestConfig = {}) {
     return this.makeRequest<T>("put", config);
   }

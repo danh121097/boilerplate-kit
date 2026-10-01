@@ -78,6 +78,59 @@ describe("hmac-signature", () => {
     expect(HMACSignatureGenerator.generateSignature(configFor("/users", "get"))).toBeNull();
   });
 
+  describe("empty secret warning", () => {
+    const WARNING = "VITE_HMAC_SECRET is empty; the backend requires it, all requests will 401.";
+
+    async function freshSigner() {
+      vi.resetModules();
+      return (await import("@/services/core/hmac-signature")).HMACSignatureGenerator;
+    }
+
+    it("warns once in dev when the secret is empty and mock auth is off", async () => {
+      vi.stubEnv("VITE_HMAC_SECRET", "");
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const signer = await freshSigner();
+
+      expect(signer.signRequest({ method: "GET", path: "/users" })).toBeNull();
+      signer.signRequest({ method: "GET", path: "/users" });
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(WARNING);
+    });
+
+    it("stays silent when a secret is set (and never prints it)", async () => {
+      vi.stubEnv("VITE_HMAC_SECRET", "shared-secret");
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const signer = await freshSigner();
+
+      signer.signRequest({ method: "GET", path: "/users" });
+
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it("stays silent in a production build", async () => {
+      vi.stubEnv("VITE_HMAC_SECRET", "");
+      vi.stubEnv("PROD", true);
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const signer = await freshSigner();
+
+      signer.signRequest({ method: "GET", path: "/users" });
+
+      expect(warn).not.toHaveBeenCalledWith(WARNING);
+    });
+
+    it("stays silent while mock auth is on", async () => {
+      vi.stubEnv("VITE_HMAC_SECRET", "");
+      vi.stubEnv("VITE_AUTH_MOCK", "true");
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const signer = await freshSigner();
+
+      signer.signRequest({ method: "GET", path: "/users" });
+
+      expect(warn).not.toHaveBeenCalledWith(WARNING);
+    });
+  });
+
   it("signs a bodyless request with an EMPTY content-type (axios sends none)", () => {
     vi.stubEnv("VITE_HMAC_SECRET", "shared-secret");
     const sig = HMACSignatureGenerator.generateSignature(configFor("/users", "get"));

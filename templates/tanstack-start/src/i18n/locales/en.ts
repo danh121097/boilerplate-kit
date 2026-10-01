@@ -17,7 +17,7 @@ export default {
   },
   validation: {
     email: "Enter a valid email address",
-    password_min: "Password must be at least 8 characters",
+    password_required: "Enter your password",
   },
   not_found: {
     title: "Page not found",

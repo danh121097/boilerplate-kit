@@ -19,7 +19,10 @@ function isAuthUser(value: unknown): value is AuthUser {
     typeof u?._id === "string" &&
     typeof u.email === "string" &&
     typeof u.name === "string" &&
-    typeof u.role === "string"
+    (u.role === "user" || u.role === "admin" || u.role === "super_admin") &&
+    typeof u.isActive === "boolean" &&
+    typeof u.createdAt === "string" &&
+    typeof u.updatedAt === "string"
   );
 }
 

@@ -55,7 +55,9 @@ describe("mock auth", () => {
     const app = await boot(jar);
     const result = await app.AuthModel.login(DEMO);
 
-    expect(result.user).toMatchObject({ email: DEMO.email, role: "admin" });
+    expect(result.user).toMatchObject({ email: DEMO.email, role: "admin", isActive: true });
+    expect(result.user.createdAt).toEqual(expect.any(String));
+    expect(result.user.updatedAt).toEqual(expect.any(String));
     expect(result.tokens.accessToken).toEqual(expect.any(String));
     expect(jar.get(STORAGE_KEYS.SESSION)).toBe("1");
     expect(app.hasSessionHint()).toBe(true);
@@ -114,10 +116,42 @@ describe("mock auth", () => {
       name: "New User",
     });
 
-    expect(user).toMatchObject({ email: "new@example.com", name: "New User" });
+    expect(user).toMatchObject({
+      email: "new@example.com",
+      name: "New User",
+      role: "user",
+      isActive: true,
+    });
     expect(jar.get(STORAGE_KEYS.SESSION)).toBe("1");
     const reloaded = await boot(jar);
     await expect(reloaded.readServerSession()).resolves.toEqual(user);
+  });
+
+  it.each([
+    [
+      "a cookie from before the full user shape",
+      { _id: "old", email: "o@x.co", name: "O", role: "user" },
+    ],
+    [
+      "an unknown role",
+      {
+        _id: "odd",
+        email: "o@x.co",
+        name: "O",
+        role: "weird",
+        isActive: true,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+    ],
+  ])("treats %s as signed out", async (_label, stale) => {
+    jar.set(`${APP_PREFIX}_MOCK_USER`, encodeURIComponent(JSON.stringify(stale)));
+    const app = await boot(jar);
+
+    await expect(app.readServerSession()).resolves.toEqual({
+      unauthorized: true,
+      hasSession: false,
+    });
   });
 
   it("clears the session on logout", async () => {
