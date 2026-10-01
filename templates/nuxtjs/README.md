@@ -54,13 +54,15 @@ Bound to `runtimeConfig.public` (read via `useRuntimeConfig()`); copy `.env.exam
 | `NUXT_PUBLIC_APP_ENDPOINT` | `http://localhost:3000` | Backend origin |
 | `NUXT_PUBLIC_API_PREFIX` | `/api/v1` | API path prefix |
 | `NUXT_PUBLIC_LANGUAGE_CODE` | `en` | Default locale (`en` / `ja`) when no cookie or browser language matches; read at build/start of `nuxt.config.ts` |
-| `NUXT_PUBLIC_HMAC_SECRET` | unset | Optional. Enables HMAC-signed requests; visible to every client (anti-casual-abuse, not authentication) |
+| `NUXT_PUBLIC_HMAC_SECRET` | unset | Required by the bundled backends; must equal the backend `HMAC_SECRET`. Visible to every client (anti-abuse, not authentication) |
 | `NUXT_PUBLIC_BUILD_VERSION` | `1.0.0` | Optional. Sent as `x-version` when signing |
 | `NUXT_PUBLIC_AUTH_MOCK` | unset | Optional, dev only. `true` answers `/auth/*` and `/users` in the browser |
 | `NUXT_PUBLIC_AUTH_MOCK_EMAIL` | `demo@example.com` | Optional, dev only. Demo account email |
 | `NUXT_PUBLIC_AUTH_MOCK_PASSWORD` | `password` | Optional, dev only. Demo account password |
 
 For private (server-only) secrets, add unprefixed keys (e.g. `NUXT_MY_SECRET`, declared under `runtimeConfig`) and read them via `useRuntimeConfig().mySecret`. The HMAC secret is **not** one of them: the browser signs its own requests, so it stays `NUXT_PUBLIC_HMAC_SECRET`.
+
+**Real backend checklist**: turn mock auth off (`NUXT_PUBLIC_AUTH_MOCK` unset), point `NUXT_PUBLIC_APP_ENDPOINT` / `NUXT_PUBLIC_API_PREFIX` at the backend, and set `NUXT_PUBLIC_HMAC_SECRET` to the backend's `HMAC_SECRET`. An empty secret makes every request 401 (dev builds log a warning).
 
 ## Structure
 
@@ -77,7 +79,7 @@ templates/nuxtjs/
 │   ├── css/                        # main.css (Tailwind @theme tokens), main.scss (extras)
 │   ├── components/ui/              # Button, Card, Input, VeeInput, Badge (auto-registered as <Ui*>)
 │   ├── composables/                # useSocketIO (auto-imported, camelCase filenames)
-│   ├── enums/                      # STORAGE_KEYS, socket events
+│   ├── enums/                      # useStorageKeys(), socket events
 │   ├── layouts/default.vue         # nav, locale toggle, session-unavailable banner
 │   ├── middleware/                 # auth + guest route middleware
 │   ├── pages/                      # index, counter, users, form, login
@@ -98,7 +100,7 @@ Cookie-first: the backend sets httpOnly access + refresh cookies, so no token to
 ## SSR safety
 
 - Storage and `window` access are client-guarded; secrets come from `runtimeConfig`, never `import.meta.env`.
-- `STORAGE_KEYS` resolves its prefix from `useRuntimeConfig().public.appName` so server and client agree.
+- `useStorageKeys()` resolves its prefix from `useRuntimeConfig().public.appName` so server and client agree.
 - A page that renders query data resolves it during SSR with `useServerRenderedQuery(useXxxQuery)` so the server renders the data (or error) the client hydrates, not a loading state the client never shows.
 - `HMACSignatureGenerator` reads the secret from `runtimeConfig`; the socket handshake reuses it.
 

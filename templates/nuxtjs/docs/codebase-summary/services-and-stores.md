@@ -59,7 +59,9 @@ outside a request scope or when no secret). It signs
 `[method, contentType, ctime, path, ""].join("\n")` with HMAC-SHA256 (base64),
 returning `{ sig, ctime, "x-version" }` (version from `public.buildVersion`).
 Because the browser signs too, the secret must stay `public` and reaches every
-client — treat it as anti-casual-abuse, not authentication. Moving it to a
+client — treat it as an anti-abuse / light integrity layer, not authentication
+or a security boundary. The bundled backends require it and the secret must
+equal their `HMAC_SECRET`; an empty one logs a dev-only warning. Moving it to a
 private `runtimeConfig.hmacSecret` would break browser signing; for an
 unforgeable signature, proxy browser traffic through a server route that signs.
 
@@ -127,17 +129,19 @@ call `startSession()`), `logout` (runs under the refresh lock via
 with `endSession("logout")`), `revokeSession` (`Promise<boolean>`; browser-only,
 revokes a server-rejected session and ends it as `"expired"`, single-flight, no
 request when it already ended), `getMe` (`Promise<AuthUser>`), `getSession`
-(`Promise<AuthUser | null>`; a 401 → `revokeSession`, then `null`).
+(`Promise<AuthUser | null>`; a 401 or 404 (`isSessionGoneError`) →
+`revokeSession`, then `null`; 5xx and network errors reject as transient).
 Cookie-first: the backend sets httpOnly access/refresh cookies, so there is no
 client-side token persistence. The response interceptor already unwraps the
 envelope, so each method reads `res.data` once. Exposes `useLoginMutation`,
 `useRegisterMutation`, `useLogoutMutation`. The canonical session read is
 `useMeQuery` (`defineQuery<AuthUser | null>` in `services/auth/session.ts`): its
 `serverFetcher` is `readServerSession()` (`serverApiGet` with the forwarded
-cookie; never refreshes) and its `fetcher` is `fetchSessionUser()` →
+cookie; never refreshes; rewrites a 404 to `error_code: 401` for this query only) and its `fetcher` is `fetchSessionUser()` →
 `AuthModel.getSession()` in the browser. Types in
 `types/auth.ts` (`AuthUser`, `AuthTokens`, `LoginPayload`, `RegisterPayload`,
-`AuthResult`) — note `refreshToken` is optional client-side (it lives in the cookie).
+`AuthResult`). `AuthUser = User` (with `Role`); the backend also returns tokens
+in the JSON body, which cookie mode never reads (`refreshToken` is optional there).
 
 ### Users (`app/services/users/users.ts`)
 
@@ -150,10 +154,11 @@ cookie; never refreshes) and its `fetcher` is `fetchSessionUser()` →
 ## Bootstrap plugin (`app/plugins/01.init-services.ts`)
 
 Runs on server + client (no `.client`/`.server` suffix). Reads
-`useRuntimeConfig().public`, declares a `services` array (MAIN defaults to
-`getApiBaseUrl() (appEndpoint + /api/v1)`, token slot `AUTH_TOKEN`, refresh `/auth/refresh`),
-and for each: `Api.setBaseURL`, `registerServiceToken`, collects refresh config.
-Finally `Api.registerInterceptors(new ApiInterceptors(refreshByService))`. Add a
+`useRuntimeConfig().public`, sets the app prefix, initializes mock auth, declares a `services` array (MAIN
+defaults to `getApiBaseUrl() (appEndpoint + /api/v1)`, refresh
+`authContract.paths.refresh`), and for each: `Api.setBaseURL`, collects refresh
+config. Finally `Api.registerInterceptors(new ApiInterceptors(refreshByService))`
+and `registerSessionRefresher(...)`. Add a
 row + `NUXT_PUBLIC_*` key to wire another authenticated backend. The REST base URL
 is computed via `getApiBaseUrl()` which appends `/api/v1` to the `appEndpoint` origin.
 
@@ -168,12 +173,13 @@ Pinia setup stores (explicit import only — `pinia.storesDirs: []`):
 
 `useSocketIO()` creates an `io()` connection scoped to the component tree.
 SSR-safe: `io()` is lazy (no socket opens until `.connect()`) and
-`onMounted(connectSocket)` only fires client-side. Auth payload is
-`{ role, sig, ctime }` (the httpOnly cookie authenticates) —
-`signHeader()` HMAC-signs `["GET","application/json",ctime,"/socket",""]` using
-`runtimeConfig.public.hmacSecret`. `authenticated` is set only by the server's `authenticated` event; a rejected
-handshake is retried with a doubling delay (`RECONNECT_BASE_MS`,
-`RECONNECT_MAX_MS`) while socket.io handles network errors itself. Event handlers
+`onMounted(connectSocket)` only fires client-side. `auth` is a callback returning
+`{ sig, ctime }` (fresh `ctime` per connect, no `role`; the httpOnly cookie
+authenticates) — `signHeader()` HMAC-signs `["GET","application/json",ctime,"/socket",""]` using
+`runtimeConfig.public.hmacSecret`. `authenticated` is set only by the server's
+`authenticated` event. A rejected handshake (`"Unauthorized!"`) refreshes the
+session once and reconnects (at most 3 per outage), then falls back to a doubling
+delay (2s, cap 30s) while socket.io handles network errors itself. Event handlers
 are keyed off `SOCKET_EVENT`, with `onScopeDispose` cleanup. `components/socket-status.vue`
 mounts it while signed in. See [Networking & Realtime](../system-architecture/networking-realtime.md). Also exports `useIo()` (lazy
 shared socket) and `useSocketEvent(event, cb)` (auto-cleanup subscription).

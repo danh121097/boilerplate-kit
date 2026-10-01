@@ -22,7 +22,7 @@ Socket.IO, and @nuxtjs/i18n. Package manager: **pnpm**.
 
 ## Conventions Quick Reference
 
-- **SSR-safe**: storage/`window` access is client-guarded (`isClient`); read secrets via `runtimeConfig`, not `import.meta.env`.
+- **SSR-safe**: `window`/`document`/storage access is guarded (`typeof document === "undefined"`); read secrets via `runtimeConfig`, not `import.meta.env`.
 - **Filenames**: kebab-case for `.ts`; a composable's filename = its exact `useXxx` name.
 - **Components**: PascalCase `.vue` under `app/components/`; Nuxt auto-imports apply.
 - **`<script setup>` order**: imports → types → props/emits → composables → const → refs → computed → functions → lifecycle; extract `interface Props` / `Emits`.

@@ -6,17 +6,18 @@ grounded in real files under `app/` (the Nuxt `srcDir`), plus `i18n/` and
 `types/`.
 
 The app boots through ordered `app/plugins/*`, which run on **both server and
-client**: `01.init-services.ts` wires the HTTP layer (base URLs, token slots,
+client**: `01.init-services.ts` wires the HTTP layer (app prefix, base URLs,
 refresh interceptors) before any page-level data fetch; then `02.vue-query.ts`
-installs TanStack Vue Query and `03.directives.ts` registers the `v-track`
-directive. The root component `app/app.vue` renders
+installs TanStack Vue Query, `03.directives.ts` registers the `v-track`
+directive, and the client-only `04.session-expiry.client.ts` and
+`05.session-sync.client.ts` handle session end and cross-tab sync. The root component `app/app.vue` renders
 `<NuxtLayout><NuxtPage /></NuxtLayout>`.
 
 ## Topics
 
 | Topic | What it covers |
 | --- | --- |
-| [Directory Structure](./codebase-summary/directory-structure.md) | The real `app/` tree (plus `i18n/`, `types/`, empty `server/`) with a one-line purpose per folder and key file |
+| [Directory Structure](./codebase-summary/directory-structure.md) | The real `app/` tree (plus `i18n/`, `types/`) with a one-line purpose per folder and key file |
 | [Services & Stores](./codebase-summary/services-and-stores.md) | The SSR-guarded axios layer (`Api`, `Model`, core utilities, refresh/HMAC), auth/users services, the init plugin, Pinia stores, and the Socket.IO composable |
 | [Conventions](./codebase-summary/conventions.md) | The `@/` → `app/` alias, barrel `index.ts` pattern, Nuxt auto-imports, the enums registry (`useStorageKeys`), and file-size guidance |
 

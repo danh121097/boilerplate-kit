@@ -21,6 +21,8 @@ const queryClient = new QueryClient({
   },
 });
 nuxtApp.vueApp.use(VueQueryPlugin, { queryClient });
+// server: dehydrate(queryClient, { shouldDehydrateQuery }) after render;
+// client: hydrate(queryClient, state) — see bootstrap-flow.md
 ```
 
 `retry: false` is intentional — the response interceptor already handles 401
@@ -35,8 +37,9 @@ Builds a reusable, typed query with a stable key builder:
 
 ```ts
 export const useUsersListQuery = defineQuery<PaginatedResponse<User>>({
-  key: "users.list",
+  key: queryKeys.users.list,   // "users.list"
   fetcher: () => UsersModel.list(),
+  serverFetcher: () => fetchUsersOnServer(),
 });
 
 // in a component:
@@ -59,23 +62,23 @@ export const useLoginMutation = defineMutation<AuthResult, LoginPayload>({
 ```
 
 - `mutator` performs the write; `mutationKey` is `[key]`.
-- Optional `invalidates: string[]` — on success the wrapper invalidates each
-  listed key via the shared `queryClient`, then runs definition- and per-call
-  `onSuccess`:
+- Optional `invalidates: (string | QueryKey)[]` — a string is a key prefix, an
+  array one exact key. On success the wrapper invalidates each, awaited, then
+  runs definition- and per-call `onSuccess` (the real code lives in
+  `tanstack-mutation.ts`):
 
 ```ts
-onSuccess: async (...args) => {
-  if (queryClient && config.invalidates) {
-    await Promise.all(config.invalidates.map(
-      (k) => queryClient.invalidateQueries({ queryKey: [k] }),
-    ));
-  }
-  await options?.onSuccess?.(...args);     // definition-level hook
-  await overrides.onSuccess?.(...args);    // per-call hook
-};
+async function invalidate(client: QueryClient) {
+  await Promise.all(
+    (config.invalidates ?? []).map((key) =>
+      client.invalidateQueries({ queryKey: typeof key === "string" ? [key] : key }),
+    ),
+  );
+}
+// onSuccess: await invalidate(client); then definition hook, then per-call hook
 ```
 
-`useQueryClient()` is only pulled in when there is something to invalidate.
+The client comes from the mutation context, so it is only used when there is something to invalidate.
 
 ### Key Conventions
 

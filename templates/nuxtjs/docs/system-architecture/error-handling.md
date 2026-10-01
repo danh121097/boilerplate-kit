@@ -90,6 +90,13 @@ return Promise.reject(toApiError(error));
 `toApiError` (`api-errors.ts`) normalizes every rejection to `ApiResponseError`
 with the HTTP status in `error_code` (`0` when there is no response), so callers
 can tell a rejected session (`isUnauthorizedError` → 401) from an outage.
+A 401 whose body carries `errorType: "HMAC_ERROR"` (bad signature, wrong secret,
+clock skew) is not a session verdict: `toApiError` keeps the backend message and
+`errorType` and marks it `retryable: true`; `isHmacError` is true while
+`isUnauthorizedError` and `isRefreshRefused` are false, so there is no refresh and
+no session end, and the layout shows the retry banner. `isSessionGoneError` (401
+or 404) is used only for the `/auth/me` read: a 404 there means the account is
+gone and signs the user out, while 5xx and network errors stay transient.
 
 ## Blob Errors
 
@@ -125,10 +132,12 @@ Failures inside a page or query are not routed here: they stay in the page as th
 ## Login form errors
 
 `pages/login.vue` validates client-side (vee-validate + zod: `email` is a valid
-email, `password` at least 8 characters) before calling the API. The shared schema
+email, `password` non-empty) before calling the API. The shared schema
 is `services/auth/schema/login.ts`; its messages are i18n keys (`validation.email`,
-`validation.password_min`) that `VeeInput` translates when it renders, so they follow
-a locale switch. A failed sign-in shows
+`validation.password_required`) that `VeeInput` translates when it renders, so they follow
+a locale switch. Login only requires a password so older accounts keep working; the
+strength rule (`password` at least 8 characters, `validation.password_min`) lives in
+`registerSchema` (`services/auth/schema/register.ts`, used by the demo `pages/form.vue`). A failed sign-in shows
 `getApiErrorMessage(error, t("login.error"))` in a `role="alert"` paragraph; the
 submit button is disabled and reads `login.submitting` while the request is pending. Each submit clears the previous server error first.
 
@@ -141,7 +150,8 @@ submit button is disabled and reads `login.submitting` while the request is pend
 | Envelope/HTTP 401 (ineligible: credential call, no hint, replayed, no refresh config) | `onSuccess`/`onError` | reject as-is |
 | Refresh refused (401/403) | `RefreshTokenManager` | `endSession("expired")` → reset cache, `/login`; reject the original 401 |
 | Refresh failed otherwise (network, timeout, 400, 408, 429, 5xx) | `refreshAndRetry` | reject `refreshUnavailable` (`retryable: true`); session kept |
-| SSR `serverApi*` failure | `server-api.ts` | reject `ApiResponseError` (`error_code` = status) |
+| Backend 401 `HMAC_ERROR` | `toApiError` | reject `retryable: true` with the backend message; no refresh, session kept |
+| SSR `serverApi*` failure | `server-api.ts` | reject `ApiResponseError` (`error_code` = status); `HMAC_ERROR` also logged once per process |
 | Network / blocked | `onError` | log; reject `{ message, error_code: 0 }` |
 | Non-2xx blob | `onSuccess` | reject synthetic `ApiResponseError` |
 | Anything else | pass-through | raw response returned |

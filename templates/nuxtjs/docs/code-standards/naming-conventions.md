@@ -11,7 +11,7 @@ const hasValidationError = computed(() => Boolean(errorMessage.value));
 const showError = computed(() => hasValidationError.value || props.error);
 
 function buildAuth() {
-  return { role: "user", ...signHeader() };
+  return signHeader();
 }
 ```
 

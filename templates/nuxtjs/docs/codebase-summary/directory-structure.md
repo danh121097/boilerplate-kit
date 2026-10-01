@@ -10,10 +10,12 @@ templates/nuxtjs/
 ├── app/
 │   ├── app.vue             # Root: <NuxtLayout><NuxtPage /></NuxtLayout>
 │   ├── error.vue           # Error page: 404 → not-found content, else a generic message
-│   ├── plugins/            # Ordered bootstrap (server + client)
-│   │   ├── 01.init-services.ts   # Wire Api base URLs, token slots, refresh interceptors
+│   ├── plugins/            # Ordered bootstrap (01-03 server + client, 04-05 client)
+│   │   ├── 01.init-services.ts   # Wire app prefix, Api base URLs, refresh interceptors
 │   │   ├── 02.vue-query.ts       # Install TanStack Vue Query (universal QueryClient)
-│   │   └── 03.directives.ts      # Register demo v-track directive
+│   │   ├── 03.directives.ts      # Register demo v-track directive
+│   │   ├── 04.session-expiry.client.ts # Reset cache + redirect when a session ends
+│   │   └── 05.session-sync.client.ts   # Follow login / logout across tabs
 │   ├── middleware/         # Route guards: auth.ts (protected), guest.ts (login)
 │   ├── pages/              # File-based routes
 │   │   ├── index.vue       # Home — Reka UI dialog demo
@@ -28,7 +30,7 @@ templates/nuxtjs/
 │   │   ├── badge.variants.ts     # CVA variant map for Badge
 │   │   └── input.props.ts        # Shared BaseInputProps for Input/VeeInput
 │   ├── composables/
-│   │   └── useSocketIO.ts  # Socket.IO connection, backoff retry, useIo/useSocketEvent helpers
+│   │   └── useSocketIO.ts  # Socket.IO connection, session refresh + backoff retry, useIo/useSocketEvent helpers
 │   ├── services/           # axios service layer (see services-and-stores.md)
 │   │   ├── core/           # Api, Model, interceptors, refresh, HMAC, tanstack, types
 │   │   ├── auth/           # AuthModel + login/register/logout/me query+mutations
@@ -39,7 +41,7 @@ templates/nuxtjs/
 │   │   └── socket-io.ts    # Holds the live Socket + auth flag
 │   ├── enums/              # Registries (barrel index.ts)
 │   │   ├── storage-keys.ts # useStorageKeys() — prefixed localStorage keys
-│   │   └── socket-events.ts# SOCKET_EVENT names + unauthorized message
+│   │   └── socket-events.ts# SOCKET_EVENT names
 │   ├── utils/              # Auto-imported helpers
 │   │   ├── cn.ts           # clsx + tailwind-merge class combiner
 │   │   └── date-format.ts  # dayjs formatDate/fromNow
@@ -47,13 +49,12 @@ templates/nuxtjs/
 │   └── __tests__/          # Vitest unit + integration + ssr tests + helpers
 ├── i18n/locales/           # en.ts, ja.ts message catalogs (lazy-loaded)
 ├── types/i18n.d.ts         # Types vue-i18n's catalog from en.ts
-├── server/                 # Empty — no Nitro routes (external backend)
 └── docs/                   # This documentation
 ```
 
 ## Notes
 
-- **No `server/` routes** — the directory exists but is empty; this template is a
+- **No `server/` directory** — no Nitro routes; this template is a
   frontend that talks to an external backend (configure via `NUXT_PUBLIC_APP_ENDPOINT`).
 - **Tests** live under `app/__tests__/` (unit + integration), with shared
   `helpers/` (`fake-storage`, `http-mocks`). Config: `vitest.config.ts`, two

@@ -39,9 +39,14 @@ Domain services subclass `Model` and self-wire in a static block:
 
 ```ts
 export class UsersModel extends Model {
-  static { Model.setup.call(this, { path: "/users" }); }
-  static list() { return this.api.get<User[]>(); }
-  static get(id: number) { return this.api.get<User>({ url: `${this.path}/${id}` }); }
+  static { Model.setup.call(this, { path: usersContract.base, service: usersContract.service }); }
+  static list(params?: PaginationParams) {
+    return this.api.paginate<User>({ url: usersContract.paths.list, params });
+  }
+  static async get(id: string) {
+    const res = await this.api.get<User>({ url: usersContract.paths.byId(id) });
+    return res.data;
+  }
 }
 ```
 
@@ -81,8 +86,9 @@ with stable key builders.
 
 ```ts
 export const useUsersListQuery = defineQuery<PaginatedResponse<User>>({
-  key: "users.list",
+  key: queryKeys.users.list,
   fetcher: () => UsersModel.list(),
+  serverFetcher: () => fetchUsersOnServer(),
 });
 ```
 
@@ -120,7 +126,7 @@ shares one connection.
 
 ```ts
 const socket = io(URL, {
-  auth: buildAuth(),         // { role: "user", ...signHeader() } — the httpOnly cookie authenticates
+  auth: (cb) => cb(buildAuth()),  // { sig, ctime } signed anew per (re)connect — the httpOnly cookie authenticates
   transports: ["websocket"],
   withCredentials: true,
   autoConnect: false,
@@ -144,26 +150,38 @@ SSR safety is built in:
 
 Behavior:
 
-- `buildAuth()` carries no token (the browser sends the httpOnly access cookie via
-  `withCredentials`) plus, when `hmacSecret` is set, an HMAC
+- `auth` is a callback, so every (re)connect is signed anew with a fresh `ctime`.
+  `buildAuth()` carries no token and no `role` (the browser sends the httpOnly
+  access cookie via `withCredentials`) plus, when `hmacSecret` is set, an HMAC
   `{ sig, ctime }` from the core `HMACSignatureGenerator.signRequest` (the same
   generator the HTTP interceptor uses) over the canonical string for `GET /socket` (see
-  [Security & Auth](./security-auth.md)).
-- Lifecycle: connects `onMounted`, tears down on `onScopeDispose` (which also
-  clears a pending retry timer). Events come from the `SOCKET_EVENT` registry
-  (`enums/socket-events.ts`): `authenticated`, `unauthorized`, `disconnect`,
-  `connect_error`.
+  [Security & Auth](./security-auth.md)). The URL is `getApiOrigin()`.
+- Lifecycle: connects `onMounted`, tears down on `onScopeDispose`. Destroy
+  disconnects, clears the retry timer, cancels an in-flight session refresh
+  (a refresh started earlier never reconnects) and resets the counters. Events
+  come from the `SOCKET_EVENT` registry (`enums/socket-events.ts`): `authenticated`,
+  `ping`, `disconnect`, `connect_error`.
 - Connection state: `authenticated` in the store becomes `true` only when the
   server emits `authenticated`. It becomes `false` on `connect_error`, on
   `disconnect` and on destroy. `connectSocket()` never sets it to `true`.
-- Reconnect policy (`RECONNECT_BASE_MS = 2000`, `RECONNECT_MAX_MS = 30_000`): on
-  `connect_error`, if `socket.active` is true socket.io is already reconnecting
-  (network error, server down) and nothing extra runs. If it is false the server
-  rejected the handshake (`"Unauthorized!"`: missing/expired/revoked token or bad
-  HMAC): one manual retry is scheduled (errors while it is pending do not
+- Rejected handshake: on `connect_error`, if `socket.active` is true socket.io is
+  already reconnecting (network error, server down) and nothing extra runs. If it
+  is false the server rejected the handshake. For `"Unauthorized!"` (expired
+  access cookie) the flow is: refresh the session once through the shared
+  single-flight `refreshSession()`, then `connect()` with the rotated cookie. A
+  refused refresh (`SessionEndedError` / `isRefreshRefused`) means the session is
+  over, so the socket stops. A transient refresh failure falls back to backoff.
+- Refresh budget: at most `MAX_REFRESH_ATTEMPTS = 3` consecutive refreshes per
+  outage; it resets on `authenticated`. Past the budget, and for any other
+  rejection, one manual retry is scheduled (errors while it is pending do not
   reschedule) after `min(RECONNECT_BASE_MS * 2 ** attempt, RECONNECT_MAX_MS)` —
-  2s, 4s, 8s, 16s, 30s, 30s, … The retry rebuilds `socket.auth` (fresh HMAC
-  `sig`/`ctime`) and calls `connect()` on the same socket. A `disconnect` with reason `io server disconnect` (the server closed the socket, e.g. a graceful restart; socket.io does not reconnect on its own) schedules the same retry. `attempt` resets to 0
-  on `authenticated`. The server's `unauthorized` event destroys the socket.
+  2s, 4s, 8s, 16s, 30s, 30s, … (`RECONNECT_BASE_MS = 2000`, `RECONNECT_MAX_MS = 30_000`),
+  each with a fresh signature. A `disconnect` with reason `io server disconnect`
+  (the server closed the socket, e.g. a graceful restart; socket.io does not
+  reconnect on its own) schedules the same retry. `attempt` resets to 0 on
+  `authenticated`.
+- Accepted residual: once the refresh budget is spent, the socket does not refresh
+  again by itself; it keeps retrying with backoff and only reconnects after an
+  HTTP call has refreshed the cookie.
 - Helpers: `useIo()` (get/lazy-init the shared socket), `useSocketEvent(event, cb)`
   (auto-unsubscribe on unmount).

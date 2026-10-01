@@ -22,7 +22,7 @@ Read the relevant nested doc before writing the matching kind of file.
 
 - **YAGNI / KISS / DRY** — no premature abstraction; build what the task needs.
 - **SSR-first** — code runs on the server and the client. Guard `window` /
-  `localStorage` access with an `isClient` check; read secrets via
+  `document` / `localStorage` access (`typeof document === "undefined"`); read secrets via
   `useRuntimeConfig()`, never `import.meta.env`.
 - **kebab-case filenames** for `.ts` (composables are the camelCase exception).
 - **≤ ~200 LOC per file** — split early into focused modules/components.

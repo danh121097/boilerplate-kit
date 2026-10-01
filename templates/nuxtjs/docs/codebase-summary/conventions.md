@@ -26,7 +26,6 @@ folder, not deep files:
 - `app/enums/index.ts` → `socket-events` + `storage-keys`.
 
 Prefer `import { ... } from "@/services/core"` over `@/services/core/api`.
-(Exception: the init plugin imports `registerServiceToken` from its exact module.)
 
 ## Nuxt auto-imports — what is and isn't automatic
 
@@ -51,11 +50,12 @@ Explicit imports (by project rule):
 
 Centralize string keys / event names so renames ripple cleanly:
 
-- **`app/enums/storage-keys.ts`** — `useStorageKeys("AUTH_TOKEN" | "LANGUAGE" |
-  "THEME")` returns a key prefixed by `NUXT_PUBLIC_APP_NAME` (fallback
+- **`app/enums/storage-keys.ts`** — `useStorageKeys("LANGUAGE" | "THEME" |
+  "SESSION" | "AUTH_SYNC")` returns a key prefixed by `NUXT_PUBLIC_APP_NAME` (fallback
   `PRISM_APP`). Resolved lazily inside the accessor (the prefix needs
   `useRuntimeConfig()`, valid only in a request scope) and cached. Always go
-  through it instead of hard-coding `localStorage` strings.
+  through it instead of hard-coding storage / cookie names (there are no token keys:
+  auth tokens are httpOnly cookies).
 - **`app/enums/socket-events.ts`** — `SOCKET_EVENT` map; reference it instead of
   raw event strings.
 
@@ -70,7 +70,7 @@ Centralize string keys / event names so renames ripple cleanly:
 ## Filenames
 
 - **kebab-case** for `.ts` files with descriptive names
-  (`refresh-token-manager.ts`, `auth-token-storage.ts`).
+  (`refresh-token-manager.ts`, `session.ts`).
 - **Composables** are the exception: filename = the exact `useXxx` function name
   (`useSocketIO.ts`).
 - **Components** are PascalCase `.vue` under `app/components/`.

@@ -66,10 +66,10 @@ Shared prop surfaces live in a sibling `*.props.ts` and are extended:
 Code runs on the Nitro server first, then hydrates on the client. Two rules keep
 SFCs and the composables they call SSR-safe.
 
-### Guard browser-only access with `isClient`
+### Guard browser-only access
 
 Never touch `window`, `document`, or `localStorage` at module scope or during
-setup without a client guard. The session hint writer shows the pattern — on the
+setup without a guard (`typeof document === "undefined"` or `onMounted`). The session hint writer shows the pattern — on the
 server it is a no-op:
 
 ```ts

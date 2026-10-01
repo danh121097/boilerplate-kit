@@ -2,8 +2,8 @@
 
 The flagship subsystem. Auth is **cookie-first**: the backend sets an httpOnly
 **access cookie** (15 min) and an httpOnly **refresh cookie** (scoped to the
-backend's `/api/v1/auth` routes); no token ever touches JS. Every request carries
-an optional **HMAC signature**. In the browser a 401 drives a **single-flight,
+backend's `/api/v1/auth` routes); the client never stores or reads a token. Every request carries
+an **HMAC signature** (required by the bundled backends). In the browser a 401 drives a **single-flight,
 cross-tab-locked** refresh-and-replay per service. The service layer never
 reloads the page: a refused refresh ends the session as `"expired"`
 (`endSession` in `services/core/session.ts`), which the app turns into a cache
@@ -48,8 +48,12 @@ Implementation: named route middleware `app/middleware/auth.ts` and `app/middlew
 
 ## HMAC Request Signing (`hmac-signature.ts`)
 
-Active only when `runtimeConfig.public.hmacSecret` (`NUXT_PUBLIC_HMAC_SECRET`) is
-set; otherwise signing is skipped. The secret is read via `useRuntimeConfig()`
+Signing is active when `runtimeConfig.public.hmacSecret` (`NUXT_PUBLIC_HMAC_SECRET`)
+is set; with an empty secret the signer returns `null` and no headers are sent.
+The bundled backends require the headers and the secret must equal their
+`HMAC_SECRET`, so an empty secret against a real backend makes every request
+fail with 401. Dev builds log one `console.warn` for it (not in production, not
+while mock auth is on; the secret is never printed). The secret is read via `useRuntimeConfig()`
 (lazily, inside a `try/catch`) — **never** `import.meta.env`:
 
 ```ts
@@ -88,7 +92,7 @@ and the path with the query stripped):
   breaks the raw-header comparison. Bodies are UTF-8.
 - **Multipart is not supported.** The browser appends a `boundary` the signer
   cannot see, so `multipart/form-data` requests fail HMAC verification. Upload
-  through a signed server route, or exempt the upload route on the backend.
+  through a server route you add (e.g. `server/api/...`) that signs the request, or exempt the upload route on the backend.
 
 Signed by the axios request interceptor (`HeadersUtils.setAuthHeaders`), the bare
 refresh client, `serverApiGet` (SSR), and the Socket.IO handshake over
@@ -96,14 +100,35 @@ refresh client, `serverApiGet` (SSR), and the Socket.IO handshake over
 
 > **Security note:** the browser must sign too, so the secret has to be in
 > `runtimeConfig.public` — which is serialized into the page payload and readable
-> by anyone. The client HMAC is therefore an **anti-casual-abuse** measure (it
-> stops naive scripted calls and replays older than 5 minutes), **not**
-> authentication. Authorization rests on the httpOnly cookies. Do **not** move the
+> by anyone. The client HMAC is therefore an **anti-abuse / light integrity**
+> layer, **not** a security boundary or authentication: the signature covers the
+> method, Content-Type, timestamp and path only (no body hash, no nonce), and the
+> backend accepts a `ctime` within ±5 minutes. Authorization rests on the httpOnly
+> cookies. Do **not** move the
 > secret to a private (non-`public`) `runtimeConfig.hmacSecret`: the browser
 > signer would then have no secret and every client request would fail HMAC
 > verification. If the signature must be unforgeable, route browser traffic
 > through a server-side proxy (Nitro route / BFF) that signs with a private
 > secret, and point the browser at that proxy instead of the backend.
+
+### `HMAC_ERROR` is not a session verdict
+
+A backend 401 with `errorType: "HMAC_ERROR"` (bad signature, wrong secret or
+clock skew) is normalized by `toApiError` with `retryable: true`.
+`isHmacError` is true for it, while `isUnauthorizedError` and `isRefreshRefused`
+are false: the browser does not refresh, the session is kept, and the layout's
+retry banner shows. SSR (`serverApiGet`) rejects the same way and logs one
+server-side warning per process; the browser logs one dev warning. Fix the device
+clock or the secret, then retry.
+
+### Tokens in the JSON body (accepted risk)
+
+In cookie mode the backend still returns the tokens in the JSON body of
+login / register / refresh, and the client ignores them. Script running on the
+page (XSS) can therefore call `/auth/refresh` and read a fresh refresh token from
+the response, despite the httpOnly cookie. This is an accepted risk; the
+mitigation (a backend opt-in to omit tokens from the body in cookie mode) is
+backlog.
 
 ## The Refresh Flow (browser)
 
@@ -321,7 +346,7 @@ close this gap.
 
 | Read | SSR | Browser |
 | --- | --- | --- |
-| `useMeQuery` (`auth.me`) | `readServerSession()`: `serverApiGet` with forwarded cookie; a 401 without the hint → `null` (anonymous); a 401 with the hint, or any other failure, rejects | `AuthModel.getSession()` via axios → refresh-and-retry; a 401 after refresh → `revokeSession` (posts only while the hint is set and the session has not already ended), then `null`; other errors surface |
+| `useMeQuery` (`auth.me`) | `readServerSession()`: `serverApiGet` with forwarded cookie; no hint → `null` (anonymous); with the hint, any failure rejects, and a 404 is rewritten to `error_code: 401` (this query only) so it takes the 401 path | `AuthModel.getSession()` via axios → refresh-and-retry; a 401 or 404 after refresh (`isSessionGoneError`) → `revokeSession` (posts only while the hint is set and the session has not already ended), then `null`; 5xx and network errors surface as transient |
 | `useUsersListQuery` | `serverApiPaginate`; failures reject | `UsersModel.list()` via axios → refresh-and-retry; errors surface |
 
 `layouts/default.vue` resolves the session once per SSR request with
@@ -336,7 +361,10 @@ header was rendered and reach the payload — a hydration mismatch.
 list or its error (a 401 renders loading and the browser refreshes). `serverApi*` helpers reject with an `ApiResponseError`
 (`error_code` = HTTP status, `0` when unreachable; `retryable: true` for
 unreachable, 408, 429 and 5xx) instead of returning `null`. SSR never calls
-`/auth/refresh`. Only a 401 ends the session on boot: a retryable failure keeps
+`/auth/refresh`. A 404 from `/auth/me` counts as signed out like a 401 (the
+account is gone); the trade-off is that a 404 from a wrong `API_PREFIX` or
+gateway signs the user out too. An `HMAC_ERROR` keeps the session and shows the
+banner. Only a 401/404 ends the session on boot: a retryable failure keeps
 the session and `layouts/default.vue` shows a `role="alert"` banner
 (`session.unavailable`) with a Retry button (`session.retry`, `refetchSession()`);
 the banner disappears once the retry succeeds. An anonymous visitor (no session hint cookie) resolves to signed-out without any

@@ -7,7 +7,7 @@ Self-documenting names so Grep/Glob find the right file without opening it.
 Use kebab-case with a meaningful, descriptive name. Long is fine if it is clear.
 
 ```
-app/services/core/auth-token-storage.ts
+app/services/core/refresh-token-manager.ts
 app/components/ui/input.props.ts
 app/stores/socket-io.ts
 app/enums/storage-keys.ts
@@ -58,7 +58,7 @@ app/services/
 │   ├── tanstack-mutation.ts
 │   ├── tanstack-optimistic.ts
 │   ├── tanstack-ssr.ts
-│   ├── auth-token-storage.ts
+│   ├── session.ts
 │   └── index.ts        # re-exports defineQuery, defineMutation, Model, ...
 ├── auth/
 │   ├── auth.ts

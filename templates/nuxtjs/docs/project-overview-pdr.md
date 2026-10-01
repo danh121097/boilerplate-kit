@@ -2,7 +2,7 @@
 
 A Nuxt 4 + TypeScript **SSR** starter, wired for a real backend out of the box:
 an SSR-guarded axios service layer with httpOnly-cookie JWT Auth, refresh-token
-rotation, optional HMAC request signing, TanStack Vue Query for server state,
+rotation, HMAC request signing, TanStack Vue Query for server state,
 Pinia for client state, Socket.IO, and `@nuxtjs/i18n`. The intent is a thin but
 complete foundation — copy it, point the `NUXT_PUBLIC_*` env vars at your API,
 and start building features.
@@ -22,7 +22,7 @@ ordered `app/plugins/*` that run on **both server and client**.
 | Client state | Pinia 3 (`@pinia/nuxt`, `app/stores/`) |
 | Server state | TanStack Vue Query 5 (`app/services/core/tanstack.ts`) |
 | HTTP | axios 1 service layer, SSR-guarded (`app/services/`) |
-| Auth | httpOnly access + refresh cookies (rotation) + session hint cookie + optional HMAC |
+| Auth | httpOnly access + refresh cookies (rotation) + session hint cookie + HMAC request signing |
 | Realtime | Socket.IO client 4 (`app/composables/useSocketIO.ts`) |
 | UI primitives | Reka UI 2 + `lucide-vue-next` icons |
 | Styling | Tailwind CSS v4 (`@tailwindcss/vite`) + SCSS (`sass-embedded`) |
@@ -58,12 +58,11 @@ Bound to `runtimeConfig.public` in `nuxt.config.ts` (read via
 
 | Env var | runtimeConfig key | Purpose |
 | --- | --- | --- |
-| `NUXT_PUBLIC_APP_NAME` | `appName` | localStorage key prefix |
+| `NUXT_PUBLIC_APP_NAME` | `appName` | prefix for storage, cookie and lock keys |
 | `NUXT_PUBLIC_APP_ENDPOINT` | `appEndpoint` | Backend origin; `getApiBaseUrl()` appends `/api/v1` (Socket.IO uses it bare) |
 | `NUXT_PUBLIC_API_PREFIX` | `apiPrefix` | REST version prefix (default `/api/v1`) |
-| `NUXT_PUBLIC_APP_ENDPOINT` | `appEndpoint` | Socket.IO endpoint |
 | `NUXT_PUBLIC_LANGUAGE_CODE` | `languageCode` | default locale (`en` / `ja`) when there is no saved cookie or matching browser language; read when `nuxt.config.ts` loads |
-| `NUXT_PUBLIC_HMAC_SECRET` | `hmacSecret` | HMAC request signing secret |
+| `NUXT_PUBLIC_HMAC_SECRET` | `hmacSecret` | HMAC signing secret; required by the bundled backends and must equal the backend `HMAC_SECRET` (an empty one logs a dev warning and every request 401s) |
 | `NUXT_PUBLIC_BUILD_VERSION` | `buildVersion` | sent as `x-version` header |
 | `NUXT_PUBLIC_AUTH_MOCK` | `authMock` | dev only: `true`/`1` answers `/auth/*` and `/users` in the browser; ignored in production builds |
 | `NUXT_PUBLIC_AUTH_MOCK_EMAIL` / `NUXT_PUBLIC_AUTH_MOCK_PASSWORD` | `authMockEmail` / `authMockPassword` | mock login credentials (default `demo@example.com` / `password`) |
@@ -73,25 +72,26 @@ runs unconfigured (see `app/plugins/01.init-services.ts`); the REST base is `app
 
 ## Key Constraints
 
-- **SSR-safe** — all `window`/`localStorage` access is client-guarded
-  (`isClient()` in `app/services/core/auth-token-storage.ts`); secrets are read
-  via `useRuntimeConfig()` inside a request scope, not at module top-level.
+- **SSR-safe** — browser-only access (`document`, `localStorage`) is guarded
+  (`typeof document === "undefined"`, as in `app/services/core/session.ts`) or kept
+  in `onMounted`; secrets are read via `useRuntimeConfig()` inside a request scope, not at module top-level.
 - **Component auto-import is scoped** — Nuxt auto-imports `app/components/**`
   with a path-derived prefix (`app/components/ui/Button.vue` → `<UiButton>`).
 - **Stores are explicit** — `pinia.storesDirs: []` disables store auto-import;
   always `import { useXStore } from "@/stores/x"`.
 - **HMAC is a PUBLIC runtime config** — exposed to every browser client, so it
-  is anti-casual-abuse only, not authentication. It must stay `public`: the
+  is an anti-abuse / light integrity layer only, not authentication or a
+  security boundary. It must stay `public`: the
   browser signs its own requests, and a private-only secret would break them.
   For an unforgeable signature, proxy browser traffic through a server route
   that signs (see `app/services/core/hmac-signature.ts`).
-- **Refresh token is server-owned** — it lives in an httpOnly cookie; only the
-  short-lived access token is held client-side (in `localStorage`).
+- **Tokens are server-owned** — both the access and refresh tokens live in
+  httpOnly cookies; JS holds only the readable session hint cookie.
 - **File size** — aim for ≤ ~200 LOC per file; split early.
 
 ## Intentionally NOT Included
 
-- No `server/` (Nitro) routes — the directory is empty; this is a frontend that
+- No `server/` (Nitro) routes — there is no such directory; this is a frontend that
   talks to an external backend (e.g. the Express template).
 - No global auth middleware — protected routes use the named `auth` / `guest` route middleware in `app/middleware/`.
 - No state-persistence plugin for Pinia.
