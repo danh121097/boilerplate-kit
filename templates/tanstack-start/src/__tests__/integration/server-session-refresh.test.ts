@@ -2,7 +2,8 @@ import { STORAGE_KEYS } from "@/enums";
 import { getMeServerFn } from "@/server/get-me";
 import { serverApiGet, serverApiPaginate } from "@/server/server-api";
 import { readServerSession } from "@/server/session";
-import { fetchSession } from "@/services/auth/session";
+import { fetchSession, isSessionUnavailable } from "@/services/auth/session";
+import { isUnauthorizedError } from "@/services/core/api-errors";
 import { registerSessionRefresher, withSessionRefresh } from "@/services/core/server-session";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -136,6 +137,80 @@ describe("server-side session read (SSR, fetchSession → readServerSession)", (
 
   it("no session hint + backend 401 resolves to null (anonymous)", async () => {
     await expect(fetchSession()).resolves.toBeNull();
+  });
+});
+
+describe("server-side HMAC_ERROR", () => {
+  const hmacBody = {
+    success: false,
+    message: "HMAC verification failed!",
+    errorType: "HMAC_ERROR",
+  };
+
+  beforeEach(() => {
+    requestCookies.clear();
+    requestCookies.set("accessToken", "AT");
+    requestCookies.set(STORAGE_KEYS.SESSION, "1");
+    vi.stubGlobal("window", {});
+    vi.mocked(getMeServerFn as unknown as () => Promise<unknown>).mockImplementation(
+      readServerSession,
+    );
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    vi.mocked(getMeServerFn as unknown as () => Promise<unknown>).mockReset();
+  });
+
+  it("flags the sentinel instead of reporting an expired session, and logs once", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(async () => Response.json(hmacBody, { status: 401 })),
+    );
+    vi.resetModules();
+    const { serverApiGet: freshGet } = await import("@/server/server-api");
+
+    const expected = { unauthorized: true, hasSession: true, hmacRejected: true };
+    await expect(freshGet("/auth/me")).resolves.toEqual(expected);
+    await expect(freshGet("/auth/me")).resolves.toEqual(expected);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("a plain 401 is still the expired-session sentinel", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockImplementation(async () =>
+          Response.json({ errorType: "AUTHENTICATION_ERROR" }, { status: 401 }),
+        ),
+    );
+    await expect(serverApiGet("/auth/me")).resolves.toEqual(UNAUTHORIZED_HINTED);
+  });
+
+  it("withSessionRefresh neither refreshes nor signs out: it rejects with the HMAC error", async () => {
+    const refresher = vi.fn();
+    registerSessionRefresher(refresher);
+    const call = vi.fn().mockResolvedValue({ ...UNAUTHORIZED_HINTED, hmacRejected: true });
+
+    const error = await withSessionRefresh(call).catch((e: unknown) => e);
+
+    expect(error).toMatchObject({ error_code: 401, errorType: "HMAC_ERROR" });
+    expect(isUnauthorizedError(error)).toBe(false);
+    expect(refresher).not.toHaveBeenCalled();
+    expect(call).toHaveBeenCalledTimes(1);
+  });
+
+  it("fetchSession rethrows it rather than resolving signed out (no session revoke)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(async () => Response.json(hmacBody, { status: 401 })),
+    );
+    const error = await fetchSession().catch((e: unknown) => e);
+    expect(error).toMatchObject({ errorType: "HMAC_ERROR", retryable: true });
+    // The session-unavailable banner path accepts it instead of showing signed-out.
+    expect(isSessionUnavailable(error)).toBe(true);
   });
 });
 

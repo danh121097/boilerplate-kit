@@ -1,5 +1,8 @@
 import {
+  HMAC_ERROR_TYPE,
+  isHmacError,
   isRefreshRefused,
+  refreshHmacRejected,
   refreshUnavailable,
   SessionEndedError,
 } from "@/services/core/api-errors";
@@ -21,6 +24,9 @@ export interface ServerUnauthorized {
   unauthorized: true;
   /** The request carried the session hint → worth a refresh, not "anonymous". */
   hasSession: boolean;
+  /** The backend rejected the request SIGNATURE (`HMAC_ERROR`: clock skew or secret
+   * mismatch), not the session — never a reason to refresh or sign the user out. */
+  hmacRejected?: true;
 }
 
 export function isServerUnauthorized(value: unknown): value is ServerUnauthorized {
@@ -39,6 +45,29 @@ let sessionRefresher: SessionRefresher | null = null;
 /** Wire the client refresher (the interceptors' single-flight manager) once at boot. */
 export function registerSessionRefresher(refresher: SessionRefresher): void {
   sessionRefresher = refresher;
+}
+
+/**
+ * Refresh `service` through the registered client refresher (the interceptors'
+ * single-flight, cross-tab-locked manager), e.g. for the Socket.IO handshake. A
+ * refused refresh has then ended the session. Rejects when none is registered.
+ */
+export function refreshSession(service: ApiService = "MAIN", sentAt?: number): Promise<void> {
+  if (!sessionRefresher) return Promise.reject(new Error("No session refresher registered"));
+  return sessionRefresher(service, sentAt);
+}
+
+/** Rejected-signature outcome: a 401 that is NOT a signed-out session. */
+function hmacRejectedError(): ApiResponseError {
+  const message = "HMAC signature rejected";
+  return {
+    status: "error",
+    error_code: 401,
+    errorType: HMAC_ERROR_TYPE,
+    retryable: true,
+    message,
+    error_message: message,
+  };
 }
 
 /** Signed-out outcome, shaped like an API error so callers can branch on 401. */
@@ -67,6 +96,8 @@ export async function withSessionRefresh<T>(
   const sentAt = Date.now();
   const first = await call();
   if (!isServerUnauthorized(first)) return first;
+  // Signature rejected: neither signed out nor refreshable — surface it, keep the session.
+  if (first.hmacRejected) throw hmacRejectedError();
   if (!first.hasSession) throw unauthorizedError();
 
   if (typeof window === "undefined") {
@@ -81,9 +112,12 @@ export async function withSessionRefresh<T>(
     // (network/5xx/429) → keep the session and surface a retryable, non-401
     // error so the query is not cached as signed-out.
     const signedOut = isRefreshRefused(error) || error instanceof SessionEndedError;
-    throw signedOut ? unauthorizedError() : refreshUnavailable(error);
+    if (signedOut) throw unauthorizedError();
+    throw isHmacError(error) ? refreshHmacRejected(error) : refreshUnavailable(error);
   }
   const second = await call();
-  if (isServerUnauthorized(second)) throw unauthorizedError();
+  if (isServerUnauthorized(second)) {
+    throw second.hmacRejected ? hmacRejectedError() : unauthorizedError();
+  }
   return second;
 }

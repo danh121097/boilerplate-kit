@@ -1,5 +1,6 @@
 import { STORAGE_KEYS } from "@/enums";
 import { getApiBaseUrl } from "@/services/core/api-config";
+import { isHmacError } from "@/services/core/api-errors";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import { isServerUnauthorized } from "@/services/core/server-session";
 import { getCookie } from "@tanstack/react-start/server";
@@ -50,6 +51,17 @@ export function toServerApiError(status: number, body?: unknown, fallback = "req
   return error;
 }
 
+let hmacWarned = false;
+
+/** Log a server-side `HMAC_ERROR` once per process (every read would repeat it). */
+function warnHmacRejectedOnce(): void {
+  if (hmacWarned) return;
+  hmacWarned = true;
+  console.warn(
+    "[server-api] Backend rejected the request signature (HMAC_ERROR): check the server clock and that VITE_HMAC_SECRET matches the backend HMAC_SECRET.",
+  );
+}
+
 /** Whether the request carries the readable session hint (see `services/core/session`). */
 export function hasServerSessionHint(): boolean {
   return getCookie(STORAGE_KEYS.SESSION) === "1";
@@ -90,7 +102,16 @@ async function authedFetch<R>(
   } catch (error) {
     throw toServerApiError(0, undefined, error instanceof Error ? error.message : undefined);
   }
-  if (res.status === 401) return unauthorized;
+  if (res.status === 401) {
+    const body: unknown = await res.json().catch(() => undefined);
+    // A rejected signature (clock skew / secret mismatch) is not an expired session:
+    // flag it so the client neither refreshes nor signs the user out.
+    if (isHmacError(body)) {
+      warnHmacRejectedOnce();
+      return { ...unauthorized, hmacRejected: true };
+    }
+    return unauthorized;
+  }
   if (!res.ok) {
     const body: unknown = await res.json().catch(() => undefined);
     throw toServerApiError(res.status, body, `GET ${path} failed with status ${res.status}`);

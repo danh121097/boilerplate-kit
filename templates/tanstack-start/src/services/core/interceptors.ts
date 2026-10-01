@@ -1,5 +1,7 @@
 import {
+  isHmacError,
   isRefreshRefused,
+  refreshHmacRejected,
   refreshUnavailable,
   SessionEndedError,
   toApiError,
@@ -72,6 +74,15 @@ function canAttemptRefresh(config: InternalAxiosRequestConfig, options: RefreshO
   return options.hasSession();
 }
 
+/** Dev-only hint: a rejected signature is a clock or secret problem, not a session one. */
+function warnHmacRejected(): void {
+  if (import.meta.env.DEV) {
+    console.warn(
+      "Request signature rejected (HMAC_ERROR): check the device clock and that VITE_HMAC_SECRET matches the backend HMAC_SECRET.",
+    );
+  }
+}
+
 interface ResponseInterceptorOpts {
   strictBlobError: boolean;
   instance: AxiosInstance;
@@ -96,6 +107,8 @@ function createResponseInterceptor(opts: ResponseInterceptorOpts) {
     unauthorized: ApiResponseError,
   ): Promise<AxiosResponse> | null => {
     if (!config) return null;
+    // A rejected signature says nothing about the session: no refresh, no replay.
+    if (isHmacError(unauthorized)) return null;
     const ctx = resolveRefresh(serviceOf(config));
     if (!ctx || !canAttemptRefresh(config, ctx.options)) return null;
     config._retry = true;
@@ -103,14 +116,18 @@ function createResponseInterceptor(opts: ResponseInterceptorOpts) {
     // as-is — the browser re-attaches the fresh cookie (no Bearer to set).
     return ctx.manager.refresh(config._sentAt).then(
       () => instance(config),
-      (refreshError: unknown) =>
-        Promise.reject<AxiosResponse>(
+      (refreshError: unknown) => {
+        if (isHmacError(refreshError)) warnHmacRejected();
+        return Promise.reject<AxiosResponse>(
           refreshError instanceof SessionEndedError
             ? refreshError
             : isRefreshRefused(refreshError)
               ? unauthorized
-              : refreshUnavailable(refreshError),
-        ),
+              : isHmacError(refreshError)
+                ? refreshHmacRejected(refreshError)
+                : refreshUnavailable(refreshError),
+        );
+      },
     );
   };
 
@@ -146,6 +163,7 @@ function createResponseInterceptor(opts: ResponseInterceptorOpts) {
     if (error.response?.status === 401) {
       const retry = refreshAndRetry(error.config, errorData);
       if (retry) return retry;
+      if (isHmacError(errorData)) warnHmacRejected();
     }
     if (error.code === "ERR_NETWORK" || error.code === "ERR_BLOCKED_BY_CLIENT") {
       console.error("Network error. Please check your internet connection.");
