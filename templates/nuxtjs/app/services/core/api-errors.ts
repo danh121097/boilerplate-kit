@@ -30,13 +30,33 @@ export function toApiError(error: unknown): ApiResponseError {
       e?.response?.status ??
       (error as { error_code?: number } | null)?.error_code ??
       0,
-    ...(isTransientHttpError(error) ? { retryable: true } : {}),
+    // A rejected signature is not a verdict on the session: surface it as retryable.
+    ...(isTransientHttpError(error) || isHmacError(data) ? { retryable: true } : {}),
   };
 }
 
+/** Backend `errorType` of a rejected request signature or timestamp: still HTTP
+ * 401, but it says nothing about the session. */
+export const HMAC_ERROR_TYPE = "HMAC_ERROR";
+
+/**
+ * Whether a rejection is the backend refusing the request SIGNATURE (bad HMAC or
+ * clock skew), not the session. Reads `errorType` from a normalized
+ * `ApiResponseError` or from a raw axios error's response body.
+ */
+export function isHmacError(error: unknown): boolean {
+  const e = error as {
+    errorType?: unknown;
+    response?: { data?: { errorType?: unknown } };
+  } | null;
+  return (e?.errorType ?? e?.response?.data?.errorType) === HMAC_ERROR_TYPE;
+}
+
 /** True when a rejection means the session was rejected (HTTP / envelope 401) —
- * as opposed to a network error, timeout or 5xx, which say nothing about it. */
+ * as opposed to a network error, timeout, 5xx or a rejected request signature
+ * (`HMAC_ERROR`), which say nothing about it. */
 export function isUnauthorizedError(error: unknown): boolean {
+  if (isHmacError(error)) return false;
   return (error as Partial<ApiResponseError> | null)?.error_code === 401;
 }
 
@@ -55,8 +75,10 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
 
 /** True when the refresh endpoint refused the session — HTTP 401 or 403. Every
  * other refresh failure (offline, timeout, 408, 429, 5xx, 400, a malformed
- * body) is transient: the session is kept and a later 401 refreshes again. */
+ * body) is transient: the session is kept and a later 401 refreshes again. So is
+ * a 401 `HMAC_ERROR` (rejected signature / clock skew): the session was never judged. */
 export function isRefreshRefused(error: unknown): boolean {
+  if (isHmacError(error)) return false;
   const status = (error as { response?: { status?: number } } | null)?.response?.status;
   return status === 401 || status === 403;
 }

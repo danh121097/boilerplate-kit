@@ -1,4 +1,5 @@
 import { getApiBaseUrl } from "@/services/core/api-config";
+import { isHmacError } from "@/services/core/api-errors";
 import { getAppPrefix } from "@/services/core/app-prefix";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import type {
@@ -36,7 +37,8 @@ function toServerApiError(error: unknown): ApiResponseError {
     e?.data && typeof e.data === "object" ? (e.data as Partial<ApiResponseError>) : undefined;
   const message = data?.message ?? e?.message ?? "request_failed";
   const status = e?.statusCode;
-  const transient = !status || status === 408 || status === 429 || status >= 500;
+  const transient =
+    !status || status === 408 || status === 429 || status >= 500 || isHmacError(data);
   return {
     ...data,
     status: data?.status ?? "error",
@@ -45,6 +47,17 @@ function toServerApiError(error: unknown): ApiResponseError {
     error_code: data?.error_code ?? status ?? 0,
     ...(transient ? { retryable: true } : {}),
   };
+}
+
+let hmacWarned = false;
+
+/** Log a server-side `HMAC_ERROR` once per process (every read would repeat it). */
+function warnHmacRejectedOnce(): void {
+  if (hmacWarned) return;
+  hmacWarned = true;
+  console.warn(
+    "[server-api] Backend rejected the request signature (HMAC_ERROR): check the server clock and that NUXT_PUBLIC_HMAC_SECRET matches the backend HMAC_SECRET.",
+  );
 }
 
 /** The value of cookie `name` in a `Cookie` header (undefined when absent). */
@@ -90,7 +103,12 @@ async function authedFetch<R>(path: string, query?: Record<string, string | numb
   try {
     return await $fetch<R>(`${apiBase}${path}`, { headers, credentials: "include", query });
   } catch (error) {
-    throw toServerApiError(error);
+    const apiError = toServerApiError(error);
+    // A rejected signature (clock skew / secret mismatch) is not an expired session:
+    // it rejects with `errorType: "HMAC_ERROR"`, which `isUnauthorizedError` ignores,
+    // so the query shows an error instead of deferring to a browser refresh.
+    if (isHmacError(apiError)) warnHmacRejectedOnce();
+    throw apiError;
   }
 }
 

@@ -1,4 +1,5 @@
 import {
+  isHmacError,
   isRefreshRefused,
   refreshUnavailable,
   SessionEndedError,
@@ -72,6 +73,22 @@ function canAttemptRefresh(config: InternalAxiosRequestConfig, options: RefreshO
   return options.hasSession();
 }
 
+/** Dev-only hint: a rejected signature is a clock or secret problem, not a session one. */
+function warnHmacRejected(): void {
+  if (import.meta.dev) {
+    console.warn(
+      "Request signature rejected (HMAC_ERROR): check the device clock and that NUXT_PUBLIC_HMAC_SECRET matches the backend HMAC_SECRET.",
+    );
+  }
+}
+
+/** The normalized error for an HMAC rejection of the refresh call itself: the
+ * backend's message and `errorType` kept, retryable, and not a 401 session. */
+function hmacRejected(error: unknown): ApiResponseError {
+  warnHmacRejected();
+  return { ...toApiError(error), retryable: true };
+}
+
 interface ResponseInterceptorOpts {
   strictBlobError: boolean;
   instance: AxiosInstance;
@@ -98,6 +115,8 @@ function createResponseInterceptor(opts: ResponseInterceptorOpts) {
     unauthorized: ApiResponseError,
   ): Promise<AxiosResponse> | null => {
     if (!config) return null;
+    // A rejected signature says nothing about the session: no refresh, no replay.
+    if (isHmacError(unauthorized)) return null;
     const ctx = resolveRefresh(serviceOf(config));
     if (!ctx || !canAttemptRefresh(config, ctx.options)) return null;
     config._retry = true;
@@ -109,7 +128,9 @@ function createResponseInterceptor(opts: ResponseInterceptorOpts) {
             ? refreshError
             : isRefreshRefused(refreshError)
               ? unauthorized
-              : refreshUnavailable(refreshError),
+              : isHmacError(refreshError)
+                ? hmacRejected(refreshError)
+                : refreshUnavailable(refreshError),
         ),
     );
   };
@@ -144,6 +165,7 @@ function createResponseInterceptor(opts: ResponseInterceptorOpts) {
     if (error.response?.status === 401) {
       const retry = refreshAndRetry(error.config, errorData);
       if (retry) return retry;
+      if (isHmacError(errorData)) warnHmacRejected();
     }
     if (error.code === "ERR_NETWORK" || error.code === "ERR_BLOCKED_BY_CLIENT") {
       console.error("Network error. Please check your internet connection.");
@@ -152,6 +174,25 @@ function createResponseInterceptor(opts: ResponseInterceptorOpts) {
   };
 
   return [onSuccess, onError] as const;
+}
+
+type SessionRefresher = (service: ApiService, sentAt?: number) => Promise<void>;
+
+let sessionRefresher: SessionRefresher | null = null;
+
+/** Register the interceptors' refresh (called once by the services plugin). */
+export function registerSessionRefresher(refresher: SessionRefresher): void {
+  sessionRefresher = refresher;
+}
+
+/**
+ * Refresh `service`'s session through the registered interceptors (the single-flight
+ * manager shared with the 401 path), e.g. for the Socket.IO handshake. A refused
+ * refresh has then ended the session. Rejects when none is registered.
+ */
+export function refreshSession(service: ApiService = "MAIN", sentAt?: number): Promise<void> {
+  if (!sessionRefresher) return Promise.reject(new Error("No session refresher registered"));
+  return sessionRefresher(service, sentAt);
 }
 
 export class ApiInterceptors implements HttpInterceptorSetup {

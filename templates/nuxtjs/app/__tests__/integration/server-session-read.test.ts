@@ -1,7 +1,7 @@
 import { AuthModel, readServerSession, fetchSessionUser } from "@/services/auth";
-import { resetQueriesToSignedOut, serverApiGet } from "@/services/core";
+import { isUnauthorizedError, resetQueriesToSignedOut, serverApiGet } from "@/services/core";
 import { QueryClient } from "@tanstack/vue-query";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Session/profile reads: in the browser they go through the refreshing axios
@@ -126,6 +126,64 @@ describe("serverApiGet", () => {
   it("unwraps the envelope data on success", async () => {
     stubNuxt(async () => ({ success: true, data: { user: USER } }));
     await expect(serverApiGet("/auth/me")).resolves.toEqual({ user: USER });
+  });
+});
+
+describe("server-side HMAC_ERROR", () => {
+  const hmacBody = {
+    success: false,
+    message: "HMAC verification failed!",
+    errorType: "HMAC_ERROR",
+  };
+
+  const hmacRejected = () =>
+    Promise.reject(Object.assign(new Error("unauthorized"), { statusCode: 401, data: hmacBody }));
+
+  beforeEach(() => {
+    vi.stubGlobal("useRuntimeConfig", () => ({
+      public: { appEndpoint: "http://api.test", apiPrefix: "/api/v1" },
+    }));
+    vi.stubGlobal("useRequestHeaders", () => ({ cookie: "PRISM_APP_SESSION=1" }));
+    vi.stubGlobal("$fetch", vi.fn(hmacRejected));
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("rejects with the HMAC errorType, which is not a signed-out session, and logs once", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.resetModules();
+    const { serverApiGet: freshGet } = await import("@/services/core/server-api");
+
+    const error = await freshGet("/auth/me").catch((e: unknown) => e);
+    await freshGet("/auth/me").catch(() => undefined);
+
+    expect(error).toMatchObject({ error_code: 401, errorType: "HMAC_ERROR", retryable: true });
+    expect(isUnauthorizedError(error)).toBe(false);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("readServerSession rejects with it rather than resolving signed out", async () => {
+    await expect(readServerSession()).rejects.toMatchObject({ errorType: "HMAC_ERROR" });
+  });
+
+  it("a plain 401 is still an unauthorized rejection and logs nothing", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.stubGlobal(
+      "$fetch",
+      vi.fn(() =>
+        Promise.reject(
+          Object.assign(new Error("unauthorized"), {
+            statusCode: 401,
+            data: { errorType: "AUTHENTICATION_ERROR" },
+          }),
+        ),
+      ),
+    );
+    const error = await serverApiGet("/auth/me").catch((e: unknown) => e);
+    expect(isUnauthorizedError(error)).toBe(true);
+    expect(warn).not.toHaveBeenCalled();
   });
 });
 

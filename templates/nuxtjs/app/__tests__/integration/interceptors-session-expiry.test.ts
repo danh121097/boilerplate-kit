@@ -1,5 +1,11 @@
 import { httpError, MAIN_REFRESH, makeClient, ok } from "@/__tests__/helpers/http-mocks";
-import { Api, ApiInterceptors, onSessionEnded } from "@/services/core";
+import {
+  Api,
+  ApiInterceptors,
+  isRefreshRefused,
+  isUnauthorizedError,
+  onSessionEnded,
+} from "@/services/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import axios from "axios";
 
@@ -102,6 +108,65 @@ describe("interceptors — 401 without reload", () => {
       expect(ended).not.toHaveBeenCalled();
     });
   }
+
+  it("a 401 HMAC_ERROR request is rejected once: no refresh, session kept", async () => {
+    const post = vi.spyOn(axios, "post");
+    let calls = 0;
+    const client = makeClient(async (config) => {
+      calls += 1;
+      return httpError(config, 401, {
+        success: false,
+        message: "HMAC verification failed: timestamp expired!",
+        errorType: "HMAC_ERROR",
+      });
+    });
+
+    const error = await client.get("/users").catch((e: unknown) => e);
+
+    expect(error).toMatchObject({ error_code: 401, errorType: "HMAC_ERROR" });
+    expect(isUnauthorizedError(error)).toBe(false);
+    expect(calls).toBe(1);
+    expect(post).not.toHaveBeenCalled();
+    expect(ended).not.toHaveBeenCalled();
+  });
+
+  it("a refresh answered with 401 HMAC_ERROR keeps the session and rejects retryable", async () => {
+    vi.spyOn(axios, "post").mockRejectedValue(
+      Object.assign(new Error("refresh failed"), {
+        isAxiosError: true,
+        response: {
+          status: 401,
+          data: { success: false, message: "HMAC verification failed!", errorType: "HMAC_ERROR" },
+        },
+      }),
+    );
+    const client = makeClient(async (config) => httpError(config));
+
+    const error = await client.get("/users").catch((e: unknown) => e);
+
+    expect(error).toMatchObject({
+      error_code: 401,
+      errorType: "HMAC_ERROR",
+      message: "HMAC verification failed!",
+      retryable: true,
+    });
+    expect(isUnauthorizedError(error)).toBe(false);
+    expect(isRefreshRefused(error)).toBe(false);
+    expect(ended).not.toHaveBeenCalled();
+  });
+
+  it("a refresh answered with 401 AUTHENTICATION_ERROR still ends the session", async () => {
+    vi.spyOn(axios, "post").mockRejectedValue(
+      Object.assign(new Error("refresh failed"), {
+        isAxiosError: true,
+        response: { status: 401, data: { success: false, errorType: "AUTHENTICATION_ERROR" } },
+      }),
+    );
+    const client = makeClient(async (config) => httpError(config));
+
+    await expect(client.get("/users")).rejects.toMatchObject({ error_code: 401 });
+    expect(ended).toHaveBeenCalledWith("expired", "MAIN");
+  });
 
   it("the refresh call is capped by a 15s timeout", async () => {
     const post = vi.spyOn(axios, "post").mockResolvedValue({ data: { success: true } } as never);

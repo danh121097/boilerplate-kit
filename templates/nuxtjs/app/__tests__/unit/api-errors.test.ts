@@ -1,5 +1,6 @@
 import {
   getApiErrorMessage,
+  isHmacError,
   isRefreshRefused,
   isTransientHttpError,
   isUnauthorizedError,
@@ -76,5 +77,43 @@ describe("refresh failure classification", () => {
     }
     expect(isTransientHttpError(httpFailure(400))).toBe(false);
     expect(isTransientHttpError(httpFailure(401))).toBe(false);
+  });
+});
+
+const hmacFailure = (status: number, errorType: string) => ({
+  isAxiosError: true,
+  response: { status, data: { success: false, message: "bad sig", errorType } },
+});
+
+describe("HMAC_ERROR classification", () => {
+  it("toApiError keeps the backend errorType", () => {
+    expect(toApiError(hmacFailure(401, "HMAC_ERROR"))).toMatchObject({
+      error_code: 401,
+      errorType: "HMAC_ERROR",
+    });
+  });
+
+  it("toApiError marks an HMAC 401 retryable so the session-unavailable banner shows", () => {
+    expect(toApiError(hmacFailure(401, "HMAC_ERROR")).retryable).toBe(true);
+    expect(toApiError(hmacFailure(401, "AUTHENTICATION_ERROR")).retryable).toBeUndefined();
+  });
+
+  it("isHmacError reads normalized and raw axios errors", () => {
+    expect(isHmacError({ error_code: 401, errorType: "HMAC_ERROR" })).toBe(true);
+    expect(isHmacError(hmacFailure(401, "HMAC_ERROR"))).toBe(true);
+    expect(isHmacError(hmacFailure(401, "AUTHENTICATION_ERROR"))).toBe(false);
+    expect(isHmacError(null)).toBe(false);
+  });
+
+  it("isRefreshRefused: 401 HMAC_ERROR is not a refusal, other 401/403 still are", () => {
+    expect(isRefreshRefused(hmacFailure(401, "HMAC_ERROR"))).toBe(false);
+    expect(isRefreshRefused(hmacFailure(401, "AUTHENTICATION_ERROR"))).toBe(true);
+    expect(isRefreshRefused(httpFailure(403))).toBe(true);
+    expect(isRefreshRefused(httpFailure(503))).toBe(false);
+  });
+
+  it("isUnauthorizedError: a 401 HMAC_ERROR does not mean a signed-out session", () => {
+    expect(isUnauthorizedError({ error_code: 401, errorType: "HMAC_ERROR" })).toBe(false);
+    expect(isUnauthorizedError({ error_code: 401 })).toBe(true);
   });
 });

@@ -5,6 +5,7 @@ import {
   ApiInterceptors,
   getApiBaseUrl,
   markSessionActive,
+  registerSessionRefresher,
   setAppPrefix,
 } from "@/services/core";
 import type { ServiceRefreshConfig } from "@/services/core";
@@ -63,5 +64,7 @@ export default defineNuxtPlugin(() => {
   // On a 401 the interceptor calls the failing service's own refresh endpoint
   // (the httpOnly refresh cookie is sent automatically); the backend rotates the
   // cookies and the request is replayed. Each service refreshes independently.
-  Api.registerInterceptors(new ApiInterceptors(refreshByService));
+  const interceptors = new ApiInterceptors(refreshByService);
+  Api.registerInterceptors(interceptors);
+  registerSessionRefresher((service, sentAt) => interceptors.refreshSession(service, sentAt));
 });

@@ -1,5 +1,8 @@
 import { SOCKET_EVENT } from "@/enums";
+import { getApiOrigin } from "@/services/core/api-config";
+import { isRefreshRefused, SessionEndedError } from "@/services/core/api-errors";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
+import { refreshSession } from "@/services/core/interceptors";
 import { useSocketIOStore } from "@/stores/socket-io";
 import { io, type Socket } from "socket.io-client";
 
@@ -7,16 +10,17 @@ import { io, type Socket } from "socket.io-client";
 const RECONNECT_BASE_MS = 2000;
 /** Ceiling of the retry delay. */
 const RECONNECT_MAX_MS = 30_000;
+/** Consecutive session refreshes tried per outage before falling back to plain backoff. */
+const MAX_REFRESH_ATTEMPTS = 3;
+/** `connect_error` message the server sends when it rejects a handshake. */
+const SOCKET_UNAUTHORIZED = "Unauthorized!";
 /** Disconnect reason when the server closed the socket; socket.io does not reconnect on its own. */
 const SERVER_DISCONNECT = "io server disconnect";
 
 export function useSocketIO() {
   const storeSocketIO = useSocketIOStore();
 
-  const runtime = useRuntimeConfig();
-
   const { ioStore } = storeToRefs(storeSocketIO);
-  const URL = runtime.public.appEndpoint || "";
 
   function signHeader() {
     const sig = HMACSignatureGenerator.signRequest({
@@ -28,14 +32,15 @@ export function useSocketIO() {
     return { sig: sig.sig, ctime: sig.ctime };
   }
 
-  /** Cookie-only auth — no Bearer. The browser sends the httpOnly access-token
-   * cookie via the `withCredentials` socket option. */
+  /** Handshake payload, signed fresh. Auth is the httpOnly access-token cookie
+   * (sent via the `withCredentials` socket option), so no `token` is sent. */
   function buildAuth() {
-    return { role: "user", ...signHeader() };
+    return signHeader();
   }
 
-  const socket = io(URL, {
-    auth: buildAuth(),
+  const socket = io(getApiOrigin(), {
+    // Callback form: every (re)connect is signed anew (fresh `ctime`).
+    auth: (cb) => cb(buildAuth()),
     transports: ["websocket"],
     withCredentials: true,
     autoConnect: false,
@@ -46,7 +51,6 @@ export function useSocketIO() {
   // Only the server's `authenticated` event marks the connection authenticated;
   // opening the transport says nothing about the handshake result.
   function connectSocket() {
-    socket.auth = buildAuth();
     if (socket.connected) return;
     socket.connect();
   }
@@ -56,6 +60,10 @@ export function useSocketIO() {
   // are left to socket.io's own reconnection (`socket.active`).
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
   let attempt = 0;
+  // Consecutive session refreshes tried since the socket was last authenticated.
+  let refreshAttempts = 0;
+  // Bumped by `destroySocket`: a refresh started earlier must not reconnect.
+  let generation = 0;
 
   function clearRetry() {
     if (retryTimer) clearTimeout(retryTimer);
@@ -63,6 +71,9 @@ export function useSocketIO() {
   }
 
   function destroySocket() {
+    generation++;
+    attempt = 0;
+    refreshAttempts = 0;
     clearRetry();
     socket.disconnect();
     if (ioStore.value.socket === socket) {
@@ -82,6 +93,7 @@ export function useSocketIO() {
 
   const handleAuthenticated = () => {
     attempt = 0;
+    refreshAttempts = 0;
     storeSocketIO.setSocketIO({ authenticated: true, socket });
   };
   const handleDisconnect = (reason: string) => {
@@ -90,16 +102,42 @@ export function useSocketIO() {
     // graceful restart), so that case joins the same backoff as a rejected handshake.
     if (reason === SERVER_DISCONNECT) scheduleRetry();
   };
-  const handleConnectError = () => {
+  // The server rejected the handshake: refresh the session once, then reconnect
+  // with the rotated cookie. Refused → the session is over (the refresh manager
+  // ended it), stop. Transient → keep the backoff. A bounded number of
+  // consecutive refreshes per outage, then plain backoff (fresh signature each try).
+  async function refreshThenReconnect() {
+    refreshAttempts++;
+    const started = generation;
+    try {
+      await refreshSession();
+    } catch (error) {
+      if (started !== generation) return;
+      if (error instanceof SessionEndedError || isRefreshRefused(error)) {
+        clearRetry();
+        socket.disconnect();
+        return;
+      }
+      scheduleRetry();
+      return;
+    }
+    if (started === generation) socket.connect();
+  }
+  const handleConnectError = (error: Error) => {
     storeSocketIO.setSocketIO({ authenticated: false });
-    if (!socket.active) scheduleRetry();
+    // `active` means socket.io is already reconnecting (network error, server
+    // down). Otherwise the server rejected the handshake.
+    if (socket.active) return;
+    if (error.message === SOCKET_UNAUTHORIZED && refreshAttempts < MAX_REFRESH_ATTEMPTS) {
+      void refreshThenReconnect();
+    } else {
+      scheduleRetry();
+    }
   };
-  const onSocketUnauthorized = () => destroySocket();
 
   socket.on(SOCKET_EVENT.AUTHENTICATED, handleAuthenticated);
   socket.on(SOCKET_EVENT.DISCONNECT, handleDisconnect);
   socket.on(SOCKET_EVENT.CONNECT_ERROR, handleConnectError);
-  socket.on(SOCKET_EVENT.UNAUTHORIZED, onSocketUnauthorized);
 
   onMounted(connectSocket);
 
@@ -107,7 +145,6 @@ export function useSocketIO() {
     socket.off(SOCKET_EVENT.AUTHENTICATED, handleAuthenticated);
     socket.off(SOCKET_EVENT.DISCONNECT, handleDisconnect);
     socket.off(SOCKET_EVENT.CONNECT_ERROR, handleConnectError);
-    socket.off(SOCKET_EVENT.UNAUTHORIZED, onSocketUnauthorized);
     destroySocket();
   });
 
