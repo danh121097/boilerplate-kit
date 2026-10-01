@@ -91,7 +91,9 @@ IPs/subnets) so Express reads the real client address from `X-Forwarded-For`;
 unset (default) ignores forwarded headers. Applied in `configureApp` via
 `app.set("trust proxy", value)`; an invalid value fails the boot. Prefer a hop
 count (e.g. `1`) over `true`: `true` trusts the leftmost `X-Forwarded-For` entry,
-which a client can forge.
+which a client can forge. Without a correct `TRUST_PROXY` behind a proxy or NAT, all
+clients share one IP and one bucket, and the shared `auth` bucket (30 / 15 min) can
+be exhausted for everyone.
 
 `@nestjs/throttler` v6 runs every named throttler on every route, so `auth` and
 `login` carry a `skipIf` (`skipUnlessOptedIn`) and only count on routes that name
