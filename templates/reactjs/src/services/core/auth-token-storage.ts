@@ -18,6 +18,9 @@ import { bumpSessionEpoch } from "@/services/core/session";
  *   registerServiceToken("ADMIN", { access: `${APP_PREFIX}_admin_ACCESS_TOKEN`,
  *                                   refresh: `${APP_PREFIX}_admin_REFRESH_TOKEN` });
  *
+ * A service that is not registered fails closed: reads return null, writes
+ * throw, clears remove nothing. It never touches the MAIN slots.
+ *
  * Security note: storing the refresh token in localStorage makes it readable by
  * JS (and thus by any XSS). The backend also sets an httpOnly refresh cookie; if
  * your threat model needs the stronger guarantee, drop the refresh token from
@@ -40,9 +43,19 @@ export function registerServiceToken(service: string, keys: ServiceTokenKeys): v
   serviceTokenKeys.set(service, keys);
 }
 
-/** Resolve a service to its slot pair, falling back to the MAIN slots. */
-function resolveKeys(service: string): ServiceTokenKeys {
-  return serviceTokenKeys.get(service) ?? DEFAULT_KEYS;
+/** The slot pair of a registered service, else undefined (never the MAIN slots). */
+function resolveKeys(service: string): ServiceTokenKeys | undefined {
+  return serviceTokenKeys.get(service);
+}
+
+function requireKeys(service: string): ServiceTokenKeys {
+  const keys = resolveKeys(service);
+  if (!keys) {
+    throw new Error(
+      `[auth] No token slots registered for service "${service}"; call registerServiceToken first.`,
+    );
+  }
+  return keys;
 }
 
 type TokensChangedListener = (service: string) => void;
@@ -69,38 +82,44 @@ function tokensCleared(service: string): void {
 }
 
 export function getAccessToken(service: string = "MAIN"): string | null {
-  return localStorage.getItem(resolveKeys(service).access);
+  const keys = resolveKeys(service);
+  return keys ? localStorage.getItem(keys.access) : null;
 }
 
 export function persistAccessToken(token: string, service: string = "MAIN"): void {
-  localStorage.setItem(resolveKeys(service).access, token);
+  localStorage.setItem(requireKeys(service).access, token);
   notifyTokensChanged(service);
 }
 
 export function clearAccessToken(service: string = "MAIN"): void {
-  localStorage.removeItem(resolveKeys(service).access);
+  const keys = resolveKeys(service);
+  if (keys) localStorage.removeItem(keys.access);
   tokensCleared(service);
 }
 
 export function getRefreshToken(service: string = "MAIN"): string | null {
-  return localStorage.getItem(resolveKeys(service).refresh);
+  const keys = resolveKeys(service);
+  return keys ? localStorage.getItem(keys.refresh) : null;
 }
 
 export function persistRefreshToken(token: string, service: string = "MAIN"): void {
-  localStorage.setItem(resolveKeys(service).refresh, token);
+  localStorage.setItem(requireKeys(service).refresh, token);
   notifyTokensChanged(service);
 }
 
 export function clearRefreshToken(service: string = "MAIN"): void {
-  localStorage.removeItem(resolveKeys(service).refresh);
+  const keys = resolveKeys(service);
+  if (keys) localStorage.removeItem(keys.refresh);
   tokensCleared(service);
 }
 
 /** Clear both tokens for a single service (e.g. when its refresh is refused). */
 export function clearServiceTokens(service: string = "MAIN"): void {
-  const { access, refresh } = resolveKeys(service);
-  localStorage.removeItem(access);
-  localStorage.removeItem(refresh);
+  const keys = resolveKeys(service);
+  if (keys) {
+    localStorage.removeItem(keys.access);
+    localStorage.removeItem(keys.refresh);
+  }
   tokensCleared(service);
 }
 

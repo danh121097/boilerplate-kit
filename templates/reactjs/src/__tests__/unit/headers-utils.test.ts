@@ -37,6 +37,13 @@ describe("headers-utils", () => {
     expect(config.headers.authorization).toBe("Bearer abc");
   });
 
+  it("addAuthorizationHeader never sends the MAIN token to an unregistered service", () => {
+    persistAccessToken("abc", "MAIN");
+    const config = configWith();
+    HeadersUtils.addAuthorizationHeader(config, "UNKNOWN");
+    expect(config.headers.authorization).toBeUndefined();
+  });
+
   it("addAuthorizationHeader is a no-op when no token is stored", () => {
     const config = configWith();
     HeadersUtils.addAuthorizationHeader(config, "MAIN");
