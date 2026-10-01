@@ -12,6 +12,7 @@ import {
   redirectOnSessionExpired,
   safeRedirect,
 } from "@/services/core";
+import { isRefreshRefused, isUnauthorizedError } from "@/services/core/api-errors";
 import { makeQueryClient, resetQueriesOnSessionEnd } from "@/services/core/query-client";
 import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import axios from "axios";
@@ -77,6 +78,77 @@ describe("session auth flows", () => {
       expect(hasSessionHint()).toBe(true);
     },
   );
+
+  it("a 401 HMAC_ERROR request is rejected once: no refresh, session and hint kept", async () => {
+    markSessionActive();
+    const { post, client } = setup(hasSessionHint);
+    const ended = vi.fn();
+    const off = onSessionEnded(ended);
+    onTestFinished(off);
+    let calls = 0;
+    const http = client(async (config) => {
+      calls += 1;
+      return httpError(config, 401, {
+        success: false,
+        message: "HMAC verification failed: timestamp expired!",
+        errorType: "HMAC_ERROR",
+      });
+    });
+
+    const error = await http.get("/users").catch((e: unknown) => e);
+
+    expect(error).toMatchObject({ error_code: 401, errorType: "HMAC_ERROR", retryable: true });
+    expect(isUnauthorizedError(error)).toBe(false);
+    expect(calls).toBe(1);
+    expect(post).not.toHaveBeenCalled();
+    expect(ended).not.toHaveBeenCalled();
+    expect(hasSessionHint()).toBe(true);
+  });
+
+  it("a refresh answered with 401 HMAC_ERROR keeps the session and rejects retryable", async () => {
+    markSessionActive();
+    const { post, client } = setup(hasSessionHint);
+    post.mockRejectedValue(
+      refreshError({
+        status: 401,
+        errorType: "HMAC_ERROR",
+        message: "HMAC verification failed: timestamp expired!",
+      }),
+    );
+    const ended = vi.fn();
+    const off = onSessionEnded(ended);
+    onTestFinished(off);
+
+    const http = client(async (config) => httpError(config, 401));
+
+    const error = await http.get("/users").catch((e: unknown) => e);
+    expect(error).toMatchObject({
+      retryable: true,
+      errorType: "HMAC_ERROR",
+      error_code: 401,
+      message: "HMAC verification failed: timestamp expired!",
+      error_message: "HMAC verification failed: timestamp expired!",
+    });
+    expect(isRefreshRefused(error)).toBe(false);
+    expect(isUnauthorizedError(error)).toBe(false);
+    expect(ended).not.toHaveBeenCalled();
+    expect(hasSessionHint()).toBe(true);
+  });
+
+  it("a refresh answered with 401 AUTHENTICATION_ERROR still ends the session", async () => {
+    markSessionActive();
+    const { post, client } = setup(hasSessionHint);
+    post.mockRejectedValue(refreshError({ status: 401, errorType: "AUTHENTICATION_ERROR" }));
+    const ended = vi.fn();
+    const off = onSessionEnded(ended);
+    onTestFinished(off);
+
+    const http = client(async (config) => httpError(config, 401));
+
+    await expect(http.get("/users")).rejects.toMatchObject({ error_code: 401 });
+    expect(ended).toHaveBeenCalledWith("expired", "MAIN");
+    expect(hasSessionHint()).toBe(false);
+  });
 
   it("the refresh request gives up after 15s so a hung refresh cannot stall requests", async () => {
     markSessionActive();

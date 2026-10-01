@@ -1,5 +1,6 @@
 import { STORAGE_KEYS } from "@/enums";
 import { getApiBaseUrl } from "@/services/core/api-config";
+import { isHmacError } from "@/services/core/api-errors";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import { cookies } from "next/headers";
 import type {
@@ -52,9 +53,21 @@ function toServerApiError(status: number, body?: unknown, fallback = "request_fa
     message,
     error_message: data?.error_message ?? message,
     error_code: data?.error_code ?? status,
-    ...(transient ? { retryable: true } : {}),
+    // A rejected signature is not a verdict on the session: retryable like a transient failure.
+    ...(transient || isHmacError(data) ? { retryable: true } : {}),
   };
   return error;
+}
+
+let hmacWarned = false;
+
+/** Log a server-side `HMAC_ERROR` once per process (every read would repeat it). */
+function warnHmacRejectedOnce(): void {
+  if (hmacWarned) return;
+  hmacWarned = true;
+  console.warn(
+    "[server-api] Backend rejected the request signature (HMAC_ERROR): check the server clock and that NEXT_PUBLIC_HMAC_SECRET matches the backend HMAC_SECRET.",
+  );
 }
 
 /** Whether the request carries the readable session hint (see `services/core/session`). */
@@ -107,6 +120,9 @@ async function authedFetch<R>(path: string, query?: Record<string, string | numb
   }
   if (!res.ok) {
     const body: unknown = await res.json().catch(() => undefined);
+    // A rejected signature (clock skew / secret mismatch) is not an expired session:
+    // the rejection keeps its `errorType`, so it is never read as a signed-out 401.
+    if (res.status === 401 && isHmacError(body)) warnHmacRejectedOnce();
     throw toServerApiError(res.status, body, `GET ${path} failed with status ${res.status}`);
   }
   return (await res.json()) as R;

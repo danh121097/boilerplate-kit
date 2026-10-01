@@ -57,11 +57,24 @@ export function observeSessionEnd() {
 const CREDENTIAL_PATHS = ["/auth/login", "/auth/register", "/auth/logout"];
 
 /** What the bare refresh client's `axios.post` rejects with. */
-export function refreshError(failure: { status?: number; code?: string }) {
+export function refreshError(failure: {
+  status?: number;
+  code?: string;
+  errorType?: string;
+  message?: string;
+}) {
   return Object.assign(new Error("refresh failed"), {
     isAxiosError: true,
     code: failure.code,
-    response: failure.status ? { status: failure.status, data: {} } : undefined,
+    response: failure.status
+      ? {
+          status: failure.status,
+          data: {
+            ...(failure.errorType ? { errorType: failure.errorType } : {}),
+            ...(failure.message ? { message: failure.message } : {}),
+          },
+        }
+      : undefined,
   });
 }
 

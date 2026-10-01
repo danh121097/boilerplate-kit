@@ -1,5 +1,6 @@
 import { STORAGE_KEYS } from "@/enums";
 import { readServerSession } from "@/server/session";
+import { isUnauthorizedError } from "@/services/core/api-errors";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -71,5 +72,48 @@ describe("readServerSession", () => {
     await readServerSession().catch(() => {});
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(String(fetchSpy.mock.calls[0]![0])).toContain("/auth/me");
+  });
+});
+
+describe("readServerSession with a rejected request signature (HMAC_ERROR)", () => {
+  const hmacBody = {
+    success: false,
+    message: "HMAC verification failed!",
+    errorType: "HMAC_ERROR",
+  };
+
+  beforeEach(() => {
+    jar.clear();
+    jar.set("accessToken", "AT");
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("is not a signed-out session: rejects even without a hint, keeping the errorType", async () => {
+    respond(401, hmacBody);
+    const error = await readServerSession().catch((e: unknown) => e);
+    expect(error).toMatchObject({
+      error_code: 401,
+      errorType: "HMAC_ERROR",
+      retryable: true,
+    });
+    expect(isUnauthorizedError(error)).toBe(false);
+  });
+
+  it("logs once per process, and not for a plain 401", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.resetModules();
+    const { serverApiGet } = await import("@/server/server-api");
+
+    respond(401, { errorType: "AUTHENTICATION_ERROR" });
+    await serverApiGet("/auth/me").catch(() => {});
+    expect(warn).not.toHaveBeenCalled();
+
+    respond(401, hmacBody);
+    await serverApiGet("/auth/me").catch(() => {});
+    await serverApiGet("/auth/me").catch(() => {});
+    expect(warn).toHaveBeenCalledTimes(1);
   });
 });

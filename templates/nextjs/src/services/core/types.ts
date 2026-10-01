@@ -113,6 +113,8 @@ export interface ApiResponseError {
   error_code: number;
   error_message: string;
   data?: Record<string, unknown>;
+  /** Backend error discriminator (e.g. `HMAC_ERROR`, `AUTHENTICATION_ERROR`), when it sent one. */
+  errorType?: string;
   /** Set when a request failed only because the token refresh was temporarily
    * unavailable (network / timeout / 5xx / 429) — the session is intact, retry later. */
   retryable?: boolean;
