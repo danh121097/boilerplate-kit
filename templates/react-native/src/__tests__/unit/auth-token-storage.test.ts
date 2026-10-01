@@ -1,7 +1,9 @@
 import { resetSecureStore } from "@/__tests__/helpers/fake-secure-store";
 import { STORAGE_KEYS } from "@/enums";
 import {
+  clearAccessToken,
   clearAuthTokens,
+  clearRefreshToken,
   clearServiceTokens,
   getAccessToken,
   getRefreshToken,
@@ -26,6 +28,26 @@ describe("auth-token-storage (async / SecureStore)", () => {
   it("returns null when no token is stored", async () => {
     expect(await getAccessToken("MAIN")).toBeNull();
     expect(await getRefreshToken("MAIN")).toBeNull();
+  });
+
+  it("fails closed for an unregistered service: never reads or touches the MAIN slots", async () => {
+    await persistAccessToken("main-a", "MAIN");
+    await persistRefreshToken("main-r", "MAIN");
+
+    expect(await getAccessToken("UNKNOWN")).toBeNull();
+    expect(await getRefreshToken("UNKNOWN")).toBeNull();
+    await expect(persistAccessToken("x", "UNKNOWN")).rejects.toThrow(/registerServiceToken/);
+    await expect(persistRefreshToken("x", "UNKNOWN")).rejects.toThrow(/registerServiceToken/);
+    await expect(
+      persistRefreshedTokensIfCurrent({ accessToken: "x" }, getSessionEpoch("UNKNOWN"), "UNKNOWN"),
+    ).rejects.toThrow(/registerServiceToken/);
+
+    await clearAccessToken("UNKNOWN");
+    await clearRefreshToken("UNKNOWN");
+    await clearServiceTokens("UNKNOWN");
+    expect(await getAccessToken("MAIN")).toBe("main-a");
+    expect(await getRefreshToken("MAIN")).toBe("main-r");
+    expect(await hasStoredSession("UNKNOWN")).toBe(false);
   });
 
   it("persists and reads access + refresh tokens per service", async () => {
@@ -66,11 +88,6 @@ describe("auth-token-storage (async / SecureStore)", () => {
     expect(await getRefreshToken("MAIN")).toBeNull();
     expect(await getAccessToken("ADMIN")).toBeNull();
     expect(await getRefreshToken("ADMIN")).toBeNull();
-  });
-
-  it("falls back to the MAIN slots for an unregistered service", async () => {
-    await persistAccessToken("main-a", "MAIN");
-    expect(await getAccessToken("UNKNOWN")).toBe("main-a"); // resolves to MAIN slot
   });
 
   it("keeps STORAGE_KEYS values SecureStore-legal ([A-Za-z0-9._-])", () => {

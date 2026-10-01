@@ -18,6 +18,10 @@ import * as SecureStore from "expo-secure-store";
  *   registerServiceToken("ADMIN", { access: `${getAppPrefix()}_admin_ACCESS_TOKEN`,
  *                                   refresh: `${getAppPrefix()}_admin_REFRESH_TOKEN` });
  *
+ * A service that is not registered fails closed: reads resolve null, writes
+ * reject, clears remove nothing. It never touches the MAIN slots, so a MAIN
+ * token can never be sent to a second backend's host.
+ *
  * Security note: `expo-secure-store` persists values in the iOS Keychain /
  * Android Keystore — encrypted at rest and not readable by other apps. Reads are
  * async (Promise-returning), which is why every helper below is `async`. Tokens
@@ -74,48 +78,67 @@ export function registerServiceToken(service: string, keys: ServiceTokenKeys): v
   serviceTokenKeys.set(service, keys);
 }
 
-/** Resolve a service to its slot pair, falling back to the MAIN slots. */
-function resolveKeys(service: string): ServiceTokenKeys {
-  return serviceTokenKeys.get(service) ?? DEFAULT_KEYS;
+/** The slot pair of a registered service, else undefined (never the MAIN slots). */
+function resolveKeys(service: string): ServiceTokenKeys | undefined {
+  return serviceTokenKeys.get(service);
 }
 
-export function getAccessToken(service: string = "MAIN"): Promise<string | null> {
-  return SecureStore.getItemAsync(resolveKeys(service).access);
+function requireKeys(service: string): ServiceTokenKeys {
+  const keys = resolveKeys(service);
+  if (!keys) {
+    throw new Error(
+      `[auth] No token slots registered for service "${service}"; call registerServiceToken first.`,
+    );
+  }
+  return keys;
+}
+
+export async function getAccessToken(service: string = "MAIN"): Promise<string | null> {
+  const keys = resolveKeys(service);
+  return keys ? SecureStore.getItemAsync(keys.access) : null;
 }
 
 export async function persistAccessToken(token: string, service: string = "MAIN"): Promise<void> {
-  await SecureStore.setItemAsync(resolveKeys(service).access, token, SECURE_OPTIONS);
+  await SecureStore.setItemAsync(requireKeys(service).access, token, SECURE_OPTIONS);
   notifyTokensChanged(service);
 }
 
-export function getRefreshToken(service: string = "MAIN"): Promise<string | null> {
-  return SecureStore.getItemAsync(resolveKeys(service).refresh);
+export async function getRefreshToken(service: string = "MAIN"): Promise<string | null> {
+  const keys = resolveKeys(service);
+  return keys ? SecureStore.getItemAsync(keys.refresh) : null;
 }
 
 export async function persistRefreshToken(token: string, service: string = "MAIN"): Promise<void> {
-  await SecureStore.setItemAsync(resolveKeys(service).refresh, token, SECURE_OPTIONS);
+  await SecureStore.setItemAsync(requireKeys(service).refresh, token, SECURE_OPTIONS);
   notifyTokensChanged(service);
 }
 
 /** Clear the access token of a single service (the refresh token is kept). */
 export async function clearAccessToken(service: string = "MAIN"): Promise<void> {
   bumpSessionEpoch(service);
-  await SecureStore.deleteItemAsync(resolveKeys(service).access);
+  const keys = resolveKeys(service);
+  if (keys) await SecureStore.deleteItemAsync(keys.access);
   notifyTokensChanged(service);
 }
 
 /** Clear the refresh token of a single service (the access token is kept). */
 export async function clearRefreshToken(service: string = "MAIN"): Promise<void> {
   bumpSessionEpoch(service);
-  await SecureStore.deleteItemAsync(resolveKeys(service).refresh);
+  const keys = resolveKeys(service);
+  if (keys) await SecureStore.deleteItemAsync(keys.refresh);
   notifyTokensChanged(service);
 }
 
 /** Clear both tokens for a single service (e.g. when its refresh is refused). */
 export async function clearServiceTokens(service: string = "MAIN"): Promise<void> {
   bumpSessionEpoch(service);
-  const { access, refresh } = resolveKeys(service);
-  await Promise.all([SecureStore.deleteItemAsync(access), SecureStore.deleteItemAsync(refresh)]);
+  const keys = resolveKeys(service);
+  if (keys) {
+    await Promise.all([
+      SecureStore.deleteItemAsync(keys.access),
+      SecureStore.deleteItemAsync(keys.refresh),
+    ]);
+  }
   notifyTokensChanged(service);
 }
 
@@ -145,7 +168,7 @@ export async function persistRefreshedTokensIfCurrent(
   service: string = "MAIN",
 ): Promise<boolean> {
   if (getSessionEpoch(service) !== epoch) return false;
-  const { access, refresh } = resolveKeys(service);
+  const { access, refresh } = requireKeys(service);
   const writes = [SecureStore.setItemAsync(access, tokens.accessToken, SECURE_OPTIONS)];
   if (tokens.refreshToken) {
     writes.push(SecureStore.setItemAsync(refresh, tokens.refreshToken, SECURE_OPTIONS));
