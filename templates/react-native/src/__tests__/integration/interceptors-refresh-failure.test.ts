@@ -1,6 +1,6 @@
 import { resetSecureStore } from "@/__tests__/helpers/fake-secure-store";
 import { httpError, makeClient, refreshFailure } from "@/__tests__/helpers/http-mocks";
-import { Api, onSessionEnded } from "@/services/core";
+import { Api, isUnauthorizedError, onSessionEnded } from "@/services/core";
 import {
   getAccessToken,
   getRefreshToken,
@@ -12,6 +12,12 @@ import axios from "axios";
 jest.mock("expo-secure-store", () =>
   require("@/__tests__/helpers/fake-secure-store").fakeSecureStore(),
 );
+
+const HMAC_BODY = {
+  success: false,
+  errorType: "HMAC_ERROR",
+  message: "HMAC verification failed: timestamp expired!",
+};
 
 /**
  * How the real interceptors react when the refresh call itself fails: transient
@@ -98,4 +104,69 @@ describe("interceptors — token refresh failures (async storage)", () => {
       expect(await getRefreshToken("MAIN")).toBeNull();
     },
   );
+
+  it("a request answered 401 HMAC_ERROR is not refreshed, retried or treated as a session end", async () => {
+    await persistAccessToken("OLD", "MAIN");
+    await persistRefreshToken("OLD_R", "MAIN");
+    const post = jest.spyOn(axios, "post");
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    let calls = 0;
+    const client = makeClient(async (config) => {
+      calls += 1;
+      return httpError(config, 401, HMAC_BODY);
+    });
+
+    await expect(client.get("/users")).rejects.toMatchObject({
+      errorType: "HMAC_ERROR",
+      message: HMAC_BODY.message,
+    });
+    expect(calls).toBe(1);
+    expect(post).not.toHaveBeenCalled();
+    expect(await getAccessToken("MAIN")).toBe("OLD");
+    expect(await getRefreshToken("MAIN")).toBe("OLD_R");
+    expect(sessionEnded).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("a refresh answered 401 HMAC_ERROR keeps the session and rejects without an expired-session 401", async () => {
+    await persistAccessToken("OLD", "MAIN");
+    await persistRefreshToken("OLD_R", "MAIN");
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    jest.spyOn(axios, "post").mockRejectedValue(
+      Object.assign(new Error("refresh failed"), {
+        isAxiosError: true,
+        response: { status: 401, data: HMAC_BODY },
+      }),
+    );
+    const client = makeClient(async (config) => httpError(config));
+
+    const error = await client.get("/users").catch((e: unknown) => e);
+
+    expect(error).toMatchObject({
+      error_code: 401,
+      errorType: "HMAC_ERROR",
+      message: HMAC_BODY.message,
+      retryable: true,
+    });
+    expect(isUnauthorizedError(error)).toBe(false);
+    expect(sessionEnded).not.toHaveBeenCalled();
+    expect(await getAccessToken("MAIN")).toBe("OLD");
+    expect(await getRefreshToken("MAIN")).toBe("OLD_R");
+  });
+
+  it("a refresh answered 401 AUTHENTICATION_ERROR still ends the session", async () => {
+    await persistAccessToken("OLD", "MAIN");
+    await persistRefreshToken("OLD_R", "MAIN");
+    jest.spyOn(axios, "post").mockRejectedValue(
+      Object.assign(new Error("refresh failed"), {
+        isAxiosError: true,
+        response: { status: 401, data: { success: false, errorType: "AUTHENTICATION_ERROR" } },
+      }),
+    );
+    const client = makeClient(async (config) => httpError(config));
+
+    await expect(client.get("/users")).rejects.toMatchObject({ error_code: 401 });
+    expect(sessionEnded).toHaveBeenCalledWith("expired", "MAIN");
+    expect(await getRefreshToken("MAIN")).toBeNull();
+  });
 });

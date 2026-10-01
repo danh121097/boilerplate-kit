@@ -1,10 +1,12 @@
 import {
+  isHmacError,
   isRefreshRefused,
   refreshUnavailable,
   SessionEndedError,
   toApiError,
 } from "@/services/core/api-errors";
 import { createTokenRefresher } from "@/services/core/auth-refresh-client";
+import { getAccessToken } from "@/services/core/auth-token-storage";
 import { HeadersUtils } from "@/services/core/headers-utils";
 import { RefreshTokenManager } from "@/services/core/refresh-token-manager";
 import { endSession, getSessionEpoch, hasStoredSession } from "@/services/core/session";
@@ -44,6 +46,21 @@ function isEnvelope(body: unknown): boolean {
   if (!body || typeof body !== "object") return false;
   const b = body as EnvelopeBody;
   return typeof b.success === "boolean";
+}
+
+/** Dev-only hint: an HMAC rejection is a signature / clock problem, not a session one. */
+function warnHmacRejected(): void {
+  if (__DEV__) {
+    console.warn(
+      "[api] Request signature rejected (HMAC_ERROR): check the device clock and that EXPO_PUBLIC_HMAC_SECRET matches the backend.",
+    );
+  }
+}
+
+/** The normalized error for an HMAC rejection of the refresh call itself. */
+function hmacRejected(error: unknown): ApiResponseError {
+  warnHmacRejected();
+  return { ...toApiError(error), errorType: "HMAC_ERROR", retryable: true };
 }
 
 /** The request path without its `?query` / `#hash`. */
@@ -104,6 +121,8 @@ function createResponseInterceptor({
   /**
    * Route a 401. Resolves to the replayed response when a refresh recovered it,
    * or to null when the 401 should go back to the caller as is:
+   * - an HMAC rejection (`HMAC_ERROR`, bad signature / clock): passed through —
+   *   no refresh, no replay, the session is untouched;
    * - no refresh for this service, or a credential/refresh endpoint: passed through;
    * - the session ended after the request was sent (logout, expiry): rejects
    *   `SessionEndedError` (`session_ended`) — no refresh, no clear, no event;
@@ -112,7 +131,8 @@ function createResponseInterceptor({
    * - otherwise refresh + replay. A refused refresh (401/403) rejects with the
    *   ORIGINAL 401 (the manager already cleared the tokens and ended the
    *   session); a transient one rejects with a retryable `refresh_unavailable`
-   *   and keeps the session. The replay's own outcome — e.g. a later 500 —
+   *   and keeps the session; a refresh rejected for its own signature rejects
+   *   with that normalized `HMAC_ERROR` and keeps the session. The replay's own outcome — e.g. a later 500 —
    *   propagates as is and must NOT clear the refreshed token.
    */
   const handle401 = async (
@@ -120,6 +140,10 @@ function createResponseInterceptor({
     unauthorized: ApiResponseError,
   ): Promise<AxiosResponse | null> => {
     if (!config) return null;
+    if (isHmacError(unauthorized)) {
+      warnHmacRejected();
+      return null;
+    }
     const service = serviceOf(config);
     const ctx = resolveRefresh(service);
     if (!ctx || isExempt(config, ctx.options)) return null;
@@ -134,7 +158,11 @@ function createResponseInterceptor({
       token = await ctx.manager.getFreshToken(sentToken(config));
     } catch (refreshError) {
       if (refreshError instanceof SessionEndedError) throw refreshError;
-      throw isRefreshRefused(refreshError) ? unauthorized : refreshUnavailable(refreshError);
+      throw isRefreshRefused(refreshError)
+        ? unauthorized
+        : isHmacError(refreshError)
+          ? hmacRejected(refreshError)
+          : refreshUnavailable(refreshError);
     }
     config.headers.authorization = `Bearer ${token}`;
     return instance(config);
@@ -181,6 +209,33 @@ function createResponseInterceptor({
   return [onSuccess, onError] as const;
 }
 
+/** The interceptors the app registered (the latest constructed), for `refreshSession`. */
+let activeInterceptors: ApiInterceptors | null = null;
+function setActiveInterceptors(interceptors: ApiInterceptors): void {
+  activeInterceptors = interceptors;
+}
+
+/**
+ * Refresh `service`'s session outside an HTTP request (e.g. a socket handshake
+ * the server rejected), through the same single-flight manager as the 401
+ * interceptor. Resolves to the fresh access token. `staleToken` is the access
+ * token that was rejected (default: the stored one, read from SecureStore). A
+ * refused refresh clears the tokens and ends the session before rejecting;
+ * rejects with `SessionEndedError` when the session already ended, and with the
+ * raw error otherwise (session kept). Rejects without a response when the
+ * service has no refresh configured.
+ */
+export async function refreshSession(
+  staleToken?: string | null,
+  service: ApiService = "MAIN",
+): Promise<string> {
+  const ctx = activeInterceptors?.getRefreshContext(service);
+  if (!ctx) throw new Error("refresh_not_configured");
+  return ctx.manager.getFreshToken(
+    staleToken === undefined ? await getAccessToken(service) : staleToken,
+  );
+}
+
 export class ApiInterceptors implements HttpInterceptorSetup {
   private readonly configs = new Map<ApiService, RefreshOptions>();
   private readonly contexts = new Map<ApiService, RefreshContext>();
@@ -200,10 +255,12 @@ export class ApiInterceptors implements HttpInterceptorSetup {
         service,
       });
     }
+    setActiveInterceptors(this);
   }
 
-  /** Lazily build (and cache) the single-flight manager for one service. */
-  private getRefreshContext(service: ApiService): RefreshContext | null {
+  /** Lazily build (and cache) the single-flight manager for one service.
+   * @internal used by `refreshSession`. */
+  getRefreshContext(service: ApiService): RefreshContext | null {
     const options = this.configs.get(service);
     if (!options) return null;
     let ctx = this.contexts.get(service);

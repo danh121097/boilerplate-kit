@@ -45,18 +45,34 @@ export function toApiError(error: unknown): ApiResponseError {
   };
 }
 
+/**
+ * True when the backend rejected the request signature or clock (`errorType`
+ * `HMAC_ERROR`, still HTTP 401) — a raw axios error or a normalized one. It says
+ * nothing about the session: never refresh, retry or end the session on it.
+ */
+export function isHmacError(error: unknown): boolean {
+  const e = error as {
+    errorType?: unknown;
+    response?: { data?: { errorType?: unknown } };
+  } | null;
+  return (e?.errorType ?? e?.response?.data?.errorType) === "HMAC_ERROR";
+}
+
 /** True when a rejection means the session was rejected (HTTP / envelope 401) —
- * as opposed to a network error, timeout or 5xx, which say nothing about it. */
+ * as opposed to a network error, timeout, 5xx or an HMAC rejection, which say
+ * nothing about it. */
 export function isUnauthorizedError(error: unknown): boolean {
-  return (error as Partial<ApiResponseError> | null)?.error_code === 401;
+  return (error as Partial<ApiResponseError> | null)?.error_code === 401 && !isHmacError(error);
 }
 
 /**
  * The refresh endpoint refused the refresh token (HTTP 401 or 403): the session
  * is over. Every other refresh failure — offline, timeout, 408, 429, 5xx, any
- * other 4xx, a 200 without an access token — is transient and keeps the session.
+ * other 4xx, a 200 without an access token, an `HMAC_ERROR` 401 (bad signature /
+ * clock, not the session) — is transient and keeps the session.
  */
 export function isRefreshRefused(error: unknown): boolean {
+  if (isHmacError(error)) return false;
   const status = httpStatusOf(error);
   return status === 401 || status === 403;
 }

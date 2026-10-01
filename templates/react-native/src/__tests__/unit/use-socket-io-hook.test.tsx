@@ -10,7 +10,6 @@ jest.mock("expo-secure-store", () =>
 type Handler = (...args: unknown[]) => void;
 const mockHandlers = new Map<string, Handler>();
 const mockSocket = {
-  auth: {} as unknown,
   connected: false,
   active: false,
   on: jest.fn((event: string, handler: Handler) => {
@@ -23,6 +22,7 @@ const mockSocket = {
 jest.mock("socket.io-client", () => ({ io: jest.fn(() => mockSocket) }));
 
 import { useSocketIO } from "@/hooks/useSocketIO";
+import { io } from "socket.io-client";
 
 const emit = (event: string, ...args: unknown[]) => {
   act(() => {
@@ -45,7 +45,6 @@ describe("useSocketIO", () => {
     await persistAccessToken("TKN", "MAIN");
     useSocketIOStore.setState({ socket: null, authenticated: false });
     mockSocket.active = false;
-    mockSocket.auth = {};
     mockSocket.connect.mockClear();
     mockSocket.disconnect.mockClear();
   });
@@ -58,6 +57,14 @@ describe("useSocketIO", () => {
     const { unmount } = renderHook(() => useSocketIO());
     await advance(0);
     expect(mockSocket.connect).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it("does not connect while signed out", async () => {
+    resetSecureStore();
+    const { unmount } = renderHook(() => useSocketIO());
+    await advance(0);
+    expect(mockSocket.connect).not.toHaveBeenCalled();
     unmount();
   });
 
@@ -95,7 +102,10 @@ describe("useSocketIO", () => {
     expect(mockSocket.connect).toHaveBeenCalledTimes(1);
     await advance(1);
     expect(mockSocket.connect).toHaveBeenCalledTimes(2);
-    expect(mockSocket.auth).toEqual(expect.objectContaining({ token: "Bearer TKN2" }));
+    // the handshake auth callback reads the rotated token on the reconnect
+    const { auth } = (io as unknown as jest.Mock).mock.calls[0][1];
+    const payload = await new Promise((resolve) => auth(resolve));
+    expect(payload).toEqual(expect.objectContaining({ token: "Bearer TKN2" }));
 
     rejectHandshake();
     await advance(3999);
