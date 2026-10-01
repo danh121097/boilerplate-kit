@@ -18,7 +18,7 @@ methods are the wiring points called once at startup:
 Instances are created with `withCredentials: true` (so the httpOnly refresh
 cookie rides along), a 30 s timeout, and JSON headers. Interceptors are applied
 lazily on first request (`ensureInterceptors`). Public methods: `get/post/put/
-patch/delete/postFormData`, all taking an `ApiRequestConfig` (`customHeaders`
+patch/delete`, all taking an `ApiRequestConfig` (`customHeaders`
 merge supported).
 
 ### `Model` (`model.ts`)
@@ -142,8 +142,8 @@ cookie; never refreshes) and its `fetcher` is `fetchSessionUser()` →
 ### Users (`app/services/users/users.ts`)
 
 `UsersModel extends Model` (path `/users`) with `list(params?: PaginationParams)`
-(resolves the `PaginatedResponse<User>` envelope: `{ data, meta }`), `get(id)` and
-`update(id, payload)` (both resolve the unwrapped `User`), plus `useUsersListQuery`
+(resolves the `PaginatedResponse<User>` envelope: `{ data, meta }`) and `get(id)`
+(resolves the unwrapped `User`), plus `useUsersListQuery`
 (same envelope; key `users.list`). The users page reads `data.data` and shows
 `users.empty` for an empty list. Types in `types/user.ts`.
 

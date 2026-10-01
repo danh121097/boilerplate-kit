@@ -30,9 +30,8 @@ Static state is shared across all instances:
 - `Api.registerInterceptors(setup)` — the one `HttpInterceptorSetup` used by all.
 
 Interceptors apply **once, lazily** on first request via `ensureInterceptors()`.
-Verb methods (`get/post/put/patch/delete`, plus `postFormData` which forces
-`multipart/form-data`) take an `ApiRequestConfig` and merge optional
-`customHeaders`.
+Verb methods (`get/post/put/patch/delete`) take an `ApiRequestConfig` and merge
+optional `customHeaders`.
 
 ## The `Model` Base (`app/services/core/model.ts`)
 

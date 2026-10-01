@@ -206,3 +206,54 @@ describe("resolveContentType", () => {
     expect(resolveContentType(input)).toBe(expected);
   });
 });
+
+describe("empty HMAC secret warning", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  /** A fresh module graph, so the once-only flag starts clear. */
+  async function load() {
+    vi.resetModules();
+    stubSecret("");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { HMACSignatureGenerator: Signer } = await import("@/services/core/hmac-signature");
+    const mockAuth = await import("@/services/auth/data/mock-auth-config");
+    return { Signer, mockAuth, warn };
+  }
+  const sign = (Signer: typeof HMACSignatureGenerator) =>
+    Signer.signRequest({ method: "GET", path: "/users" });
+
+  it("warns once, by key name, and never prints a secret", async () => {
+    const { Signer, warn } = await load();
+    expect(sign(Signer)).toBeNull();
+    sign(Signer);
+    expect(warn).toHaveBeenCalledExactlyOnceWith(
+      "NUXT_PUBLIC_HMAC_SECRET is empty; the backend requires it, all requests will 401.",
+    );
+  });
+
+  it("stays quiet in a production build", async () => {
+    vi.stubEnv("PROD", true);
+    const { Signer, warn } = await load();
+    sign(Signer);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("stays quiet while mock auth is on", async () => {
+    const { Signer, mockAuth, warn } = await load();
+    mockAuth.initMockAuth({ authMock: "true" });
+    warn.mockClear();
+    sign(Signer);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("stays quiet when a secret is configured", async () => {
+    const { Signer, warn } = await load();
+    stubSecret("shared-secret");
+    expect(sign(Signer)).not.toBeNull();
+    expect(warn).not.toHaveBeenCalled();
+  });
+});

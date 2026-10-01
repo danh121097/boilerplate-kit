@@ -26,7 +26,15 @@ import type { Component, FunctionalComponent } from "vue";
  * payload after the header was rendered, a hydration mismatch.
  */
 
-const SESSION_USER = { _id: "u1", email: "ada@example.com", name: "Ada", role: "admin" };
+const SESSION_USER: User = {
+  _id: "u1",
+  email: "ada@example.com",
+  name: "Ada",
+  role: "admin",
+  isActive: true,
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
+};
 const USERS = { success: true, data: [], meta: {} } as unknown as PaginatedResponse<User>;
 
 let DefaultLayout: Component;

@@ -2,6 +2,7 @@ import { AuthModel, readServerSession, fetchSessionUser } from "@/services/auth"
 import { isUnauthorizedError, resetQueriesToSignedOut, serverApiGet } from "@/services/core";
 import { QueryClient } from "@tanstack/vue-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { User } from "@/services/users";
 
 /**
  * Session/profile reads: in the browser they go through the refreshing axios
@@ -10,7 +11,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * ending a session clears the whole query cache.
  */
 
-const USER = { _id: "u1", email: "a@b.com", name: "A", role: "user" };
+const USER: User = {
+  _id: "u1",
+  email: "a@b.com",
+  name: "A",
+  role: "user",
+  isActive: true,
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
+};
 
 describe("fetchSessionUser (browser)", () => {
   afterEach(() => vi.restoreAllMocks());
@@ -23,6 +32,11 @@ describe("fetchSessionUser (browser)", () => {
 
   it("maps a 401 that survived the refresh to null (anonymous)", async () => {
     vi.spyOn(AuthModel, "getMe").mockRejectedValue({ error_code: 401, message: "unauthorized" });
+    await expect(fetchSessionUser()).resolves.toBeNull();
+  });
+
+  it("maps a 404 (the account behind the session is gone) to null like a 401", async () => {
+    vi.spyOn(AuthModel, "getMe").mockRejectedValue({ error_code: 404, message: "User not found!" });
     await expect(fetchSessionUser()).resolves.toBeNull();
   });
 
@@ -67,6 +81,20 @@ describe("readServerSession (SSR)", () => {
   it("session hint + 401 → rejects (expired access cookie; the browser refreshes)", async () => {
     stubServer("PRISM_APP_SESSION=1; accessToken=x", unauthorized);
     await expect(readServerSession()).rejects.toMatchObject({ error_code: 401 });
+  });
+
+  it("session hint + 404 (account gone) → rejects as a 401, left for the browser", async () => {
+    stubServer("PRISM_APP_SESSION=1", () =>
+      Promise.reject(
+        Object.assign(new Error("not found"), {
+          statusCode: 404,
+          data: { success: false, message: "User not found!" },
+        }),
+      ),
+    );
+    const error = await readServerSession().catch((e: unknown) => e);
+    expect(error).toMatchObject({ error_code: 401, message: "User not found!" });
+    expect(isUnauthorizedError(error)).toBe(true);
   });
 
   it("returns the signed-in user", async () => {
@@ -141,7 +169,7 @@ describe("server-side HMAC_ERROR", () => {
 
   beforeEach(() => {
     vi.stubGlobal("useRuntimeConfig", () => ({
-      public: { appEndpoint: "http://api.test", apiPrefix: "/api/v1" },
+      public: { appEndpoint: "http://api.test", apiPrefix: "/api/v1", hmacSecret: "test-secret" },
     }));
     vi.stubGlobal("useRequestHeaders", () => ({ cookie: "PRISM_APP_SESSION=1" }));
     vi.stubGlobal("$fetch", vi.fn(hmacRejected));

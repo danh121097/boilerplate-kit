@@ -54,10 +54,5 @@ describe("Api", () => {
       });
       expect(String(captured?.headers["X-Trace"])).toBe("42");
     });
-
-    it("postFormData routes as POST", async () => {
-      await new Api({ path: "/up" }).postFormData({ data: {}, adapter: capture });
-      expect(captured?.method).toBe("post");
-    });
   });
 });

@@ -93,6 +93,9 @@ function answer(
       email,
       name: String(body.name ?? ""),
       role: "user",
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
     writeMockUser(user);
     return reply(config, 201, succeed("User registered successfully!", authResult(user)));

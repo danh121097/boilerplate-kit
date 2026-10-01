@@ -1,3 +1,4 @@
+import { isMockAuthEnabled } from "@/services/auth/data/mock-auth-config";
 import type { HMACSignatureData } from "@/services/core/types";
 import type { InternalAxiosRequestConfig } from "axios";
 import Base64 from "crypto-js/enc-base64";
@@ -44,6 +45,15 @@ export function resolveContentType(config: InternalAxiosRequestConfig): string {
   return "application/json";
 }
 
+let warnedEmptySecret = false;
+
+/** Dev builds only, once: an empty secret with mock auth off means every request 401s. */
+function warnEmptySecretOnce(): void {
+  if (warnedEmptySecret || import.meta.env.PROD || isMockAuthEnabled()) return;
+  warnedEmptySecret = true;
+  console.warn("NUXT_PUBLIC_HMAC_SECRET is empty; the backend requires it, all requests will 401.");
+}
+
 /**
  * HMAC request signer — active only when the HMAC secret is configured. The
  * secret lives under `runtimeConfig.public.hmacSecret` because the browser must
@@ -81,6 +91,7 @@ export class HMACSignatureGenerator {
   }: SignRequestInput): HMACSignatureData | null {
     let secret = "";
     let xVersion = "1.0.0";
+    let inScope = false;
 
     try {
       const cfg = useRuntimeConfig() as unknown as {
@@ -89,11 +100,15 @@ export class HMACSignatureGenerator {
       // Same public secret on server (SSR fetches) and client (axios, refresh).
       secret = cfg.public?.hmacSecret ?? "";
       xVersion = cfg.public?.buildVersion ?? "1.0.0";
+      inScope = true;
     } catch {
       // Outside Nuxt request scope (e.g. pure unit test) — secret stays empty
     }
 
-    if (!secret) return null;
+    if (!secret) {
+      if (inScope) warnEmptySecretOnce();
+      return null;
+    }
 
     const stringToSign = [
       method.toUpperCase(),

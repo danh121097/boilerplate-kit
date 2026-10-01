@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { loginSchema } from "@/services/auth/schema/login";
+import { registerSchema } from "@/services/auth/schema/register";
 import { toTypedSchema } from "@vee-validate/zod";
 import { useForm } from "vee-validate";
 
 const { t } = useI18n();
 
-const schema = toTypedSchema(loginSchema);
+const schema = toTypedSchema(registerSchema);
 
 // Start fields as empty strings so zod's "expected string" check passes — users see
 // the format/length validation messages instead of the generic type error.

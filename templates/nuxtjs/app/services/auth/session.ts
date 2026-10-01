@@ -3,9 +3,10 @@ import { authContract } from "@/services/auth/contract";
 import { isMockAuthEnabled } from "@/services/auth/data/mock-auth-config";
 import { mockUnauthorizedError } from "@/services/auth/data/mock-auth-responses";
 import { readMockServerUser } from "@/services/auth/data/mock-auth-session";
-import { defineQuery, hasSessionHint, serverApiGet } from "@/services/core";
+import { defineQuery, hasSessionHint, isSessionGoneError, serverApiGet } from "@/services/core";
 import { queryKeys } from "@/services/query-keys";
 import type { AuthUser } from "@/services/auth/types/auth";
+import type { ApiResponseError } from "@/services/core";
 
 /**
  * Browser read of the signed-in user (null when anonymous) — `useMeQuery`'s
@@ -50,7 +51,13 @@ export async function readServerSession(): Promise<AuthUser | null> {
   if (!hinted) return null;
   // Hint set: any failure rejects, including a 401 (an expired access cookie only
   // the browser can refresh), so the query is resolved after hydration.
-  const body = await serverApiGet<{ user?: AuthUser }>(authContract.paths.me);
+  // A 404 (the account is gone) is read as a 401: the browser re-reads it through
+  // `AuthModel.getSession`, which ends the session and clears the hint.
+  const body = await serverApiGet<{ user?: AuthUser }>(authContract.paths.me).catch(
+    (error: unknown) => {
+      throw isSessionGoneError(error) ? { ...(error as ApiResponseError), error_code: 401 } : error;
+    },
+  );
   return body?.user ?? null;
 }
 

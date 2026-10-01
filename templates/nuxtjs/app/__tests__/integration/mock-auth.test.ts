@@ -25,7 +25,13 @@ async function boot(jar: Map<string, string>) {
   vi.resetModules();
   vi.stubGlobal("defineNuxtPlugin", (fn: () => void) => fn);
   vi.stubGlobal("useRuntimeConfig", () => ({
-    public: { appEndpoint: "http://api.test", apiPrefix: "/api/v1", appName: "", ...publicConfig },
+    public: {
+      appEndpoint: "http://api.test",
+      apiPrefix: "/api/v1",
+      appName: "",
+      hmacSecret: "test-secret",
+      ...publicConfig,
+    },
   }));
   const cookie = [...jar].map(([name, value]) => `${name}=${value}`).join("; ");
   vi.stubGlobal("useRequestHeaders", () => (cookie ? { cookie } : {}));
@@ -60,7 +66,13 @@ describe("mock auth", () => {
     const app = await boot(jar);
     const result = await app.AuthModel.login(DEMO);
 
-    expect(result.user).toMatchObject({ email: DEMO.email, role: "admin" });
+    expect(result.user).toMatchObject({
+      email: DEMO.email,
+      role: "admin",
+      isActive: true,
+      createdAt: expect.any(String),
+      updatedAt: expect.any(String),
+    });
     expect(result.tokens.accessToken).toEqual(expect.any(String));
     expect(jar.get(HINT)).toBe("1");
     expect(app.hasSessionHint()).toBe(true);
@@ -121,7 +133,14 @@ describe("mock auth", () => {
       name: "New User",
     });
 
-    expect(user).toMatchObject({ email: "new@example.com", name: "New User" });
+    expect(user).toMatchObject({
+      email: "new@example.com",
+      name: "New User",
+      role: "user",
+      isActive: true,
+      createdAt: expect.any(String),
+      updatedAt: expect.any(String),
+    });
     expect(jar.get(HINT)).toBe("1");
     const reloaded = await boot(jar);
     await expect(reloaded.readServerSession()).resolves.toEqual(user);
@@ -192,6 +211,23 @@ describe("mock auth", () => {
 
       await expect(app.readServerSession()).resolves.toBeNull();
       expect(app.fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not sign in a mock cookie whose role is not a backend role", async () => {
+      const user = {
+        _id: "x",
+        email: "x@example.com",
+        name: "X",
+        role: "root",
+        isActive: true,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      };
+      jar.set("PRISM_APP_MOCK_USER", encodeURIComponent(JSON.stringify(user)));
+      jar.set("PRISM_APP_SESSION", "1");
+      const app = await boot(jar);
+
+      await expect(app.readServerSession()).rejects.toMatchObject({ error_code: 401 });
     });
 
     it("uses the backend when the flag is off", async () => {

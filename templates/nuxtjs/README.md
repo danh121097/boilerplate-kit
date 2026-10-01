@@ -110,7 +110,7 @@ Nuxt auto-imports Vue APIs, Nuxt composables, `app/composables/**`, `app/utils/*
 
 ## Users contract
 
-`UsersModel.list(params?)` resolves the paginated envelope `{ data, meta }` (`PaginatedResponse<User>`); `get` and `update` resolve the unwrapped `User`. `/users` renders `data.data`, the error message, or `users.empty` when the list is empty.
+`UsersModel.list(params?)` resolves the paginated envelope `{ data, meta }` (`PaginatedResponse<User>`); `get` resolves the unwrapped `User`. `/users` renders `data.data`, the error message, or `users.empty` when the list is empty.
 
 ## i18n
 

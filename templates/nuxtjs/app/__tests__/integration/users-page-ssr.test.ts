@@ -76,6 +76,17 @@ describe("users page SSR", () => {
     expect(queries[0]?.state).toMatchObject({ status: "error", error: failure });
   });
 
+  it("renders a 404 of a non-session query as an error, not loading", async () => {
+    const failure = { error_code: 404, message: "nope", error_message: "Not found" };
+    vi.spyOn(UsersModel, "list").mockRejectedValue(failure);
+
+    const { html, queries } = await renderOnServer();
+
+    expect(html).toContain("users.error: Not found");
+    expect(html).not.toContain("users.loading");
+    expect(queries[0]?.state).toMatchObject({ status: "error", error: failure });
+  });
+
   it("renders the empty state for an empty list", async () => {
     vi.spyOn(UsersModel, "list").mockResolvedValue({ ...USERS, data: [] });
 
