@@ -1,3 +1,4 @@
+import { isMockAuthEnabled } from "@/services/auth/data/mock-auth-config";
 import type { HMACSignatureData } from "@/services/core/types";
 import type { InternalAxiosRequestConfig } from "axios";
 import Base64 from "crypto-js/enc-base64";
@@ -46,6 +47,16 @@ export function resolveContentType(config: InternalAxiosRequestConfig): string {
   return "application/json";
 }
 
+let warnedEmptySecret = false;
+
+/** Dev builds only: an empty secret with the mock off means every real request is
+ * unsigned and the backend will 401 it. The secret itself is never printed. */
+function warnEmptySecretOnce(): void {
+  if (warnedEmptySecret || process.env.NODE_ENV === "production" || isMockAuthEnabled()) return;
+  warnedEmptySecret = true;
+  console.warn("NEXT_PUBLIC_HMAC_SECRET is empty; the backend requires it, all requests will 401.");
+}
+
 /**
  * HMAC request signer — active only when `NEXT_PUBLIC_HMAC_SECRET` is set. The
  * secret is client-readable (soft integrity layer matching the backend's secret).
@@ -74,7 +85,10 @@ export class HMACSignatureGenerator {
     ctime = Date.now(),
   }: SignRequestInput): HMACSignatureData | null {
     const secret = process.env.NEXT_PUBLIC_HMAC_SECRET;
-    if (!secret) return null;
+    if (!secret) {
+      warnEmptySecretOnce();
+      return null;
+    }
 
     const xVersion = process.env.NEXT_PUBLIC_BUILD_VERSION || "1.0.0";
     const stringToSign = [

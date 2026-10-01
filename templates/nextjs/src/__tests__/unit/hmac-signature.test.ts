@@ -75,7 +75,43 @@ describe("hmac-signature", () => {
   });
 
   it("returns null when no secret is configured", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(HMACSignatureGenerator.generateSignature(configFor("/users", "get"))).toBeNull();
+  });
+
+  describe("empty secret warning", () => {
+    const message =
+      "NEXT_PUBLIC_HMAC_SECRET is empty; the backend requires it, all requests will 401.";
+
+    async function signWithoutSecret(times = 1) {
+      vi.resetModules();
+      const { HMACSignatureGenerator: fresh } = await import("@/services/core/hmac-signature");
+      for (let i = 0; i < times; i++) fresh.signRequest({ method: "GET", path: "/users" });
+    }
+
+    it("warns once per page load when the secret is empty and mock auth is off", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      await signWithoutSecret(3);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(message);
+    });
+
+    it("stays quiet in a production build", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.stubEnv("NODE_ENV", "production");
+      await signWithoutSecret();
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it("stays quiet when mock auth is on, or when a secret is set", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.stubEnv("NEXT_PUBLIC_AUTH_MOCK", "true");
+      await signWithoutSecret();
+      vi.stubEnv("NEXT_PUBLIC_AUTH_MOCK", "");
+      vi.stubEnv("NEXT_PUBLIC_HMAC_SECRET", "shared-secret");
+      await signWithoutSecret();
+      expect(warn.mock.calls.filter(([m]) => m === message)).toEqual([]);
+    });
   });
 
   it("signs '' (empty contentType) for bodyless GET — matches server canonical string", () => {

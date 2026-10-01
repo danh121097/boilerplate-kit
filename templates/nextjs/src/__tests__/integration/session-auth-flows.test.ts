@@ -53,6 +53,15 @@ describe("session auth flows", () => {
     await expect(AuthModel.getSession()).resolves.toBeNull();
   });
 
+  it("getSession resolves a 404 (account gone) to null, like a 401", async () => {
+    markSessionActive();
+    vi.spyOn(AuthModel.api, "get").mockRejectedValue({
+      error_code: 404,
+      message: "User not found",
+    });
+    await expect(AuthModel.getSession()).resolves.toBeNull();
+  });
+
   it("getSession with no session hint resolves signed out without a request", async () => {
     const get = vi.spyOn(AuthModel.api, "get").mockRejectedValue({ error_code: 503 });
     await expect(AuthModel.getSession()).resolves.toBeNull();

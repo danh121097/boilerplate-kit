@@ -126,7 +126,14 @@ describe("mock auth", () => {
       name: "New User",
     });
 
-    expect(user).toMatchObject({ email: "new@example.com", name: "New User" });
+    expect(user).toMatchObject({
+      email: "new@example.com",
+      name: "New User",
+      role: "user",
+      isActive: true,
+      createdAt: expect.any(String),
+      updatedAt: expect.any(String),
+    });
     expect(jar.get(STORAGE_KEYS.SESSION)).toBe("1");
     await expect(app.AuthModel.getMe()).resolves.toEqual(user);
   });
@@ -186,6 +193,7 @@ describe("mock auth", () => {
 
     it("uses the backend when the flag is off", async () => {
       vi.stubEnv("NEXT_PUBLIC_AUTH_MOCK", "");
+      vi.stubEnv("NEXT_PUBLIC_HMAC_SECRET", "shared-secret");
       const app = await boot();
 
       await expect(app.AuthModel.login(DEMO)).resolves.toEqual(REAL_RESULT);

@@ -17,7 +17,7 @@ labels — use `sr-only` to hide one visually. The login fields also set
 ## Errors and alerts
 
 - Validation messages render under the field (`FormField` `error`), translated
-  from i18n keys (`validation.email`, `validation.password_min`).
+  from i18n keys (`validation.email`, `validation.password_required`).
 - A failed sign-in shows the server message (or `login.error`) in an element with
   `role="alert"`, so screen readers announce it.
 - The session-unavailable banner is also `role="alert"` and carries a retry

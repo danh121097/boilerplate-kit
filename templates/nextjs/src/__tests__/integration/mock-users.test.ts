@@ -213,7 +213,15 @@ describe("mock users", () => {
       });
       expect(anonymous).not.toHaveProperty("retryable");
 
-      const plain = { _id: "u1", email: "u@example.com", name: "U", role: "user" };
+      const plain = {
+        _id: "u1",
+        email: "u@example.com",
+        name: "U",
+        role: "user",
+        isActive: true,
+        createdAt: "2026-03-02T08:00:00.000Z",
+        updatedAt: "2026-03-02T08:00:00.000Z",
+      };
       requestCookies.set(MOCK_USER_COOKIE, JSON.stringify(plain));
       await expect(getUsersServerData()).rejects.toMatchObject({
         error_code: 403,

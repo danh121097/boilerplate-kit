@@ -86,7 +86,7 @@ Schema messages are i18n keys, translated where they render:
 ```tsx
 const schema = z.object({
   email: z.email("validation.email"),
-  password: z.string().min(8, "validation.password_min"),
+  password: z.string().min(1, "validation.password_required"),
 });
 // error={errors.email?.message && t(errors.email.message)}
 ```

@@ -1,4 +1,3 @@
-import { STORAGE_KEYS } from "@/enums";
 import { getApiBaseUrl } from "@/services/core/api-config";
 import { isHmacError } from "@/services/core/api-errors";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
@@ -70,9 +69,15 @@ function warnHmacRejectedOnce(): void {
   );
 }
 
-/** Whether the request carries the readable session hint (see `services/core/session`). */
-export async function hasServerSessionHint(): Promise<boolean> {
-  return (await cookies()).get(STORAGE_KEYS.SESSION)?.value === "1";
+/** Query params as callers pass them; `undefined` / `null` entries are dropped. */
+type QueryParams = Record<string, string | number | null | undefined>;
+
+/** The params that carry a value, or undefined when none do (no stray `?page=undefined`). */
+function definedParams(query?: QueryParams): Record<string, string | number> | undefined {
+  const entries = Object.entries(query ?? {}).filter(([, v]) => v !== undefined && v !== null);
+  return entries.length
+    ? (Object.fromEntries(entries) as Record<string, string | number>)
+    : undefined;
 }
 
 function hmacHeaders(method: string, path: string, contentType: string): Record<string, string> {
@@ -90,7 +95,8 @@ function hmacHeaders(method: string, path: string, contentType: string): Record<
  * missing access cookie — never resolving a failure to a value React Query
  * would cache as success.
  */
-async function authedFetch<R>(path: string, query?: Record<string, string | number>): Promise<R> {
+async function authedFetch<R>(path: string, params?: QueryParams): Promise<R> {
+  const query = definedParams(params);
   // Dev-only mock auth answers the reads it owns from the mock cookie. The
   // constant makes this branch (and the dynamic import) vanish in production.
   if (process.env.NODE_ENV !== "production") {
@@ -142,10 +148,7 @@ export function serverApiPaginate<T>(
   path: string,
   params?: PaginationParams,
 ): Promise<PaginatedResponse<T>> {
-  return authedFetch<PaginatedResponse<T>>(
-    path,
-    params as Record<string, string | number> | undefined,
-  );
+  return authedFetch<PaginatedResponse<T>>(path, params as QueryParams | undefined);
 }
 
 /**
@@ -156,8 +159,5 @@ export function serverApiCursorPaginate<T>(
   path: string,
   params?: CursorParams,
 ): Promise<CursorResponse<T>> {
-  return authedFetch<CursorResponse<T>>(
-    path,
-    params as Record<string, string | number> | undefined,
-  );
+  return authedFetch<CursorResponse<T>>(path, params as QueryParams | undefined);
 }

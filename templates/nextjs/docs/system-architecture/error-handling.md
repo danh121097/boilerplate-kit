@@ -67,7 +67,7 @@ alongside it.
 ## Form validation
 
 `react-hook-form` + `zod` (v4) + `@hookform/resolvers` handle field errors. Schema
-messages are i18n keys (`validation.email`, `validation.password_min`); pages
+messages are i18n keys (`validation.email`, `validation.password_required`); pages
 translate them at render (`t(errors.email.message)`) and `FormField` prints the
 result under the input. The login form has `noValidate`, so zod (not the
 browser's native tooltip) owns the messages.

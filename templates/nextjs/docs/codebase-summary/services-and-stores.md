@@ -6,8 +6,7 @@
 
 | File              | Purpose                                                              |
 | ----------------- | -------------------------------------------------------------------- |
-| `server-api.ts`   | `serverApiGet` / `serverApiPaginate` / `serverApiCursorPaginate` — fetch with the access cookie + HMAC; reject with an `ApiResponseError` (401 when the access cookie is missing or rejected; no server refresh). `hasServerSessionHint()` |
-| `session.ts`      | `readServerSession()` — current user, or null when anonymous (no session hint) |
+| `server-api.ts`   | `serverApiGet` / `serverApiPaginate` / `serverApiCursorPaginate` — fetch with the access cookie + HMAC; reject with an `ApiResponseError` (401 when the access cookie is missing or rejected; no server refresh). |
 | `get-users.ts`    | `getUsersServerData()` — users list server-side, returns `PaginatedResponse<User>` |
 | `hydrated-queries.tsx` | `<HydratedQueries prefetch=…>` — prefetch, dehydrate, `HydrationBoundary`; `serverQuery(def, serverFetcher)` pairs a definition with its server fetcher |
 | `queries/`        | One paired server query per resource (`usersListServer`) — what pages prefetch |
@@ -48,7 +47,7 @@ never touches `localStorage` or reads tokens directly.
 ### users/
 
 - `contract.ts` — endpoint paths + React Query keys
-- `UsersModel` — `list(params?: PaginationParams): Promise<PaginatedResponse<User>>`, `get(id): Promise<User>`, `update(id, payload): Promise<User>` (get/update unwrap the response)
+- `UsersModel` — `list(params?: PaginationParams): Promise<PaginatedResponse<User>>`, `get(id): Promise<User>` (`get` unwraps the response)
 - `useUsersListQuery` — returns the `PaginatedResponse<User>` envelope; pages read the array from `data.data`
 - `data/mock-users.ts` — dev-only mock of `GET /users` answering the same `{ data, meta }` envelope
 

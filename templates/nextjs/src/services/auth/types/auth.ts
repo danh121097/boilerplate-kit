@@ -1,13 +1,12 @@
 /** Domain types for the Auth service — mirrors the backend auth module. */
 
-export interface AuthUser {
-  _id: string;
-  email: string;
-  name: string;
-  role: string;
-}
+import type { User } from "@/services/users/types/user";
 
-/** Only the access token is held client-side; the refresh token is cookie-only. */
+/** The signed-in user: the backend's public user, same shape `/users` returns. */
+export type AuthUser = User;
+
+/** The login/register body also carries the tokens, but cookie mode never stores
+ * them: the backend sets them as httpOnly cookies, so JS holds none. */
 export interface AuthTokens {
   accessToken: string;
   refreshToken?: string;

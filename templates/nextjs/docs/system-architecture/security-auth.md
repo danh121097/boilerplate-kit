@@ -98,9 +98,8 @@ ended the session and `false` — posting nothing — when the session had alrea
 ended (no hint, a logout running, or the epoch moved since the read started).
 It checks again once it holds the lock, so a refused refresh that ended the
 session while the revoke waited is not ended twice. It never runs on the server.
-Concurrent calls share one revoke: one POST, one event. The server-side read
-(`readServerSession`) never revokes. An anonymous 401 (no hint) resolves to
-`null` without a POST or an event.
+Concurrent calls share one revoke: one POST, one event. Server-side reads never
+revoke. An anonymous 401 (no hint) resolves to `null` without a POST or an event.
 
 ## Return Path
 
@@ -241,10 +240,7 @@ would trigger reuse detection (all sessions revoked). Instead:
   an empty list.
 
 The prefetch then fails, is not dehydrated, and the client query refetches
-through axios, which refreshes and replays. `readServerSession()`
-(`src/server/session.ts`) resolves the current user, and resolves `null` for a
-401 only when the request carries no session hint (anonymous); with the hint it
-rejects so the browser refreshes.
+through axios, which refreshes and replays.
 
 ## Security Notes
 

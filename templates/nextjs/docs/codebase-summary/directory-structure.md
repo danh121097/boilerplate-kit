@@ -48,7 +48,6 @@ templates/nextjs/
     ├── utils/                # cn.ts, cookie-storage.ts, date-format.ts
     ├── server/               # SSR helpers (RSC only)
     │   ├── server-api.ts     # serverApiGet / serverApiPaginate / serverApiCursorPaginate
-    │   ├── session.ts        # readServerSession()
     │   ├── get-users.ts      # getUsersServerData()
     │   ├── queries/          # serverQuery pairs per resource
     │   ├── hydrated-queries.tsx  # prefetch + HydrationBoundary

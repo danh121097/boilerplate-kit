@@ -9,7 +9,7 @@ import {
   getSessionEpoch,
   hasSessionHint,
   isLogoutPending,
-  isUnauthorizedError,
+  isSessionGoneError,
   Model,
   startSession,
   withSessionLock,
@@ -132,7 +132,7 @@ export class AuthModel extends Model {
   }
 
   /** Current user, or null when signed out. Without a session hint (anonymous) it
-   * resolves null with no request. A 401 resolves to null; while the
+   * resolves null with no request. A 401 (or a 404: the account is gone) resolves to null; while the
    * session is still live (hint set, not ended meanwhile) it is revoked first
    * (`revokeSession`, ends as "expired"). Other failures (network/5xx) still
    * throw so they are not cached as "signed out". Browser-only. */
@@ -143,7 +143,7 @@ export class AuthModel extends Model {
     try {
       return await this.getMe();
     } catch (error) {
-      if (!isUnauthorizedError(error)) throw error;
+      if (!isSessionGoneError(error)) throw error;
       await this.revokeSession(epoch);
       return null;
     }

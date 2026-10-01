@@ -34,9 +34,7 @@ Next.js build
   then `NEXT_PUBLIC_LANGUAGE_CODE`, then `en`.
 - The `QueryClient` is created once per browser session via `getQueryClient()`;
   on the server a fresh client is created per request to avoid state leakage.
-- Auth state (`useAuth()`) is derived from the client's session query; server components
-  call `readServerSession()` (`src/server/session.ts`) to resolve the session
-  server-side with forwarded cookies.
+- Auth state (`useAuth()`) is derived from the client's session query.
 
 ## Route Rendering
 

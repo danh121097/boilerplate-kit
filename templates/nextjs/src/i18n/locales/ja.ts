@@ -17,7 +17,7 @@ export default {
   },
   validation: {
     email: "有効なメールアドレスを入力してください",
-    password_min: "パスワードは8文字以上で入力してください",
+    password_required: "パスワードを入力してください",
   },
   not_found: {
     title: "ページが見つかりません",

@@ -28,7 +28,6 @@ src/
 ├── stores/               # Zustand stores (counter, socket-io)
 ├── server/               # SSR helpers (RSC/async component only)
 │   ├── server-api.ts     # serverApiGet / serverApiPaginate — SSR fetch with auth cookies + HMAC
-│   ├── session.ts        # readServerSession() — current user server-side
 │   ├── get-users.ts      # getUsersServerData() — users list (PaginatedResponse<User>)
 │   ├── queries/          # serverQuery pairs (usersListServer) — what pages prefetch
 │   ├── hydrated-queries.tsx # prefetch + HydrationBoundary wrapper

@@ -111,7 +111,5 @@ const { user, isAuthenticated, isLoading, sessionUnavailable, retrySession } = u
 There is no client auth store: the cookie-based session lives in the session query.
 `sessionUnavailable` is true when the restore failed for a transient reason
 (network, timeout, 5xx) and drives the banner — see
-[error-handling.md](./error-handling.md#session-unavailable). A 401 resolves to
+[error-handling.md](./error-handling.md#session-unavailable). A 401 (or a 404) resolves to
 `null` (signed out) and never sets it.
-
-For server components, call `readServerSession()` directly from `@/server/session`.

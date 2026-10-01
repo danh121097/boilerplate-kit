@@ -13,26 +13,26 @@ function messagesOf(input: unknown): Record<string, string> {
 }
 
 describe("login schema", () => {
-  it("accepts a valid email and an 8+ character password", () => {
+  it("accepts a valid email and any non-empty password, including a legacy short one", () => {
     expect(loginSchema.safeParse({ email: "a@b.co", password: "12345678" }).success).toBe(true);
+    expect(loginSchema.safeParse({ email: "a@b.co", password: "x" }).success).toBe(true);
   });
 
-  it("rejects a malformed email and a short password with i18n keys", () => {
+  it("rejects a malformed email with an i18n key", () => {
     expect(messagesOf({ email: "nope", password: "1234567" })).toEqual({
       email: "validation.email",
-      password: "validation.password_min",
     });
   });
 
   it("rejects empty fields the same way", () => {
     expect(messagesOf({ email: "", password: "" })).toEqual({
       email: "validation.email",
-      password: "validation.password_min",
+      password: "validation.password_required",
     });
   });
 
   it.each([en, ja])("every message key exists in the locale", (locale) => {
     expect(locale.validation.email).toBeTruthy();
-    expect(locale.validation.password_min).toBeTruthy();
+    expect(locale.validation.password_required).toBeTruthy();
   });
 });
