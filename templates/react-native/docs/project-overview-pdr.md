@@ -45,8 +45,9 @@ pnpm format       # prettier --write
 - No `any` without explicit justification comment.
 - `strict`, `noUncheckedIndexedAccess`, `noFallthroughCasesInSwitch` and `verbatimModuleSyntax` in tsconfig.
 - Token storage is **async**—all SecureStore reads/writes return promises.
-- HMAC secret must match backend `HMAC_SECRET`; leave empty for backends without HMAC.
-  It ships in the bundle — anti-casual-abuse only, not a security boundary.
+- HMAC secret is required by the bundled backends and must equal the backend `HMAC_SECRET`
+  (empty means every request gets a 401; a dev build warns once). It ships in the bundle,
+  so it is public — an anti-abuse layer, not a security boundary.
 - `EXPO_PUBLIC_*` environment variables are inlined at build time — no secrets.
-- Hard logout: a refused refresh, or a 401 on the session query (`AuthModel.revokeSession()`), ends the session as expired (`onSessionEnded`); `watchSessionEnd` resets auth state; the `(app)` gate redirects to `/login?redirect=…` (no `window.location`).
+- Hard logout: a refused refresh, or a 401 or 404 on the session query (`AuthModel.revokeSession()`), ends the session as expired (`onSessionEnded`); `watchSessionEnd` resets auth state; the `(app)` gate redirects to `/login?redirect=…` (no `window.location`).
 - File size target ≤ 200 LOC per file; split early.

@@ -6,11 +6,12 @@ import { Redirect, Stack, usePathname } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 
 /**
- * Authenticated route group. Renders a splash while the boot-time SecureStore
- * hydration is in flight (so it never flashes /login), then redirects guests to
+ * Authenticated route group. Renders a splash until the boot-time hydration
+ * settles: the SecureStore read and, when tokens exist, the `getMe` call with its
+ * refresh (so it never flashes /login). Then it redirects guests to
  * the login screen with `?redirect=<current path>` so sign-in returns there. The
- * decision is the store's synchronous `isAuthenticated`, before any profile
- * fetch. Only an explicit logout goes to a plain /login.
+ * decision is the store's `isAuthenticated`. Only an explicit logout goes to a
+ * plain /login.
  */
 export default function AppLayout() {
   const pathname = usePathname();

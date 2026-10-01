@@ -8,10 +8,24 @@
 | Refresh token | `expo-secure-store` (same as above) | Client (rotated by backend on every refresh) |
 
 **All token storage is async.** `SecureStore.getItemAsync()` returns a promise;
-all reads and writes must await. The backend also sets httpOnly cookies, but a
-React Native app has no reliable cookie jar, so this client sends the access token
-as a `Bearer` header and the refresh token in the request **body** of
-`/auth/refresh` and `/auth/logout`.
+all reads and writes must await. The backend also sets httpOnly cookies, but the
+app never uses them: cookies are disabled (`withCredentials: false` on the app
+client, the refresh client and the socket), so no native cookie jar is involved.
+The client sends the access token as a `Bearer` header and the refresh token in the
+request **body** of `/auth/refresh` and `/auth/logout`. Tokens live only in
+SecureStore.
+
+**Unregistered services fail closed.** `auth-token-storage.ts` resolves a service
+to its own slot pair and never falls back to the MAIN slots: for a service not
+registered with `registerServiceToken`, reads resolve `null` (so no `Bearer` or
+refresh token is attached), writes reject with an error naming
+`registerServiceToken`, and clears remove nothing. A MAIN token can therefore never
+be sent to a second backend's host.
+
+**CSRF.** The backend's optional origin check (`ENABLE_CSRF`) exempts requests
+that carry no `Cookie`, `Origin` or `Referer` header, which is what this native
+client sends, so it works with the check on. Browsers always send `Origin` on a
+cross-site mutating request, so browser CSRF stays closed.
 
 SecureStore keys must match `[A-Za-z0-9._-]`. The `EXPO_PUBLIC_APP_NAME` key
 prefix is sanitized (`sanitizeStorageKeyPrefix`): any other character, spaces
@@ -19,7 +33,11 @@ included, becomes `_` (`"My App"` → `My_App_ACCESS_TOKEN`).
 
 ## HMAC request signing
 
-Every request is signed when `EXPO_PUBLIC_HMAC_SECRET` is set.
+The bundled backends require a signature on every request, so
+`EXPO_PUBLIC_HMAC_SECRET` must equal the backend `HMAC_SECRET`. With the secret empty
+and mock auth off, nothing is signed and every request gets a 401; a dev build logs
+`EXPO_PUBLIC_HMAC_SECRET is empty; the backend requires it, all requests will 401.`
+once (never the secret itself).
 
 Canonical string (identical to backend `verifyHmac`):
 ```
@@ -50,10 +68,18 @@ Signed with HMAC-SHA256, Base64-encoded → `sig` header. Also sends `ctime` and
 method, path, contentType, ctime })`; the request interceptor uses the
 `generateSignature(config)` adapter.
 
-**This is anti-casual-abuse only, not a security boundary.** `EXPO_PUBLIC_*`
-values are inlined into the JS bundle, so anyone with the app binary can extract
-the secret and sign arbitrary requests. It raises the bar for scripted traffic
-against the API; authorization must still be enforced server-side by the JWT.
+**This is an anti-abuse, light-integrity layer, not a security boundary.**
+`EXPO_PUBLIC_*` values are inlined into the JS bundle, so a secret shipped in the
+app is public: anyone with the binary can extract it and sign arbitrary requests.
+There is no body hash and no nonce, and the backend accepts a `ctime` within ±5
+minutes, so a signed request can be replayed inside that window. It raises the bar
+for scripted traffic; authorization is enforced server-side by the JWT.
+
+A rejected signature or a device clock off by more than the window comes back as
+HTTP 401 with `errorType: "HMAC_ERROR"`. That says nothing about the session: the
+client never refreshes, replays or signs out because of it (a dev build logs a hint
+to check the clock and the secret). The 401 reaches the caller as is, and the same
+holds when the refresh call itself is rejected for its signature.
 
 The bare refresh client (`auth-refresh-client.ts`) signs its own request with
 `signRequest` (it bypasses the app interceptors to prevent refresh recursion).
@@ -88,6 +114,8 @@ Refresh is configured per service in `initServices()` as `RefreshOptions`
 ## 401 handling
 
 A 401 is routed in this order:
+0. **HMAC rejection** (`errorType: "HMAC_ERROR"`): passed through — no refresh, no
+   replay, session untouched.
 1. **No refresh for the service, the refresh endpoint or a `skipPaths` entry**
    (login, register, logout; matched on the path without `?query` / `#hash`):
    passed through untouched — no refresh, no token clear, no session-ended event.
@@ -188,9 +216,9 @@ are rolled back (compare-and-delete).
 - A guest on a protected route is sent to `/login?redirect=<original path>`.
 - A signed-in user on the guest-only login screen is sent to the validated return
   path (in-app paths only, `safeRedirect`), else home.
-- The decision uses the synchronous session signal (the auth store's
-  `isAuthenticated`, restored from SecureStore at boot) before any profile fetch.
-  There is no SSR. A guest arriving by deep link at boot goes to
+- The decision uses the auth store's `isAuthenticated`, restored at boot by
+  `hydrate()` (SecureStore read, then `getMe`); the `(app)` gate shows a splash
+  until it finishes. There is no SSR. A guest arriving by deep link at boot goes to
   `/login?redirect=<path>` once hydration finishes.
 - Own explicit logout goes to plain `/login`; an involuntary sign-out (expired
   session) goes to `/login?redirect=<current path>`.
@@ -206,8 +234,15 @@ next protected screen opened as a guest gets a return path again.
 Every session the server rejects ends as `"expired"`:
 - the refresh endpoint refuses the refresh with 401/403: the refresh manager
   clears the service's tokens and calls `endSession("expired", service)`;
-- the session query (`getMe`) itself gets a 401 — at boot, or on the profile
-  screen's retry mid-session: `loadUser()` calls `AuthModel.revokeSession()`.
+- the session query (`getMe`) itself says the session is gone — a 401, or a 404
+  (the account was deleted; `isSessionGoneError` in `api-errors.ts`) — at boot, or
+  on the profile screen's retry mid-session: `loadUser()` calls
+  `AuthModel.revokeSession()`.
+
+Offline, timeout, 429 and 5xx on that read stay transient (session kept, retry
+banner). Trade-off: the backend answers the same `NOT_FOUND` for a deleted user and
+for an unknown route, so a 404 caused by a wrong `EXPO_PUBLIC_API_PREFIX` or a
+gateway that drops the route also signs the user out.
 
 `revokeSession(sinceEpoch?)` runs the logout steps above (early token capture,
 lock, epoch bump, best-effort `POST /auth/logout`, clear) but ends with
@@ -251,7 +286,8 @@ is kept; the stack history before the expiry is not restored.
 `useAuthStore.hydrate()` checks `hasStoredSession()` (an access **or** a refresh
 token is stored) and calls `getMe`:
 - success → authenticated with `user`;
-- a 401 (the refresh was refused, or the session query itself was refused) →
+- a 401 or 404 (the refresh was refused, or the session query itself was refused
+  or found no user) →
   logged out; unless the session already ended, the store runs
   `AuthModel.revokeSession()` (revoke, clear, end as `"expired"`, `redirect`);
 - any other failure (offline, 5xx, 429, timeout) with tokens still stored →
@@ -259,11 +295,20 @@ token is stored) and calls `getMe`:
   session-unavailable banner (`session.unavailable`, `session.retry`; `accessibilityRole="alert"`).
   `retryHydrate()` re-runs the restore and clears the banner on success; `loadUser()`
   also retries, and the profile screen calls it when it opens authenticated without a
-  user (never after logout). A 401 never sets `hydrateError`.
+  user (never after logout). A 401 or 404 never sets `hydrateError`.
+
+`hydrated` flips only after `hydrate()` finishes, and `hydrate()` awaits `getMe`
+(including its refresh and replay). The `(app)` gate shows a splash until then, so
+a slow or offline start keeps the splash until the request settles (bounded by the
+request timeouts) rather than flashing `/login`.
 
 `useMeQuery` (a TanStack query on `queryKeys.auth.me`) fetches through
-`AuthModel.getSession()`, which resolves `null` on a 401 instead of throwing, so
-a signed-out session reads as `data: null`.
+`AuthModel.getSession()`, which resolves `null` on a 401 or 404 instead of
+throwing, so a signed-out session reads as `data: null`.
+
+`AuthUser` is the backend's `PublicUser`: the same shape as a listed `User`
+(`_id`, `email`, `name`, `role`, `isActive`, `createdAt`, `updatedAt`), with
+`role` typed `Role = "user" | "admin" | "super_admin"`.
 
 ## Mock auth (before backend integration)
 
@@ -280,8 +325,8 @@ EXPO_PUBLIC_AUTH_MOCK=true
 ```
 
 Truthy is exactly `"true"` or `"1"` (anything else, e.g. `TRUE`, is off).
-Restart Metro after changing an `EXPO_PUBLIC_*` value. The login form requires 8+
-characters, so keep an overridden password that long. Implementation:
+Restart Metro after changing an `EXPO_PUBLIC_*` value. The login form only requires
+a non-empty password (the server judges strength). Implementation:
 `services/auth/data/mock-auth.ts` (adapter), with `mock-auth-config.ts` (flag),
 `mock-auth-session.ts` (tokens) and `mock-auth-responses.ts` (backend-shaped
 replies), plus `services/users/data/mock-users.ts` (the users fixture and handlers).

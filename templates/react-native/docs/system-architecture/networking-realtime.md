@@ -60,22 +60,43 @@ the unwrapped `User`. Screens read `data.data`, show
 
 ## Socket.IO
 
-- The handshake `{ sig, ctime }` is signed with `HMACSignatureGenerator.signRequest`
-  (the same signer as HTTP requests), `GET /socket`; the Bearer token is read
-  asynchronously from SecureStore before connecting.
+- The handshake `auth` is a callback, so every connect and reconnect builds a fresh
+  payload: `{ token: "Bearer <access>", sig, ctime }` with a new `ctime` and
+  signature each time (`HMACSignatureGenerator.signRequest`, `GET /socket`, the same
+  signer as HTTP). The access token is read asynchronously from SecureStore.
+  `token` is omitted when signed out (never an empty `Bearer`), `sig`/`ctime` when no
+  secret is set, and the payload carries no `role`: the backend reads only `sig`,
+  `ctime` and `token`, and takes the role from the JWT.
+- If the SecureStore read fails, the handshake goes out empty and unsigned; the
+  backend rejects it with `connect_error "Unauthorized!"`, so the failure is visible
+  (the status dot goes grey) instead of the handshake hanging.
+- The socket events are `authenticated`, `ping`, `disconnect` and `connect_error`
+  (`SOCKET_EVENT`); there are no `unauthorized` or `notification` events.
 - `authenticated` in the socket store becomes true only when the server emits
   `authenticated`. It is false after `connect_error`, `disconnect` and destroy;
   `connectSocket()` never sets it to true.
 - A `connect_error` while `socket.active` is true means socket.io is already
   auto-reconnecting (network error, server down): nothing extra is scheduled. When
-  `socket.active` is false the server rejected the handshake (`Unauthorized!`): one
-  manual retry is scheduled after `Math.min(RECONNECT_BASE_MS * 2 ** attempt,
-  RECONNECT_MAX_MS)` (`RECONNECT_BASE_MS` 2000, `RECONNECT_MAX_MS` 30 000, so 2 s, 4 s,
-  8 s, 16 s, 30 s, 30 s, ...). Errors while a retry is pending do not reschedule. The
-  retry rebuilds `socket.auth` (fresh token, `sig`, `ctime`) and calls `connect()` on
-  the same socket. A `disconnect` with reason `io server disconnect` (the server closed the socket, e.g. a graceful restart; socket.io does not reconnect on its own) schedules the same retry. The attempt counter resets when `authenticated` arrives.
-- The server `unauthorized` event destroys the socket. Unmount or destroy clears a
-  pending retry and nothing connects afterwards.
+  `socket.active` is false the server rejected the handshake:
+  - `Unauthorized!` with refresh budget left: the session is refreshed once
+    (`refreshSession`, the same single-flight as HTTP) and the socket reconnects
+    once with the new token and a new `ctime`. A refused refresh (401/403) ends the
+    session and stops; a transient refresh failure falls back to the retry timer.
+  - The budget is `MAX_REFRESH_ATTEMPTS` (3) refreshes per outage, reset when
+    `authenticated` arrives. Any other rejection, or an exhausted budget, schedules
+    one retry timer that reconnects without refreshing, after
+    `Math.min(RECONNECT_BASE_MS * 2 ** attempt, RECONNECT_MAX_MS)` (`RECONNECT_BASE_MS`
+    2000, `RECONNECT_MAX_MS` 30 000, so 2 s, 4 s, 8 s, 16 s, 30 s, 30 s, ...). Errors
+    while a retry is pending do not reschedule.
+  - A `disconnect` with reason `io server disconnect` (the server closed the socket,
+    e.g. a graceful restart; socket.io does not reconnect on its own) joins the same
+    retry timer.
+- Accepted residual: once repeated handshake rejections have used the refresh budget,
+  an idle socket keeps retrying with the stale token and stays down until an HTTP call
+  refreshes the token. There is deliberately no timer-based refresh: it would burn the
+  backend's shared auth rate-limit bucket.
+- Unmount or destroy clears a pending retry or in-flight recovery and nothing
+  connects afterwards.
 - The `(app)` layout calls `useSocketIO()` only while signed in, so signing out
   closes the socket. `SocketStatus` (`src/components/socket-status.tsx`) reads
   `authenticated` from the store and is rendered as every screen's native

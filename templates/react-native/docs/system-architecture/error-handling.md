@@ -4,13 +4,17 @@
 
 `ApiInterceptors` response interceptor handles all non-2xx responses:
 
+0. **401 with `errorType: "HMAC_ERROR"`** (bad signature or device clock) — passed
+   through as is: no refresh, no replay, the session is kept.
 1. **401 with eligible request** — triggers refresh flow via `RefreshTokenManager`,
    then retries the original request once (`config._retry = true`).
 2. **401 after retry / non-refresh 401** — rejects with the original error.
 3. **Other errors** — reject with `toApiError(error)`: `{ error_code: <status,
 or 0 without a response>, message, retryable? }`.
 
-The helpers live in `services/core/api-errors.ts`. Show a failed call's message
+The helpers live in `services/core/api-errors.ts`. `isSessionGoneError` is true
+for a 401 or a 404 on the `/auth/me` read (signed out); offline, timeout and 5xx are
+transient (`retryable: true`). Show a failed call's message
 with `getApiErrorMessage(error, fallback)` — rejections are plain
 `ApiResponseError` objects, not `Error`s. A 2xx body carrying `success: false`
 (the backend error envelope) is rejected as-is; envelopes are recognised only by

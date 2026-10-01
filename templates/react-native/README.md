@@ -33,9 +33,27 @@ pnpm install
 pnpm dev                      # expo start — press i / a for iOS / Android
 ```
 
-Point `EXPO_PUBLIC_APP_ENDPOINT` at a running backend (the `express` or `nestjs`
-template in this kit works out of the box). Every `EXPO_PUBLIC_*` var is inlined
-into the JS bundle at build time — never put real secrets there.
+Point `EXPO_PUBLIC_APP_ENDPOINT` at a running backend (the `express`, `fastify` or
+`nestjs` template in this kit works out of the box). Every `EXPO_PUBLIC_*` var is
+inlined into the JS bundle at build time — never put real secrets there.
+
+Where the backend is reachable from depends on where the app runs:
+
+- **iOS simulator**: `http://localhost:3000` works.
+- **Android emulator**: `localhost` is the emulator itself; use `http://10.0.2.2:3000`
+  for the host machine.
+- **Physical device**: use the host's LAN IP (e.g. `http://192.168.1.20:3000`) on the
+  same network, and make sure the host firewall allows the port.
+- **Release builds**: plain-HTTP (cleartext) requests are blocked by the platforms, so
+  a release build needs an `https://` endpoint.
+
+The target is native only (iOS and Android); there is no web build.
+
+Checklist for a real backend (instead of mock auth):
+
+1. `EXPO_PUBLIC_AUTH_MOCK` unset or `false`.
+2. `EXPO_PUBLIC_APP_ENDPOINT` and `EXPO_PUBLIC_API_PREFIX` match the backend.
+3. `EXPO_PUBLIC_HMAC_SECRET` equals the backend `HMAC_SECRET`.
 
 ## Scripts
 
@@ -63,7 +81,7 @@ Copy `.env.example` → `.env` and fill in the values:
 | `EXPO_PUBLIC_API_PREFIX`          | API path prefix (e.g. `/api/v1`)                                        |
 | `EXPO_PUBLIC_APP_NAME`            | Prefix for SecureStore keys (sanitized to `[A-Za-z0-9._-]`)             |
 | `EXPO_PUBLIC_LANGUAGE_CODE`       | Fallback language (`en` / `ja`) when nothing is saved and the device locale is unsupported |
-| `EXPO_PUBLIC_HMAC_SECRET`         | Request signing secret; must match the backend `HMAC_SECRET`            |
+| `EXPO_PUBLIC_HMAC_SECRET`         | Required by the bundled backends; must equal the backend `HMAC_SECRET`  |
 | `EXPO_PUBLIC_BUILD_VERSION`       | Sent as `x-version`; injected by CI                                     |
 | `EXPO_PUBLIC_AUTH_MOCK`           | Dev only: `true` answers `/auth/*` and `/users` in the app              |
 | `EXPO_PUBLIC_AUTH_MOCK_EMAIL`     | Dev only: demo login email (default `demo@example.com`)                 |
@@ -101,8 +119,8 @@ src/
    HMAC signature headers.
 4. On a 401 the response interceptor refreshes once (single-flight — concurrent
    401s share one network refresh), replays the request with the new token, and
-   rotates the stored refresh token. Only a 401/403 from the refresh endpoint ends
-   the session (tokens cleared, queries reset to signed out, and the auth gate sends the
+   rotates the stored refresh token. Only a 401/403 from the refresh endpoint, or a
+   401/404 on the `/auth/me` read, ends the session (tokens cleared, queries reset to signed out, and the auth gate sends the
    user to `/login` with a `redirect` of the current screen, restored after
    sign-in); offline, timeout, 429 and 5xx keep the tokens and surface a
    retryable error.
@@ -110,8 +128,8 @@ src/
    refresh token in the body so the backend revokes it, then clears the tokens and
    resets the queries to signed out even if the request fails.
 
-HMAC signing is anti-casual-abuse only: `EXPO_PUBLIC_HMAC_SECRET` ships inside the
-bundle. See [security-auth](./docs/system-architecture/security-auth.md).
+HMAC signing is an anti-abuse, light-integrity layer, not a security boundary:
+`EXPO_PUBLIC_HMAC_SECRET` ships inside the bundle, so it is public. See [security-auth](./docs/system-architecture/security-auth.md).
 
 Unlike the web templates there is no `window.location.reload()` — hard logout is
 a state reset through `watchSessionEnd` (an `onSessionEnded` listener), and the

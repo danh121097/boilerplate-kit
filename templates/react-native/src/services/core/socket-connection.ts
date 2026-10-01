@@ -23,8 +23,8 @@ type SocketAuth = { token?: string; sig?: string; ctime?: number };
 /**
  * Build the per-handshake `{ sig, ctime }` expected by HMAC-protected backends,
  * signed by the same generator as the HTTP requests. Empty when
- * `EXPO_PUBLIC_HMAC_SECRET` is not set — the server can then accept the bare
- * bearer token alone (or reject).
+ * `EXPO_PUBLIC_HMAC_SECRET` is not set — the bundled backends then reject the
+ * handshake (HMAC is required).
  *
  * SECURITY: an `EXPO_PUBLIC_*` var is inlined into the shipped bundle. Production
  * apps should sign on the server (a BFF/proxy) and forward the headers.

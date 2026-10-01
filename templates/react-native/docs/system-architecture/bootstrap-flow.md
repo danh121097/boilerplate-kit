@@ -24,9 +24,13 @@ app/_layout.tsx (root layout)
 - `initServices()` (called once in `app/_layout.tsx`) must run before any `Api`
   instance makes a request, because it calls `Api.setBaseURL()` and
   `Api.registerInterceptors()` with the per-service `RefreshOptions`.
+- The `(app)` gate renders a splash until `useAuthStore.hydrate()` finishes, and
+  `hydrate()` awaits the `getMe` call (with its refresh and replay). A slow or
+  offline start therefore keeps the splash until that request settles; the gate then
+  shows the app, the session-unavailable banner, or `/login`.
 - Token storage is **async** — all `SecureStore.getItemAsync()` calls return promises.
-- Hard logout: only a refresh refused with 401/403 ends the session
-  (`endSession("expired", service)`). The root layout subscribes
+- Hard logout: a refresh refused with 401/403, or a 401/404 on the `getMe` read
+  (`isSessionGoneError`), ends the session (`endSession("expired", service)`). The root layout subscribes
   `watchSessionEnd()`, which resets the query cache to signed out and calls
   `expireSession()` for the auth service; the `(app)` gate then redirects to
   `/(auth)/login` with a `redirect` path.

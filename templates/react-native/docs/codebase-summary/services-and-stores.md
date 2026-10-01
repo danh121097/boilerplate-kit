@@ -15,7 +15,7 @@ src/services/
 │   ├── query-client.ts           # resetQueriesToSignedOut / resetQueriesOnSessionEnd
 │   ├── app-prefix.ts             # getAppPrefix() — sanitized SecureStore key prefix
 │   ├── auth-refresh-client.ts    # Bare axios refresh call (no interceptors)
-│   ├── auth-token-storage.ts     # Per-service expo-secure-store token registry (async)
+│   ├── auth-token-storage.ts     # Per-service expo-secure-store token registry (async, fails closed for unregistered services)
 │   ├── headers-utils.ts    # HeadersUtils.setAuthHeaders / addAuthorizationHeader
 │   ├── hmac-signature.ts   # HMACSignatureGenerator.signRequest + resolveContentType (crypto-js)
 │   ├── model.ts            # Model base class — subclass + Model.setup()
