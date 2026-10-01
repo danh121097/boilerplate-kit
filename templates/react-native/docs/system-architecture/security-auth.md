@@ -242,7 +242,7 @@ Every session the server rejects ends as `"expired"`:
 Offline, timeout, 429 and 5xx on that read stay transient (session kept, retry
 banner). Trade-off: the backend answers the same `NOT_FOUND` for a deleted user and
 for an unknown route, so a 404 caused by a wrong `EXPO_PUBLIC_API_PREFIX` or a
-gateway that drops the route also signs the user out.
+gateway that drops the route also signs the user out. The session end also posts `/auth/logout`, which revokes the user's access tokens on every device (Redis on), so that misconfiguration can sign the user out elsewhere too.
 
 `revokeSession(sinceEpoch?)` runs the logout steps above (early token capture,
 lock, epoch bump, best-effort `POST /auth/logout`, clear) but ends with

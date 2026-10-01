@@ -51,7 +51,8 @@ The target is native only (iOS and Android); there is no web build.
 
 Checklist for a real backend (instead of mock auth):
 
-1. `EXPO_PUBLIC_AUTH_MOCK` unset or `false`.
+1. `EXPO_PUBLIC_AUTH_MOCK` set to `false` or removed: `.env.example` ships it as `true`, and
+   only exactly `true` or `1` turns the mock on.
 2. `EXPO_PUBLIC_APP_ENDPOINT` and `EXPO_PUBLIC_API_PREFIX` match the backend.
 3. `EXPO_PUBLIC_HMAC_SECRET` equals the backend `HMAC_SECRET`.
 
@@ -86,6 +87,10 @@ Copy `.env.example` → `.env` and fill in the values:
 | `EXPO_PUBLIC_AUTH_MOCK`           | Dev only: `true` answers `/auth/*` and `/users` in the app              |
 | `EXPO_PUBLIC_AUTH_MOCK_EMAIL`     | Dev only: demo login email (default `demo@example.com`)                 |
 | `EXPO_PUBLIC_AUTH_MOCK_PASSWORD`  | Dev only: demo login password (default `password`)                      |
+
+In dev, values in the `.env*` files override `EXPO_PUBLIC_*` variables exported in the shell.
+Put personal overrides in `.env.development.local` (gitignored); it wins over `.env` without
+editing it. Restart Metro after changing any env file (`npx expo start -c`).
 
 ## Structure
 
