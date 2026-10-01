@@ -45,6 +45,49 @@ describe("hmac-signature", () => {
     expect(HMACSignatureGenerator.generateSignature(configFor("/users", "get"))).toBeNull();
   });
 
+  describe("empty secret warning", () => {
+    async function freshGenerator() {
+      vi.resetModules();
+      return (await import("@/services/core/hmac-signature")).HMACSignatureGenerator;
+    }
+    const sign = (generator: typeof HMACSignatureGenerator) =>
+      generator.signRequest({ method: "get", path: "/users" });
+
+    it("warns once, names the variable and never prints a secret", async () => {
+      vi.stubEnv("VITE_HMAC_SECRET", "");
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const generator = await freshGenerator();
+
+      sign(generator);
+      sign(generator);
+
+      expect(warn).toHaveBeenCalledExactlyOnceWith(
+        "VITE_HMAC_SECRET is empty; the backend requires it, all requests will 401.",
+      );
+      warn.mockRestore();
+    });
+
+    it("stays silent in a production build, with mock auth on, or with a secret", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      vi.stubEnv("VITE_HMAC_SECRET", "");
+      vi.stubEnv("DEV", false);
+      sign(await freshGenerator());
+      vi.stubEnv("DEV", true);
+
+      vi.stubEnv("VITE_AUTH_MOCK", "true");
+      warn.mockClear(); // the mock's own boot warning is not under test
+      sign(await freshGenerator());
+      vi.stubEnv("VITE_AUTH_MOCK", "");
+
+      vi.stubEnv("VITE_HMAC_SECRET", "shared-secret");
+      sign(await freshGenerator());
+
+      expect(warn).not.toHaveBeenCalledWith(expect.stringContaining("HMAC_SECRET is empty"));
+      warn.mockRestore();
+    });
+  });
+
   it("signs '' (empty contentType) for bodyless GET — matches server canonical string", () => {
     vi.stubEnv("VITE_HMAC_SECRET", "shared-secret");
     // GET with no body → contentType signed as "" (axios omits Content-Type on bodyless requests)

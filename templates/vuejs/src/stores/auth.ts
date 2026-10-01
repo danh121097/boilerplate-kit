@@ -5,7 +5,7 @@ import {
   getAccessToken,
   getSessionEpoch,
   hasStoredSession,
-  isUnauthorizedError,
+  isSessionGoneError,
   onSessionEnded,
   onTokensChanged,
   resetQueriesToSignedOut,
@@ -87,7 +87,7 @@ export const useAuthStore = defineStore("auth", () => {
         if (getSessionEpoch(service) !== sinceEpoch) {
           // The session changed while the read ran (logout, or a login elsewhere
           // with its own read): that path owns the state, so the failure is dropped.
-        } else if (isUnauthorizedError(error)) {
+        } else if (isSessionGoneError(error)) {
           await AuthModel.revokeSession(sinceEpoch);
           resetSignedOut();
         } else if (!hasStoredSession(service)) {

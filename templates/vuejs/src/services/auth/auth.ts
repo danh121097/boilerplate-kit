@@ -12,7 +12,7 @@ import {
   getSessionEpoch,
   hasStoredSession,
   isLogoutPending,
-  isUnauthorizedError,
+  isSessionGoneError,
   Model,
   persistAccessToken,
   persistRefreshToken,
@@ -107,15 +107,15 @@ export class AuthModel extends Model {
     return res.data.user;
   }
 
-  /** The signed-in user, or null when the session is rejected (401 — after the
-   * interceptor's refresh attempt; the session is then revoked through
+  /** The signed-in user, or null when the session is gone (401 — after the
+   * interceptor's refresh attempt — or 404, a deleted account; the session is then revoked through
    * `revokeSession`). Other failures (offline, 5xx) reject. */
   static async getSession(): Promise<AuthUser | null> {
     const sinceEpoch = getSessionEpoch(this.service);
     try {
       return await this.getMe();
     } catch (error) {
-      if (!isUnauthorizedError(error)) throw error;
+      if (!isSessionGoneError(error)) throw error;
       await this.revokeSession(sinceEpoch);
       return null;
     }

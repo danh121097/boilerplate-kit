@@ -2,7 +2,7 @@ import { failure, pathOf, queryOf, reply } from "@/services/auth/data/mock-auth-
 import { usersContract } from "@/services/users/contract";
 import type { MockAuthConfig } from "@/services/auth/data/mock-auth-config";
 import type { AuthUser } from "@/services/auth/types/auth";
-import type { User } from "@/services/users/types/user";
+import type { Role, User } from "@/services/users/types/user";
 import type { AxiosResponse, InternalAxiosRequestConfig } from "axios";
 
 /**
@@ -18,7 +18,7 @@ import type { AxiosResponse, InternalAxiosRequestConfig } from "axios";
  * screen refuses them with `403`, as the backend would.
  */
 
-const MOCK_ADMIN_ROLES = ["admin", "super_admin"];
+const MOCK_ADMIN_ROLES: Role[] = ["admin", "super_admin"];
 
 /** Same limits as the backend's offset pagination (`?page&limit`, clamped, never rejected). */
 const DEFAULT_LIMIT = 20;
@@ -75,18 +75,22 @@ export const MOCK_SAMPLE_USERS: User[] = [
 
 /** The user a demo login signs in as. An admin, so `/users` is reachable. */
 export function mockDemoUser(mock: MockAuthConfig): AuthUser {
-  return { _id: "mock-user", email: mock.email, name: "Demo User", role: "admin" };
-}
-
-/** Every listed user, newest first (the backend sorts by `_id` descending). */
-function listedUsers(mock: MockAuthConfig): User[] {
-  const demo: User = {
-    ...mockDemoUser(mock),
+  return {
+    _id: "mock-user",
+    email: mock.email,
+    name: "Demo User",
+    role: "admin",
     isActive: true,
     createdAt: "2026-03-02T08:00:00.000Z",
     updatedAt: "2026-03-02T08:00:00.000Z",
   };
-  return [demo, ...MOCK_SAMPLE_USERS].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/** Every listed user, newest first (the backend sorts by `_id` descending). */
+function listedUsers(mock: MockAuthConfig): User[] {
+  return [mockDemoUser(mock), ...MOCK_SAMPLE_USERS].sort((a, b) =>
+    b.createdAt.localeCompare(a.createdAt),
+  );
 }
 
 /** Who is calling: the signed-in user, or the 401 message the backend's `authenticate` would send. */

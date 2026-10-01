@@ -1,6 +1,8 @@
 import { installLocalStorage } from "@/__tests__/helpers/fake-storage";
 import {
+  clearAccessToken,
   clearAuthTokens,
+  clearRefreshToken,
   clearServiceTokens,
   getAccessToken,
   getRefreshToken,
@@ -64,9 +66,20 @@ describe("auth-token-storage", () => {
     expect(getRefreshToken("ADMIN")).toBeNull();
   });
 
-  it("falls back to the MAIN slots for an unregistered service", () => {
+  it("fails closed for an unregistered service: never reads or touches the MAIN slots", () => {
     persistAccessToken("main-a", "MAIN");
-    expect(getAccessToken("UNKNOWN")).toBe("main-a"); // resolves to MAIN slot
+    persistRefreshToken("main-r", "MAIN");
+
+    expect(getAccessToken("UNKNOWN")).toBeNull();
+    expect(getRefreshToken("UNKNOWN")).toBeNull();
+    expect(() => persistAccessToken("x", "UNKNOWN")).toThrow(/registerServiceToken/);
+    expect(() => persistRefreshToken("x", "UNKNOWN")).toThrow(/registerServiceToken/);
+
+    clearAccessToken("UNKNOWN");
+    clearRefreshToken("UNKNOWN");
+    clearServiceTokens("UNKNOWN");
+    expect(getAccessToken("MAIN")).toBe("main-a");
+    expect(getRefreshToken("MAIN")).toBe("main-r");
   });
 
   it("every clear invalidates in-flight refreshes of the cleared service", () => {

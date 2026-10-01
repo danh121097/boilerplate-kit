@@ -54,6 +54,14 @@ export function isUnauthorizedError(error: unknown): boolean {
   return (error as Partial<ApiResponseError> | null)?.error_code === 401 && !isHmacError(error);
 }
 
+/** The `/auth/me` read says the session has no user behind it: a 401, or a 404
+ * (the account was deleted). Both mean signed out, unlike a network error or 5xx. */
+export function isSessionGoneError(error: unknown): boolean {
+  return (
+    isUnauthorizedError(error) || (error as Partial<ApiResponseError> | null)?.error_code === 404
+  );
+}
+
 /**
  * The message to show a user for a failed call: the server's `error_message` /
  * `message` when it sent one (e.g. "Invalid credentials" on a login 401), else

@@ -1,3 +1,4 @@
+import { isMockAuthEnabled } from "@/services/auth/data/mock-auth-config";
 import type { HMACSignatureData } from "@/services/core/types";
 import type { InternalAxiosRequestConfig } from "axios";
 import Base64 from "crypto-js/enc-base64";
@@ -30,8 +31,7 @@ function headerContentType(headers: unknown): string | undefined {
  * `application/x-www-form-urlencoded;charset=utf-8`, a string →
  * `application/x-www-form-urlencoded`, anything else → `application/json`.
  * Never pin a charset: browsers may rewrite it on the wire (Chrome sends
- * `charset=UTF-8`), breaking the comparison. Multipart is NOT supported: the
- * browser appends a boundary the signer cannot see.
+ * `charset=UTF-8`), breaking the comparison.
  */
 export function resolveContentType(config: InternalAxiosRequestConfig): string {
   if (config.data === undefined) return "";
@@ -42,6 +42,16 @@ export function resolveContentType(config: InternalAxiosRequestConfig): string {
   }
   if (typeof config.data === "string") return "application/x-www-form-urlencoded";
   return "application/json";
+}
+
+let warnedEmptySecret = false;
+
+/** Dev builds only: the backend rejects every unsigned request, so say so once
+ * when no secret is set (and the mock, which needs no backend, is off). */
+function warnEmptySecret(): void {
+  if (warnedEmptySecret || !import.meta.env.DEV || isMockAuthEnabled()) return;
+  warnedEmptySecret = true;
+  console.warn("VITE_HMAC_SECRET is empty; the backend requires it, all requests will 401.");
 }
 
 /**
@@ -69,7 +79,10 @@ export class HMACSignatureGenerator {
     ctime = Date.now(),
   }: SignRequestInput): HMACSignatureData | null {
     const secret = import.meta.env.VITE_HMAC_SECRET;
-    if (!secret) return null;
+    if (!secret) {
+      warnEmptySecret();
+      return null;
+    }
 
     const xVersion = import.meta.env.VITE_BUILD_VERSION || "1.0.0";
     const stringToSign = [

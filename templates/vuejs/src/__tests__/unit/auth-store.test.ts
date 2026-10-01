@@ -94,6 +94,18 @@ describe("auth store", () => {
     expect(store.user).toBeNull();
   });
 
+  it("a 404 on hydrate (account deleted) signs out like a 401, without a retry banner", async () => {
+    vi.spyOn(AuthModel, "getMe").mockRejectedValue({ error_code: 404, message: "User not found" });
+    const revoke = vi.spyOn(AuthModel, "revokeSession").mockResolvedValue(undefined as never);
+    const store = useAuthStore();
+
+    await store.hydrate();
+
+    expect(revoke).toHaveBeenCalledOnce();
+    expect(store.hydrateError).toBeNull();
+    expect(store.user).toBeNull();
+  });
+
   it("a 401 HMAC_ERROR on hydrate keeps a valid session: no refresh, no logout", async () => {
     const post = vi.spyOn(axios, "post");
     vi.spyOn(console, "warn").mockImplementation(() => {});

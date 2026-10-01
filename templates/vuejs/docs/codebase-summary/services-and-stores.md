@@ -19,9 +19,8 @@ this.http = axios.create({
 ```
 
 Static registry methods: `Api.setBaseURL(url, service)`, `Api.getBaseURL(service)`,
-`Api.registerInterceptors(...)`. Instance verbs: `get/post/put/patch/delete`
-plus `postFormData` (sets `multipart/form-data`). All take an
-`ApiRequestConfig` (`core/types.ts`).
+`Api.registerInterceptors(...)`. Instance verbs: `get/post/put/patch/delete`.
+All take an `ApiRequestConfig` (`core/types.ts`).
 
 ### `Model` — base for domain models (`core/model.ts`)
 
@@ -79,7 +78,7 @@ const SERVICES: ServiceDefinition[] = [
   `auth/types/auth.ts`.
 - `users/users.ts` — `UsersModel` (`/users`): `list(params?: PaginationParams)`
   returns `PaginatedResponse<User>` (`{ success, data, meta }`, read through
-  `Api.paginate`); `get` and `update` return the unwrapped `User`. Exposes
+  `Api.paginate`); `get` returns the unwrapped `User`. Exposes
   `useUsersListQuery` (same paginated shape, key `users.list`). Pages read
   `data.data` and show `users.empty` for an empty list. Types in
   `users/types/user.ts`; pagination types (`OffsetMeta`, `CursorMeta`,

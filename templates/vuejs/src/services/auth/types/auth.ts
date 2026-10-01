@@ -1,13 +1,12 @@
 /** Domain types for the Auth service — mirrors the backend auth module. */
 
-export interface AuthUser {
-  _id: string;
-  email: string;
-  name: string;
-  role: string;
-}
+import type { User } from "@/services/users/types/user";
 
-/** Only the access token is held client-side; the refresh token is cookie-only. */
+/** The signed-in user: the backend's `PublicUser`, same shape as a `/users` row. */
+export type AuthUser = User;
+
+/** Access + refresh token pair. The client keeps both in localStorage (the refresh
+ * token is sent in the refresh body); the backend also sets an httpOnly refresh cookie. */
 export interface AuthTokens {
   accessToken: string;
   refreshToken?: string;

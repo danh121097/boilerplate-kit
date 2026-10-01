@@ -89,11 +89,15 @@ function answer(
     const email = String(body.email ?? "")
       .trim()
       .toLowerCase();
+    const now = new Date().toISOString();
     const user: AuthUser = {
       _id: `mock-${email}`,
       email,
       name: String(body.name ?? ""),
       role: "user",
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
     };
     return reply(
       config,
