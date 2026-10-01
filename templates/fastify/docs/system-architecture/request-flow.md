@@ -12,7 +12,8 @@ buildApp() configures the Fastify instance in this order:
 3. Cookie, CORS, helmet, and compression plugins.
 4. Swagger and Swagger UI at /docs and /docs/json (skipped when DOCS_ENABLED
    turns docs off).
-5. Shared error and not-found handlers.
+5. Shared error and not-found handlers (an unmatched route is not counted by the
+   rate limiters).
 6. Root onRequest hooks for HMAC and optional CSRF.
 7. Global rate limiting, plus the shared auth and separate login buckets.
 8. Health, auth, and user route plugins under API_PREFIX.
@@ -34,8 +35,11 @@ Swagger metadata alongside the handler. There is no custom router generator.
 
 For an API request, the root HMAC hook checks sig and ctime before route
 handling. The optional CSRF hook then checks Origin or Referer for mutating
-methods. Fastify parses JSON and cookies; rate-limit hooks run before the
-controller. Route validation uses the Zod schemas; protected handlers run
+methods. The rate-limit hooks are also `onRequest` hooks, so they run before the
+body is parsed; Fastify then parses JSON and cookies. Because HMAC runs before body
+parsing, an unsigned request with a malformed or oversize body gets
+`401 HMAC_ERROR` (Express answers `400`/`413`); the body is not signed, so the
+order has no security impact. Route validation uses the Zod schemas; protected handlers run
 authenticate and, for admin routes, requireMinRole.
 
 ## Controller and service boundaries

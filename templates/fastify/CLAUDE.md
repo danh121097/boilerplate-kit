@@ -30,7 +30,8 @@ Socket.IO, rate limiting, optional Redis, Zod validation, and Swagger.
   `controller.ts`, `service.ts`, `routes.ts`, and `validation.ts` as needed.
 - Register routes as Fastify plugins from `src/routes/index.ts`. Protect them
   with `authenticate` (`src/plugins/auth.ts`) and `requireMinRole`
-  (`src/plugins/role.ts`) in `preHandler`.
+  (`src/plugins/role.ts`) in `preHandler` (`preValidation` when params are
+  validated, as on `GET /users/:id`, so auth wins over validation).
 - Use the `@/` import alias and kebab-case file names.
 - Keep request/response schemas, Swagger metadata, and handler behavior aligned.
 

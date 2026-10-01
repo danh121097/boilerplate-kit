@@ -76,7 +76,9 @@ verifyHmac({
 
 So the client signs `['GET', 'application/json', ctime, '/socket', ''].join('\n')`
 — same `verifyHmac` (freshness + timing-safe compare) as HTTP, just a fixed path
-with no volatile query. See [hmac-verification.md](./hmac-verification.md).
+with no volatile query. A failure is the generic `Unauthorized!` connect error
+(not `HMAC_ERROR`). `ctime` must be fresh, so a reconnecting client re-signs each
+handshake. See [hmac-verification.md](./hmac-verification.md).
 
 ### 2. `socketAuth`
 
@@ -95,6 +97,10 @@ Same `verifyAccessToken` + user-level revocation check as the HTTP `authenticate
 middleware (revocation is a no-op when Redis is off). On success
 `socket.data.user` is populated for handlers.
 
+The handshake reads **only** `auth.sig`, `auth.ctime` and `auth.token` (or the
+cookie). It reads no `auth.role`: the role comes from the verified JWT in
+`socket.data.user`, never from client input.
+
 ## Events
 
 [`socket/events.ts`](../../src/socket/events.ts) is the central event-name registry
@@ -103,8 +109,12 @@ middleware (revocation is a no-op when Redis is off). On success
 | Constant                     | Value             | Direction                                |
 | ---------------------------- | ----------------- | ---------------------------------------- |
 | `SOCKET_EVENT.AUTHENTICATED` | `'authenticated'` | server → client, on successful handshake |
-| `SOCKET_EVENT.NOTIFICATION`  | `'notification'`  | server → client, user-targeted           |
+| `SOCKET_EVENT.PING`          | `'ping'`          | registry entry only; no handler is wired |
 | `SOCKET_UNAUTHORIZED`        | `'Unauthorized!'` | handshake rejection error message        |
+
+`authenticated` is the only event the server emits on its own; no `unauthorized` or
+`notification` event exists. A rejected handshake surfaces to the client as a
+`connect_error` with the `Unauthorized!` message.
 
 ## Emitting From Services
 

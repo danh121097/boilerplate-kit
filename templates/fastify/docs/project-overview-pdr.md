@@ -27,9 +27,11 @@ and Swagger/OpenAPI.
 - Access JWTs are RS256-signed with local RSA keys and default to 15 minutes.
 - Refresh JWTs are HS256-signed, SHA-256 hashed in MongoDB, and default to 7
   days. Rotation uses an atomic database claim; a 10-second grace handles
-  retries. Later reuse revokes the user's sessions.
+  retries. Later reuse of a rotated token revokes all of the user's refresh tokens;
+  logout deletes the presented token's family.
 - API routes require HMAC sig and ctime headers. Signatures expire after five
-  minutes; the body and query string are not signed.
+  minutes; the body and query string are not signed, there is no nonce, and
+  failures are 401 HMAC_ERROR. It is an anti-abuse layer, not a security boundary.
 - authenticate (plugins/auth.ts) checks bearer or access-cookie tokens. Admin
   user routes also enforce role rank (requireMinRole, plugins/role.ts) on the
   server.

@@ -93,7 +93,7 @@ Key behaviors:
 | --------------- | ------------------------------ | ------------------------------ |
 | `users`         | `email` (unique)               | login lookup + uniqueness      |
 | `refreshtokens` | `token` (unique)               | rotation/logout lookup by hash |
-| `refreshtokens` | `familyId`                     | logout revokes a session chain |
+| `refreshtokens` | `familyId`                     | logout deletes a session chain |
 | `refreshtokens` | `userId`                       | per-user queries               |
 | `refreshtokens` | `expiresAt` (TTL `expires: 0`) | auto-expiry                    |
 

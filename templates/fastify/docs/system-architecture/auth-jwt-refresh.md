@@ -126,6 +126,16 @@ The refresh cookie is **path-scoped to `/api/v1/auth`** so the browser only send
 it to the auth endpoints, shrinking its exposure. `clearTokenCookies` clears both
 using the matching paths.
 
+## Tokens In The Response Body
+
+register / login / refresh return both tokens in the JSON body **in addition to**
+the httpOnly cookies. This is by design: token-mode clients (native apps and the
+token-mode web templates) cannot rely on cookies and need the refresh token in the
+body. The cost is that a cookie-mode web client loses httpOnly protection for the
+refresh token: script running on the page (XSS) can call `/auth/refresh` and read a
+fresh refresh token from the response. This is an accepted risk; an opt-in to omit
+the body tokens for cookie clients is backlog, not implemented.
+
 ## Auth Flows
 
 register / login / me live in [`modules/auth/service.ts`](../../src/modules/auth/service.ts); token issue, refresh rotation and logout live in [`modules/auth/refresh-session.ts`](../../src/modules/auth/refresh-session.ts). Controllers:
@@ -142,13 +152,15 @@ register / login / me live in [`modules/auth/service.ts`](../../src/modules/auth
 - **refresh** (`POST /auth/refresh`) — read the raw token from the optional body
   `refreshToken` (string; non-string is a 400) or, when absent/empty, the
   `refreshToken` cookie; controller 401s if neither exists. See rotation below.
-- **logout** (`POST /auth/logout`) — same token sources; revoke every refresh
-  token of the presented token's `familyId` (clearing their `rotatedAt`, so a
-  graced predecessor cannot resurrect the session), call
+- **logout** (`POST /auth/logout`) — same token sources; **delete** every refresh
+  token of the presented token's `familyId` (not flag them revoked), call
   `revokeUserTokens(userId)` (Redis access-token cutoff), disconnect the user's
-  sockets, clear cookies. The user's other families (other devices) keep their
-  sessions. Tokens issued before `familyId` existed fall back to revoking just
-  the presented token.
+  sockets, clear cookies. Replaying a logged-out refresh token finds no document, so
+  it is a plain `401` and not theft reuse: it revokes nothing. The user's other
+  families (other devices) keep their refresh tokens; with Redis on, the cutoff
+  invalidates the user's access tokens on every device, so those devices get `401`
+  on their next call and recover by refreshing. Tokens issued before `familyId`
+  existed fall back to deleting just the presented token.
 - **getMe** (`GET /auth/me`) — `authenticate` middleware required; returns the
   user resolved from `request.user.userId`.
 
@@ -187,18 +199,19 @@ Clients must single-flight refreshes (the frontend templates lock across tabs).
 between tabs, not theft: it gets a fresh access + refresh pair exactly like a
 normal refresh and nothing is revoked. This matters in a browser, where the
 first response already set new cookies — refusing the second request would clear
-them and kill the winning session. Outside the window, or for a token revoked by
-logout (which never sets `rotatedAt`), reuse revokes every refresh token of the user
-and disconnects their sockets. That revocation also clears `rotatedAt` on every
-token, so replaying a recently rotated token after a family revoke stays a `401`.
+them and kill the winning session. Reuse of a _rotated_ token outside the window revokes
+**every** refresh token of the user (all families, so all devices) and disconnects
+their sockets. That revocation also clears `rotatedAt` on every token, so replaying
+a recently rotated token after the revoke stays a `401`. Logout does not feed this
+path: it deletes the family instead of flagging it revoked.
 A graced retry adds a further live token to the family (same `familyId`); each is
 rotated or revoked like any other.
 
 After inserting the new token, `refresh` re-checks (one `exists` query) that the
-predecessor still carries `rotatedAt`. Every family or user-wide revoke `$unset`s
-it, so if one ran between the claim/grace check and the insert, the new token is
-revoked and the request gets `401` (cookies cleared) instead of surviving the
-revoke.
+predecessor still carries `rotatedAt`. A user-wide reuse revoke `$unset`s it and a
+logout deletes the predecessor, so if either ran between the claim/grace check and
+the insert, the new token is revoked and the request gets `401` (cookies cleared)
+instead of surviving the revoke.
 
 Limit of the grace window: a stolen token replayed within it is
 indistinguishable from a retry and mints another live token for that family

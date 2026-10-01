@@ -44,10 +44,11 @@ export async function issueTokens(
  * when it is a benign retry/race (rotated moments ago, still unexpired) so the
  * caller issues a fresh pair; throws the matching 401 otherwise.
  *
- * Any other reuse of an already-revoked token is a sign of theft/replay: nuke the
- * user's whole token family (all refresh tokens + access tokens + sockets) so
- * attacker and user must re-login. `rotatedAt` is cleared on every token in the
- * same write so a later graced replay cannot resurrect a revoked family.
+ * Any other reuse of an already-revoked token is a sign of theft/replay: revoke
+ * every refresh token of the user (all families, so all devices) plus their access
+ * tokens and sockets, so attacker and user must re-login. `rotatedAt` is cleared on
+ * every token in the same write so a later graced replay cannot resurrect a revoked
+ * session.
  */
 async function classifyUnclaimableToken(hashedToken: string): Promise<RefreshTokenDocument> {
   const storedToken = await RefreshToken.findOne({ token: hashedToken });

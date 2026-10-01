@@ -6,10 +6,18 @@ API_PREFIX. Socket.IO handshakes use the same signer with a fixed path. Source:
 [src/plugins/security.ts](../../src/plugins/security.ts), and
 [src/socket/hmac-middleware.ts](../../src/socket/hmac-middleware.ts).
 
-HMAC only proves that a caller knows the shared secret and that the timestamp is
-fresh. It does not sign the request body or query string and does not use a
-nonce, so a captured signature can be replayed within the five-minute window.
-Authorization still depends on access tokens and role checks.
+HMAC is an anti-abuse and light integrity layer, **not a security boundary**. It
+only proves that a caller knows the shared secret and that the timestamp is fresh,
+and a secret shipped into a browser or app bundle is public. It does not sign the
+request body or query string and uses no body hash or nonce, so a captured
+signature can be replayed within the ±5 minute `ctime` window. Authorization still
+depends on access tokens and role checks.
+
+A failed check answers `401` with `errorType: "HMAC_ERROR"` (distinct from
+`AUTHENTICATION_ERROR`, so a client does not treat a bad signature or clock skew as
+a dead session). A client whose clock is more than five minutes off gets
+`HMAC_ERROR` on every request until the clock is fixed. A Socket.IO handshake
+rejects with the generic `Unauthorized!` connect error instead.
 
 ## Canonical request
 
@@ -46,11 +54,11 @@ part of the signature.
 
 ## Client compatibility
 
-The Vue and Nuxt clients use the same field order, Base64 encoding, millisecond
-timestamp, relative API path, and shared HMAC_SECRET. Keep those invariants
-aligned with their signer at
-templates/vuejs/src/services/core/hmac-signature.ts and
-templates/nuxtjs/src/services/core/hmac-signature.ts.
+The bundled frontend clients use the same field order, Base64 encoding,
+millisecond timestamp, relative API path, and shared HMAC_SECRET (their build-time
+copy). Keep those invariants aligned with their signer at
+templates/<frontend>/.../services/core/hmac-signature.ts (under src/, or app/ in
+nuxtjs).
 
 See [realtime-socket.md](./realtime-socket.md) for socket authentication and
 [security-rate-limit.md](./security-rate-limit.md) for HTTP security hooks.

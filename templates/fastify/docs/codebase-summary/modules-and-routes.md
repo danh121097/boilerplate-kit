@@ -37,7 +37,8 @@ OpenAPI generation.
 
 Root HMAC and optional CSRF hooks run before the API route handlers. Per-route
 preHandler hooks run authenticate (src/plugins/auth.ts) and then requireMinRole
-(src/plugins/role.ts) for admin routes.
+(src/plugins/role.ts) for admin routes. GET /users/:id uses preValidation for the
+same pair, so auth and role are decided before the :id param is validated.
 Controllers handle HTTP details; services do not depend on Fastify request or
 reply objects.
 
@@ -58,7 +59,7 @@ All paths below are relative to API_PREFIX and require HMAC.
 | POST   | /auth/register | Public                                                       |
 | POST   | /auth/login    | Public                                                       |
 | POST   | /auth/refresh  | Refresh token in body or cookie (body optional)              |
-| POST   | /auth/logout   | Public; revokes the presented session family (body optional) |
+| POST   | /auth/logout   | Public; deletes the presented session family (body optional) |
 | GET    | /auth/me       | Authenticated user                                           |
 | GET    | /users         | Admin or super_admin                                         |
 | GET    | /users/:id     | Admin or super_admin                                         |

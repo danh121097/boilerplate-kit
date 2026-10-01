@@ -86,6 +86,28 @@ describe("auth rate limits", () => {
     expect(res.json()).toMatchObject({ errorType: "RATE_LIMIT", message: tooMany });
   });
 
+  it("global limiter counts bad-JWT requests but not signed unknown-route 404s", async () => {
+    const badJwt = () =>
+      signedRequest({
+        method: "GET",
+        url: `${API}/auth/me`,
+        headers: { authorization: "Bearer not-a-jwt" },
+      });
+    for (let i = 0; i < 100; i++) expect((await badJwt()).statusCode).toBe(401);
+    expect((await badJwt()).statusCode).toBe(429);
+
+    // A fresh app resets the counters; 404s from the not-found handler never reach the limiter.
+    await app.close();
+    app = buildApp({ sockets: false });
+    await app.ready();
+    signedRequest = createSignedRequest(app);
+    for (let i = 0; i < 101; i++) {
+      const res = await signedRequest({ method: "GET", url: `${API}/no-such-route` });
+      expect(res.statusCode).toBe(404);
+    }
+    expect((await signedRequest({ method: "GET", url: `${API}/health` })).statusCode).toBe(200);
+  });
+
   it("auth routes also count against the global 100-per-minute cap", async () => {
     // 3 buckets: 30 register/refresh/logout + 30 login are well under 100, so spend the
     // remainder on health, then confirm an auth call is rejected by the global limiter.

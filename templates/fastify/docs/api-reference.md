@@ -18,18 +18,39 @@ outside production and off in production unless `DOCS_ENABLED=true`;
 
 ## Shared rules
 
-- **Rate limits:** 100 requests per minute globally. Per client, register,
+- **HMAC:** every request under `API_PREFIX` needs `sig` and `ctime`. A missing,
+  stale (more than 5 minutes off), or invalid signature is `401` with
+  `errorType: "HMAC_ERROR"`, not `AUTHENTICATION_ERROR`; clients must not treat it
+  as a dead session. HMAC is an anti-abuse layer (no body hash, no nonce), not a
+  security boundary.
+- **CSRF (`ENABLE_CSRF=true`, default off):** mutating methods need an `Origin`
+  (or `Referer` origin) in `corsOrigins`, else `403 AUTHORIZATION_ERROR`. A request
+  with none of `Cookie`, `Origin`, `Referer` (native apps, server-to-server) is
+  exempt: with no ambient credentials there is nothing to forge, and browsers
+  always send `Origin` on cross-site writes.
+- **Rate limits:** per client IP, 100 requests per minute globally. Register,
   refresh, and logout share one 30-request/15-minute auth bucket; login has a
-  separate 30-request/15-minute bucket. Rate-limit responses use the common
-  error shape.
+  separate 30-request/15-minute bucket (login attempts do not use the auth bucket).
+  Auth requests count in both their own bucket and the global cap. All limiters
+  run as `onRequest` hooks after the HMAC and CSRF hooks, so they count every
+  request that passes those: validation failures, bad-JWT requests, and signed
+  requests with a malformed or oversize body. Not counted: HMAC- or CSRF-rejected
+  requests and signed unknown paths (the 404 handler is not a counted route).
+  Rate-limit responses use the common error shape.
 - **Access tokens:** send `Authorization: Bearer <token>` or the `accessToken`
   cookie. Protected routes also check Redis revocation state when Redis is on.
 - **Refresh cookies:** `accessToken` and `refreshToken` are httpOnly. Refresh
-  cookies are scoped to `{API_PREFIX}/auth`; the JSON token pair is also
-  returned for non-browser clients.
+  cookies are scoped to `{API_PREFIX}/auth`. The JSON token pair is also returned
+  in the body by design, because token-mode clients need it; cookie-mode web
+  clients therefore expose the refresh token to script on the page (accepted risk).
 - **Refresh reuse:** concurrent retries and replays within 10 seconds of a
-  rotation receive a new token pair. Reuse after that grace period revokes the
-  user's refresh sessions and access tokens.
+  rotation receive a new token pair. Reuse of a rotated token after that grace
+  period revokes every refresh token of the user (all devices) and their access
+  tokens.
+- **Logout:** deletes the presented token's session family. Replaying that token
+  is a plain `401` (not reuse); other families keep their refresh tokens. With
+  Redis on, the user's access tokens on every device are cut off, so other devices
+  get `401` on their next call and recover by refreshing.
 - **Proxy trust:** `TRUST_PROXY` accepts `true`, `false`, or explicit IP/CIDR
   ranges. Fastify 5.12 does not support hop-count trust.
 
@@ -72,8 +93,20 @@ Application and validation errors use the shared envelope:
 ```
 
 Common types include `VALIDATION_ERROR`, `AUTHENTICATION_ERROR`,
-`AUTHORIZATION_ERROR`, `NOT_FOUND`, `CONFLICT`, `RATE_LIMIT`, and
-`INTERNAL_ERROR`. Internal 5xx messages are generic outside development.
+`AUTHORIZATION_ERROR`, `HMAC_ERROR` (status `401`), `NOT_FOUND`, `CONFLICT`,
+`RATE_LIMIT`, and `INTERNAL_ERROR`. Internal 5xx messages are generic outside
+development, and `stack` is added to the body only when `NODE_ENV=development` and
+the status is `>= 500`.
+
+A body that is not valid JSON is `400 VALIDATION_ERROR` ("Malformed JSON request
+body!") and an oversize one (over 100 KiB) is `413 VALIDATION_ERROR` ("Request body
+is too large!"). Fastify checks HMAC before parsing the body, so an **unsigned**
+request with a bad or oversize body gets `401 HMAC_ERROR`; Express parses the body
+first and answers `400`/`413`. The body is not signed, so the order has no
+security impact.
+
+Unmatched routes return `404 NOT_FOUND`. Under `API_PREFIX` an unsigned unknown
+path is `401 HMAC_ERROR` first.
 
 Successful responses use `{ success: true, message?, data, meta? }`; `/health` is
 the exception and returns `{ status: "ok", ... }` without the envelope. The

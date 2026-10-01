@@ -12,7 +12,7 @@ Socket.IO, optional Redis, Zod validation, Swagger, and Vitest integration tests
 | Framework             | Fastify 5                                                                |
 | Database              | MongoDB via Mongoose                                                     |
 | Auth                  | RS256 access JWT + rotating HS256 refresh JWT in an httpOnly cookie      |
-| API signing           | HMAC-SHA256 on every route under `API_PREFIX`                            |
+| API signing           | HMAC-SHA256 on every route under `API_PREFIX` (required)                 |
 | Realtime              | Socket.IO attached to Fastify's Node HTTP server                         |
 | Cache / scale         | Optional Redis for rate limits, cache, revocation, and Socket.IO adapter |
 | Validation / API docs | Zod 4 + Fastify Swagger/OpenAPI                                          |
@@ -34,13 +34,13 @@ Redis is optional and disabled by default.
 ## Environment
 
 See [`.env.example`](./.env.example) for the complete list. Required values are
-`MONGODB_URI`, `HMAC_SECRET` and `JWT_REFRESH_SECRET` (at least 32 characters).
+`MONGODB_URI`, `HMAC_SECRET` (must equal the secret the client signs with; anti-abuse only, a secret shipped to a browser or app is public) and `JWT_REFRESH_SECRET` (at least 32 characters).
 RSA key paths default to `src/keys/rsa.private` and `src/keys/rsa.public`;
 generate them with `pnpm keys`. `LOG_LEVEL` (`debug`, `info`, `warn`, `error`) defaults to `debug` in
 development and `info` in production. `DOCS_ENABLED` optionally forces Swagger on or off (unset = on outside
 production). `PORT` defaults to `3000`, `REDIS_URL` to `redis://localhost:6379`
 (used only when `REDIS_ENABLED=true`), `COOKIE_DOMAIN` (optional) sets the auth cookie domain, and `APP_NAME` (optional) sets the Swagger title.
-`ENABLE_CSRF` turns on the Origin/Referer check for state-changing requests. `TRUST_PROXY` accepts `true`, `false`, or
+`ENABLE_CSRF` turns on the Origin/Referer check for state-changing requests; requests with no `Cookie`, `Origin` and `Referer` header (native apps, server-to-server) are exempt because there are no ambient credentials to forge. `TRUST_PROXY` accepts `true`, `false`, or
 comma-separated IP/CIDR ranges. Fastify 5.12 intentionally does not accept
 hop-count trust because it can allow direct clients to spoof forwarded headers.
 
@@ -55,7 +55,7 @@ and public auth routes, requires valid `sig` and `ctime` HMAC headers.
 | POST   | `/auth/register` | HMAC                 | Create an account                       |
 | POST   | `/auth/login`    | HMAC                 | Log in and issue tokens                 |
 | POST   | `/auth/refresh`  | HMAC + refresh token | Rotate the token pair                   |
-| POST   | `/auth/logout`   | HMAC                 | Revoke the refresh-token session family |
+| POST   | `/auth/logout`   | HMAC                 | Delete the refresh-token session family |
 | GET    | `/auth/me`       | HMAC + access token  | Current user                            |
 | GET    | `/users`         | HMAC + admin         | Paginated user list                     |
 | GET    | `/users/:id`     | HMAC + admin         | Get a user by ID                        |

@@ -4,7 +4,11 @@ import crypto from "crypto";
 /** Maximum age of a request timestamp (5 minutes) to prevent replay attacks. */
 export const MAX_TIMESTAMP_AGE_MS = 5 * 60 * 1000;
 
-/** Default content type used when a request carries none (matches the client). */
+/**
+ * Content type signed for a Socket.IO handshake, which has no HTTP body (matches the
+ * client). HTTP requests do not use it: the middleware signs the raw `Content-Type`
+ * header, or `""` when absent.
+ */
 export const DEFAULT_CONTENT_TYPE = "application/json";
 
 /** Fixed path the client signs for a Socket.IO handshake (no volatile query). */

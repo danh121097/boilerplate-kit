@@ -20,16 +20,20 @@ Application, validation, database, and rate-limit failures are normalized to:
 ```
 
 The fields preserve the API contract used by the existing backend templates.
-Unmatched routes return 404 with errorType NOT_FOUND. Internal 5xx responses
-use a generic message outside development; logs include status and error name
-but not request secrets.
+Unmatched routes return 404 with errorType NOT_FOUND (under API_PREFIX an unsigned
+request gets 401 HMAC_ERROR first). HMAC failures use errorType HMAC_ERROR with
+status 401. Internal 5xx responses use a generic message outside development; the
+response includes `stack` only when NODE_ENV=development and the status is >= 500.
+Logs include status and error name but not request secrets.
 
 ## Fastify and validation errors
 
 Route schemas are Zod schemas. fastify-type-provider-zod validates inputs and
 serializes declared response shapes. Fastify validation errors become 400
 VALIDATION_ERROR with joined issue messages. Malformed JSON is also 400, while
-body-limit errors are 413. Mongoose cast, validation, and duplicate-key errors
+body-limit errors are 413 (messages "Malformed JSON request body!" and "Request
+body is too large!"; the parser's own text is never forwarded). HMAC runs first, so
+an unsigned request with such a body is 401 HMAC_ERROR. Mongoose cast, validation, and duplicate-key errors
 are mapped by src/utils/map-database-error.ts.
 
 To add a route, keep its Zod schemas in the module's validation.ts and declare
