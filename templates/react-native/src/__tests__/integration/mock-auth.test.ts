@@ -150,6 +150,36 @@ describe("mock auth", () => {
     await expect(app.AuthModel.getMe()).resolves.toEqual(user);
   });
 
+  it.each([
+    [{ email: "nope", password: "password", name: "N" }, "Invalid email format"],
+    [
+      { email: "a@example.com", password: "short", name: "N" },
+      "Password must be at least 8 characters",
+    ],
+    [{ email: "a@example.com", password: "password", name: "  " }, "Name is required"],
+  ])(
+    "rejects an invalid register body with a 400 and starts no session",
+    async (payload, message) => {
+      const app = boot();
+
+      await expect(app.AuthModel.register(payload)).rejects.toMatchObject({
+        error_code: 400,
+        errorType: "VALIDATION_ERROR",
+        message,
+      });
+      await expect(app.hasStoredSession("MAIN")).resolves.toBe(false);
+    },
+  );
+
+  it("rejects registering the demo account's email with a 409", async () => {
+    const app = boot();
+
+    await expect(
+      app.AuthModel.register({ email: "Demo@Example.com", password: "password", name: "Dup" }),
+    ).rejects.toMatchObject({ error_code: 409, errorType: "CONFLICT" });
+    await expect(app.hasStoredSession("MAIN")).resolves.toBe(false);
+  });
+
   it("clears the session on logout", async () => {
     const app = boot();
     await app.AuthModel.login(DEMO);

@@ -5,8 +5,8 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: false,
-      // React Native has no window focus; refetch on app foreground is handled by
-      // Query's AppState integration if wired — off by default here.
+      // React Native has no window focus. The session is re-checked on app resume by
+      // `useSessionRevalidation`; other queries are not refetched on foreground.
       refetchOnWindowFocus: false,
       staleTime: 60_000,
       placeholderData: keepPreviousData,

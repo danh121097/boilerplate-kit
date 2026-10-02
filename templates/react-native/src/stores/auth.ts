@@ -1,6 +1,7 @@
 import { queryClient } from "@/providers/query-client-provider";
 import { AuthModel, authContract } from "@/services/auth";
 import {
+  clearStaleTokensOnFirstLaunch,
   getSessionEpoch,
   hasStoredSession,
   isSessionGoneError,
@@ -33,12 +34,14 @@ interface AuthState {
   /** Reset auth state after the refresh endpoint refused the session. */
   expireSession: () => void;
   setUser: (user: AuthUser | null) => void;
-  /** Boot-time restore: read the persisted token, resolve the user, mark hydrated. */
+  /** Boot-time restore: on the first launch after an install clear stale tokens, then read the persisted token, resolve the user, mark hydrated. */
   hydrate: () => Promise<void>;
   /** Re-run the restore after a transient failure (does not show the boot splash again). */
   retryHydrate: () => Promise<void>;
-  /** (Re)fetch the signed-in user. Safe to call again after a transient failure. */
-  loadUser: () => Promise<void>;
+  /** (Re)fetch the signed-in user. Safe to call again after a transient failure.
+   * `silent`: a transient failure (offline, 5xx) changes nothing instead of flagging
+   * `hydrateError` — for background re-checks; a refused session still signs out. */
+  loadUser: (options?: { silent?: boolean }) => Promise<void>;
   /** Local sign-out after the logout request settled (`useLogoutMutation`'s
    * `onSettled`): reset state and the query cache, and mark an explicit logout so
    * the gate goes to a plain /login. Does not call the API. */
@@ -63,18 +66,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ user, isAuthenticated: Boolean(user), loggedOut: false, hydrateError: null }),
 
   hydrate: async () => {
+    // A reinstall keeps the Keychain: drop the previous install's tokens before they are read.
+    await clearStaleTokensOnFirstLaunch();
     await restoreSession(get);
     set({ hydrated: true });
   },
 
   retryHydrate: () => restoreSession(get),
 
-  loadUser: () => {
+  loadUser: ({ silent = false } = {}) => {
     // Overlapping calls in the same session share one getMe, so two callers
     // hitting the same 401 run a single logout.
     const epoch = getSessionEpoch(authContract.service);
     if (inFlightLoad?.epoch === epoch) return inFlightLoad.promise;
-    const promise = loadUserOnce(epoch).finally(() => {
+    const promise = loadUserOnce(epoch, silent).finally(() => {
       if (inFlightLoad?.promise === promise) inFlightLoad = null;
     });
     inFlightLoad = { epoch, promise };
@@ -129,7 +134,7 @@ let inFlightLoad: { epoch: number; promise: Promise<void> } | null = null;
 /** Resolve the signed-in user for the session of `epoch`. A logout / expiry
  * while getMe is in flight bumps the epoch; a late result (success or failure)
  * must not resurrect or rewrite that ended session. */
-async function loadUserOnce(epoch: number): Promise<void> {
+async function loadUserOnce(epoch: number, silent: boolean): Promise<void> {
   const isStale = () => getSessionEpoch(authContract.service) !== epoch;
   try {
     const user = await AuthModel.getMe();
@@ -148,6 +153,7 @@ async function loadUserOnce(epoch: number): Promise<void> {
     }
     // Offline / 5xx / 429 / timeout / an unavailable refresh keep the tokens:
     // stay signed in with an unknown user and let the UI retry.
+    if (silent) return;
     const stillSignedIn = await readStoredSession();
     if (isStale()) return;
     if (stillSignedIn === null) return keepStateOnReadError();

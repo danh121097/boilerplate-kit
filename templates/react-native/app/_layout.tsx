@@ -1,4 +1,5 @@
 import { MockAuthBadge } from "@/components/mock-auth-badge";
+import { useSessionRevalidation } from "@/hooks/useSessionRevalidation";
 import { initI18n } from "@/i18n/i18n";
 import { AppQueryClientProvider } from "@/providers/query-client-provider";
 import { initServices } from "@/services";
@@ -24,6 +25,9 @@ export default function RootLayout() {
   // expiry let the (app) gate redirect to /login with a `redirect`. Subscribed
   // before the hydrate effect so an expiry during boot is not missed.
   useEffect(() => watchSessionEnd(), []);
+
+  // Re-check the session when the app returns from the background.
+  useSessionRevalidation();
 
   // Restore any persisted session from SecureStore on boot.
   useEffect(() => {

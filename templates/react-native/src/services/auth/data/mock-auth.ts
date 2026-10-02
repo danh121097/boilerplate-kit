@@ -3,6 +3,7 @@ import { getMockAuth } from "@/services/auth/data/mock-auth-config";
 import {
   bearerOf,
   bodyOf,
+  failure,
   pathOf,
   reply,
   succeed,
@@ -63,6 +64,16 @@ function callerOf(config: InternalAxiosRequestConfig): MockCaller {
   return userFromToken(token, ACCESS_PREFIX) ?? "Invalid or expired access token!";
 }
 
+/** The backend's register validation message (first failing rule), or null when the body passes. */
+function registerError(email: string, body: Record<string, unknown>): string | null {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "Invalid email format";
+  if (typeof body.password !== "string" || body.password.length < 8) {
+    return "Password must be at least 8 characters";
+  }
+  if (typeof body.name !== "string" || !body.name.trim()) return "Name is required";
+  return null;
+}
+
 /** Answer one auth or users request the way the backend would, or null for a path this mock does not own. */
 function answer(
   mock: MockAuthConfig,
@@ -89,6 +100,11 @@ function answer(
     const email = String(body.email ?? "")
       .trim()
       .toLowerCase();
+    const invalid = registerError(email, body);
+    if (invalid) return reply(config, 400, failure(400, "VALIDATION_ERROR", invalid));
+    if (email === mock.email.toLowerCase()) {
+      return reply(config, 409, failure(409, "CONFLICT", "Email already registered!"));
+    }
     const user: AuthUser = {
       _id: `mock-${email}`,
       email,
@@ -130,7 +146,7 @@ function answer(
   if (method === "get" && path.endsWith(paths.me)) {
     const caller = callerOf(config);
     if (typeof caller === "string") return reply(config, 401, unauthorized(caller));
-    return reply(config, 200, succeed("", { user: caller }));
+    return reply(config, 200, { success: true, data: { user: caller } });
   }
 
   return answerMockUsers(mock, config, () => callerOf(config));

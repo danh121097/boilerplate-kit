@@ -13,6 +13,7 @@ import {
   createSocket,
   MAX_REFRESH_ATTEMPTS,
   RECONNECT_BASE_MS,
+  RECONNECT_MAX_MS,
 } from "@/services/core/socket-connection";
 import { io } from "socket.io-client";
 import axios from "axios";
@@ -236,6 +237,28 @@ describe("socket connection", () => {
       expect(await getAccessToken()).toBe("NEW");
       expect(socket.connect).toHaveBeenCalledTimes(1);
       expect(onAuthenticated).toHaveBeenCalledWith(false);
+    });
+
+    it("an HMAC rejection spends no refresh and reconnects with backoff", async () => {
+      const hmac = Object.assign(new Error("Unauthorized!"), { data: { errorType: "HMAC_ERROR" } });
+      const post = jest.spyOn(axios, "post");
+
+      const { socket, emit } = track(setup());
+
+      for (let i = 0; i < MAX_REFRESH_ATTEMPTS + 1; i += 1) {
+        emit(SOCKET_EVENT.CONNECT_ERROR, hmac);
+        await flush();
+        expect(socket.connect).toHaveBeenCalledTimes(i);
+        await jest.advanceTimersByTimeAsync(RECONNECT_MAX_MS);
+        expect(socket.connect).toHaveBeenCalledTimes(i + 1);
+      }
+
+      expect(post).not.toHaveBeenCalled();
+      // the refresh budget is untouched: a token rejection still refreshes
+      jest.spyOn(axios, "post").mockResolvedValue(NEW_TOKEN);
+      emit(SOCKET_EVENT.CONNECT_ERROR, rejected);
+      await flush();
+      expect(axios.post).toHaveBeenCalledTimes(1);
     });
 
     it("does nothing extra while socket.io is auto-reconnecting", async () => {

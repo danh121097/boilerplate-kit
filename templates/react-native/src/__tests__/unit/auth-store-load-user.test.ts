@@ -47,6 +47,29 @@ describe("auth store loadUser", () => {
   afterEach(() => jest.restoreAllMocks());
 
   describe("loadUser", () => {
+    it("a silent re-check keeps the session and flags nothing on a transient failure, but still signs out a deleted user", async () => {
+      await persistAccessToken("AT", "MAIN");
+      await persistRefreshToken("RT", "MAIN");
+      useAuthStore.setState({ user: USER as never, isAuthenticated: true, hydrated: true });
+      const getMe = jest
+        .spyOn(AuthModel, "getMe")
+        .mockRejectedValueOnce({ status: "error", error_code: 500, message: "boom" })
+        .mockRejectedValueOnce({ status: "error", error_code: 404, message: "User not found!" });
+      jest.spyOn(AuthModel.api, "post").mockResolvedValue({ success: true } as never);
+
+      await useAuthStore.getState().loadUser({ silent: true });
+      expect(useAuthStore.getState()).toMatchObject({
+        user: USER,
+        isAuthenticated: true,
+        hydrateError: null,
+      });
+
+      await useAuthStore.getState().loadUser({ silent: true });
+      expect(getMe).toHaveBeenCalledTimes(2);
+      expect(useAuthStore.getState()).toMatchObject({ user: null, isAuthenticated: false });
+      expect(await getAccessToken("MAIN")).toBeNull();
+    });
+
     it("recovers the user on retry after a transient boot failure", async () => {
       await persistAccessToken("AT", "MAIN");
       jest

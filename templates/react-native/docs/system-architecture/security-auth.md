@@ -117,7 +117,9 @@ A 401 is routed in this order:
 0. **HMAC rejection** (`errorType: "HMAC_ERROR"`): passed through — no refresh, no
    replay, session untouched.
 1. **No refresh for the service, the refresh endpoint or a `skipPaths` entry**
-   (login, register, logout; matched on the path without `?query` / `#hash`):
+   (login, register, logout; an exact match on the path as the caller wrote it — without
+   `?query` / `#hash` and without the service `baseURL` — so `/users/auth/login` is
+   not exempt):
    passed through untouched — no refresh, no token clear, no session-ended event.
 2. **Session ended after send**: the request interceptor stamps the session epoch
    on every request; if the session ended since (logout, expiry, a new login),
@@ -302,6 +304,25 @@ token is stored) and calls `getMe`:
 a slow or offline start keeps the splash until the request settles (bounded by the
 request timeouts) rather than flashing `/login`.
 
+**Reinstall.** The iOS Keychain survives an uninstall, so a reinstalled app would
+boot into the previous install's session. Before reading any token, `hydrate()`
+calls `clearStaleTokensOnFirstLaunch()` (`services/core/first-launch.ts`): it looks
+for a marker file in the app's document directory (`expo-file-system`, already part
+of Expo, now declared in `package.json`), which an uninstall deletes. No marker means
+the first launch after an install: the marker is written, then every registered
+service's SecureStore tokens are cleared, so the app boots signed out. A normal
+relaunch finds the marker and keeps the session. It fails open: if the marker cannot
+be read or written the stored session is kept (a broken disk must not sign users out
+on every launch). An app updated from a version without this marker looks like a
+fresh install once and signs out once.
+
+**Resume.** `useSessionRevalidation()` (`hooks/useSessionRevalidation.ts`, mounted in
+the root layout) re-checks the session when `AppState` becomes `active`: it calls
+`loadUser({ silent: true })` — the same `/auth/me` read through the interceptors and
+their single-flight refresh — at most once per 30 s (mount counts as a check), only
+while hydrated and authenticated. A 401/404 signs the user out as on any other read;
+a transient failure (offline, 5xx) changes nothing and shows no banner (`silent`).
+
 `useMeQuery` (a TanStack query on `queryKeys.auth.me`) fetches through
 `AuthModel.getSession()`, which resolves `null` on a 401 or 404 instead of
 throwing, so a signed-out session reads as `data: null`.
@@ -345,7 +366,12 @@ replies), plus `services/users/data/mock-users.ts` (the users fixture and handle
   `refresh` need no server state.
 - **Credentials.** One login pair, signed in as an `admin` so the built-in
   users screen works. `register` signs up any user, who stays signed in but
-  cannot log in again (no user store) and is a plain `user`.
+  cannot log in again (no user store) and is a plain `user`. Register answers like
+  the backend's validation (400 `VALIDATION_ERROR`: email format, password of at
+  least 8 characters, a non-blank name) and 409 `CONFLICT` for the demo email.
+  The mock stays stateless: refresh rotates the tokens but does not detect reuse, and
+  `me` returns no `message`. A session cookie/token whose user lacks any `AuthUser`
+  field or has a `role` outside the union is rejected.
 - **Users.** `GET /users` (offset-paginated `?page&limit`, envelope
   `{ success: true, data, meta }`) and `GET /users/:id` answer from a fixed
   fixture: the demo user plus five sample users (`MOCK_SAMPLE_USERS`), newest

@@ -28,6 +28,9 @@ app/_layout.tsx (root layout)
   `hydrate()` awaits the `getMe` call (with its refresh and replay). A slow or
   offline start therefore keeps the splash until that request settles; the gate then
   shows the app, the session-unavailable banner, or `/login`.
+- On the first launch after an install, `hydrate()` first clears the tokens a previous
+  install left in the Keychain (see [security-auth](./security-auth.md)); on resume from
+  the background `useSessionRevalidation()` re-checks the session at most every 30 s.
 - Token storage is **async** — all `SecureStore.getItemAsync()` calls return promises.
 - Hard logout: a refresh refused with 401/403, or a 401/404 on the `getMe` read
   (`isSessionGoneError`), ends the session (`endSession("expired", service)`). The root layout subscribes

@@ -4,6 +4,7 @@ export * from "@/services/core/api-errors";
 export * from "@/services/core/app-prefix";
 export * from "@/services/core/auth-refresh-client";
 export * from "@/services/core/auth-token-storage";
+export * from "@/services/core/first-launch";
 export * from "@/services/core/headers-utils";
 export * from "@/services/core/hmac-signature";
 export * from "@/services/core/interceptors";

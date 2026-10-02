@@ -78,7 +78,12 @@ the unwrapped `User`. Screens read `data.data`, show
 - A `connect_error` while `socket.active` is true means socket.io is already
   auto-reconnecting (network error, server down): nothing extra is scheduled. When
   `socket.active` is false the server rejected the handshake:
-  - `Unauthorized!` with refresh budget left: the session is refreshed once
+  - An HMAC rejection (`error.data.errorType === "HMAC_ERROR"`, detected with
+    `isHmacError`; the backends send it only for signature / clock failures, token
+    rejections have no `data`) never refreshes and spends none of the budget: it logs
+    the dev-only signature warning (`warnHmacRejected`) and takes the retry timer
+    below, where the reconnect signs with a fresh `ctime`.
+  - `Unauthorized!` without that `data`, with refresh budget left: the session is refreshed once
     (`refreshSession`, the same single-flight as HTTP) and the socket reconnects
     once with the new token and a new `ctime`. A refused refresh (401/403) ends the
     session and stops; a transient refresh failure falls back to the retry timer.

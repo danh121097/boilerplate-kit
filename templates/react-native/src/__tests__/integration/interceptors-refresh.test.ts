@@ -146,6 +146,26 @@ describe("interceptors — token refresh (async storage)", () => {
     expect(await getAccessToken("MAIN")).toBe("OLD");
   });
 
+  it.each([
+    ["/auth/login", true],
+    ["auth/login", true],
+    ["http://api.test/api/v1/auth/login?next=1", true],
+    ["/auth/refresh", true],
+    ["/users/auth/login", false],
+    ["/auth/login/extra", false],
+    ["/xauth/refresh", false],
+  ])("exempts only the exact auth path: %s -> exempt %s", async (url, exempt) => {
+    await persistAccessToken("OLD", "MAIN");
+    const post = jest.spyOn(axios, "post").mockResolvedValue(NEW_TOKEN);
+    const client = makeClient(async (config) =>
+      bearerOf(config) === "NEW" ? ok(config, { success: true, data: 1 }) : httpError(config),
+    );
+
+    await client.get(url, { baseURL: "http://api.test/api/v1" }).catch(() => undefined);
+
+    expect(post).toHaveBeenCalledTimes(exempt ? 0 : 1);
+  });
+
   it("rejects a 401 that lands after the session was cleared as session_ended, without refreshing", async () => {
     await persistAccessToken("OLD", "MAIN");
     const post = jest.spyOn(axios, "post");

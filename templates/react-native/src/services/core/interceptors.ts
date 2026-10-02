@@ -48,8 +48,8 @@ function isEnvelope(body: unknown): boolean {
   return typeof b.success === "boolean";
 }
 
-/** Dev-only hint: an HMAC rejection is a signature / clock problem, not a session one. */
-function warnHmacRejected(): void {
+/** Dev-only hint: an HMAC rejection (HTTP or socket handshake) is a signature / clock problem, not a session one. */
+export function warnHmacRejected(): void {
   if (__DEV__) {
     console.warn(
       "[api] Request signature rejected (HMAC_ERROR): check the device clock and that EXPO_PUBLIC_HMAC_SECRET matches the backend.",
@@ -63,15 +63,22 @@ function hmacRejected(error: unknown): ApiResponseError {
   return { ...toApiError(error), errorType: "HMAC_ERROR", retryable: true };
 }
 
-/** The request path without its `?query` / `#hash`. */
+/** The request path without its `?query` / `#hash`, and without the service's
+ * `baseURL` when the url was given absolute — so it compares to a configured path
+ * ("/auth/login") as the caller wrote it. */
 function pathOf(config: InternalAxiosRequestConfig): string {
-  return (config.url ?? "").split(/[?#]/)[0] ?? "";
+  let url = (config.url ?? "").split(/[?#]/)[0] ?? "";
+
+  const base = config.baseURL?.replace(/\/+$/, "");
+  if (base && url.startsWith(base)) url = url.slice(base.length);
+  return url.startsWith("/") ? url : `/${url}`;
 }
 
-/** The refresh endpoint and the credential paths never trigger a refresh. */
+/** The refresh endpoint and the credential paths never trigger a refresh. An
+ * exact match only: a suffix match would also exempt e.g. `/users/auth/login`. */
 function isExempt(config: InternalAxiosRequestConfig, options: RefreshOptions): boolean {
   const path = pathOf(config);
-  return [options.endpoint, ...options.skipPaths].some((p) => path === p || path.endsWith(p));
+  return [options.endpoint, ...options.skipPaths].includes(path);
 }
 
 /**

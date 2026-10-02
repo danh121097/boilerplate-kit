@@ -29,9 +29,9 @@ interface AuthState {
   hydrateError: ApiResponseError | null; // transient restore failure (session kept)
   expireSession(): void;     // session expired: user null, isAuthenticated false
   setUser(user): void;       // also clears loggedOut
-  hydrate(): Promise<void>;  // read token → loadUser(); marks hydrated
+  hydrate(): Promise<void>;  // first launch after install: clear stale tokens; read token → loadUser(); marks hydrated
   retryHydrate(): Promise<void>; // re-run the restore (no splash); clears hydrateError on success
-  loadUser(): Promise<void>; // getMe; safe to retry after a transient failure
+  loadUser(opts?: { silent?: boolean }): Promise<void>; // getMe; safe to retry; silent = no hydrateError on a transient failure
   clearSession(): void;      // local sign-out: reset state + queries, loggedOut: true (no API call)
 }
 ```
