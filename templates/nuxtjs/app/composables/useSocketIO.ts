@@ -1,6 +1,6 @@
 import { SOCKET_EVENT } from "@/enums";
 import { getApiOrigin } from "@/services/core/api-config";
-import { isRefreshRefused, SessionEndedError } from "@/services/core/api-errors";
+import { HMAC_ERROR_TYPE, isRefreshRefused, SessionEndedError } from "@/services/core/api-errors";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import { refreshSession } from "@/services/core/interceptors";
 import { useSocketIOStore } from "@/stores/socket-io";
@@ -128,6 +128,17 @@ export function useSocketIO() {
     // `active` means socket.io is already reconnecting (network error, server
     // down). Otherwise the server rejected the handshake.
     if (socket.active) return;
+    // A rejected signature (clock skew, wrong secret) says nothing about the
+    // session: no refresh, and the refresh budget stays untouched.
+    if ((error as { data?: { errorType?: unknown } }).data?.errorType === HMAC_ERROR_TYPE) {
+      if (import.meta.dev) {
+        console.warn(
+          "Socket signature rejected (HMAC_ERROR): check the device clock and that NUXT_PUBLIC_HMAC_SECRET matches the backend HMAC_SECRET.",
+        );
+      }
+      scheduleRetry();
+      return;
+    }
     if (error.message === SOCKET_UNAUTHORIZED && refreshAttempts < MAX_REFRESH_ATTEMPTS) {
       void refreshThenReconnect();
     } else {
@@ -150,7 +161,6 @@ export function useSocketIO() {
 
   return {
     socket,
-    authenticated: Boolean(ioStore.value.authenticated),
     connectSocket,
     destroySocket,
   };
@@ -163,13 +173,10 @@ export function useIo() {
   const { ioStore } = storeToRefs(storeSocketIO);
 
   if (!ioStore.value.socket) {
-    const { socket, authenticated } = useSocketIO();
-    return { socket, authenticated };
+    const { socket } = useSocketIO();
+    return { socket };
   }
-  return {
-    socket: ioStore.value.socket as Socket,
-    authenticated: ioStore.value.authenticated,
-  };
+  return { socket: ioStore.value.socket as Socket };
 }
 
 /** Subscribe to a socket event with auto cleanup on component unmount. */

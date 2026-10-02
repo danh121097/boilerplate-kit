@@ -3,6 +3,7 @@ import { getMockAuthConfig } from "@/services/auth/data/mock-auth-config";
 import {
   authResult,
   bodyOf,
+  failure,
   pathOf,
   reply,
   succeed,
@@ -88,6 +89,10 @@ function answer(
     const email = String(body.email ?? "")
       .trim()
       .toLowerCase();
+    // The demo account exists already, like a registered email on the backend.
+    if (email === mock.email.toLowerCase()) {
+      return reply(config, 409, failure(409, "CONFLICT", "Email already registered!"));
+    }
     const user: AuthUser = {
       _id: `mock-${email}`,
       email,
@@ -122,7 +127,8 @@ function answer(
   if (method === "get" && path.endsWith(paths.me)) {
     const caller = callerOf();
     if (typeof caller === "string") return reply(config, 401, unauthorized(caller));
-    return reply(config, 200, succeed("", { user: caller }));
+    // Like the backend, `/me` carries no message.
+    return reply(config, 200, { success: true, data: { user: caller } });
   }
 
   return answerMockUsers(mock, config, () => callerOf());

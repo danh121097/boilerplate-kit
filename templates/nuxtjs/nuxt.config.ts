@@ -1,3 +1,4 @@
+import { mockAuthPublicConfig } from "./config/mock-auth-public-config";
 import tailwindcss from "@tailwindcss/vite";
 
 // Locale used when neither the saved cookie nor the browser language picks one.
@@ -74,10 +75,11 @@ export default defineNuxtConfig({
       languageCode: DEFAULT_LOCALE,
       hmacSecret: "",
       buildVersion: "1.0.0",
-      // Dev-only mock auth (see services/auth/data/mock-auth.ts). Off unless "true"/"1".
-      authMock: "",
-      authMockEmail: "",
-      authMockPassword: "",
+      // Session hint cookie lifetime in days; match the backend's JWT_REFRESH_EXPIRY.
+      sessionHintMaxAgeDays: 7,
+      // Dev-only mock auth (see services/auth/data/mock-auth.ts). Off unless "true"/"1";
+      // the keys are not declared at all in a production build.
+      ...mockAuthPublicConfig(process.env.NODE_ENV === "production"),
     },
   },
 

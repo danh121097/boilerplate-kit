@@ -64,7 +64,8 @@ Bound to `runtimeConfig.public` in `nuxt.config.ts` (read via
 | `NUXT_PUBLIC_LANGUAGE_CODE` | `languageCode` | default locale (`en` / `ja`) when there is no saved cookie or matching browser language; read when `nuxt.config.ts` loads |
 | `NUXT_PUBLIC_HMAC_SECRET` | `hmacSecret` | HMAC signing secret; required by the bundled backends and must equal the backend `HMAC_SECRET` (an empty one logs a dev warning and every request 401s) |
 | `NUXT_PUBLIC_BUILD_VERSION` | `buildVersion` | sent as `x-version` header |
-| `NUXT_PUBLIC_AUTH_MOCK` | `authMock` | dev only: `true`/`1` answers `/auth/*` and `/users` in the browser; ignored in production builds |
+| `NUXT_PUBLIC_SESSION_HINT_MAX_AGE_DAYS` | `sessionHintMaxAgeDays` | session hint cookie lifetime in days (default 7); keep equal to the backend `JWT_REFRESH_EXPIRY` |
+| `NUXT_PUBLIC_AUTH_MOCK` | `authMock` | dev only: `true`/`1` answers `/auth/*` and `/users` in the browser; not declared in production builds |
 | `NUXT_PUBLIC_AUTH_MOCK_EMAIL` / `NUXT_PUBLIC_AUTH_MOCK_PASSWORD` | `authMockEmail` / `authMockPassword` | mock login credentials (default `demo@example.com` / `password`) |
 
 `appEndpoint` falls back to `http://localhost:3000` so the starter

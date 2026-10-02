@@ -113,6 +113,14 @@ describe("mock auth", () => {
     expect(jar.size).toBe(0);
   });
 
+  it("rejects registering the demo email with the backend's 409 and starts no session", async () => {
+    const app = await boot(jar);
+    const error = await app.AuthModel.register({ ...DEMO, name: "Dup" }).catch((e: unknown) => e);
+
+    expect(error).toMatchObject({ error_code: 409, message: "Email already registered!" });
+    expect(jar.size).toBe(0);
+  });
+
   it("keeps the session across a reload", async () => {
     const before = await boot(jar);
     const user = (await before.AuthModel.login(DEMO)).user;

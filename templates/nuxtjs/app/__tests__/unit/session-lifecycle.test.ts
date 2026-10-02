@@ -5,6 +5,7 @@ import {
   getSessionEpoch,
   hasSessionHint,
   markSessionActive,
+  setSessionHintMaxAgeDays,
   startSession,
 } from "@/services/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -51,6 +52,20 @@ describe("session hint", () => {
     clearSessionHint();
     expect(doc.cookie).toContain("max-age=0");
     expect(hasSessionHint()).toBe(false);
+  });
+
+  it.each([
+    [undefined, 7],
+    [14, 14],
+    ["30", 30],
+    [0, 7],
+    ["abc", 7],
+    ["", 7],
+  ])("hint max-age from runtime config %j → %d days", (config, days) => {
+    setSessionHintMaxAgeDays(config);
+    markSessionActive();
+    expect(doc.cookie).toContain(`max-age=${days * 86400};`);
+    setSessionHintMaxAgeDays(undefined);
   });
 
   it("finds the hint among other cookies", () => {

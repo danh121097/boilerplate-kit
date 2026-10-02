@@ -7,6 +7,7 @@ import {
   markSessionActive,
   registerSessionRefresher,
   setAppPrefix,
+  setSessionHintMaxAgeDays,
 } from "@/services/core";
 import type { ServiceRefreshConfig } from "@/services/core";
 
@@ -24,6 +25,8 @@ export default defineNuxtPlugin(() => {
   // Resolve the app-name prefix (session hint cookie, refresh lock + timestamp)
   // while a Nuxt context exists — same prefix as `useStorageKeys`.
   setAppPrefix(useRuntimeConfig().public.appName);
+  // Hint cookie lifetime: keep it equal to the backend's refresh-token lifetime.
+  setSessionHintMaxAgeDays(useRuntimeConfig().public.sessionHintMaxAgeDays);
   // Dev-only mock auth: reads its flag and logs its one boot warning (or why the
   // flag was ignored). Off by default; never active in a production build.
   initMockAuth(useRuntimeConfig().public);

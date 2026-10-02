@@ -232,6 +232,55 @@ describe("useSocketIO", () => {
     expect(socket.connect).toHaveBeenCalledTimes(1);
   });
 
+  it("an HMAC_ERROR rejection never refreshes: backoff reconnect with a fresh signature", async () => {
+    const { socket } = mount();
+    socket.connect.mockClear();
+    const first = handshake(socket).sig;
+    const hmacRejected = Object.assign(new Error("Unauthorized!"), {
+      data: { errorType: "HMAC_ERROR" },
+    });
+
+    socket.emit(SOCKET_EVENT.CONNECT_ERROR, hmacRejected);
+    await vi.advanceTimersByTimeAsync(1999);
+    expect(socket.connect).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(socket.connect).toHaveBeenCalledTimes(1);
+    expect(handshake(socket).sig).not.toBe(first);
+
+    socket.emit(SOCKET_EVENT.CONNECT_ERROR, hmacRejected);
+    await vi.advanceTimersByTimeAsync(3999);
+    expect(socket.connect).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(socket.connect).toHaveBeenCalledTimes(2);
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("HMAC_ERROR rejections do not spend the refresh budget for later token rejections", async () => {
+    refresh.mockResolvedValue(undefined);
+    const { socket } = mount();
+    const hmacRejected = Object.assign(new Error("Unauthorized!"), {
+      data: { errorType: "HMAC_ERROR" },
+    });
+    for (let i = 0; i < 4; i += 1) {
+      socket.emit(SOCKET_EVENT.CONNECT_ERROR, hmacRejected);
+      await vi.advanceTimersByTimeAsync(30_000);
+    }
+    socket.emit(SOCKET_EVENT.CONNECT_ERROR, unauthorized);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("an Unauthorized! carrying unrelated data still refreshes like a token rejection", async () => {
+    refresh.mockResolvedValue(undefined);
+    const { socket } = mount();
+    socket.emit(
+      SOCKET_EVENT.CONNECT_ERROR,
+      Object.assign(new Error("Unauthorized!"), { data: { errorType: "OTHER" } }),
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
   it("does not refresh while socket.io is already reconnecting (network error)", async () => {
     const { socket } = mount();
     socket.active = true;

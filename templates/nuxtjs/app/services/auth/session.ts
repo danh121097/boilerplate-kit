@@ -66,12 +66,3 @@ export const useMeQuery = defineQuery<AuthUser | null>({
   fetcher: fetchSessionUser,
   serverFetcher: readServerSession,
 });
-
-export function useAuth() {
-  const session = useMeQuery();
-  return {
-    user: session.data.value ?? null,
-    isAuthenticated: Boolean(session.data.value),
-    isLoading: session.isPending.value,
-  };
-}

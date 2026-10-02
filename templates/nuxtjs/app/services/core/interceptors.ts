@@ -48,16 +48,23 @@ function isEnvelope(body: unknown): boolean {
   return typeof b.success === "boolean";
 }
 
-/** Request path without query string / hash, for exact endpoint matching. */
+/** Request path without query string / hash, origin and the baseURL's path prefix
+ * (e.g. `/api/v1`), so it compares exactly against the contract paths. */
 function pathOf(config: InternalAxiosRequestConfig): string {
-  return (config.url ?? "").split(/[?#]/)[0] ?? "";
+  const raw = (config.url ?? "").split(/[?#]/)[0] ?? "";
+  const path = raw.replace(/^[a-z][a-z\d+.-]*:\/\/[^/]*/i, "");
+  const base = (config.baseURL ?? "")
+    .replace(/^[a-z][a-z\d+.-]*:\/\/[^/]*/i, "")
+    .replace(/\/+$/, "");
+  return base && path.startsWith(`${base}/`) ? path.slice(base.length) : path;
 }
 
 /** Whether the request targets the refresh endpoint or a credential endpoint
- * (login/register/logout) — their 401 is final, never a reason to refresh. */
+ * (login/register/logout) — their 401 is final, never a reason to refresh. Exact
+ * match: a lookalike such as `/x/auth/login` is an ordinary request. */
 function isRefreshExempt(config: InternalAxiosRequestConfig, options: RefreshOptions): boolean {
   const path = pathOf(config);
-  return [options.endpoint, ...options.skipPaths].some((p) => path === p || path.endsWith(p));
+  return [options.endpoint, ...options.skipPaths].some((p) => path === p);
 }
 
 /**

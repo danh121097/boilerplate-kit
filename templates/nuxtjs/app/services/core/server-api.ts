@@ -16,7 +16,7 @@ import type {
  * these call it DIRECTLY (no in-app proxy). They sign the HMAC the backend requires
  * and run isomorphically (SSR + client). On the CLIENT, `credentials: "include"`
  * attaches the httpOnly cookie (same-site); during SSR the browser cookie isn't
- * auto-sent, so it is forwarded from the incoming request headers.
+ * auto-sent, so the `accessToken` cookie alone is forwarded from the incoming request.
  *
  * `path` is AFTER the API prefix — the contract path (e.g. "/auth/me"). The base
  * (`getApiBaseUrl()` = appEndpoint + "/api/v1") carries the prefix and the backend's
@@ -60,12 +60,18 @@ function warnHmacRejectedOnce(): void {
   );
 }
 
-/** The value of cookie `name` in a `Cookie` header (undefined when absent). */
+/** The value of cookie `name` in a `Cookie` header (undefined when absent or malformed). */
 function readCookie(header: string | undefined, name: string): string | undefined {
   if (!header) return undefined;
   for (const part of header.split(";")) {
     const [key, ...rest] = part.trim().split("=");
-    if (key === name) return decodeURIComponent(rest.join("="));
+    if (key === name) {
+      try {
+        return decodeURIComponent(rest.join("="));
+      } catch {
+        return undefined;
+      }
+    }
   }
   return undefined;
 }
@@ -96,8 +102,10 @@ async function authedFetch<R>(path: string, query?: Record<string, string | numb
   }
 
   if (import.meta.server) {
-    const cookie = useRequestHeaders(["cookie"]).cookie;
-    if (cookie) headers.cookie = cookie;
+    // Only the access cookie: the refresh cookie is never needed (SSR cannot
+    // refresh) and the rest of the browser's cookies are not the backend's business.
+    const access = readCookie(useRequestHeaders(["cookie"]).cookie, "accessToken");
+    if (access) headers.cookie = `accessToken=${access}`;
   }
 
   try {

@@ -171,6 +171,11 @@ Behavior:
   single-flight `refreshSession()`, then `connect()` with the rotated cookie. A
   refused refresh (`SessionEndedError` / `isRefreshRefused`) means the session is
   over, so the socket stops. A transient refresh failure falls back to backoff.
+  The backend adds `error.data = { errorType: "HMAC_ERROR" }` to an HMAC
+  rejection only (same `"Unauthorized!"` message; a token rejection has no
+  `data`). That one is not a session verdict: it skips the refresh and leaves the
+  refresh budget untouched, schedules the usual backoff retry (fresh `ctime`
+  each try) and logs a dev-only console warning, like the HTTP interceptor.
 - Refresh budget: at most `MAX_REFRESH_ATTEMPTS = 3` consecutive refreshes per
   outage; it resets on `authenticated`. Past the budget, and for any other
   rejection, one manual retry is scheduled (errors while it is pending do not
@@ -184,4 +189,5 @@ Behavior:
   again by itself; it keeps retrying with backoff and only reconnects after an
   HTTP call has refreshed the cookie.
 - Helpers: `useIo()` (get/lazy-init the shared socket), `useSocketEvent(event, cb)`
-  (auto-unsubscribe on unmount).
+  (auto-unsubscribe on unmount). Neither returns the connection state; read
+  `ioStore.authenticated` from the store for that.

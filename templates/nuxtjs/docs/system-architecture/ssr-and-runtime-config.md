@@ -37,7 +37,8 @@ server-only. Each key is overridable at runtime by a matching env var, camelCase
 | `public.languageCode` | `NUXT_PUBLIC_LANGUAGE_CODE` | default locale (`en` / `ja`); read when `nuxt.config.ts` loads, so a change needs a rebuild/restart, unlike the other keys |
 | `public.hmacSecret` | `NUXT_PUBLIC_HMAC_SECRET` | `hmac-signature.ts` (also reached by `useSocketIO.ts` and `server-api.ts`) |
 | `public.buildVersion` | `NUXT_PUBLIC_BUILD_VERSION` | `hmac-signature.ts` (`x-version`) |
-| `public.authMock` / `authMockEmail` / `authMockPassword` | `NUXT_PUBLIC_AUTH_MOCK` / `_EMAIL` / `_PASSWORD` | `mock-auth.ts` (dev-only mock auth; ignored in production builds) |
+| `public.sessionHintMaxAgeDays` | `NUXT_PUBLIC_SESSION_HINT_MAX_AGE_DAYS` | `core/session.ts` (session hint cookie lifetime in days, default 7; keep equal to the backend `JWT_REFRESH_EXPIRY`) |
+| `public.authMock` / `authMockEmail` / `authMockPassword` | `NUXT_PUBLIC_AUTH_MOCK` / `_EMAIL` / `_PASSWORD` | `mock-auth.ts` (dev-only mock auth; **not declared in production builds**, so these env vars are ignored and never reach the SSR payload) |
 
 > Because these are runtime overrides, the same built image can be deployed to
 > dev/staging/prod with different `NUXT_PUBLIC_*` values — no rebuild.

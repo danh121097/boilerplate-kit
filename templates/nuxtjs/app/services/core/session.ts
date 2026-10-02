@@ -17,8 +17,8 @@ import type { ApiService } from "@/services/core/types";
  * signed-in user whose access cookie just expired. The hint is set on login /
  * register / refresh and cleared when the session ends. It only drives UX (no
  * hint → a 401 is anonymous: no refresh, no redirect); it carries no secret and
- * is never trusted for authorization. Its lifetime mirrors the 7-day refresh
- * cookie.
+ * is never trusted for authorization. Its lifetime mirrors the refresh cookie
+ * (`sessionHintMaxAgeDays`, default 7).
  *
  * Session end — logout and a refused refresh both end a service's session;
  * listeners (query cache, router) filter on the service and react. The service
@@ -64,7 +64,23 @@ export function beginLogout(service: ApiService = "MAIN"): () => void {
   };
 }
 
-const SESSION_HINT_MAX_AGE = 7 * 24 * 60 * 60;
+const DEFAULT_HINT_MAX_AGE_DAYS = 7;
+const SECONDS_PER_DAY = 24 * 60 * 60;
+
+let hintMaxAgeSeconds = DEFAULT_HINT_MAX_AGE_DAYS * SECONDS_PER_DAY;
+
+/**
+ * Set the hint cookie's lifetime from `runtimeConfig.public.sessionHintMaxAgeDays`
+ * (set once at boot by `01.init-services.ts`, like the app prefix). Keep it equal
+ * to the backend's refresh-token lifetime (`JWT_REFRESH_EXPIRY`). Env overrides
+ * arrive as a number or a numeric string; anything not a positive number falls
+ * back to the 7-day default.
+ */
+export function setSessionHintMaxAgeDays(value: unknown): void {
+  const days = typeof value === "string" && value.trim() !== "" ? Number(value) : value;
+  const valid = typeof days === "number" && Number.isFinite(days) && days > 0;
+  hintMaxAgeSeconds = Math.round((valid ? days : DEFAULT_HINT_MAX_AGE_DAYS) * SECONDS_PER_DAY);
+}
 
 /** `${APP_PREFIX}_SESSION` — matches `useStorageKeys("SESSION")`. */
 const hintCookieName = () => `${getAppPrefix()}_SESSION`;
@@ -89,7 +105,7 @@ export function hasSessionHint(): boolean {
 export function markSessionActive(): void {
   if (typeof document === "undefined") return;
   knownHint = true;
-  document.cookie = `${hintCookieName()}=1; path=/; max-age=${SESSION_HINT_MAX_AGE}; SameSite=Lax`;
+  document.cookie = `${hintCookieName()}=1; path=/; max-age=${hintMaxAgeSeconds}; SameSite=Lax`;
 }
 
 /** Drop the hint. The epoch is not touched — `endSession` owns that. */

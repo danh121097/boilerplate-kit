@@ -56,6 +56,7 @@ Bound to `runtimeConfig.public` (read via `useRuntimeConfig()`); copy `.env.exam
 | `NUXT_PUBLIC_LANGUAGE_CODE` | `en` | Default locale (`en` / `ja`) when no cookie or browser language matches; read at build/start of `nuxt.config.ts` |
 | `NUXT_PUBLIC_HMAC_SECRET` | unset | Required by the bundled backends; must equal the backend `HMAC_SECRET`. Visible to every client (anti-abuse, not authentication) |
 | `NUXT_PUBLIC_BUILD_VERSION` | `1.0.0` | Optional. Sent as `x-version` when signing |
+| `NUXT_PUBLIC_SESSION_HINT_MAX_AGE_DAYS` | `7` | Optional. Session hint cookie lifetime in days; keep equal to the backend `JWT_REFRESH_EXPIRY` |
 | `NUXT_PUBLIC_AUTH_MOCK` | unset | Optional, dev only. `true` answers `/auth/*` and `/users` in the browser |
 | `NUXT_PUBLIC_AUTH_MOCK_EMAIL` | `demo@example.com` | Optional, dev only. Demo account email |
 | `NUXT_PUBLIC_AUTH_MOCK_PASSWORD` | `password` | Optional, dev only. Demo account password |
@@ -145,7 +146,7 @@ Complex primitives (dialog, popover, …) come straight from `reka-ui` — see `
 
 ## Mock auth (before backend integration)
 
-`NUXT_PUBLIC_AUTH_MOCK=true` answers auth and users in the browser and during SSR, so pages can be built before the backend exists. The flag is ignored in production builds. See [Mock auth](./docs/system-architecture/security-auth.md#mock-auth-before-backend-integration).
+`NUXT_PUBLIC_AUTH_MOCK=true` answers auth and users in the browser and during SSR, so pages can be built before the backend exists. Production builds do not declare the mock keys, so the flag and credentials are ignored there. See [Mock auth](./docs/system-architecture/security-auth.md#mock-auth-before-backend-integration).
 
 ## Documentation
 

@@ -13,9 +13,9 @@ reset + client-side redirect to `/login?redirect=<current path>`.
 
 | Token | Where it lives | Set by | Read by JS? | Sent on SSR fetches? |
 | --- | --- | --- | --- | --- |
-| Access (JWT, 15 min) | httpOnly cookie `accessToken` (path `/`) | backend on login / register / refresh | **no** | yes — `serverApiGet` forwards the incoming `cookie` header |
+| Access (JWT, 15 min) | httpOnly cookie `accessToken` (path `/`) | backend on login / register / refresh | **no** | yes — `serverApiGet` forwards only the incoming `accessToken` cookie (not the refresh cookie or any other) |
 | Refresh | httpOnly cookie `refreshToken` (path `<API_PREFIX>/auth`) | backend on login / every rotation | **no** | **no** — the browser only sends it to the auth routes |
-| Session hint | readable cookie `<APP_NAME>_SESSION=1` (path `/`, 7 days) | this app on login / register / refresh success; cleared when the session ends | yes | yes |
+| Session hint | readable cookie `<APP_NAME>_SESSION=1` (path `/`, `sessionHintMaxAgeDays`, default 7) | this app on login / register / refresh success; cleared when the session ends | yes | yes |
 
 The **session hint** (`hasSessionHint`, `markSessionActive`,
 `clearSessionHint` in `services/core/session.ts`) carries no secret — it
@@ -148,8 +148,9 @@ hint: an anonymous visitor's 401 is final — no refresh request. **Credential e
 never refreshed — a 401 from login is a wrong password, and the error reaches the
 form untouched. Exempt paths are the refresh `endpoint` plus `skipPaths`
 (default `[]`; `01.init-services.ts` passes the auth contract's login, register
-and logout paths), matched against the request path without query or hash
-(`path === p || path.endsWith(p)`).
+and logout paths), matched exactly (`path === p`) against the request path without query, hash,
+origin or the baseURL's prefix, so a lookalike such as `/x/auth/login` is an
+ordinary request.
 
 ### Single-Flight + Cross-Tab Lock — `RefreshTokenManager`
 
@@ -342,6 +343,32 @@ logout-in-progress flag live in each tab's memory, so another tab's refresh can
 still land after this tab logs out. Every current browser has Web Locks, which
 close this gap.
 
+## Deploying the frontend and API on different subdomains
+
+Checked in Chromium (Playwright) against the express backend over plain HTTP with the
+development cookie attributes (`HttpOnly`, `SameSite=Lax`, no `Domain`). The fastify and
+nestjs backends set the same attributes; that is read from their source, not run.
+
+- Verified: with the page on `app.localhost` and the API on `api.localhost`, the browser
+  stored none of the `Set-Cookie` headers and `/auth/me` returned 401. Chromium treats
+  `localhost` as a public suffix, so the two hosts are different sites and `Lax` cookies
+  are not stored on a cross-site fetch. The same page on `localhost:5400` calling
+  `localhost:4100` (same site, different port) stored the cookies and sent them back.
+  A probe that sent `SameSite=None; Secure` was stored and sent from `api.localhost`, and a
+  `Domain=.localhost` attribute was rejected.
+- Not tested, from the SameSite rules: `app.example.com` and `api.example.com` share a
+  registrable domain, so they are the same site and `Lax`/`Strict` cookies work with
+  `credentials: include` (axios `withCredentials`). Hosts on different registrable domains
+  need `SameSite=None; Secure`, which the backends do not offer: `sameSite` is fixed to
+  `strict` in production and `lax` otherwise in the backend cookie helper.
+- Cookies are host-only unless the backend sets `COOKIE_DOMAIN` (for example
+  `.example.com`). Without it the browser sends `accessToken` only to the API host, so an
+  SSR server on the app host never sees it and SSR session reads are anonymous. Not tested
+  (no parent domain is available locally); the value goes to `Domain` on both set and clear.
+- In production the cookies are `Secure` and `SameSite=Strict` (HTTPS only; not tested).
+  Strict cookies are withheld on a navigation that arrives from another site, so the first
+  SSR render after following an external link can be anonymous until the browser refreshes.
+
 ## Session Reads: SSR vs Browser
 
 | Read | SSR | Browser |
@@ -443,7 +470,9 @@ cookie) and `mock-auth-responses.ts` (backend-shaped replies), plus
   refused refresh.
 - **Credentials.** One login pair, signed in as an `admin` so the built-in
   users page works. `register` signs up any user, who stays signed in but
-  cannot log in again (no user store) and is a plain `user`.
+  cannot log in again (no user store) and is a plain `user`; registering the
+  demo email is refused with the backend's `409` ("Email already registered!").
+  Refresh-token rotation and reuse detection are not mocked.
 - **Users.** `GET /users` (offset-paginated `?page&limit`, envelope
   `{ success: true, data, meta }`) and `GET /users/:id` answer from a fixed
   fixture: the demo user plus five sample users (`MOCK_SAMPLE_USERS`), newest
@@ -463,9 +492,11 @@ cookie) and `mock-auth-responses.ts` (backend-shaped replies), plus
   `<APP>_MOCK_USER` cookie as the user's identity, with no signature or backend
   check: anyone who can reach it can forge a session. Run with the flag only on
   localhost, never on a shared, staging or tunnelled dev server.
-- **Production guard.** In a production build (`import.meta.env.PROD`) the flag
-  is ignored, even though `runtimeConfig` is read at runtime, with one
-  `console.warn`; the mock adapter, the SSR branches and the users fixture are
+- **Production guard.** A production build (`NODE_ENV=production`) does not declare
+  `authMock` / `authMockEmail` / `authMockPassword` in `runtimeConfig.public`
+  (`config/mock-auth-public-config.ts`), so Nuxt ignores `NUXT_PUBLIC_AUTH_MOCK*`
+  set at runtime and the mock credentials never reach the SSR payload. As a
+  second guard `import.meta.env.PROD` also turns the mock off; the mock adapter, the SSR branches and the users fixture are
   removed from the bundle. The badge component is imported only outside
   production, so its code is not in a production bundle at all.
 - **Limits.** Endpoints beyond auth and users (and other SSR reads through

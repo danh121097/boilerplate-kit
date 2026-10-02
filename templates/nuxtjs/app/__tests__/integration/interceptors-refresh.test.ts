@@ -93,4 +93,28 @@ describe("interceptors — cookie refresh", () => {
     await client.get("/public");
     expect(post).toHaveBeenCalledTimes(1);
   });
+
+  // Credential endpoints match exactly (with or without the baseURL prefix or an
+  // origin, ignoring the query); a lookalike path is an ordinary request.
+  it.each([
+    ["/auth/login", false],
+    ["/auth/login?next=/", false],
+    ["/auth/refresh", false],
+    ["/api/v1/auth/logout", false],
+    ["http://api.test/api/v1/auth/register", false],
+    ["/x/auth/login", true],
+    ["/auth/login/extra", true],
+    ["/users/auth/refresh", true],
+  ])("401 on %s refreshes: %s", async (url, refreshes) => {
+    const post = vi.spyOn(axios, "post").mockResolvedValue(REFRESH_OK);
+    let calls = 0;
+    const client = makeClient(async (config) => {
+      calls += 1;
+      return calls === 1 || !refreshes ? httpError(config) : ok(config, { success: true });
+    });
+    client.defaults.baseURL = "http://api.test/api/v1";
+
+    await client.get(url).catch(() => undefined);
+    expect(post).toHaveBeenCalledTimes(refreshes ? 1 : 0);
+  });
 });

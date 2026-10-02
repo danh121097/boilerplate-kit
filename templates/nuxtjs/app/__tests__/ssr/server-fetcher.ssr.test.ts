@@ -50,18 +50,29 @@ describe("defineQuery on the server", () => {
 });
 
 describe("resource queries on the server", () => {
-  it("useUsersListQuery reads through the server API with the forwarded cookie", async () => {
+  it("useUsersListQuery reads through the server API forwarding only the access cookie", async () => {
     const list = vi.spyOn(UsersModel, "list");
-    stubServer("PRISM_APP_SESSION=1; accessToken=x", async () => USERS);
+    stubServer(
+      "PRISM_APP_SESSION=1; refreshToken=r; analytics=a; accessToken=x; PRISM_APP_LANGUAGE=en",
+      async () => USERS,
+    );
 
     await expect(run(useUsersListQuery.queryOptions())).resolves.toEqual(USERS);
     expect($fetch).toHaveBeenCalledWith(
       expect.stringContaining("/users"),
       expect.objectContaining({
-        headers: expect.objectContaining({ cookie: "PRISM_APP_SESSION=1; accessToken=x" }),
+        headers: expect.objectContaining({ cookie: "accessToken=x" }),
       }),
     );
     expect(list).not.toHaveBeenCalled();
+  });
+
+  it("sends no cookie header when the access cookie is absent", async () => {
+    stubServer("PRISM_APP_SESSION=1; refreshToken=r", async () => USERS);
+
+    await run(useUsersListQuery.queryOptions());
+    const init = vi.mocked($fetch).mock.calls[0]?.[1] as { headers: Record<string, string> };
+    expect(init.headers).not.toHaveProperty("cookie");
   });
 
   it("useMeQuery resolves the user via readServerSession, not the browser Model", async () => {
