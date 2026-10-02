@@ -5,7 +5,6 @@ import {
   bumpSessionEpoch,
   clearAuthTokens,
   defineMutation,
-  defineQuery,
   endSession,
   getAccessToken,
   getRefreshToken,
@@ -195,12 +194,6 @@ export class AuthModel extends Model {
     return result;
   }
 }
-
-// Queries
-export const useMeQuery = defineQuery<AuthUser | null>({
-  key: queryKeys.auth.me,
-  fetcher: () => AuthModel.getSession(),
-});
 
 // Mutations
 

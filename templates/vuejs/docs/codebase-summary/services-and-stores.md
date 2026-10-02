@@ -42,6 +42,7 @@ startup via `initServices()`.
 | `auth-token-storage.ts` | Per-service access + refresh token slots in `localStorage` (`get/persist/clear{Access,Refresh}Token`, `clearServiceTokens`, `clearAuthTokens`, `registerServiceToken`) + `onTokensChanged` for reactive mirrors. Fails closed: an unregistered service reads `null`, writes throw, clears never touch the MAIN slots |
 | `headers-utils.ts` | `HeadersUtils`: attach HMAC signature headers + Bearer authorization header |
 | `hmac-signature.ts` | `HMACSignatureGenerator` (`signRequest`, `generateSignature`) + `resolveContentType`: HMAC-SHA256 sign per request; skipped when `VITE_HMAC_SECRET` is empty (the bundled backends then 401, and a dev build warns once unless mock auth is on) |
+| `runtime-env.ts` | `isDevBuild()`: the bundler dev flag, read in one place so `hmac-signature.ts` and `interceptors.ts` are identical to the reactjs copies |
 | `tanstack.ts` | `defineQuery()` factory typed against `ApiResponseError` |
 | `tanstack-mutation.ts` | `defineMutation()` (`invalidates`, opt-in `optimistic`, `.mutationOptions()`) |
 | `tanstack-optimistic.ts` | Optimistic snapshot / rollback helpers |
@@ -74,8 +75,7 @@ const SERVICES: ServiceDefinition[] = [
   refresh lock (`withSessionLock` — never overlaps a refresh), sends the latest
   `{ refreshToken }` so the backend revokes it, then clears all tokens and
   calls `endSession("logout", service)`. Exposes `useLoginMutation`,
-  `useRegisterMutation`, `useLogoutMutation`, `useMeQuery`
-  (`defineQuery<AuthUser | null>` over `getSession`). Types in
+  `useRegisterMutation`, `useLogoutMutation`. Types in
   `auth/types/auth.ts`; `AuthUser` is an alias of `User`, the backend's public
   user (`_id`, `name`, `email`, `role: Role`, `isActive`, `createdAt`, `updatedAt`).
 - `users/users.ts` — `UsersModel` (`/users`): `list(params?: PaginationParams)`

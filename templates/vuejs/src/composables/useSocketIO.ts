@@ -53,7 +53,6 @@ export function useSocketIO() {
 
   return {
     socket,
-    authenticated: Boolean(ioStore.value.authenticated),
     connectSocket,
     destroySocket,
   };
@@ -66,13 +65,10 @@ export function useIo() {
   const { ioStore } = storeToRefs(storeSocketIO);
 
   if (!ioStore.value.socket) {
-    const { socket, authenticated } = useSocketIO();
-    return { socket, authenticated };
+    const { socket } = useSocketIO();
+    return { socket };
   }
-  return {
-    socket: ioStore.value.socket as Socket,
-    authenticated: ioStore.value.authenticated,
-  };
+  return { socket: ioStore.value.socket as Socket };
 }
 
 /** Subscribe to a socket event with auto cleanup on component unmount. */

@@ -1,9 +1,9 @@
 import { SOCKET_EVENT } from "@/enums";
 import { getApiOrigin } from "@/services/core/api-config";
-import { isRefreshRefused, SessionEndedError } from "@/services/core/api-errors";
+import { isHmacError, isRefreshRefused, SessionEndedError } from "@/services/core/api-errors";
 import { getAccessToken } from "@/services/core/auth-token-storage";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
-import { refreshSession } from "@/services/core/interceptors";
+import { refreshSession, warnHmacRejected } from "@/services/core/interceptors";
 import { hasStoredSession } from "@/services/core/session";
 import { io, type Socket } from "socket.io-client";
 
@@ -15,7 +15,7 @@ export const RECONNECT_MAX_MS = 30_000;
 export const MAX_REFRESH_ATTEMPTS = 3;
 /** Disconnect reason when the server closed the socket; socket.io does not reconnect on its own. */
 const SERVER_DISCONNECT = "io server disconnect";
-/** `connect_error` message the backend sends when it rejects a handshake (HMAC or token). */
+/** `connect_error` message the backend sends when it rejects a handshake; an HMAC rejection also carries `data.errorType`. */
 const HANDSHAKE_REJECTED = "Unauthorized!";
 
 /**
@@ -77,9 +77,11 @@ export interface SocketLifecycle {
  * - `authenticated` event: `onAuthenticated(true)`, backoff and refresh budget reset.
  * - `disconnect` / `connect_error`: `onAuthenticated(false)`.
  * - `connect_error` while socket.io is still auto-reconnecting (`socket.active`):
- *   nothing extra. Otherwise the server rejected the handshake: `"Unauthorized!"`
- *   refreshes the session once and reconnects once; a refused refresh ends the
- *   session and stops; a transient failure, any other rejection, or an exhausted
+ *   nothing extra. Otherwise the server rejected the handshake: a signature
+ *   rejection (`data.errorType` `HMAC_ERROR`: bad signature or clock, not the
+ *   session) never refreshes and takes the backoff below; any other
+ *   `"Unauthorized!"` refreshes the session once and reconnects once; a refused
+ *   refresh ends the session and stops; a transient failure, any other rejection, or an exhausted
  *   refresh budget (`MAX_REFRESH_ATTEMPTS` since the last `authenticated`) falls
  *   back to one retry timer with exponential backoff (`RECONNECT_BASE_MS` doubling
  *   up to `RECONNECT_MAX_MS`) that reconnects without refreshing.
@@ -133,7 +135,10 @@ export function attachSocketLifecycle(
   const handleConnectError = (error: Error) => {
     onAuthenticated(false);
     if (socket.active) return;
-    if (error.message === HANDSHAKE_REJECTED && refreshAttempts < MAX_REFRESH_ATTEMPTS) {
+    if (isHmacError((error as { data?: unknown }).data)) {
+      warnHmacRejected();
+      scheduleRetry();
+    } else if (error.message === HANDSHAKE_REJECTED && refreshAttempts < MAX_REFRESH_ATTEMPTS) {
       void recover();
     } else {
       scheduleRetry();

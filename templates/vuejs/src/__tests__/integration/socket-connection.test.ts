@@ -12,6 +12,7 @@ import {
   createSocket,
   MAX_REFRESH_ATTEMPTS,
   RECONNECT_BASE_MS,
+  RECONNECT_MAX_MS,
 } from "@/services/core/socket-connection";
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import axios from "axios";
@@ -50,6 +51,9 @@ const NEW_TOKEN = {
   data: { success: true, data: { tokens: { accessToken: "NEW", refreshToken: "NEW_R" } } },
 } as never;
 const rejected = new Error("Unauthorized!");
+const hmacRejected = Object.assign(new Error("Unauthorized!"), {
+  data: { errorType: "HMAC_ERROR" },
+});
 
 function refreshFailure(status?: number) {
   return Object.assign(new Error("refresh failed"), {
@@ -267,6 +271,54 @@ describe("socket connection", () => {
       await flush();
 
       expect(post).toHaveBeenCalledTimes(MAX_REFRESH_ATTEMPTS + 1);
+    });
+
+    it("a signature rejection spends no refresh and backs off with a doubling delay", async () => {
+      const post = vi.spyOn(axios, "post");
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      const { socket, emit } = setup();
+
+      for (let outage = 0; outage < MAX_REFRESH_ATTEMPTS + 2; outage += 1) {
+        emit(SOCKET_EVENT.CONNECT_ERROR, hmacRejected);
+        await flush();
+        expect(socket.connect).toHaveBeenCalledTimes(outage);
+        await vi.advanceTimersByTimeAsync(
+          Math.min(RECONNECT_BASE_MS * 2 ** outage, RECONNECT_MAX_MS) - 1,
+        );
+        expect(socket.connect).toHaveBeenCalledTimes(outage);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(socket.connect).toHaveBeenCalledTimes(outage + 1);
+      }
+
+      expect(post).not.toHaveBeenCalled();
+      expect(getAccessToken()).toBe("OLD");
+      expect(warn).toHaveBeenCalled();
+    });
+
+    it("a signature rejection leaves the refresh budget for token rejections", async () => {
+      const post = vi.spyOn(axios, "post").mockResolvedValue(NEW_TOKEN);
+      vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      const { emit } = setup();
+
+      for (let i = 0; i < MAX_REFRESH_ATTEMPTS; i += 1)
+        emit(SOCKET_EVENT.CONNECT_ERROR, hmacRejected);
+      emit(SOCKET_EVENT.CONNECT_ERROR, rejected);
+      await flush();
+
+      expect(post).toHaveBeenCalledTimes(1);
+    });
+
+    it("an Unauthorized! with unrelated data still refreshes", async () => {
+      const post = vi.spyOn(axios, "post").mockResolvedValue(NEW_TOKEN);
+      const { emit } = setup();
+
+      emit(
+        SOCKET_EVENT.CONNECT_ERROR,
+        Object.assign(new Error("Unauthorized!"), { data: { errorType: "AUTHENTICATION_ERROR" } }),
+      );
+      await flush();
+
+      expect(post).toHaveBeenCalledTimes(1);
     });
 
     it("a rejection other than Unauthorized! only backs off", async () => {

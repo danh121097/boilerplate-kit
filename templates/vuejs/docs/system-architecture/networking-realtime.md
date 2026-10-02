@@ -141,13 +141,16 @@ const socket = io(getApiOrigin(), {
   - On `connect_error` while `socket.active` is true, socket.io is already
     reconnecting (network error, server down): nothing extra is done.
   - When `socket.active` is false the server rejected the handshake. For
-    `"Unauthorized!"` (missing, expired or revoked token, or a bad HMAC) the
-    session is refreshed once through the shared single-flight refresh
+    `"Unauthorized!"` carrying `data.errorType` `HMAC_ERROR` (bad signature or
+    clock, not the session) nothing is refreshed and no refresh is counted: it
+    takes the timed retry below and logs the same dev-only hint as an HTTP
+    `HMAC_ERROR`. For any other `"Unauthorized!"` (missing, expired or revoked
+    token) the session is refreshed once through the shared single-flight refresh
     (`refreshSession`) and the socket reconnects once with the new token. A
     refused refresh ends the session and stops; a transient refresh failure falls
     back to the timed retry below.
   - At most 3 refreshes are made per outage; the count resets on `authenticated`.
-    Once spent, or for any other rejection, a single retry timer reconnects
+    Once spent, or for any other rejection (and every HMAC rejection), a single retry timer reconnects
     **without refreshing** after `Math.min(RECONNECT_BASE_MS * 2 ** attempt,
     RECONNECT_MAX_MS)`, then `attempt` increments: 2 s, 4 s, 8 s, 16 s, 30 s,
     30 s, … Each retry rebuilds `auth` (current token, fresh `ctime`). Errors

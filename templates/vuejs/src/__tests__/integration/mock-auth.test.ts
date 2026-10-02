@@ -112,6 +112,33 @@ describe("mock auth", () => {
     await expect(app.AuthModel.getMe()).resolves.toEqual(user);
   });
 
+  it("refuses a duplicate or invalid registration like the backend", async () => {
+    const app = await boot();
+    const body = { email: "dup@example.com", password: "password", name: "Dup" };
+
+    await app.AuthModel.register(body);
+    await expect(app.AuthModel.register(body)).rejects.toMatchObject({ error_code: 409 });
+    await expect(app.AuthModel.register({ ...DEMO, name: "Demo" })).rejects.toMatchObject({
+      error_code: 409,
+    });
+    await expect(app.AuthModel.register({ ...body, name: " " })).rejects.toMatchObject({
+      error_code: 400,
+    });
+  });
+
+  it("refuses a refresh token that was already rotated", async () => {
+    const app = await boot();
+
+    const { tokens } = await app.AuthModel.login(DEMO);
+    app.persistAccessToken("expired", "MAIN");
+    await app.AuthModel.getMe(); // rotates the refresh token
+
+    app.persistAccessToken("expired", "MAIN");
+    app.persistRefreshToken(tokens.refreshToken ?? "", "MAIN"); // replay the spent one
+    await expect(app.AuthModel.getSession()).resolves.toBeNull();
+    expect(app.hasStoredSession("MAIN")).toBe(false);
+  });
+
   it("clears the session on logout", async () => {
     const app = await boot();
     await app.AuthModel.login(DEMO);

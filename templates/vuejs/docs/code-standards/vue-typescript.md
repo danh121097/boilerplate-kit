@@ -91,7 +91,7 @@ const inputEl = useTemplateRef<HTMLInputElement>("inputEl");
 
 ```ts
 const { errorMessage, value } = useField<string | number>(() => props.name);
-export const useMeQuery = defineQuery<AuthUser>({ key: "auth.me", fetcher: () => AuthModel.getMe() });
+export const useUsersListQuery = defineQuery<PaginatedResponse<User>>({ key: "users.list", fetcher: () => UsersModel.list() });
 ```
 
 Validate via `pnpm typecheck` (`vue-tsc --noEmit`) — it runs in `pnpm build` too.

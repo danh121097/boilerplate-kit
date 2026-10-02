@@ -1,5 +1,5 @@
 import { installLocalStorage } from "@/__tests__/helpers/fake-storage";
-import { bearerOf, httpError, makeClient, ok } from "@/__tests__/helpers/http-mocks";
+import { MAIN_REFRESH, bearerOf, httpError, makeClient, ok } from "@/__tests__/helpers/http-mocks";
 import { STORAGE_KEYS } from "@/enums";
 import { Api } from "@/services/core";
 import { getAccessToken, getRefreshToken } from "@/services/core/auth-token-storage";
@@ -105,5 +105,23 @@ describe("interceptors — token refresh", () => {
     await expect(client.get("/public")).rejects.toBeTruthy();
     expect(post).not.toHaveBeenCalled();
     expect(calls).toBe(1);
+  });
+
+  it.each([
+    ["/auth/login", false],
+    ["/auth/register", false],
+    ["/auth/logout", false],
+    ["/auth/refresh", false],
+    ["/auth/login?next=/home", false],
+    ["/x/auth/login", true],
+    ["/auth/login/extra", true],
+    ["/v2/auth/refresh", true],
+  ])("401 on %s triggers a refresh: %s", async (url, refreshes) => {
+    localStorage.setItem(TOKEN_KEY, "OLD");
+    const post = vi.spyOn(axios, "post").mockResolvedValue(NEW_TOKEN);
+    const client = makeClient(async (config) => httpError(config), { MAIN: MAIN_REFRESH });
+
+    await expect(client.get(url)).rejects.toBeTruthy();
+    expect(post).toHaveBeenCalledTimes(refreshes ? 1 : 0);
   });
 });

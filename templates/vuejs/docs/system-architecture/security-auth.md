@@ -308,7 +308,7 @@ Implementation: `router/auth-guard.ts` (`authGuard`, a global `beforeEach`) read
 
 `AuthModel.revokeSession(sinceEpoch?): Promise<boolean>` handles a session the
 server rejects outside a refused refresh — a 401 or 404 on the session read
-(`hydrate`, or `getSession` behind `useMeQuery`; a 401 only after it survived a
+(`hydrate` or `getSession`; a 401 only after it survived a
 successful refresh). It
 shares `logout`'s internals (the private `endServerSession(reason,
 sinceEpoch?)`: token capture, lock, epoch bump, `POST /auth/logout`, clear) but
@@ -420,11 +420,15 @@ and `mock-auth-responses.ts` (backend-shaped replies), plus
 - **Session.** Persisted exactly like the real mode: opaque
   `mock-access|…` / `mock-refresh|…` tokens go to the same localStorage slots,
   so a reload keeps the session, an invalid access token refreshes through the
-  mock, cross-tab sync and logout work. The token carries the user, so `me` and
-  `refresh` need no server state.
+  mock, cross-tab sync and logout work. The token carries the user, so `me` needs no server state. `refresh` rotates: each
+  refresh token works once, and a replayed one is a `401` (the spent set lives in
+  memory, so a reload forgets it).
 - **Credentials.** One login pair, signed in as an `admin` so the built-in
-  users screen works. `register` signs up any user, who stays signed in but
-  cannot log in again (no user store) and is a plain `user`.
+  users screen works. `register` signs up a user, who stays signed in but
+  cannot log in again (no user store) and is a plain `user`. A body without a valid
+  email, password and name is `400` (`VALIDATION_ERROR`); the demo email or an email
+  already registered since load is `409` (`CONFLICT`). Password strength is not
+  enforced.
 - **Users.** `GET /users` (offset-paginated `?page&limit`, envelope
   `{ success: true, data, meta }`) and `GET /users/:id` answer from a fixed
   fixture: the demo user plus five sample users (`MOCK_SAMPLE_USERS`), newest

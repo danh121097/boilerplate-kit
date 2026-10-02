@@ -1,4 +1,5 @@
 import { isMockAuthEnabled } from "@/services/auth/data/mock-auth-config";
+import { isDevBuild } from "@/services/core/runtime-env";
 import type { HMACSignatureData } from "@/services/core/types";
 import type { InternalAxiosRequestConfig } from "axios";
 import Base64 from "crypto-js/enc-base64";
@@ -11,31 +12,30 @@ export interface SignRequestInput {
   ctime?: number;
 }
 
-/** The Content-Type pinned on the request (instance default or per-request),
- * looked up case-insensitively; undefined when none is pinned. */
-function headerContentType(headers: unknown): string | undefined {
-  if (!headers || typeof headers !== "object") return undefined;
-  const h = headers as { get?: (name: string) => unknown } & Record<string, unknown>;
-  const value =
-    typeof h.get === "function"
-      ? h.get("Content-Type")
-      : Object.entries(h).find(([key]) => key.toLowerCase() === "content-type")?.[1];
-  return typeof value === "string" && value ? value : undefined;
+type HeaderBag = Record<string, unknown> & { get?: (name: string) => unknown };
+
+/** The Content-Type pinned on the request (instance default or per request):
+ * `AxiosHeaders.get` when available, else a case-insensitive key scan. */
+function headerContentType(config: InternalAxiosRequestConfig): string | undefined {
+  const headers = config.headers as unknown as HeaderBag | undefined;
+  if (!headers) return undefined;
+  const raw =
+    typeof headers.get === "function"
+      ? headers.get("Content-Type")
+      : Object.entries(headers).find(([key]) => key.toLowerCase() === "content-type")?.[1];
+  return typeof raw === "string" && raw ? raw : undefined;
 }
 
 /**
- * The Content-Type the request will actually send — the backend verifies the
- * raw header. axios drops Content-Type only when there is no body, so those
- * sign ""; a request with a body (even `null`) sends its pinned type exactly as
- * set, else axios's default for the body: `URLSearchParams` →
- * `application/x-www-form-urlencoded;charset=utf-8`, a string →
- * `application/x-www-form-urlencoded`, anything else → `application/json`.
- * Never pin a charset: browsers may rewrite it on the wire (Chrome sends
- * `charset=UTF-8`), breaking the comparison.
+ * The Content-Type axios will send, which is what the backend verifies: ""
+ * when there is no body (axios drops the header only for `data === undefined`),
+ * else the pinned value exactly as set, else axios's own default for the body —
+ * form-urlencoded (with charset) for `URLSearchParams`, form-urlencoded for a
+ * string, JSON otherwise (`null` included: axios sends it as a JSON body).
  */
 export function resolveContentType(config: InternalAxiosRequestConfig): string {
   if (config.data === undefined) return "";
-  const pinned = headerContentType(config.headers);
+  const pinned = headerContentType(config);
   if (pinned) return pinned;
   if (typeof URLSearchParams !== "undefined" && config.data instanceof URLSearchParams) {
     return "application/x-www-form-urlencoded;charset=utf-8";
@@ -46,21 +46,22 @@ export function resolveContentType(config: InternalAxiosRequestConfig): string {
 
 let warnedEmptySecret = false;
 
-/** Dev builds only: the backend rejects every unsigned request, so say so once
- * when no secret is set (and the mock, which needs no backend, is off). */
+/** Dev-only, once: an empty secret against a real backend means every request is rejected. */
 function warnEmptySecret(): void {
-  if (warnedEmptySecret || !import.meta.env.DEV || isMockAuthEnabled()) return;
+  if (warnedEmptySecret || !isDevBuild() || isMockAuthEnabled()) return;
   warnedEmptySecret = true;
   console.warn("VITE_HMAC_SECRET is empty; the backend requires it, all requests will 401.");
 }
 
 /**
- * HMAC signature generator for API request authentication.
- * Computes a signature header set; only active when VITE_HMAC_SECRET is set.
+ * HMAC signature generator for API request authentication. Only active when
+ * `VITE_HMAC_SECRET` is set. `signRequest` is the pure core (the bare refresh
+ * client uses it directly); `generateSignature` adapts an axios request config.
  */
 export class HMACSignatureGenerator {
-  /** The path the server verifies: leading "/", no `?query` / `#hash` (the
-   * backends sign `req.url` / `originalUrl` with the query stripped). */
+  /** The path the backend verifies: leading "/", no query string or hash (it
+   * signs `req.url` with the query stripped, so an inline `?x=1` must not be
+   * signed either). */
   private static normalizeUrl(url: string): string {
     const path = url.split(/[?#]/)[0] ?? "";
     return path.startsWith("/") ? path : `/${path}`;
@@ -70,8 +71,7 @@ export class HMACSignatureGenerator {
     return Base64.stringify(HmacSHA256(stringToSign, secret));
   }
 
-  /** Pure signer — used by the axios interceptor and the bare refresh client.
-   * Returns null when no secret is configured. */
+  /** Pure signer. Returns null when no secret is configured. */
   static signRequest({
     method,
     path,
@@ -96,8 +96,8 @@ export class HMACSignatureGenerator {
     return { sig: this.sign(stringToSign, secret), ctime, "x-version": xVersion };
   }
 
-  /** Adapter for the axios interceptor — signs `config.url` (the path after
-   * baseURL) with the Content-Type the request will send. */
+  /** Adapter for the request interceptor: signs `config.url` (the path after
+   * the baseURL) with the Content-Type the request will actually send. */
   static generateSignature(config: InternalAxiosRequestConfig): HMACSignatureData | null {
     return this.signRequest({
       method: config.method || "",
