@@ -5,6 +5,7 @@ import {
   bodyOf,
   pathOf,
   reply,
+  failure,
   succeed,
   unauthorized,
 } from "@/services/auth/data/mock-auth-responses";
@@ -12,6 +13,7 @@ import {
   ACCESS_PREFIX,
   issueTokens,
   REFRESH_PREFIX,
+  spendRefreshToken,
   userFromToken,
 } from "@/services/auth/data/mock-auth-session";
 import { answerMockUsers, mockDemoUser } from "@/services/users/data/mock-users";
@@ -56,6 +58,9 @@ export {
 } from "@/services/auth/data/mock-auth-config";
 export type { MockAuthConfig } from "@/services/auth/data/mock-auth-config";
 
+/** Emails signed up through the mock since load (the backend answers 409 for a duplicate). */
+const registered = new Set<string>();
+
 /** Who sent the request: the user in its access token, or the backend's 401 message for a missing/invalid one. */
 function callerOf(config: InternalAxiosRequestConfig): MockCaller {
   const token = bearerOf(config);
@@ -89,11 +94,19 @@ function answer(
     const email = String(body.email ?? "")
       .trim()
       .toLowerCase();
+    const name = String(body.name ?? "").trim();
+    if (!email.includes("@") || !body.password || !name) {
+      return reply(config, 400, failure(400, "VALIDATION_ERROR", "Invalid request body!"));
+    }
+    if (email === mock.email.toLowerCase() || registered.has(email)) {
+      return reply(config, 409, failure(409, "CONFLICT", "Email already registered!"));
+    }
+    registered.add(email);
     const now = new Date().toISOString();
     const user: AuthUser = {
       _id: `mock-${email}`,
       email,
-      name: String(body.name ?? ""),
+      name,
       role: "user",
       isActive: true,
       createdAt: now,
@@ -116,7 +129,10 @@ function answer(
       );
     }
     const user = userFromToken(token, REFRESH_PREFIX);
-    if (!user) return reply(config, 401, unauthorized("Invalid refresh token!"));
+    // Rotation: each refresh token works once; a replayed one is refused.
+    if (!user || !spendRefreshToken(String(token))) {
+      return reply(config, 401, unauthorized("Invalid refresh token!"));
+    }
     return reply(
       config,
       200,
@@ -131,7 +147,7 @@ function answer(
   if (method === "get" && path.endsWith(paths.me)) {
     const caller = callerOf(config);
     if (typeof caller === "string") return reply(config, 401, unauthorized(caller));
-    return reply(config, 200, succeed("", { user: caller }));
+    return reply(config, 200, { success: true, data: { user: caller } });
   }
 
   return answerMockUsers(mock, config, () => callerOf(config));

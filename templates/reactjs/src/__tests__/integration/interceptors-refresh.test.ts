@@ -13,6 +13,10 @@ import axios from "axios";
  */
 
 const TOKEN_KEY = STORAGE_KEYS.ACCESS_TOKEN;
+const EXEMPT_REFRESH = {
+  endpoint: "/auth/refresh",
+  skipPaths: ["/auth/login", "/auth/register", "/auth/logout"],
+};
 const NEW_TOKEN = {
   data: { success: true, data: { tokens: { accessToken: "NEW", refreshToken: "NEW_R" } } },
 } as never;
@@ -113,5 +117,23 @@ describe("interceptors — token refresh", () => {
     await expect(client.get("/public")).rejects.toBeTruthy();
     expect(post).not.toHaveBeenCalled();
     expect(calls).toBe(1);
+  });
+
+  it.each([
+    ["/auth/login", false],
+    ["/auth/register", false],
+    ["/auth/logout", false],
+    ["/auth/refresh", false],
+    ["/auth/login?next=/home", false],
+    ["/x/auth/login", true],
+    ["/auth/login/extra", true],
+    ["/v2/auth/refresh", true],
+  ])("401 on %s triggers a refresh: %s", async (url, refreshes) => {
+    localStorage.setItem(TOKEN_KEY, "OLD");
+    const post = vi.spyOn(axios, "post").mockResolvedValue(NEW_TOKEN);
+    const client = makeClient(async (config) => httpError(config), { MAIN: EXEMPT_REFRESH });
+
+    await expect(client.get(url)).rejects.toBeTruthy();
+    expect(post).toHaveBeenCalledTimes(refreshes ? 1 : 0);
   });
 });

@@ -22,6 +22,11 @@ Route component
 - Each `Api` instance lazily applies interceptors on first request.
 - Per-instance `service` tag propagates through `config.serviceType` so the
   response interceptor knows which refresh endpoint to call.
+- Response interceptor: `onSuccess` unwraps a recognized envelope (a boolean
+  `success`); non-envelope bodies pass through as the raw `AxiosResponse`, the
+  same as the other starters. Blob responses return the blob. Refresh-exempt
+  paths (refresh and the credential endpoints) are matched exactly against the
+  request path, not by suffix.
 
 ## TanStack React Query integration
 
@@ -81,11 +86,14 @@ failure. `Api.paginate` / `Api.cursorPaginate` and the `OffsetMeta`, `CursorMeta
 - **Reconnect** (`attachSocketLifecycle`). On `connect_error`, if `socket.active` is true
   socket.io is already auto-reconnecting (network error, server down) and nothing extra is
   scheduled. If it is false the server rejected the handshake:
-  - `"Unauthorized!"` with refresh budget left: refresh the session once
+  - `"Unauthorized!"` with `data.errorType` `HMAC_ERROR` (bad signature or clock, not the
+    session): no refresh and no budget spent. It takes the timed retry below with a fresh
+    `ctime`, and logs the same dev-only hint as an HTTP `HMAC_ERROR`.
+  - `"Unauthorized!"` without that data (a token rejection) with refresh budget left: refresh the session once
     (`refreshSession`), then reconnect with the new token and a fresh `ctime`. The budget
     is `MAX_REFRESH_ATTEMPTS = 3` per outage and resets when `authenticated` arrives. A
     refused refresh ends the session and stops.
-  - Any other rejection, a transient refresh failure, or an exhausted budget: one retry
+  - Any other rejection, an HMAC rejection, a transient refresh failure, or an exhausted budget: one retry
     timer (errors while one is pending do not reschedule) after
     `min(RECONNECT_BASE_MS * 2 ** attempt, RECONNECT_MAX_MS)`, with `RECONNECT_BASE_MS = 2000`
     and `RECONNECT_MAX_MS = 30_000` (2s, 4s, 8s, 16s, 30s, 30s, ...), reconnecting without

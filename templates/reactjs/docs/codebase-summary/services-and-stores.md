@@ -20,6 +20,7 @@ src/services/
 │   ├── query-client.ts     # resetQueriesToSignedOut / resetQueriesOnSessionEnd / resyncQueriesAfterLogin
 │   ├── headers-utils.ts    # HeadersUtils.setAuthHeaders / addAuthorizationHeader
 │   ├── hmac-signature.ts   # HMACSignatureGenerator.signRequest / generateSignature, resolveContentType
+│   ├── runtime-env.ts      # isDevBuild() — bundler env flag shared by the transport files
 │   ├── model.ts            # Model base class — subclass + Model.setup()
 │   ├── tanstack.ts         # defineQuery (React Query)
 │   ├── tanstack-mutation.ts   # defineMutation (+ opt-in optimistic updates)

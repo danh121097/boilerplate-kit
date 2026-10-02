@@ -9,6 +9,7 @@ import { createTokenRefresher } from "@/services/core/auth-refresh-client";
 import { getAccessToken } from "@/services/core/auth-token-storage";
 import { HeadersUtils } from "@/services/core/headers-utils";
 import { RefreshTokenManager } from "@/services/core/refresh-token-manager";
+import { isDevBuild } from "@/services/core/runtime-env";
 import { endSession, hasStoredSession } from "@/services/core/session";
 import type {
   ApiResponseError,
@@ -54,8 +55,8 @@ function isEnvelope(body: unknown): boolean {
 }
 
 /** Dev-only hint: an HMAC rejection is a signature / clock problem, not a session one. */
-function warnHmacRejected(): void {
-  if (import.meta.env.DEV) {
+export function warnHmacRejected(): void {
+  if (isDevBuild()) {
     console.warn(
       "[api] Request signature rejected (HMAC_ERROR): check the device clock and that VITE_HMAC_SECRET matches the backend.",
     );
@@ -65,7 +66,7 @@ function warnHmacRejected(): void {
 /** The normalized, retryable error for an HMAC rejection of the refresh call itself (session kept). */
 function hmacRejected(error: unknown): ApiResponseError {
   warnHmacRejected();
-  return { ...toApiError(error), retryable: true };
+  return { ...toApiError(error), errorType: "HMAC_ERROR", retryable: true };
 }
 
 function pathOf(config: InternalAxiosRequestConfig): string {
@@ -73,10 +74,12 @@ function pathOf(config: InternalAxiosRequestConfig): string {
 }
 
 /** Whether the request targets the refresh endpoint or a credential endpoint
- * (login/register/logout) — their 401 is final, never a reason to refresh. */
+ * (login/register/logout) — their 401 is final, never a reason to refresh.
+ * Exact match on the request path (the base URL carries any prefix), so a
+ * lookalike such as `/x/auth/login` is not exempt. */
 function isRefreshExempt(config: InternalAxiosRequestConfig, options: RefreshOptions): boolean {
   const path = pathOf(config);
-  return [options.endpoint, ...options.skipPaths].some((p) => path === p || path.endsWith(p));
+  return [options.endpoint, ...options.skipPaths].some((p) => path === p);
 }
 
 /**
@@ -96,10 +99,11 @@ interface ResponseInterceptorOpts {
   resolveRefresh: (service: ApiService) => RefreshContext | null;
 }
 
-function createResponseInterceptor(opts: ResponseInterceptorOpts) {
-  const serviceOf = (config?: InternalAxiosRequestConfig): ApiService =>
-    (config?.serviceType ?? "MAIN") as ApiService;
+function serviceOf(config?: InternalAxiosRequestConfig): ApiService {
+  return (config?.serviceType ?? "MAIN") as ApiService;
+}
 
+function createResponseInterceptor(opts: ResponseInterceptorOpts) {
   const { strictBlobError, instance, resolveRefresh } = opts;
 
   /** Replay the original request after refreshing the right service; null when

@@ -1,4 +1,5 @@
 import { isMockAuthEnabled } from "@/services/auth/data/mock-auth-config";
+import { isDevBuild } from "@/services/core/runtime-env";
 import type { HMACSignatureData } from "@/services/core/types";
 import type { InternalAxiosRequestConfig } from "axios";
 import Base64 from "crypto-js/enc-base64";
@@ -36,7 +37,7 @@ export function resolveContentType(config: InternalAxiosRequestConfig): string {
   if (config.data === undefined) return "";
   const pinned = headerContentType(config);
   if (pinned) return pinned;
-  if (config.data instanceof URLSearchParams) {
+  if (typeof URLSearchParams !== "undefined" && config.data instanceof URLSearchParams) {
     return "application/x-www-form-urlencoded;charset=utf-8";
   }
   if (typeof config.data === "string") return "application/x-www-form-urlencoded";
@@ -47,7 +48,7 @@ let warnedEmptySecret = false;
 
 /** Dev-only, once: an empty secret against a real backend means every request is rejected. */
 function warnEmptySecret(): void {
-  if (warnedEmptySecret || !import.meta.env.DEV || isMockAuthEnabled()) return;
+  if (warnedEmptySecret || !isDevBuild() || isMockAuthEnabled()) return;
   warnedEmptySecret = true;
   console.warn("VITE_HMAC_SECRET is empty; the backend requires it, all requests will 401.");
 }

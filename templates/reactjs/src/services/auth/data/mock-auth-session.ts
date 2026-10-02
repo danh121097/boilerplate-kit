@@ -36,3 +36,13 @@ export function userFromToken(token: unknown, prefix: string): AuthUser | null {
     return null;
   }
 }
+
+/** Refresh tokens already exchanged: the backend rotates them, so a replay is refused. */
+const spentRefreshTokens = new Set<string>();
+
+/** Spend a refresh token; false when it was already spent (reuse). */
+export function spendRefreshToken(token: string): boolean {
+  if (spentRefreshTokens.has(token)) return false;
+  spentRefreshTokens.add(token);
+  return true;
+}
