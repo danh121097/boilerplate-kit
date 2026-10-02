@@ -1,9 +1,16 @@
+import { config } from "@/config/environment";
 import { serializeUser } from "@/modules/user/serialize-user";
 import { AppError } from "@/types";
+import { AuthTokens } from "@/types/auth";
 import { clearTokenCookies, setTokenCookies } from "@/utils/cookie";
 import type { LoginBody, RefreshBody, RegisterBody } from "@/modules/auth/validation";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import * as AuthService from "@/modules/auth/service";
+
+/** Tokens for the response body: empty when AUTH_TOKENS_IN_BODY=false (cookies still carry them). */
+function bodyTokens(tokens: AuthTokens): Partial<AuthTokens> {
+  return config.authTokensInBody ? tokens : {};
+}
 
 export async function register(
   request: FastifyRequest<{ Body: RegisterBody }>,
@@ -15,7 +22,7 @@ export async function register(
   return reply.status(201).send({
     success: true,
     message: "User registered successfully!",
-    data: { user: serializeUser(user), tokens },
+    data: { user: serializeUser(user), tokens: bodyTokens(tokens) },
   });
 }
 
@@ -29,7 +36,7 @@ export async function login(
   return reply.send({
     success: true,
     message: "Login successful!",
-    data: { user: serializeUser(user), tokens },
+    data: { user: serializeUser(user), tokens: bodyTokens(tokens) },
   });
 }
 
@@ -53,7 +60,7 @@ export async function refresh(
     return reply.send({
       success: true,
       message: "Tokens refreshed successfully!",
-      data: { tokens },
+      data: { tokens: bodyTokens(tokens) },
     });
   } catch (error) {
     if (error instanceof AppError && (error.statusCode === 401 || error.statusCode === 403)) {

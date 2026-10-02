@@ -11,6 +11,31 @@ import Redis from "ioredis";
  */
 let client: Redis | null = null;
 
+/** Minimum gap between log lines for the same connection error (ioredis retries every ~1.4 s). */
+export const CONNECTION_ERROR_LOG_INTERVAL_MS = 60_000;
+/** Cap on remembered keys; the oldest is evicted so a long outage with changing messages stays bounded. */
+export const MAX_LOG_THROTTLE_KEYS = 100;
+const lastLoggedAt = new Map<string, number>();
+
+/**
+ * Log a Redis connection error as one concise line (message only, no stack), at most
+ * once per interval for each distinct label + message, so an outage does not flood the log.
+ */
+export function logRedisConnectionError(label: string, err: Error): void {
+  const key = `${label}:${err.message}`;
+  const now = Date.now();
+  const last = lastLoggedAt.get(key);
+  if (last !== undefined && now - last < CONNECTION_ERROR_LOG_INTERVAL_MS) return;
+  // Re-insert so Map order stays oldest-first, then drop the oldest beyond the cap.
+  lastLoggedAt.delete(key);
+  lastLoggedAt.set(key, now);
+  if (lastLoggedAt.size > MAX_LOG_THROTTLE_KEYS) {
+    const oldest = lastLoggedAt.keys().next().value;
+    if (oldest !== undefined) lastLoggedAt.delete(oldest);
+  }
+  logger.warn(label, { reason: err.message });
+}
+
 /** Connect lazily; no-op when disabled. Never exits the process on failure. */
 export function connectRedis(): void {
   if (!config.redisEnabled) {
@@ -28,7 +53,7 @@ export function connectRedis(): void {
   });
 
   client.on("connect", () => logger.info("Redis connected"));
-  client.on("error", (err) => logger.error("Redis error", { err }));
+  client.on("error", (err) => logRedisConnectionError("Redis error", err));
 }
 
 /** Shared client, or null when Redis is disabled / not connected. */

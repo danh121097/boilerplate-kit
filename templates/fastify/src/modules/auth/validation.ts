@@ -29,7 +29,11 @@ export const publicUserSchema = z.object({
   updatedAt: z.iso.datetime(),
 });
 
-export const tokensSchema = z.object({ accessToken: z.string(), refreshToken: z.string() });
+// Both fields are omitted from the body when AUTH_TOKENS_IN_BODY=false (cookies still carry them).
+export const tokensSchema = z.object({
+  accessToken: z.string().optional(),
+  refreshToken: z.string().optional(),
+});
 export const registerResponseSchema = z.object({
   success: z.literal(true),
   message: z.string(),

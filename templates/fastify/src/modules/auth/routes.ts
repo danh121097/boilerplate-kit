@@ -78,8 +78,6 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       AuthController.logout,
     );
   });
-  // One encapsulated scope per limiter: a scope owns a single rate-limit store, so
-  // its routes share one counter (a per-route `config.rateLimit` would not).
   await fastify.register(async (scope) => {
     await scope.register(rateLimit, loginRateLimitOptions());
     scope.post(

@@ -56,8 +56,9 @@ describe("refresh reuse grace window", () => {
     expect(disconnectUserSockets).not.toHaveBeenCalled();
   });
 
-  it("treats reuse after the window as theft: revokes all tokens and drops sockets", async () => {
+  it("treats reuse after the window as theft: revokes all tokens (every device) and drops sockets", async () => {
     const { userId, tokens } = await signUp();
+    const otherDevice = await login(creds.email, creds.password);
     const rotated = await refresh(tokens.refreshToken);
     await rotatedAgo(tokens.refreshToken, REFRESH_REUSE_GRACE_MS + 1_000);
 
@@ -65,6 +66,9 @@ describe("refresh reuse grace window", () => {
     expect(await activeCount(userId)).toBe(0);
     expect(disconnectUserSockets).toHaveBeenCalledWith(userId);
     await expect(refresh(rotated.refreshToken)).rejects.toBeInstanceOf(AppError);
+    await expect(refresh(otherDevice.tokens.refreshToken)).rejects.toMatchObject({
+      statusCode: 401,
+    });
   });
 
   it("honors the window with fake timers", async () => {
@@ -168,20 +172,6 @@ describe("logout ends the whole session chain", () => {
     await expect(refresh(other.tokens.refreshToken)).resolves.toBeDefined();
   });
 
-  it("replaying a logged-out token is a generic 401 and leaves the other device logged in", async () => {
-    const { userId, tokens: a } = await signUp();
-    const b = await login(creds.email, creds.password);
-    await logout(a.refreshToken);
-    vi.mocked(disconnectUserSockets).mockClear();
-
-    await expect(refresh(a.refreshToken)).rejects.toMatchObject({
-      statusCode: 401,
-      message: "Invalid refresh token!",
-    });
-    await expect(refresh(b.tokens.refreshToken)).resolves.toBeDefined();
-    expect(disconnectUserSockets).not.toHaveBeenCalledWith(userId);
-  });
-
   it("replaying the OLD rotated token after logout is a 401 and the other device survives", async () => {
     const { tokens: a } = await signUp();
     const b = await login(creds.email, creds.password);
@@ -196,17 +186,6 @@ describe("logout ends the whole session chain", () => {
     const { tokens } = await signUp();
     await logout(tokens.refreshToken);
     await expect(logout(tokens.refreshToken)).resolves.toBeUndefined();
-  });
-
-  it("genuine reuse past the grace window still revokes the user's other devices", async () => {
-    const { userId, tokens: a } = await signUp();
-    const b = await login(creds.email, creds.password);
-    await refresh(a.refreshToken);
-    await rotatedAgo(a.refreshToken, REFRESH_REUSE_GRACE_MS + 1_000);
-
-    await expect(refresh(a.refreshToken)).rejects.toMatchObject({ statusCode: 401 });
-    await expect(refresh(b.tokens.refreshToken)).rejects.toMatchObject({ statusCode: 401 });
-    expect(await activeCount(userId)).toBe(0);
   });
 });
 

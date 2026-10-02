@@ -22,7 +22,7 @@ export async function hmacRequestInterceptor(request: SwaggerRequest): Promise<S
   let config = browser.__HMAC_CFG__;
   if (!config) {
     try {
-      const response = await fetch("/docs/hmac-config");
+      const response = await fetch("/docs/hmac-config.js");
       if (!response.ok) return request;
       config = (await response.json()) as HmacConfig;
       browser.__HMAC_CFG__ = config;

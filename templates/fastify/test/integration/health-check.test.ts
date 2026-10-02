@@ -68,7 +68,7 @@ describe("GET /api/v1/health", () => {
     expect(spec.paths[`${API}/users/{id}`].get.security).toEqual([{ bearerAuth: [] }]);
 
     // The signing secret is only exposed in development, never under the test env.
-    expect((await app.inject({ method: "GET", url: "/docs/hmac-config" })).statusCode).toBe(404);
+    expect((await app.inject({ method: "GET", url: "/docs/hmac-config.js" })).statusCode).toBe(404);
     expect((await app.inject({ method: "GET", url: `${API}/health` })).statusCode).toBe(401);
   });
 

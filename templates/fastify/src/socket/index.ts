@@ -1,5 +1,6 @@
 import { config } from "@/config/environment";
-import { getRedis } from "@/config/redis";
+import { getRedis, logRedisConnectionError } from "@/config/redis";
+import { isOriginAllowed, isSameOrigin } from "@/plugins/security";
 import { socketAuth } from "@/socket/auth-middleware";
 import { SOCKET_EVENT } from "@/socket/events";
 import { socketHmac } from "@/socket/hmac-middleware";
@@ -76,6 +77,19 @@ function withSafeSubscriptions(client: Redis): Redis {
 export function initSocket(httpServer: HttpServer): Server {
   io = new Server(httpServer, {
     cors: { origin: config.corsOrigins, credentials: true },
+    // `cors` only sets response headers; it does not stop a cross-site page from opening a
+    // WebSocket with the user's cookies. Apply the HTTP CSRF origin rule to the handshake /
+    // upgrade request (a no-op unless ENABLE_CSRF=true). Cookie-less native clients pass, and
+    // so does an Origin equal to the server's own host (React Native sends the API origin,
+    // and may attach cookies from its jar); a cross-site page cannot forge either header.
+    allowRequest: (req, callback): void => {
+      callback(
+        null,
+        !config.enableCsrf ||
+          isSameOrigin(req.headers) ||
+          isOriginAllowed(req.headers, config.corsOrigins),
+      );
+    },
     // Heartbeat: drop dead connections without flooding the wire (Socket.IO defaults).
     pingInterval: 25000,
     pingTimeout: 20000,
@@ -97,7 +111,9 @@ export function initSocket(httpServer: HttpServer): Server {
       commandTimeout: undefined,
       maxRetriesPerRequest: null,
     });
-    subClient.on("error", (err) => logger.warn("Socket.IO Redis subscriber error", { err }));
+    subClient.on("error", (err) =>
+      logRedisConnectionError("Socket.IO Redis subscriber error", err),
+    );
     io.adapter(createAdapter(withSafePublish(pub), withSafeSubscriptions(subClient)));
   }
 

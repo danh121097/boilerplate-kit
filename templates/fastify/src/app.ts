@@ -75,7 +75,7 @@ export function buildApp(
   // Off in production unless DOCS_ENABLED=true.
   if (config.docsEnabled) {
     if (config.isDevelopment) {
-      app.get("/docs/hmac-config", async (_request, reply) => {
+      app.get("/docs/hmac-config.js", async (_request, reply) => {
         return reply
           .header("cache-control", "no-store")
           .send({ secret: config.hmacSecret, apiPrefix: config.apiPrefix });

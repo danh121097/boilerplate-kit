@@ -17,6 +17,7 @@ server attaches to the exact HTTP server Fastify listens on:
 ```ts
 io = new Server(httpServer, {
   cors: { origin: config.corsOrigins, credentials: true },
+  allowRequest, // ENABLE_CSRF origin rule on handshake + upgrade (isOriginAllowed)
   pingInterval: 25000,
   pingTimeout: 20000,
   maxHttpBufferSize: 1e6, // 1 MB cap on inbound payloads
@@ -39,6 +40,19 @@ io.on("connection", (socket) => {
 
 Notes:
 
+- **Origin check.** `cors` only sets response headers, so `allowRequest` applies the HTTP
+  CSRF rule (`isOriginAllowed` from `plugins/security.ts`) to every handshake and
+  upgrade when `ENABLE_CSRF=true`: no Cookie/Origin/Referer is allowed (native
+  clients), an Origin or Referer outside `corsOrigins` is rejected with 403, and a
+  Cookie without an allowed Origin is rejected. An Origin whose host (including
+  port, case-insensitive) equals the request's `Host` header is also allowed, with or
+  without a Cookie: React Native's WebSocket sends the API's own origin and may attach
+  cookies from its jar, and a cross-site page cannot forge Origin or Host. A malformed
+  Origin, `null`, or the same hostname on another port is not same-origin. It is read per request and does
+  nothing when `ENABLE_CSRF` is off. Behind a reverse proxy the original `Host` header must
+  reach the app unchanged (nginx: `proxy_set_header Host $host;`; `X-Forwarded-Host` is never
+  read): a proxy that rewrites `Host` to the upstream name makes the same-origin rule fail,
+  and React Native sockets get 403 when `ENABLE_CSRF=true`.
 - **Optional, like the rest of the realtime/Redis stack.** Without Redis it runs
   single-instance; with Redis a pub/sub adapter (`@socket.io/redis-adapter`) makes
   emits reach clients on every instance. `sub` is a duplicated connection owned by
@@ -57,7 +71,8 @@ Notes:
 ## Handshake Gates (order matters)
 
 Two middleware run on every handshake — **HMAC first, then JWT** — mirroring the
-HTTP pipeline. Both reject with the message `SOCKET_UNAUTHORIZED` (`'Unauthorized!'`).
+HTTP pipeline. Both reject with the message `SOCKET_UNAUTHORIZED` (`'Unauthorized!'`); only
+the HMAC rejection also carries `error.data = { errorType: "HMAC_ERROR" }` (see below).
 
 ### 1. `socketHmac`
 
@@ -76,9 +91,13 @@ verifyHmac({
 
 So the client signs `['GET', 'application/json', ctime, '/socket', ''].join('\n')`
 — same `verifyHmac` (freshness + timing-safe compare) as HTTP, just a fixed path
-with no volatile query. A failure is the generic `Unauthorized!` connect error
-(not `HMAC_ERROR`). `ctime` must be fresh, so a reconnecting client re-signs each
-handshake. See [hmac-verification.md](./hmac-verification.md).
+with no volatile query. A failure (missing `sig`/`ctime`, invalid signature, invalid
+or expired `ctime`) is a connect error with `message === "Unauthorized!"` and
+`data = { errorType: "HMAC_ERROR" }`, the same `errorType` the HTTP middleware uses
+(`SOCKET_HMAC_ERROR_TYPE` in `socket/events.ts`). Socket.IO passes `data` to the client's
+`connect_error`, so a client can tell a clock-skew or signature problem from a rejected
+token and must not spend a token refresh on it. `ctime` must be fresh, so a reconnecting
+client re-signs each handshake. See [hmac-verification.md](./hmac-verification.md).
 
 ### 2. `socketAuth`
 
@@ -95,7 +114,8 @@ socket.data.user = decoded;
 
 Same `verifyAccessToken` + user-level revocation check as the HTTP `authenticate`
 middleware (revocation is a no-op when Redis is off). On success
-`socket.data.user` is populated for handlers.
+`socket.data.user` is populated for handlers. A token rejection (missing, invalid,
+expired or revoked) is `Unauthorized!` with **no** `data`.
 
 The handshake reads **only** `auth.sig`, `auth.ctime` and `auth.token` (or the
 cookie). It reads no `auth.role`: the role comes from the verified JWT in
@@ -114,7 +134,8 @@ cookie). It reads no `auth.role`: the role comes from the verified JWT in
 
 `authenticated` is the only event the server emits on its own; no `unauthorized` or
 `notification` event exists. A rejected handshake surfaces to the client as a
-`connect_error` with the `Unauthorized!` message.
+`connect_error` with the `Unauthorized!` message; `err.data.errorType === "HMAC_ERROR"`
+marks an HMAC rejection and is absent for a token rejection.
 
 ## Emitting From Services
 

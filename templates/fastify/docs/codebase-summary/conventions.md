@@ -25,7 +25,8 @@ same schemas. Do not duplicate validation in a separate middleware layer.
 
 src/config/environment.ts is the source of validated config. Feature modules
 should import config instead of reading process.env directly. MONGODB_URI,
-HMAC_SECRET, and JWT_REFRESH_SECRET are required. Redis is optional.
+HMAC_SECRET, and JWT_REFRESH_SECRET are required (both secrets at least 32
+characters). Redis is optional.
 
 ## Tokens and optional services
 

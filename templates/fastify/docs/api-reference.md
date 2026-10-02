@@ -27,7 +27,18 @@ outside production and off in production unless `DOCS_ENABLED=true`;
   (or `Referer` origin) in `corsOrigins`, else `403 AUTHORIZATION_ERROR`. A request
   with none of `Cookie`, `Origin`, `Referer` (native apps, server-to-server) is
   exempt: with no ambient credentials there is nothing to forge, and browsers
-  always send `Origin` on cross-site writes.
+  always send `Origin` on cross-site writes. The Socket.IO handshake and websocket
+  upgrade apply the same rule (any method), so a cross-site page cannot open an
+  authenticated socket with the user's cookies. The handshake also accepts an `Origin` whose host equals the
+  request `Host` header (React Native's own-origin WebSocket), cookies or not. Behind a reverse
+  proxy the `Host` header must reach the app unchanged, or that rule rejects React Native
+  sockets when `ENABLE_CSRF=true`.
+- **Socket handshake errors:** the Socket.IO handshake needs `auth.sig` and `auth.ctime`
+  (HMAC over `GET`, `application/json`, `ctime`, `/socket`) and an access token
+  (`auth.token` or the `accessToken` cookie). Every rejection is a client `connect_error`
+  with `message === "Unauthorized!"`. An HMAC rejection (missing, invalid or expired
+  signature or `ctime`) adds `err.data = { errorType: "HMAC_ERROR" }`; a token rejection has
+  no `data`. Treat `HMAC_ERROR` as a clock or signing problem, not a dead session.
 - **Rate limits:** per client IP, 100 requests per minute globally. Register,
   refresh, and logout share one 30-request/15-minute auth bucket; login has a
   separate 30-request/15-minute bucket (login attempts do not use the auth bucket).
@@ -40,9 +51,13 @@ outside production and off in production unless `DOCS_ENABLED=true`;
 - **Access tokens:** send `Authorization: Bearer <token>` or the `accessToken`
   cookie. Protected routes also check Redis revocation state when Redis is on.
 - **Refresh cookies:** `accessToken` and `refreshToken` are httpOnly. Refresh
-  cookies are scoped to `{API_PREFIX}/auth`. The JSON token pair is also returned
-  in the body by design, because token-mode clients need it; cookie-mode web
-  clients therefore expose the refresh token to script on the page (accepted risk).
+  cookies are scoped to `{API_PREFIX}/auth`. By default the JSON token pair is also
+  returned in the body, because token-mode clients need it; cookie-mode web clients
+  then expose the refresh token to script on the page (accepted risk). With
+  `AUTH_TOKENS_IN_BODY=false` register, login and refresh return `tokens: {}`
+  (`accessToken` and `refreshToken` omitted, cookies unchanged); refresh still
+  accepts the token from the body or the cookie. Use it only when every client is
+  cookie-based.
 - **Refresh reuse:** concurrent retries and replays within 10 seconds of a
   rotation receive a new token pair. Reuse of a rotated token after that grace
   period revokes every refresh token of the user (all devices) and their access
@@ -100,7 +115,12 @@ the status is `>= 500`.
 
 A body that is not valid JSON is `400 VALIDATION_ERROR` ("Malformed JSON request
 body!") and an oversize one (over 100 KiB) is `413 VALIDATION_ERROR` ("Request body
-is too large!"). Fastify checks HMAC before parsing the body, so an **unsigned**
+is too large!"). Other body failures answer with fixed messages and never echo the
+parser's text: an unsupported content type, `Content-Encoding` or JSON charset (anything but utf-8) is `415`
+("Unsupported request content type!" / "Unsupported request content encoding!" /
+"Unsupported request charset!"), and
+a corrupt compressed body or a `Content-Length` mismatch is `400` ("Request body
+could not be read!"). Fastify checks HMAC before parsing the body, so an **unsigned**
 request with a bad or oversize body gets `401 HMAC_ERROR`; Express parses the body
 first and answers `400`/`413`. The body is not signed, so the order has no
 security impact.

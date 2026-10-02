@@ -1,6 +1,7 @@
 import { config } from "@/config/environment";
 import { AppError } from "@/types";
 import { logger } from "@/utils/logger";
+import { mapBodyParserError, unsupportedCharsetError } from "@/utils/map-body-parser-error";
 import { mapDatabaseError } from "@/utils/map-database-error";
 import type { FastifyError, FastifyInstance } from "fastify";
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -10,6 +11,16 @@ const GENERIC_SERVER_ERROR = "Internal Server Error!";
 export function installErrorHandlers(
   app: FastifyInstance<import("fastify").RawServerDefault, IncomingMessage, ServerResponse>,
 ): void {
+  // preParsing runs for every request, so skip the ones that carry no body (no Content-Length
+  // and no Transfer-Encoding, as body-parser's hasBody): a bodyless GET with a stray
+  // Content-Type is not a charset problem.
+  app.addHook("preParsing", async (request) => {
+    const { "content-length": length, "transfer-encoding": encoding } = request.headers;
+    if (encoding === undefined && (length === undefined || Number.isNaN(Number(length)))) return;
+    const error = unsupportedCharsetError(request.headers["content-type"]);
+    if (error) throw error;
+  });
+
   app.setErrorHandler((err: FastifyError, _request, reply) => {
     let error = err instanceof AppError ? err : mapDatabaseError(err);
     if (!error && err.code === "FST_ERR_VALIDATION") {
@@ -20,20 +31,7 @@ export function installErrorHandlers(
         errorType: "VALIDATION_ERROR",
       });
     }
-    if (!error && err.code === "FST_ERR_CTP_INVALID_JSON_BODY") {
-      error = new AppError({
-        message: "Malformed JSON request body!",
-        statusCode: 400,
-        errorType: "VALIDATION_ERROR",
-      });
-    }
-    if (!error && err.code === "FST_ERR_CTP_BODY_TOO_LARGE") {
-      error = new AppError({
-        message: "Request body is too large!",
-        statusCode: 413,
-        errorType: "VALIDATION_ERROR",
-      });
-    }
+    error ??= mapBodyParserError(err);
 
     const statusCode = error?.statusCode ?? err.statusCode ?? 500;
     const errorType = error?.errorType ?? (statusCode === 429 ? "RATE_LIMIT" : "INTERNAL_ERROR");

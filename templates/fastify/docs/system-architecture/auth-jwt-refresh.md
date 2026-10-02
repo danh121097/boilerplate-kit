@@ -66,8 +66,10 @@ export function signRefreshToken(payload: JwtPayload): string {
 `verifyAccessToken` pins `algorithms: ['RS256']` and verifies against
 `config.jwtAccessPublicKey`, enforces the `issuer` and asserts
 `token_use=access` — throwing otherwise. Verification order: signature →
-algorithm → issuer → `token_use`. Refresh tokens have no verify helper: validity
-comes from the DB lookup of their SHA-256 hash.
+algorithm → issuer → `token_use`. Refresh tokens have no verify helper: `refresh`
+checks the HS256 signature and `exp` with `JWT_REFRESH_SECRET` first (a bad one is
+the same generic 401 as an unknown token), then validity comes from the DB lookup of
+their SHA-256 hash.
 
 The RSA keypair is loaded at startup by [`config/keys.ts`](../../src/config/keys.ts):
 it reads `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH`, runs a sign/verify
@@ -126,6 +128,32 @@ The refresh cookie is **path-scoped to `/api/v1/auth`** so the browser only send
 it to the auth endpoints, shrinking its exposure. `clearTokenCookies` clears both
 using the matching paths.
 
+## Deploying the frontend and API on different subdomains
+
+Checked in Chromium (Playwright) against the express backend over plain HTTP with the
+development cookie attributes (`HttpOnly`, `SameSite=Lax`, no `Domain`). The fastify and
+nestjs backends set the same attributes; that is read from their source, not run.
+
+- Verified: with the page on `app.localhost` and the API on `api.localhost`, the browser
+  stored none of the `Set-Cookie` headers and `/auth/me` returned 401. Chromium treats
+  `localhost` as a public suffix, so the two hosts are different sites and `Lax` cookies
+  are not stored on a cross-site fetch. The same page on `localhost:5400` calling
+  `localhost:4100` (same site, different port) stored the cookies and sent them back.
+  A probe that sent `SameSite=None; Secure` was stored and sent from `api.localhost`, and a
+  `Domain=.localhost` attribute was rejected.
+- Not tested, from the SameSite rules: `app.example.com` and `api.example.com` share a
+  registrable domain, so they are the same site and `Lax`/`Strict` cookies work with
+  `credentials: include` (axios `withCredentials`). Hosts on different registrable domains
+  need `SameSite=None; Secure`, which the backends do not offer: `sameSite` is fixed to
+  `strict` in production and `lax` otherwise in the backend cookie helper.
+- Cookies are host-only unless the backend sets `COOKIE_DOMAIN` (for example
+  `.example.com`). Without it the browser sends `accessToken` only to the API host, so an
+  SSR server on the app host never sees it and SSR session reads are anonymous. Not tested
+  (no parent domain is available locally); the value goes to `Domain` on both set and clear.
+- In production the cookies are `Secure` and `SameSite=Strict` (HTTPS only; not tested).
+  Strict cookies are withheld on a navigation that arrives from another site, so the first
+  SSR render after following an external link can be anonymous until the browser refreshes.
+
 ## Tokens In The Response Body
 
 register / login / refresh return both tokens in the JSON body **in addition to**
@@ -133,8 +161,12 @@ the httpOnly cookies. This is by design: token-mode clients (native apps and the
 token-mode web templates) cannot rely on cookies and need the refresh token in the
 body. The cost is that a cookie-mode web client loses httpOnly protection for the
 refresh token: script running on the page (XSS) can call `/auth/refresh` and read a
-fresh refresh token from the response. This is an accepted risk; an opt-in to omit
-the body tokens for cookie clients is backlog, not implemented.
+fresh refresh token from the response. This is an accepted risk. Deployments whose
+clients are all cookie-based (nextjs, nuxtjs, tanstack-start) can set
+`AUTH_TOKENS_IN_BODY=false`: the three responses then return `tokens: {}` and the
+cookies are unchanged, while refresh still reads the token from the body or the cookie.
+It is a per-deployment switch, not a per-request opt-in, because an attacker's script
+could simply not opt in. reactjs, vuejs and react-native need the default `true`.
 
 ## Auth Flows
 

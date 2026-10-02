@@ -9,13 +9,26 @@ describe("parseEnvironmentFlags", () => {
       enableCsrf: false,
       redisEnabled: false,
       docsEnabled: undefined,
+      authTokensInBody: true,
     });
   });
 
   it("treats empty values as unset", () => {
     expect(
-      parseEnvironmentFlags({ PORT: "", ENABLE_CSRF: "", REDIS_ENABLED: "", DOCS_ENABLED: "" }),
-    ).toMatchObject({ port: 3000, enableCsrf: false, redisEnabled: false, docsEnabled: undefined });
+      parseEnvironmentFlags({
+        PORT: "",
+        ENABLE_CSRF: "",
+        REDIS_ENABLED: "",
+        DOCS_ENABLED: "",
+        AUTH_TOKENS_IN_BODY: "",
+      }),
+    ).toMatchObject({
+      port: 3000,
+      enableCsrf: false,
+      redisEnabled: false,
+      docsEnabled: undefined,
+      authTokensInBody: true,
+    });
   });
 
   it("parses valid values", () => {
@@ -26,6 +39,7 @@ describe("parseEnvironmentFlags", () => {
         ENABLE_CSRF: "true",
         REDIS_ENABLED: "true",
         DOCS_ENABLED: "false",
+        AUTH_TOKENS_IN_BODY: "false",
       }),
     ).toEqual({
       nodeEnv: "production",
@@ -33,6 +47,7 @@ describe("parseEnvironmentFlags", () => {
       enableCsrf: true,
       redisEnabled: true,
       docsEnabled: false,
+      authTokensInBody: false,
     });
   });
 
@@ -41,6 +56,7 @@ describe("parseEnvironmentFlags", () => {
     ["ENABLE_CSRF", "1"],
     ["REDIS_ENABLED", "yes"],
     ["DOCS_ENABLED", "on"],
+    ["AUTH_TOKENS_IN_BODY", "0"],
     ["NODE_ENV", "prod"],
     ["PORT", "abc"],
     ["PORT", "0"],

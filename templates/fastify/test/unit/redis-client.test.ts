@@ -122,3 +122,56 @@ describe("redis client — shutdown while Redis is down", () => {
     expect(client.disconnect).toHaveBeenCalledOnce();
   });
 });
+
+describe("redis client — connection error logging", () => {
+  it("logs one concise line per distinct message per interval, without a stack", async () => {
+    process.env.REDIS_ENABLED = "true";
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const { logger } = await import("@/utils/logger");
+      const warn = vi.spyOn(logger, "warn").mockImplementation(() => logger);
+      const { CONNECTION_ERROR_LOG_INTERVAL_MS, connectRedis } = await import("@/config/redis");
+      connectRedis();
+      const handler = onSpy.mock.calls.find(([event]) => event === "error")?.[1] as (
+        err: Error,
+      ) => void;
+
+      handler(new Error("connect ECONNREFUSED 127.0.0.1:6379"));
+      handler(new Error("connect ECONNREFUSED 127.0.0.1:6379"));
+      handler(new Error("other failure"));
+      expect(warn).toHaveBeenCalledTimes(2);
+      expect(warn).toHaveBeenNthCalledWith(1, "Redis error", {
+        reason: "connect ECONNREFUSED 127.0.0.1:6379",
+      });
+
+      vi.setSystemTime(Date.now() + CONNECTION_ERROR_LOG_INTERVAL_MS);
+      handler(new Error("connect ECONNREFUSED 127.0.0.1:6379"));
+      expect(warn).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("bounds the log throttle map by evicting the oldest key", async () => {
+    vi.useFakeTimers();
+    try {
+      const { logger } = await import("@/utils/logger");
+      const warn = vi.spyOn(logger, "warn").mockImplementation(() => logger);
+      const { MAX_LOG_THROTTLE_KEYS, logRedisConnectionError } = await import("@/config/redis");
+
+      logRedisConnectionError("Redis error", new Error("first"));
+      for (let i = 0; i < MAX_LOG_THROTTLE_KEYS; i++) {
+        logRedisConnectionError("Redis error", new Error(`other ${i}`));
+      }
+      expect(warn).toHaveBeenCalledTimes(MAX_LOG_THROTTLE_KEYS + 1);
+
+      // "first" was evicted, so it logs again inside the interval; a recent key is still throttled.
+      logRedisConnectionError("Redis error", new Error("first"));
+      expect(warn).toHaveBeenCalledTimes(MAX_LOG_THROTTLE_KEYS + 2);
+      logRedisConnectionError("Redis error", new Error(`other ${MAX_LOG_THROTTLE_KEYS - 1}`));
+      expect(warn).toHaveBeenCalledTimes(MAX_LOG_THROTTLE_KEYS + 2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

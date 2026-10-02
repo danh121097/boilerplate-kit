@@ -50,15 +50,19 @@ and Swagger/OpenAPI.
 
 ## Environment
 
-MONGODB_URI, HMAC_SECRET, and JWT_REFRESH_SECRET are required.
+MONGODB_URI, HMAC_SECRET, and JWT_REFRESH_SECRET are required; both secrets must be
+at least 32 characters or startup fails.
 JWT_PRIVATE_KEY_PATH and JWT_PUBLIC_KEY_PATH default to files generated under
 src/keys/. REDIS_ENABLED defaults to false. LOG_LEVEL (debug, info, warn, error) defaults
 to debug in development and info in production. DOCS_ENABLED (optional) forces Swagger on
-or off; unset = on outside production. API_PREFIX defaults to /api/v1;
+or off; unset = on outside production. API_PREFIX defaults to /api/v1 (trimmed, one leading slash, no trailing slash; empty = default);
+CORS_ORIGINS (optional, non-production) replaces the default dev origin list;
+AUTH_TOKENS_IN_BODY (default true) set to false omits accessToken/refreshToken from
+register/login/refresh bodies (cookie-only deployments);
 PORT defaults to 3000, REDIS_URL to redis://localhost:6379 (used when REDIS_ENABLED=true),
 COOKIE_DOMAIN (optional) sets the auth cookie domain, and APP_NAME (optional) sets the Swagger title; see .env.example for all supported values.
 
-Startup fails with a listed error when NODE_ENV is not development, production or test, when PORT is not a positive integer, or when ENABLE_CSRF, REDIS_ENABLED or DOCS_ENABLED is anything but true or false (empty counts as unset).
+Startup fails with a listed error when NODE_ENV is not development, production or test, when PORT is not a positive integer, or when ENABLE_CSRF, REDIS_ENABLED, DOCS_ENABLED or AUTH_TOKENS_IN_BODY is anything but true or false (empty counts as unset).
 
 TRUST_PROXY accepts true, false, or comma-separated IP/CIDR ranges. Numeric
 hop counts are rejected by Fastify 5.12 because they cannot verify the immediate

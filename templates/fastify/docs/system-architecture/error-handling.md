@@ -32,8 +32,20 @@ Route schemas are Zod schemas. fastify-type-provider-zod validates inputs and
 serializes declared response shapes. Fastify validation errors become 400
 VALIDATION_ERROR with joined issue messages. Malformed JSON is also 400, while
 body-limit errors are 413 (messages "Malformed JSON request body!" and "Request
-body is too large!"; the parser's own text is never forwarded). HMAC runs first, so
-an unsigned request with such a body is 401 HMAC_ERROR. Mongoose cast, validation, and duplicate-key errors
+body is too large!"). The remaining content-type parser and request-decompression
+failures are mapped by src/utils/map-body-parser-error.ts to fixed messages: 415 for an
+unsupported content type, Content-Encoding, or a JSON charset other than utf-8 ("Unsupported
+request charset!"), 400 "Request body could not be read!"
+for a corrupt compressed body or a Content-Length mismatch. All are VALIDATION_ERROR and
+the parser's own text is never forwarded.
+The charset rule lives in a `preParsing` hook: it applies to JSON media types
+(`application/json`, `+json`) on requests that carry a body (a `Content-Length` or
+`Transfer-Encoding` header; a bodyless GET is ignored) and accepts only `utf-8` or
+`utf8`, case-insensitive; a missing charset passes. Express and NestJS delegate to
+body-parser, which accepts any charset starting with `utf-` (such as `utf-16`) and then fails
+to parse the bytes as a 400 "Malformed JSON request body!"; every non-`utf-` charset is the
+same 415 on all three. Express and NestJS also parse the body before HMAC, so an unsigned
+request with a bad charset is 415 there and 401 HMAC_ERROR here. Mongoose cast, validation, and duplicate-key errors
 are mapped by src/utils/map-database-error.ts.
 
 To add a route, keep its Zod schemas in the module's validation.ts and declare

@@ -27,7 +27,8 @@ paths: the 404 handler is not a route, so the global limiter never sees it
 (Express counts those).
 
 Redis is used as the distributed rate-limit store only when enabled; the
-plugin is configured to fail open on store errors. With Redis disabled,
+plugin is configured to fail open on store errors, and logs one concise warning
+(reason only, no stack) per minute while the store is failing. With Redis disabled,
 rate limiting uses the plugin's in-process store.
 
 ## Request protections
@@ -37,7 +38,18 @@ optional CSRF origin check to mutating requests when ENABLE_CSRF=true. A request
 with none of Cookie, Origin or Referer (native apps, server-to-server) skips the
 CSRF check: with no ambient credentials there is nothing to forge, and browsers
 always send Origin on cross-site writes. A Cookie without Origin or Referer is
-still rejected with 403.
+still rejected with 403. The same rule (`isOriginAllowed` in plugins/security.ts) gates
+the Socket.IO handshake and websocket upgrade through `allowRequest` when
+ENABLE_CSRF=true; cookie-less native clients still connect. The handshake additionally
+passes when the `Origin` host equals the `Host` header (`isSameOrigin`), which is what
+React Native's WebSocket sends (the API's own origin, possibly with cookies); HTTP CSRF
+checks do not use this rule.
+
+Outside production the allowed origins default to localhost:5173, :9000 and :4321 and
+can be replaced with `CORS_ORIGINS` (comma-separated bare origins; anything else fails
+startup). Production uses the list hard-coded in config/environment.ts. The first
+origin is also the JWT issuer, so changing the list invalidates tokens issued under the
+old first origin.
 
 HMAC is an anti-abuse layer, not authentication, body integrity or a security
 boundary: a secret shipped to a browser or app is public, protected routes still

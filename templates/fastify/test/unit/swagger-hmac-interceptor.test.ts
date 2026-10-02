@@ -23,7 +23,7 @@ describe("Swagger HMAC request interceptor", () => {
 
     const signed = await hmacRequestInterceptor(request);
 
-    expect(fetchConfig).toHaveBeenCalledWith("/docs/hmac-config");
+    expect(fetchConfig).toHaveBeenCalledWith("/docs/hmac-config.js");
     expect(
       verifyHmac({
         method: "POST",

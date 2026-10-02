@@ -8,9 +8,12 @@ import {
   getMe,
   REFRESH_REUSE_GRACE_MS,
 } from "@/modules/auth/service";
+import { config } from "@/config/environment";
 import { AppError } from "@/types";
 import { hashToken } from "@/utils/jwt";
+import { randomUUID } from "crypto";
 import { describe, it, expect } from "vitest";
+import jwt from "jsonwebtoken";
 
 /** Pretend a token was rotated `ms` ago (default: just past the reuse grace window). */
 async function backdateRotation(
@@ -84,6 +87,70 @@ describe("AuthService", () => {
       const predecessor = await RefreshToken.findOne({ token: hashToken(tokens.refreshToken) });
       expect(predecessor?.isRevoked).toBe(true);
       expect(predecessor?.rotatedAt).toBeInstanceOf(Date);
+    });
+
+    describe("refresh JWT verification", () => {
+      /**
+       * A token the server never signed correctly, but whose hash IS stored (as if an
+       * attacker had planted it): only the JWT signature/expiry check can reject it.
+       */
+      async function storeForged(forge: (real: string) => string): Promise<string> {
+        const { user, tokens } = await register(
+          validUser.email,
+          validUser.password,
+          validUser.name,
+        );
+        const forged = forge(tokens.refreshToken);
+        await RefreshToken.create({
+          token: hashToken(forged),
+          userId: user._id,
+          familyId: "forged-family",
+          expiresAt: new Date(Date.now() + 60_000),
+        });
+        return forged;
+      }
+
+      /** Same claims as `real`, re-signed with `secret` and the given expiry. */
+      const resign = (real: string, secret: string, expiresIn: number): string => {
+        const { iat: _iat, exp: _exp, jti: _jti, ...claims } = jwt.decode(real) as jwt.JwtPayload;
+        return jwt.sign(claims, secret, {
+          algorithm: "HS256",
+          expiresIn,
+          jwtid: randomUUID(),
+        });
+      };
+
+      const expectGeneric401 = async (token: string): Promise<void> => {
+        const unknown = await refresh("not-a-stored-token").catch((e: unknown) => e as AppError);
+        const err = await refresh(token).catch((e: unknown) => e as AppError);
+        expect(err).toBeInstanceOf(AppError);
+        expect(err).toMatchObject({
+          statusCode: 401,
+          errorType: "AUTHENTICATION_ERROR",
+          message: (unknown as AppError).message,
+        });
+      };
+
+      it("rejects a tampered signature with the same generic 401 as an unknown token", async () => {
+        const forged = await storeForged((real) => {
+          const [header, payload, signature] = real.split(".");
+          const flipped = (signature[0] === "A" ? "B" : "A") + signature.slice(1);
+          return `${header}.${payload}.${flipped}`;
+        });
+        await expectGeneric401(forged);
+      });
+
+      it("rejects a token signed with the wrong secret with the same generic 401", async () => {
+        const forged = await storeForged((real) =>
+          resign(real, `${config.jwtRefreshSecret}-other`, 60),
+        );
+        await expectGeneric401(forged);
+      });
+
+      it("rejects an expired JWT even when its stored record is still live", async () => {
+        const forged = await storeForged((real) => resign(real, config.jwtRefreshSecret, -60));
+        await expectGeneric401(forged);
+      });
     });
 
     it("rejects invalid refresh token", async () => {

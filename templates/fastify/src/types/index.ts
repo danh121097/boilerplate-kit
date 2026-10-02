@@ -53,6 +53,8 @@ export interface EnvironmentConfig {
   /** Fastify trustProxy setting; undefined = trust nothing. */
   trustProxy?: boolean | string[];
   apiPrefix: string;
+  /** Include accessToken/refreshToken in auth response bodies (cookies are always set). */
+  authTokensInBody: boolean;
   redisEnabled: boolean;
   redisUrl: string;
   logLevel: "debug" | "info" | "warn" | "error";

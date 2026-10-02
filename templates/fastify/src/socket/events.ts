@@ -1,3 +1,5 @@
+import type { ErrorType } from "@/types";
+
 /**
  * Central registry of socket event names. Reference these instead of string
  * literals so event names stay consistent across server emits and client
@@ -13,3 +15,6 @@ export const SOCKET_EVENT = {
 export const SOCKET_UNAUTHORIZED = "Unauthorized!";
 
 export type SocketEvent = (typeof SOCKET_EVENT)[keyof typeof SOCKET_EVENT];
+
+/** `error.data.errorType` on a handshake rejected for its HMAC signature (same value as the HTTP path). */
+export const SOCKET_HMAC_ERROR_TYPE: ErrorType = "HMAC_ERROR";

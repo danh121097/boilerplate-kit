@@ -16,6 +16,7 @@ const flagsSchema = z.object({
   ENABLE_CSRF: optionalBoolean,
   REDIS_ENABLED: optionalBoolean,
   DOCS_ENABLED: optionalBoolean,
+  AUTH_TOKENS_IN_BODY: optionalBoolean,
 });
 
 export interface EnvironmentFlags {
@@ -25,6 +26,8 @@ export interface EnvironmentFlags {
   redisEnabled: boolean;
   /** `undefined` = not set, so the caller picks the default (on outside production). */
   docsEnabled: boolean | undefined;
+  /** Include accessToken/refreshToken in auth response bodies (default true); cookies are always set. */
+  authTokensInBody: boolean;
 }
 
 /** Validate NODE_ENV, PORT and the boolean flags, failing boot with every problem listed. */
@@ -43,5 +46,6 @@ export function parseEnvironmentFlags(env: NodeJS.ProcessEnv = process.env): Env
     enableCsrf: v.ENABLE_CSRF ?? false,
     redisEnabled: v.REDIS_ENABLED ?? false,
     docsEnabled: v.DOCS_ENABLED,
+    authTokensInBody: v.AUTH_TOKENS_IN_BODY ?? true,
   };
 }

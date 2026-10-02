@@ -1,4 +1,5 @@
 import { buildApp } from "@/app";
+import { config } from "@/config/environment";
 import { RefreshToken } from "@/models/refresh-token";
 import { computeSignature } from "@/utils/hmac";
 import { hashToken } from "@/utils/jwt";
@@ -321,6 +322,52 @@ describe("Auth routes", () => {
         expect(res.json()).toMatchObject({ errorType: "HMAC_ERROR", error_code: 401 });
         expect(res.json().message).toMatch(message);
       }
+    });
+  });
+  describe("AUTH_TOKENS_IN_BODY", () => {
+    const original = config.authTokensInBody;
+    afterEach(() => {
+      config.authTokensInBody = original;
+    });
+
+    it.each([true, false])("=%s: register, login and refresh bodies", async (inBody) => {
+      config.authTokensInBody = inBody;
+      const expectTokens = (res: LightMyRequestResponse): void => {
+        const { tokens } = res.json().data;
+        if (inBody) {
+          expect(tokens).toEqual({
+            accessToken: expect.any(String),
+            refreshToken: expect.any(String),
+          });
+        } else {
+          // The key stays; both fields are omitted.
+          expect(tokens).toEqual({});
+        }
+        const cookies = setCookies(res);
+        expect(cookieValue(cookies, "accessToken")).toMatch(/^accessToken=.+/);
+        expect(cookieValue(cookies, "refreshToken")).toMatch(/^refreshToken=.+/);
+      };
+
+      const registered = await post("register", user);
+      expect(registered.statusCode).toBe(201);
+      expectTokens(registered);
+      expect(registered.json().data.user).toMatchObject({ email: user.email });
+
+      const loggedIn = await post("login", { email: user.email, password: user.password });
+      expect(loggedIn.statusCode).toBe(200);
+      expectTokens(loggedIn);
+
+      // Refresh still reads the cookie when the body carries no token.
+      const viaCookie = await post("refresh", undefined, toCookies(setCookies(loggedIn)));
+      expect(viaCookie.statusCode).toBe(200);
+      expectTokens(viaCookie);
+
+      // ...and the body token (when the deployment hands it out, a client has one).
+      const viaBody = await post("refresh", {
+        refreshToken: cookieValue(setCookies(viaCookie), "refreshToken")!.split("=")[1],
+      });
+      expect(viaBody.statusCode).toBe(200);
+      expectTokens(viaBody);
     });
   });
 });

@@ -1,3 +1,4 @@
+import { parseDevCorsOrigins } from "@/config/cors-origins";
 import { parseDurationSeconds } from "@/config/duration";
 import { parseEnvironmentFlags } from "@/config/env-validation";
 import { loadRsaKeyPair } from "@/config/keys";
@@ -60,15 +61,16 @@ const isTest = nodeEnv === "test";
 const docsEnabled = flags.docsEnabled ?? !isProduction;
 
 /**
- * Allowed browser origins for CORS + the CSRF guard. Hard-coded here (not env) so
- * the list is easy to edit in one place — add your production frontend origin(s)
- * below before deploying. Keep localhost out of the production list.
+ * Allowed browser origins for CORS + the CSRF guard. The production list is hard-coded
+ * here so it is easy to edit in one place — add your production frontend origin(s)
+ * below before deploying and keep localhost out of it. Outside production the default
+ * dev ports can be replaced with CORS_ORIGINS (comma-separated).
  */
 const corsOrigins: string[] = isProduction
   ? [
       "https://app.example.com", // ← replace with your production frontend origin(s)
     ]
-  : ["http://localhost:5173", "http://localhost:9000", "http://localhost:4321"];
+  : parseDevCorsOrigins(process.env.CORS_ORIGINS);
 
 /** Validated environment configuration */
 export const config: EnvironmentConfig = {
@@ -94,6 +96,7 @@ export const config: EnvironmentConfig = {
   // Unset = trust no proxy; explicit proxy ranges let request.ip and rate limits use the client IP.
   trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
   apiPrefix: getApiPrefix(),
+  authTokensInBody: flags.authTokensInBody,
   // Redis is optional: not read via getRequiredEnvVar so the app boots fine when off.
   redisEnabled: flags.redisEnabled,
   redisUrl: process.env.REDIS_URL || "redis://localhost:6379",

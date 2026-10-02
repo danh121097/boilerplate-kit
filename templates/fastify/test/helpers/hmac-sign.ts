@@ -31,8 +31,7 @@ export function signHmac(
  * Sign the fixed socket handshake contract (mirrors the client signHeader):
  *   ['GET', 'application/json', ctime, '/socket', ''].join('\n')
  */
-export function signSocketHmac(): { sig: string; ctime: string } {
-  const ctime = Date.now().toString();
+export function signSocketHmac(ctime = Date.now().toString()): { sig: string; ctime: string } {
   const stringToSign = ["GET", "application/json", ctime, "/socket", ""].join("\n");
   const sig = crypto.createHmac("sha256", HMAC_SECRET).update(stringToSign).digest("base64");
   return { sig, ctime };

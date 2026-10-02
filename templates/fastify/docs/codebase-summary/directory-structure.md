@@ -10,7 +10,8 @@ This tree reflects the current template. Unit and integration tests live in test
     - response-descriptions.ts — OpenAPI response descriptions and docs transforms
   - config/
     - environment.ts — dotenv loading and validated application config
-    - env-validation.ts — Zod check of NODE_ENV, PORT, ENABLE_CSRF, REDIS_ENABLED, DOCS_ENABLED
+    - env-validation.ts — Zod check of NODE_ENV, PORT, ENABLE_CSRF, REDIS_ENABLED, DOCS_ENABLED, AUTH_TOKENS_IN_BODY
+    - cors-origins.ts — CORS_ORIGINS parsing and default dev origins
     - database.ts — Mongoose connect and disconnect
     - duration.ts — token lifetime parsing
     - keys.ts — RSA key loading and validation
@@ -29,7 +30,8 @@ This tree reflects the current template. Unit and integration tests live in test
     - user/ — controller, service, routes, and serialize-user (public user allowlist)
   - plugins/
     - error-handlers.ts — global error and not-found handlers
-    - security.ts — HMAC and CSRF onRequest hooks only
+    - security.ts — HMAC and CSRF onRequest hooks, plus the shared `isOriginAllowed` rule
+    - rate-limit.ts — limiter options, fail-open Redis store with throttled failure warning
     - auth.ts — `authenticate` (access-token verification + revocation)
     - role.ts — `requireMinRole` (role-rank hierarchy guard)
   - routes/
@@ -50,6 +52,7 @@ This tree reflects the current template. Unit and integration tests live in test
     - hmac.ts — canonical signature compute/verify
     - jwt.ts — JWT sign/verify and token hashes
     - logger.ts — application logger
+    - map-body-parser-error.ts — content-type parser / decompression error mapping
     - map-database-error.ts — Mongoose/Mongo error mapping
     - pagination.ts — offset pagination parsing and metadata
     - password.ts — password strength and bcrypt helpers

@@ -1,3 +1,4 @@
+import { config } from "@/config/environment";
 import { RefreshToken } from "@/models/refresh-token";
 import { User } from "@/models/user";
 import { AppError } from "@/types";
@@ -8,6 +9,7 @@ import { refreshTtlSeconds } from "@/utils/token-lifetimes";
 import { revokeUserTokens } from "@/utils/token-revocation";
 import { randomUUID } from "crypto";
 import type { Types } from "mongoose";
+import jwt from "jsonwebtoken";
 
 /**
  * A rotated refresh token may be presented again for this long after rotation
@@ -93,12 +95,31 @@ async function classifyUnclaimableToken(hashedToken: string): Promise<RefreshTok
 }
 
 /**
+ * Reject a refresh token that this server did not sign (or that has expired) with the
+ * same generic 401 as an unknown token, before touching the database. Only the
+ * signature, HS256 and `exp` are checked here; revocation, reuse and expiry bookkeeping
+ * stay with the stored hash.
+ */
+function assertRefreshSignature(rawRefreshToken: string): void {
+  try {
+    jwt.verify(rawRefreshToken, config.jwtRefreshSecret, { algorithms: ["HS256"] });
+  } catch {
+    throw new AppError({
+      message: "Invalid refresh token!",
+      statusCode: 401,
+      errorType: "AUTHENTICATION_ERROR",
+    });
+  }
+}
+
+/**
  * Rotate refresh token: atomically claim (revoke) the old one, issue a new pair.
  * The claim is a single findOneAndUpdate on {token, not revoked, not expired},
  * so concurrent refreshes with the same token yield exactly one winner. Losers
  * inside the reuse grace window still get a fresh pair (see classifyUnclaimableToken).
  */
 export async function refresh(rawRefreshToken: string): Promise<AuthTokens> {
+  assertRefreshSignature(rawRefreshToken);
   const hashedToken = hashToken(rawRefreshToken);
   const claimed = await RefreshToken.findOneAndUpdate(
     { token: hashedToken, isRevoked: false, expiresAt: { $gt: new Date() } },

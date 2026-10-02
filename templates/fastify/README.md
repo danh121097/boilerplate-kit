@@ -34,13 +34,13 @@ Redis is optional and disabled by default.
 ## Environment
 
 See [`.env.example`](./.env.example) for the complete list. Required values are
-`MONGODB_URI`, `HMAC_SECRET` (must equal the secret the client signs with; anti-abuse only, a secret shipped to a browser or app is public) and `JWT_REFRESH_SECRET` (at least 32 characters).
+`MONGODB_URI`, `HMAC_SECRET` (must equal the secret the client signs with; anti-abuse only, a secret shipped to a browser or app is public) and `JWT_REFRESH_SECRET`. Both secrets must be at least 32 characters; shorter values fail startup.
 RSA key paths default to `src/keys/rsa.private` and `src/keys/rsa.public`;
 generate them with `pnpm keys`. `LOG_LEVEL` (`debug`, `info`, `warn`, `error`) defaults to `debug` in
 development and `info` in production. `DOCS_ENABLED` optionally forces Swagger on or off (unset = on outside
 production). `PORT` defaults to `3000`, `REDIS_URL` to `redis://localhost:6379`
 (used only when `REDIS_ENABLED=true`), `COOKIE_DOMAIN` (optional) sets the auth cookie domain, and `APP_NAME` (optional) sets the Swagger title.
-`ENABLE_CSRF` turns on the Origin/Referer check for state-changing requests; requests with no `Cookie`, `Origin` and `Referer` header (native apps, server-to-server) are exempt because there are no ambient credentials to forge. `TRUST_PROXY` accepts `true`, `false`, or
+`ENABLE_CSRF` turns on the Origin/Referer check for state-changing requests and for the Socket.IO handshake; requests with no `Cookie`, `Origin` and `Referer` header (native apps, server-to-server) are exempt because there are no ambient credentials to forge. The socket handshake also accepts an `Origin` whose host equals the request `Host` (React Native sends the API's own origin, possibly with cookies); a cross-site page cannot forge it. Behind a reverse proxy the original `Host` header must reach the app unchanged (nginx: `proxy_set_header Host $host;`), otherwise this same-origin rule rejects React Native sockets when `ENABLE_CSRF=true`. `CORS_ORIGINS` (optional, comma-separated bare origins like `http://localhost:3000`) replaces the default dev origins outside production; production keeps the list hard-coded in `src/config/environment.ts`. The first entry is also the JWT issuer, so changing or reordering `CORS_ORIGINS` in development invalidates live access tokens (one refresh per client recovers). `AUTH_TOKENS_IN_BODY` (default `true`) controls whether register/login/refresh responses carry `accessToken` and `refreshToken` in the JSON body; set it to `false` only when every client is cookie-based (nextjs, nuxtjs, tanstack-start), because reactjs, vuejs and react-native read the tokens from the body. Cookies are set either way. `TRUST_PROXY` accepts `true`, `false`, or
 comma-separated IP/CIDR ranges. Fastify 5.12 intentionally does not accept
 hop-count trust because it can allow direct clients to spoof forwarded headers.
 

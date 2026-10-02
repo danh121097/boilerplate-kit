@@ -144,7 +144,7 @@ describe("User routes", () => {
       const res = await get("/not-an-id", token);
       expect(res.statusCode).toBe(400);
       expect(res.json().errorType).toBe("VALIDATION_ERROR");
-      expect(res.json().message).toBe("Invalid user ID!");
+      expect(res.json().message).toBe("Invalid value for _id!");
     });
 
     it("401 before validation for an unauthenticated malformed id", async () => {

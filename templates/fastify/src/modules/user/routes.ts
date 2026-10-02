@@ -16,7 +16,9 @@ interface UserIdParams {
 
 const userRoutes: FastifyPluginAsync = async (fastify) => {
   const querySchema = z.object({ page: z.string().optional(), limit: z.string().optional() });
-  const paramsSchema = z.object({ id: z.string().regex(/^[\da-f]{24}$/i, "Invalid user ID!") });
+  const paramsSchema = z.object({
+    id: z.string().regex(/^[\da-f]{24}$/i, "Invalid value for _id!"),
+  });
   const listResponseSchema = z.object({
     success: z.literal(true),
     data: z.array(publicUserSchema),
