@@ -68,10 +68,11 @@ const GROUPS: SharedGroup[] = [
     normalize: asReactQuery,
   },
   {
-    // interceptors.ts is left out on purpose: it differs from nextjs only by the dev-mode check
-    // and the env-var name in a warning (import.meta.env.DEV / VITE_* vs process.env / NEXT_PUBLIC_*).
+    // runtime-env.ts is left out on purpose: it reads each framework's own env source.
     name: "React cookie-mode auth core",
     files: [
+      "services/core/hmac-signature.ts",
+      "services/core/interceptors.ts",
       "services/core/refresh-token-manager.ts",
       "services/core/session.ts",
       "services/core/api-errors.ts",
@@ -84,7 +85,13 @@ const GROUPS: SharedGroup[] = [
   {
     // Token-mode web clients (bearer + body tokens) share these; the cookie-mode copies differ on purpose.
     name: "Token-mode web transport",
-    files: ["services/core/api.ts", "services/core/socket-connection.ts"],
+    files: [
+      "services/core/api.ts",
+      "services/core/socket-connection.ts",
+      "services/core/hmac-signature.ts",
+      "services/core/interceptors.ts",
+      "services/core/runtime-env.ts",
+    ],
     roots: ["reactjs/src", "vuejs/src"],
   },
   {
@@ -94,7 +101,11 @@ const GROUPS: SharedGroup[] = [
   },
   {
     name: "Backend auth and HMAC",
-    files: ["src/modules/auth/refresh-session.ts", "src/utils/hmac.ts"],
+    files: [
+      "src/modules/auth/refresh-session.ts",
+      "src/utils/hmac.ts",
+      "src/models/refresh-token.ts",
+    ],
     roots: BACKEND_ROOTS,
   },
 ];
