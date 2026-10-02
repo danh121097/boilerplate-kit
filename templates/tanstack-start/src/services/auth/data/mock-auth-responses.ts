@@ -47,6 +47,19 @@ export const failure = (status: number, errorType: string, message: string) => (
 
 export const unauthorized = (message: string) => failure(401, "AUTHENTICATION_ERROR", message);
 
+/** Register validation, as the backend's zod schema reports it: 400 messages joined by ", ". */
+export function registerIssues(body: Record<string, unknown>): string[] {
+  const issues: string[] = [];
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(body.email ?? "").trim())) {
+    issues.push("Invalid email format");
+  }
+  if (typeof body.password !== "string" || body.password.length < 8) {
+    issues.push("Password must be at least 8 characters");
+  }
+  if (typeof body.name !== "string" || body.name.trim() === "") issues.push("Name is required");
+  return issues;
+}
+
 export function bodyOf(config: InternalAxiosRequestConfig): Record<string, unknown> {
   const raw: unknown = config.data;
   try {

@@ -86,6 +86,9 @@ with a `connect_error` message `Unauthorized!`.
   `connect()` on the same socket with a freshly signed handshake. A refused
   refresh (or a session already ended) disconnects and stops; a transient refresh
   failure falls back to the backoff below.
+- A rejection whose `error.data.errorType` is `HMAC_ERROR` (`HMAC_ERROR_TYPE`: clock skew
+  or a wrong secret; token rejections carry no `data`) never refreshes and does not use
+  the refresh budget: it goes straight to the backoff below with a freshly signed handshake.
 - At most `MAX_REFRESH_ATTEMPTS = 3` refreshes run per outage (the counter resets
   when `authenticated` arrives). After that, and for any other rejection, one
   manual retry is scheduled (errors while it is pending do not reschedule) after

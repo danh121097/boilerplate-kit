@@ -140,4 +140,27 @@ describe("interceptors — cookie-based token refresh", () => {
     expect(calls).toBe(2);
     vi.unstubAllGlobals();
   });
+
+  it.each([
+    ["/auth/login", false],
+    ["/auth/login?next=/home", false],
+    ["/auth/refresh", false],
+    ["/x/auth/login", true],
+    ["/users/auth/logout", true],
+    ["/auth/login/extra", true],
+    ["http://api.test/auth/login", false],
+    ["http://api.test/x/auth/login", true],
+  ])("refresh-exempt matching: %s refreshes=%s", async (url, refreshes) => {
+    const post = vi.spyOn(axios, "post").mockResolvedValue({ data: {} } as never);
+    const client = makeClient(async (config) => httpError(config), {
+      MAIN: {
+        endpoint: "/auth/refresh",
+        skipPaths: ["/auth/login", "/auth/logout"],
+        hasSession: () => true,
+      },
+    });
+
+    await expect(client.get(url, { baseURL: "http://api.test" })).rejects.toBeTruthy();
+    expect(post).toHaveBeenCalledTimes(refreshes ? 1 : 0);
+  });
 });

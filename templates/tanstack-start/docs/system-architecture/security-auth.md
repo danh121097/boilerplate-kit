@@ -2,11 +2,11 @@
 
 ## Token storage model
 
-| Token | Where stored | Who manages |
-|-------|-------------|-------------|
-| Access token (JWT, 15 min) | httpOnly cookie `accessToken` | Server (set on login, rotated on refresh) |
-| Refresh token (7 d) | httpOnly cookie `refreshToken`, path `${apiPrefix}/auth` | Server (rotated on refresh, revoked on logout) |
-| Session hint | readable cookie `STORAGE_KEYS.SESSION` (`${APP_PREFIX}_SESSION`, prefix from `VITE_APP_NAME`, default `PRISM_APP`) = `"1"` | Client (`services/core/session.ts`) |
+| Token                      | Where stored                                                                                                               | Who manages                                    |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| Access token (JWT, 15 min) | httpOnly cookie `accessToken`                                                                                              | Server (set on login, rotated on refresh)      |
+| Refresh token (7 d)        | httpOnly cookie `refreshToken`, path `${apiPrefix}/auth`                                                                   | Server (rotated on refresh, revoked on logout) |
+| Session hint               | readable cookie `STORAGE_KEYS.SESSION` (`${APP_PREFIX}_SESSION`, prefix from `VITE_APP_NAME`, default `PRISM_APP`) = `"1"` | Client (`services/core/session.ts`)            |
 
 The client never reads either token. `withCredentials: true` on every axios
 instance lets the browser attach the cookies automatically.
@@ -25,6 +25,7 @@ nothing is signed, every request is rejected, and dev builds log one
 `console.warn` (never the secret; skipped while mock auth is on).
 
 Canonical string (identical to backend `verifyHmac`):
+
 ```
 METHOD\n
 Content-Type\n
@@ -98,6 +99,7 @@ on one origin never share them.
 ## Refresh eligibility
 
 A 401 triggers an automatic refresh only when ALL are true:
+
 1. `config._retry` is not set (not already retried).
 2. The URL is not the refresh endpoint or a credential endpoint in `skipPaths`
    (`/auth/login`, `/auth/register`, `/auth/logout`) — a wrong-password 401
@@ -183,6 +185,32 @@ again once it holds the lock, so a refused refresh that ended the session while
 the revoke waited is not ended twice. Concurrent calls share one revoke: one
 POST, one event. Server functions and SSR never
 revoke. `AuthModel.getSession()` (axios, browser) behaves the same way.
+
+## Deploying the frontend and API on different subdomains
+
+Checked in Chromium (Playwright) against the express backend over plain HTTP with the
+development cookie attributes (`HttpOnly`, `SameSite=Lax`, no `Domain`). The fastify and
+nestjs backends set the same attributes; that is read from their source, not run.
+
+- Verified: with the page on `app.localhost` and the API on `api.localhost`, the browser
+  stored none of the `Set-Cookie` headers and `/auth/me` returned 401. Chromium treats
+  `localhost` as a public suffix, so the two hosts are different sites and `Lax` cookies
+  are not stored on a cross-site fetch. The same page on `localhost:5400` calling
+  `localhost:4100` (same site, different port) stored the cookies and sent them back.
+  A probe that sent `SameSite=None; Secure` was stored and sent from `api.localhost`, and a
+  `Domain=.localhost` attribute was rejected.
+- Not tested, from the SameSite rules: `app.example.com` and `api.example.com` share a
+  registrable domain, so they are the same site and `Lax`/`Strict` cookies work with
+  `credentials: include` (axios `withCredentials`). Hosts on different registrable domains
+  need `SameSite=None; Secure`, which the backends do not offer: `sameSite` is fixed to
+  `strict` in production and `lax` otherwise in the backend cookie helper.
+- Cookies are host-only unless the backend sets `COOKIE_DOMAIN` (for example
+  `.example.com`). Without it the browser sends `accessToken` only to the API host, so an
+  SSR server on the app host never sees it and SSR session reads are anonymous. Not tested
+  (no parent domain is available locally); the value goes to `Domain` on both set and clear.
+- In production the cookies are `Secure` and `SameSite=Strict` (HTTPS only; not tested).
+  Strict cookies are withheld on a navigation that arrives from another site, so the first
+  SSR render after following an external link can be anonymous until the browser refreshes.
 
 ## Server functions (SSR reads)
 
@@ -312,8 +340,9 @@ cookie) and `mock-auth-responses.ts` (backend-shaped replies) in the browser,
   cookie gone but the hint left, the refresh is refused and the session ends as
   "expired", like a real refused refresh.
 - **Credentials.** One login pair, signed in as an `admin` so the built-in
-  users screen works. `register` signs up any user, who stays signed in but
-  cannot log in again (no user store) and is a plain `user`.
+  users screen works. `register` answers 400 for invalid input (same messages as the
+  backend) and 409 for the demo email; otherwise it signs up a user, who stays signed in
+  but cannot log in again (no user store) and is a plain `user`.
 - **Users.** `GET /users` (offset-paginated `?page&limit`, envelope
   `{ success: true, data, meta }`) and `GET /users/:id` answer from a fixed
   fixture: the demo user plus five sample users (`MOCK_SAMPLE_USERS`), newest

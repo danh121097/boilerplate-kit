@@ -3,7 +3,9 @@ import { getMockAuth } from "@/services/auth/data/mock-auth-config";
 import {
   authResult,
   bodyOf,
+  failure,
   pathOf,
+  registerIssues,
   reply,
   succeed,
   unauthorized,
@@ -38,7 +40,8 @@ import axios from "axios";
  * the user during SSR, and it lives as long as the backend's refresh cookie.
  * Login accepts one credential pair (`VITE_AUTH_MOCK_EMAIL` /
  * `VITE_AUTH_MOCK_PASSWORD`, default demo@example.com / password); register
- * signs up any user, who then stays signed in but cannot log in again.
+ * signs up a valid new user (400 on bad input, 409 for the demo email), who then stays
+ * signed in but cannot log in again.
  *
  * Files: `mock-auth-config.ts` (the flag), `mock-auth-session.ts` (the mock user cookie),
  * `mock-auth-responses.ts` (backend-shaped replies), `services/users/data/mock-users.ts`
@@ -84,9 +87,15 @@ function answer(
   }
 
   if (method === "post" && path.endsWith(paths.register)) {
+    const issues = registerIssues(body);
+    if (issues.length)
+      return reply(config, 400, failure(400, "VALIDATION_ERROR", issues.join(", ")));
     const email = String(body.email ?? "")
       .trim()
       .toLowerCase();
+    if (email === mock.email.toLowerCase()) {
+      return reply(config, 409, failure(409, "CONFLICT", "Email already registered!"));
+    }
     const now = new Date().toISOString();
     const user: AuthUser = {
       _id: `mock-${email}`,
@@ -122,7 +131,7 @@ function answer(
   if (method === "get" && path.endsWith(paths.me)) {
     const caller = callerOf(config);
     if (typeof caller === "string") return reply(config, 401, unauthorized(caller));
-    return reply(config, 200, succeed("", { user: caller }));
+    return reply(config, 200, { success: true, data: { user: caller } });
   }
 
   return answerMockUsers(mock, config, () => callerOf(config));

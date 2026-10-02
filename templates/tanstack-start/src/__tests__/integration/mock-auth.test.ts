@@ -107,6 +107,21 @@ describe("mock auth", () => {
     await expect(after.readServerSession()).resolves.toEqual(user);
   });
 
+  it("rejects an invalid or duplicate registration like the backend and starts no session", async () => {
+    const app = await boot(jar);
+    const bad = await app.AuthModel.register({ email: "nope", password: "short", name: " " }).catch(
+      (e: unknown) => e,
+    );
+    expect(bad).toMatchObject({
+      error_code: 400,
+      message: "Invalid email format, Password must be at least 8 characters, Name is required",
+    });
+
+    const dup = await app.AuthModel.register({ ...DEMO, name: "Demo" }).catch((e: unknown) => e);
+    expect(dup).toMatchObject({ error_code: 409, message: "Email already registered!" });
+    expect(jar.size).toBe(0);
+  });
+
   it("registers a user who stays signed in", async () => {
     const app = await boot(jar);
 

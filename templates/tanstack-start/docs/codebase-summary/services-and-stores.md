@@ -17,7 +17,8 @@ src/services/
 │   ├── server-session.ts   # ServerUnauthorized + withSessionRefresh (server-fn reads)
 │   ├── query-client.ts     # makeQueryClient, resetQueriesOnSessionEnd(client, key, service), resyncQueriesAfterLogin
 │   ├── headers-utils.ts    # HeadersUtils.setAuthHeaders (HMAC; cookies auto-sent)
-│   ├── hmac-signature.ts   # HMACSignatureGenerator (crypto-js, VITE_HMAC_SECRET), signRequest, resolveContentType
+│   ├── hmac-signature.ts   # HMACSignatureGenerator (crypto-js), signRequest, resolveContentType
+│   ├── runtime-env.ts      # Per-template env access (HMAC secret, build version, dev flag) for hmac-signature / interceptors
 │   ├── model.ts            # Model base class — subclass + Model.setup()
 │   ├── tanstack.ts         # defineQuery (React Query)
 │   ├── tanstack-mutation.ts   # defineMutation (+ opt-in optimistic updates)

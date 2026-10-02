@@ -168,6 +168,39 @@ describe("useSocketIO", () => {
     expect(sock.connect).toHaveBeenCalledTimes(1);
   });
 
+  it("a rejected signature (HMAC_ERROR) backs off without spending a refresh", async () => {
+    const { sock } = await mount();
+    sock.connect.mockClear();
+
+    sock.fire(
+      "connect_error",
+      Object.assign(new Error("Unauthorized!"), { data: { errorType: "HMAC_ERROR" } }),
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sock.connect).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(refresh).not.toHaveBeenCalled();
+    expect(sock.connect).toHaveBeenCalledTimes(1);
+  });
+
+  it("signature rejections leave the refresh budget intact for a later token rejection", async () => {
+    refresh.mockResolvedValue(undefined);
+    const { sock } = await mount();
+    const hmac = Object.assign(new Error("Unauthorized!"), { data: { errorType: "HMAC_ERROR" } });
+    for (let i = 0; i < 4; i += 1) {
+      sock.fire("connect_error", hmac);
+      await vi.advanceTimersByTimeAsync(30_000);
+    }
+    sock.connect.mockClear();
+
+    sock.fire("connect_error", unauthorized);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(sock.connect).toHaveBeenCalledTimes(1);
+  });
+
   it("does not refresh while socket.io is already reconnecting (network error)", async () => {
     const { sock } = await mount();
     sock.active = true;

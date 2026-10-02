@@ -1,4 +1,10 @@
 import { isMockAuthEnabled } from "@/services/auth/data/mock-auth-config";
+import {
+  getBuildVersion,
+  getHmacSecret,
+  HMAC_SECRET_ENV,
+  isDevBuild,
+} from "@/services/core/runtime-env";
 import type { HMACSignatureData } from "@/services/core/types";
 import type { InternalAxiosRequestConfig } from "axios";
 import Base64 from "crypto-js/enc-base64";
@@ -50,7 +56,7 @@ export function resolveContentType(config: InternalAxiosRequestConfig): string {
 }
 
 /**
- * HMAC request signer — active only when `VITE_HMAC_SECRET` is set. The secret is
+ * HMAC request signer — active only when the HMAC secret env (`HMAC_SECRET_ENV`) is set. The secret is
  * client-readable (a soft integrity layer matching the backend's HMAC_SECRET).
  * `signRequest` is the pure core, reused by the axios interceptor and SSR server
  * functions so a forwarded SSR fetch carries the same headers the backend requires.
@@ -71,9 +77,9 @@ export class HMACSignatureGenerator {
   /** Dev builds only, once: an empty secret means the backend will reject every request
    * (unless the dev-only mock auth answers them). Never prints the secret. */
   private static warnEmptySecret(): void {
-    if (emptySecretWarned || import.meta.env.PROD || isMockAuthEnabled()) return;
+    if (emptySecretWarned || !isDevBuild() || isMockAuthEnabled()) return;
     emptySecretWarned = true;
-    console.warn("VITE_HMAC_SECRET is empty; the backend requires it, all requests will 401.");
+    console.warn(`${HMAC_SECRET_ENV} is empty; the backend requires it, all requests will 401.`);
   }
 
   /** Pure signer. Returns null when no secret is configured. */
@@ -83,13 +89,13 @@ export class HMACSignatureGenerator {
     contentType = "application/json",
     ctime = Date.now(),
   }: SignRequestInput): HMACSignatureData | null {
-    const secret = import.meta.env.VITE_HMAC_SECRET;
+    const secret = getHmacSecret();
     if (!secret) {
       this.warnEmptySecret();
       return null;
     }
 
-    const xVersion = import.meta.env.VITE_BUILD_VERSION || "1.0.0";
+    const xVersion = getBuildVersion() || "1.0.0";
     const stringToSign = [
       method.toUpperCase(),
       contentType,
