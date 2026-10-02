@@ -70,14 +70,19 @@ pnpm test           # vitest run           (test:watch, test:coverage)
 `JWT_PRIVATE_KEY_PATH`, `JWT_PUBLIC_KEY_PATH`, `JWT_REFRESH_SECRET`,
 `JWT_ACCESS_EXPIRY`, `JWT_REFRESH_EXPIRY`, `HMAC_SECRET`, `REDIS_ENABLED`,
 `REDIS_URL`, `TRUST_PROXY` (optional), `DOCS_ENABLED` (optional), `LOG_LEVEL` (optional),
-`ENABLE_CSRF` (optional), `COOKIE_DOMAIN` (optional), `APP_NAME` (optional; Swagger title). CORS origins are not an env var:
-they are the hard-coded `corsOrigins` list in `src/config/environment.ts`.
+`ENABLE_CSRF` (optional), `COOKIE_DOMAIN` (optional), `AUTH_TOKENS_IN_BODY` (optional, default `true`),
+`CORS_ORIGINS` (optional, non-production only), `APP_NAME` (optional; Swagger title). The production CORS origins are the
+hard-coded `corsOrigins` list in `src/config/environment.ts` (its first entry is the JWT `iss`, so changing or reordering `CORS_ORIGINS` in dev invalidates live access tokens until each client refreshes); outside production `CORS_ORIGINS`
+(comma-separated origins) replaces the default dev list.
 
-Startup fails with a listed error when `NODE_ENV` is not `development`, `production` or `test`, when `PORT` is not a positive integer, or when `ENABLE_CSRF`, `REDIS_ENABLED` or `DOCS_ENABLED` is anything but `true` or `false` (empty counts as unset).
+Startup fails with a listed error when `NODE_ENV` is not `development`, `production` or `test`, when `PORT` is not a positive integer, or when `ENABLE_CSRF`, `REDIS_ENABLED`, `DOCS_ENABLED` or `AUTH_TOKENS_IN_BODY` is anything but `true` or `false` (empty counts as unset).
 
-`MONGODB_URI`, `HMAC_SECRET`, and `JWT_REFRESH_SECRET` (symmetric secret; use
-≥32 random chars, length is not enforced) are **required** — boot throws if
-missing (`src/config/environment.ts`). The RSA key paths (`JWT_PRIVATE_KEY_PATH`,
+`MONGODB_URI`, `HMAC_SECRET`, and `JWT_REFRESH_SECRET` (symmetric secret) are **required** — boot throws if
+missing, and `HMAC_SECRET` / `JWT_REFRESH_SECRET` throw `<NAME> must be at least 32
+characters` when shorter (`src/config/environment.ts`). **Upgrade note:** the length rule
+breaks existing `.env` files with short secrets; generate longer ones (rotating
+`JWT_REFRESH_SECRET` signs every user out). `API_PREFIX` is trimmed and normalized to one
+leading `/` and no trailing `/` (empty = `/api/v1`; `//` or `?` fails boot). The RSA key paths (`JWT_PRIVATE_KEY_PATH`,
 `JWT_PUBLIC_KEY_PATH`) must point at readable PEM files outside `test` /
 `development` (see Constraints). Redis vars are optional.
 

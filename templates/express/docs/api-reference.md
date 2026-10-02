@@ -18,8 +18,9 @@ outside production and off in production unless `DOCS_ENABLED=true`;
 ## Conventions
 
 - **Base path (`apiPrefix`)** — every route mounts under `API_PREFIX`
-  (default `/api/v1`, see `src/config/environment.ts`). Paths below show the
-  full path including this prefix.
+  (default `/api/v1`, see `src/config/environment.ts`; the value is trimmed and
+  normalized to one leading `/` and no trailing `/`). Paths below show the full path
+  including this prefix.
 - **HMAC (always)** — `app.use(apiPrefix, verifyHmacRequest)` guards _every_
   route under the prefix. Each request MUST send `sig` and `ctime` headers.
   The signed canonical string is
@@ -30,11 +31,14 @@ outside production and off in production unless `DOCS_ENABLED=true`;
   (clients must not treat it as a dead session; clock skew causes it too). HMAC is
   an anti-abuse layer, not a security boundary: a secret shipped to a browser or
   app is public.
-- **CSRF guard (`ENABLE_CSRF=true`, default off)** — mutating methods need an
+- **CSRF guard (`ENABLE_CSRF=true`, default off)** — the Socket.IO handshake follows
+  the same rule (see realtime-socket.md); mutating methods need an
   `Origin` (or `Referer` origin) in `corsOrigins`, else `403 AUTHORIZATION_ERROR`.
   A request with none of `Cookie`, `Origin`, `Referer` (native apps, server-to-server)
   is exempt: with no ambient credentials there is nothing for a forged request to
-  ride on, and browsers always send `Origin` on cross-site writes.
+  ride on, and browsers always send `Origin` on cross-site writes. The Socket.IO
+  handshake also accepts an `Origin` equal to the request `Host` (native WebSocket);
+  behind a reverse proxy `Host` must reach the app unchanged.
 - **Global rate limit (always)** — `globalRateLimiter` (100 req / 60s per client
   IP) is applied under the prefix after HMAC and the origin guard, so it counts
   every request that passes them: all routes (auth included), bad-JWT requests,
@@ -53,8 +57,12 @@ Bearer <token>` or the `accessToken` cookie; also enforces token revocation
   Cookie `maxAge` follows `JWT_ACCESS_EXPIRY` / `JWT_REFRESH_EXPIRY` (defaults
   `15m` / `7d`).
 - **Tokens in the body** — register / login / refresh also return both tokens in
-  the JSON body (by design: token-mode clients need them). Cookie-mode web clients
-  therefore expose the refresh token to script on the page (accepted risk).
+  the JSON body by default (`AUTH_TOKENS_IN_BODY=true`; token-mode clients need them).
+  Cookie-mode web clients therefore expose the refresh token to script on the page.
+  With `AUTH_TOKENS_IN_BODY=false` the body carries `tokens: {}` (both fields omitted);
+  cookies are unchanged and refresh still accepts the token from the body or the cookie.
+  Use `false` only when every client is cookie-based (nextjs, nuxtjs, tanstack-start);
+  react-native, reactjs and vuejs token-mode clients need `true`.
 - **Behind a proxy** — set `TRUST_PROXY` (a hop count, `true`, or a
   comma-separated IP/subnet list) so `req.ip` and rate limits use the client
   address; unset trusts no proxy. Prefer a hop count (e.g. `1`) over `true`,
@@ -63,16 +71,16 @@ Bearer <token>` or the `accessToken` cookie; also enforces token revocation
 
 ## Endpoints
 
-| Method | Path                    | Auth / Guards                                                | Request body (Zod)                                                                                                                               | Response shape                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| ------ | ----------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/api/v1/health`        | HMAC, global rate-limit                                      | —                                                                                                                                                | `{ status: "ok", timestamp, uptime, database, redis }`                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| POST   | `/api/v1/auth/register` | HMAC, `authRateLimiter` (30/15m), `validate(registerSchema)` | `{ email: string (email), password: string (min 8), name: string (min 1) }`                                                                      | `201` `{ success: true, message, data: { user, tokens: { accessToken, refreshToken } } }` + httpOnly cookies                                                                                                                                                                                                                                                                                                                                                                                      |
-| POST   | `/api/v1/auth/login`    | HMAC, `loginRateLimiter` (30/15m), `validate(loginSchema)`   | `{ email: string (email), password: string (min 1) }`                                                                                            | `{ success: true, message, data: { user, tokens: { accessToken, refreshToken } } }` + httpOnly cookies                                                                                                                                                                                                                                                                                                                                                                                            |
-| POST   | `/api/v1/auth/refresh`  | HMAC, `authRateLimiter` (30/15m)                             | optional `{ refreshToken?: string }` (falls back to the `refreshToken` cookie when absent or `""`; a non-string value is `400 VALIDATION_ERROR`) | `{ success: true, message, data: { tokens: { accessToken, refreshToken } } }` + rotated cookies. A token rotated within the last 10s (retry / parallel tabs) is answered like a normal refresh with a fresh pair. `401 AUTHENTICATION_ERROR` if the token is missing/invalid/expired/reused after that window (reuse of a rotated token revokes every session of the user and disconnects their sockets), with both token cookies cleared (`Set-Cookie` expired, `refreshToken` on its auth path) |
-| POST   | `/api/v1/auth/logout`   | HMAC, `authRateLimiter` (30/15m)                             | optional `{ refreshToken?: string }` (same body/cookie rules as refresh)                                                                         | `{ success: true, message }` + cleared cookies. Deletes the token's family (replaying it is a plain `401`; other devices' refresh tokens survive), cuts off the user's access tokens (Redis on) and disconnects their sockets                                                                                                                                                                                                                                                                     |
-| GET    | `/api/v1/auth/me`       | HMAC, `authenticate`                                         | —                                                                                                                                                | `{ success: true, data: { user } }`                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| GET    | `/api/v1/users`         | HMAC, `authenticate`, `requireMinRole('admin')`              | — (query: `page`≥1 def 1, `limit` 1–100 def 20)                                                                                                  | `{ success: true, data: PublicUser[], meta: OffsetMeta }`. `403` if below admin                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| GET    | `/api/v1/users/:id`     | HMAC, `authenticate`, `requireMinRole('admin')`              | —                                                                                                                                                | `{ success: true, data: PublicUser }`. `403` if below admin, `404` if not found                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Method | Path                    | Auth / Guards                                                | Request body (Zod)                                                                                                                               | Response shape                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------ | ----------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/v1/health`        | HMAC, global rate-limit                                      | —                                                                                                                                                | `{ status: "ok", timestamp, uptime, database, redis }`                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| POST   | `/api/v1/auth/register` | HMAC, `authRateLimiter` (30/15m), `validate(registerSchema)` | `{ email: string (email), password: string (min 8), name: string (min 1) }`                                                                      | `201` `{ success: true, message, data: { user, tokens: { accessToken?, refreshToken? } } }` + httpOnly cookies                                                                                                                                                                                                                                                                                                                                                                                      |
+| POST   | `/api/v1/auth/login`    | HMAC, `loginRateLimiter` (30/15m), `validate(loginSchema)`   | `{ email: string (email), password: string (min 1) }`                                                                                            | `{ success: true, message, data: { user, tokens: { accessToken?, refreshToken? } } }` + httpOnly cookies                                                                                                                                                                                                                                                                                                                                                                                            |
+| POST   | `/api/v1/auth/refresh`  | HMAC, `authRateLimiter` (30/15m)                             | optional `{ refreshToken?: string }` (falls back to the `refreshToken` cookie when absent or `""`; a non-string value is `400 VALIDATION_ERROR`) | `{ success: true, message, data: { tokens: { accessToken?, refreshToken? } } }` + rotated cookies. A token rotated within the last 10s (retry / parallel tabs) is answered like a normal refresh with a fresh pair. `401 AUTHENTICATION_ERROR` if the token is missing/invalid/expired/reused after that window (reuse of a rotated token revokes every session of the user and disconnects their sockets), with both token cookies cleared (`Set-Cookie` expired, `refreshToken` on its auth path) |
+| POST   | `/api/v1/auth/logout`   | HMAC, `authRateLimiter` (30/15m)                             | optional `{ refreshToken?: string }` (same body/cookie rules as refresh)                                                                         | `{ success: true, message }` + cleared cookies. Deletes the token's family (replaying it is a plain `401`; other devices' refresh tokens survive), cuts off the user's access tokens (Redis on) and disconnects their sockets                                                                                                                                                                                                                                                                       |
+| GET    | `/api/v1/auth/me`       | HMAC, `authenticate`                                         | —                                                                                                                                                | `{ success: true, data: { user } }`                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| GET    | `/api/v1/users`         | HMAC, `authenticate`, `requireMinRole('admin')`              | — (query: `page`≥1 def 1, `limit` 1–100 def 20)                                                                                                  | `{ success: true, data: PublicUser[], meta: OffsetMeta }`. `403` if below admin                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| GET    | `/api/v1/users/:id`     | HMAC, `authenticate`, `requireMinRole('admin')`              | —                                                                                                                                                | `{ success: true, data: PublicUser }`. `403` if below admin, `404` if not found                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 ## Error shape
 
@@ -89,7 +97,12 @@ Common codes: `400 VALIDATION_ERROR`, `401 AUTHENTICATION_ERROR`,
 large!"), `429 RATE_LIMIT` (every rate-limit response uses this envelope).
 
 A body that is not valid JSON is `400 VALIDATION_ERROR` ("Malformed JSON request
-body!"). Express parses the body before the HMAC check, so an unsigned request with
+body!"). Other body-parser failures are fixed generic `VALIDATION_ERROR`s too: an
+unsupported content encoding or charset is `415` (a JSON `charset` must start with `utf-`
+and be a charset the parser can decode: `utf-8` passes, `utf8` and `latin1` are `415`,
+and `utf-16` / `utf-32` pass the charset check but fail as a malformed body, `400`), and an aborted, size-mismatched or
+over-parameterized body is `400` ("Request body could not be read!"), as is a corrupt
+compressed body (a plain body sent with `Content-Encoding: gzip`, `br` or `deflate`). Express parses the body before the HMAC check, so an unsigned request with
 a malformed or oversize body gets `400`/`413`; Fastify answers `401` for the same
 request. The body is not signed, so the order has no security impact.
 
@@ -99,6 +112,19 @@ request. The body is not signed, so the order has no security impact.
 Unmatched routes fall through to `notFoundHandler`
 (`src/middleware/not-found-handler.ts`). Under `apiPrefix` an unsigned unknown path
 is `401 HMAC_ERROR` first; outside it (for example `/foo`) there is no HMAC gate.
+
+## Socket.IO handshake
+
+`auth` payload: `{ sig, ctime, token? }` (`token` may be `Bearer <jwt>`, or the
+`accessToken` cookie). Rejections arrive as the client's `connect_error`:
+
+| Reason                                                        | `err.message`   | `err.data`                    |
+| ------------------------------------------------------------- | --------------- | ----------------------------- |
+| HMAC: missing/invalid/expired signature, bad or stale `ctime` | `Unauthorized!` | `{ errorType: "HMAC_ERROR" }` |
+| Token: missing, invalid, expired or revoked                   | `Unauthorized!` | none                          |
+
+On `HMAC_ERROR` fix the signature or clock and reconnect; do not refresh the token.
+Details in [system-architecture/realtime-socket.md](./system-architecture/realtime-socket.md).
 
 ## Pagination
 

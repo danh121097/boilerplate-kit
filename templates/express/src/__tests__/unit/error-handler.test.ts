@@ -100,6 +100,56 @@ describe("errorHandler", () => {
     expect(jsonArg.error_message).toBe("Malformed JSON request body!");
   });
 
+  it.each([
+    ["encoding.unsupported", 415],
+    ["charset.unsupported", 415],
+    ["request.aborted", 400],
+    ["request.size.invalid", 400],
+    ["stream.encoding.set", 400],
+    ["parameters.too.many", 400],
+  ])(
+    "maps body-parser type %s to %i VALIDATION_ERROR without echoing parser text",
+    (type, status) => {
+      const res = createMockRes();
+      const raw = `unsupported content encoding "x-secret-${type}"`;
+      const err = Object.assign(new Error(raw), { statusCode: 500, type });
+      errorHandler(err as any, mockReq, res, mockNext);
+      expect(res.status).toHaveBeenCalledWith(status);
+      const jsonArg = res.json.mock.calls[0][0];
+      expect(jsonArg.errorType).toBe("VALIDATION_ERROR");
+      expect(jsonArg.message).toBe(jsonArg.error_message);
+      expect(jsonArg.message).not.toContain("x-secret");
+      expect(jsonArg.message).not.toContain(type);
+    },
+  );
+
+  it("leaves an unknown body-parser type to the generic handling", () => {
+    const res = createMockRes();
+    const err = Object.assign(new Error("raw parser text"), {
+      statusCode: 500,
+      type: "constructor",
+    });
+    errorHandler(err as any, mockReq, res, mockNext);
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json.mock.calls[0][0].message).toBe("Internal Server Error!");
+  });
+
+  it.each([
+    ["zlib", { code: "Z_DATA_ERROR", errno: -3, status: 400 }, 400],
+    ["brotli", { code: "ERR_BROTLI_DECOMPRESSION_FAILED" }, 400],
+    ["untabled 4xx parser type", { type: "something.new", status: 422 }, 422],
+    ["exposed 4xx", { expose: true, statusCode: 400 }, 400],
+  ])("maps a %s body-reading error to a fixed message", (_name, props, status) => {
+    const res = createMockRes();
+    const err = Object.assign(new Error("incorrect header check at /srv/x"), props);
+    errorHandler(err as any, mockReq, res, mockNext);
+    expect(res.status).toHaveBeenCalledWith(status);
+    const jsonArg = res.json.mock.calls[0][0];
+    expect(jsonArg.errorType).toBe("VALIDATION_ERROR");
+    expect(jsonArg.message).toBe("Request body could not be read!");
+    expect(jsonArg.message).toBe(jsonArg.error_message);
+  });
+
   it("maps a body-parser size failure to 413 VALIDATION_ERROR", () => {
     const res = createMockRes();
     const err = Object.assign(new Error("request entity too large"), {

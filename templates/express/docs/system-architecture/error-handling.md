@@ -68,7 +68,15 @@ res.status(statusCode).json({
 - Body-parser failures (`express.json()` runs before HMAC) are mapped to fixed
   client-safe messages, never the parser's own text: invalid JSON →
   `400 VALIDATION_ERROR` "Malformed JSON request body!", oversize →
-  `413 VALIDATION_ERROR` "Request body is too large!". So an unsigned request with
+  `413 VALIDATION_ERROR` "Request body is too large!", unsupported
+  `Content-Encoding` / charset → `415 VALIDATION_ERROR` ("Unsupported request content
+  encoding!" / "Unsupported request charset!"), and aborted / size-invalid /
+  `stream.encoding.set` / too-many-parameters bodies → `400 VALIDATION_ERROR` "Request
+  body could not be read!" (table in `middleware/error-handler.ts`). A corrupt compressed body (zlib / brotli
+  decompress errors under `Content-Encoding: gzip|br|deflate`) and any other 4xx
+  body-reading error the table does not name map to `400` "Request body could not be
+  read!" (or a fixed message by status class) — never raw zlib text or
+  `INTERNAL_ERROR`. So an unsigned request with
   a bad body gets `400`/`413` here, where Fastify answers `401` (HMAC first); HMAC
   does not cover the body, so the order has no security impact.
 - Every error is logged through the app `logger`: `error` level (with the

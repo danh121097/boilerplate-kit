@@ -19,7 +19,8 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:redis": "vitest run -c vitest.redis.config.ts"
   },
   "keywords": [
     "nodejs",

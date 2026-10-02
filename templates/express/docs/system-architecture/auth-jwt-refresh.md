@@ -66,15 +66,18 @@ export function signRefreshToken(payload: JwtPayload): string {
 `verifyAccessToken` pins `algorithms: ['RS256']` and verifies against
 `config.jwtAccessPublicKey`, enforces the `issuer` and asserts
 `token_use=access` — throwing otherwise. Verification order: signature →
-algorithm → issuer → `token_use`. Refresh tokens have no verify helper: validity
-comes from the DB lookup of their SHA-256 hash.
+algorithm → issuer → `token_use`. Refresh tokens have no verify helper in
+`utils/jwt.ts`: `refresh()` in `refresh-session.ts` first checks the signature
+(`JWT_REFRESH_SECRET`, HS256) and `exp`, refusing a bad or expired one with the same
+generic `401 Invalid refresh token!` as an unknown token, and then validity,
+revocation and reuse come from the DB lookup of the token's SHA-256 hash.
 
 The RSA keypair is loaded at startup by [`config/keys.ts`](../../src/config/keys.ts):
 it reads `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH`, runs a sign/verify
 self-test, and only `test`/`development` may fall back to an ephemeral in-memory
 keypair — any other env throws (fail-closed, never forge tokens silently). The
 keypair signs and verifies **access** tokens. Refresh tokens are signed and
-verified with `JWT_REFRESH_SECRET` — a required symmetric secret (use ≥32 random chars; length is not enforced).
+verified with `JWT_REFRESH_SECRET` — a required symmetric secret (at least 32 characters, enforced at boot).
 The `JwtPayload` carries `{ userId, email, role }` only — never `exp`/`iat`/`iat_ms`
 (owned by `expiresIn`).
 
@@ -112,6 +115,7 @@ const baseCookieOptions = {
   secure: config.isProduction, // HTTPS-only in prod
   sameSite: config.isProduction ? "strict" : "lax",
   path: "/",
+  domain: config.cookieDomain, // optional, host-only when unset
 };
 // accessToken  → path '/',          maxAge = JWT_ACCESS_EXPIRY  (default 15m)
 // refreshToken → path `${apiPrefix}/auth`, maxAge = JWT_REFRESH_EXPIRY (default 7d)
@@ -125,6 +129,32 @@ parses `15m` / `7d` / plain seconds).
 The refresh cookie is **path-scoped to `/api/v1/auth`** so the browser only sends
 it to the auth endpoints, shrinking its exposure. `clearTokenCookies` clears both
 using the matching paths.
+
+## Deploying the frontend and API on different subdomains
+
+Checked in Chromium (Playwright) against the express backend over plain HTTP with the
+development cookie attributes (`HttpOnly`, `SameSite=Lax`, no `Domain`). The fastify and
+nestjs backends set the same attributes; that is read from their source, not run.
+
+- Verified: with the page on `app.localhost` and the API on `api.localhost`, the browser
+  stored none of the `Set-Cookie` headers and `/auth/me` returned 401. Chromium treats
+  `localhost` as a public suffix, so the two hosts are different sites and `Lax` cookies
+  are not stored on a cross-site fetch. The same page on `localhost:5400` calling
+  `localhost:4100` (same site, different port) stored the cookies and sent them back.
+  A probe that sent `SameSite=None; Secure` was stored and sent from `api.localhost`, and a
+  `Domain=.localhost` attribute was rejected.
+- Not tested, from the SameSite rules: `app.example.com` and `api.example.com` share a
+  registrable domain, so they are the same site and `Lax`/`Strict` cookies work with
+  `credentials: include` (axios `withCredentials`). Hosts on different registrable domains
+  need `SameSite=None; Secure`, which the backends do not offer: `sameSite` is fixed to
+  `strict` in production and `lax` otherwise in the backend cookie helper.
+- Cookies are host-only unless the backend sets `COOKIE_DOMAIN` (for example
+  `.example.com`). Without it the browser sends `accessToken` only to the API host, so an
+  SSR server on the app host never sees it and SSR session reads are anonymous. Not tested
+  (no parent domain is available locally); the value goes to `Domain` on both set and clear.
+- In production the cookies are `Secure` and `SameSite=Strict` (HTTPS only; not tested).
+  Strict cookies are withheld on a navigation that arrives from another site, so the first
+  SSR render after following an external link can be anonymous until the browser refreshes.
 
 ## Tokens In The Response Body
 

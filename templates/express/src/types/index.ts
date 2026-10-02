@@ -44,7 +44,7 @@ export interface EnvironmentConfig {
   jwtAccessExpiry: string;
   jwtRefreshExpiry: string;
   hmacSecret: string;
-  /** Allowed browser origins for CORS + the CSRF guard (hard-coded in config). */
+  /** Allowed browser origins for CORS + the CSRF guard (hard-coded in prod; CORS_ORIGINS overrides the dev list). */
   corsOrigins: string[];
   /** Enable the Origin-allow-list CSRF guard on mutating methods (default off). */
   enableCsrf: boolean;
@@ -53,6 +53,8 @@ export interface EnvironmentConfig {
   /** Express `trust proxy` setting from TRUST_PROXY; undefined = trust nothing. */
   trustProxy?: boolean | number | string;
   apiPrefix: string;
+  /** Include accessToken/refreshToken in register/login/refresh response bodies. */
+  authTokensInBody: boolean;
   redisEnabled: boolean;
   redisUrl: string;
 }

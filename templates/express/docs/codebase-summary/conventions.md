@@ -92,7 +92,7 @@ the group as `const x: RouteGroup = { ... }` so the compiler checks every route.
 
 Never read `process.env` outside `src/config/environment.ts`. That file calls
 `dotenv.config()` once, validates required vars (`getRequiredEnvVar` throws on
-missing `MONGODB_URI` / `HMAC_SECRET` / `JWT_REFRESH_SECRET`), and exports a
+missing `MONGODB_URI` / `HMAC_SECRET` / `JWT_REFRESH_SECRET`; the two secrets must be ≥32 chars), and exports a
 typed `config: EnvironmentConfig`. Everywhere else:
 
 ```ts
@@ -120,7 +120,7 @@ verify with the public key without holding signing power:
   automatically if `rsa.private` is absent). Keep `rsa.private` out of git.
 
 **Refresh** tokens are HS256-signed with the symmetric secret `JWT_REFRESH_SECRET`
-(required; use ≥32 random chars, length is not enforced). Symmetric is the right tool because refresh tokens are
+(required, at least 32 characters, enforced at boot). Symmetric is the right tool because refresh tokens are
 only ever verified by this auth server — never sent to third parties. They differ
 from access tokens by the `token_use` claim, expiry, and that they are DB-tracked,
 httpOnly-cookie-delivered, rotated, and reuse-detected. The `token_use` claim

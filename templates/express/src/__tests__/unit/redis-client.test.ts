@@ -122,3 +122,34 @@ describe("redis client — shutdown while Redis is down", () => {
     expect(client.disconnect).toHaveBeenCalledOnce();
   });
 });
+
+describe("redis client — outage error logging", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("logs one stackless line per distinct message per minute", async () => {
+    vi.useFakeTimers();
+    process.env.REDIS_ENABLED = "true";
+    const { logger } = await import("@/utils/logger");
+    const errorLog = vi.spyOn(logger, "error").mockImplementation(() => undefined);
+    const { connectRedis } = await import("@/config/redis");
+    connectRedis();
+    const onError = onSpy.mock.calls.find(([event]) => event === "error")?.[1] as (
+      e: Error,
+    ) => void;
+
+    const refused = new Error("connect ECONNREFUSED 127.0.0.1:6379");
+    for (let i = 0; i < 5; i++) {
+      onError(refused);
+      vi.advanceTimersByTime(1400);
+    }
+    expect(errorLog).toHaveBeenCalledTimes(1);
+    expect(errorLog).toHaveBeenCalledWith("Redis error: connect ECONNREFUSED 127.0.0.1:6379");
+
+    onError(new Error("getaddrinfo ENOTFOUND redis"));
+    expect(errorLog).toHaveBeenCalledTimes(2);
+
+    vi.advanceTimersByTime(60_000);
+    onError(refused);
+    expect(errorLog).toHaveBeenCalledTimes(3);
+  });
+});

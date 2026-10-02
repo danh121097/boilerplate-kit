@@ -48,15 +48,13 @@ describe("auth rate limits", () => {
     expect((await post("register", { email: "x" })).status).toBe(429);
     expect((await post("logout")).status).toBe(429);
 
-    // ...but login still has its own full allowance.
+    // ...but login still has its own full allowance. The body is invalid on purpose: the
+    // 400 comes after the limiter and skips the bcrypt compare a real attempt would run.
     for (let i = 0; i < LIMIT; i++) {
-      const res = await post("login", { email: "nobody@example.com", password: "Password1!" });
-      expect(res.status, `login ${i + 1}`).toBe(401);
+      const res = await post("login", { email: "nobody@example.com" });
+      expect(res.status, `login ${i + 1}`).toBe(400);
     }
-    const loginBlocked = await post("login", {
-      email: "nobody@example.com",
-      password: "Password1!",
-    });
+    const loginBlocked = await post("login", { email: "nobody@example.com" });
     expect(loginBlocked.status).toBe(429);
     expect(loginBlocked.body).toMatchObject({
       errorType: "RATE_LIMIT",

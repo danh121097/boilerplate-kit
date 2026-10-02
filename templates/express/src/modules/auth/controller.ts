@@ -1,8 +1,15 @@
+import { config } from "@/config/environment";
 import { serializeUser } from "@/modules/user/serialize-user";
 import { AppError } from "@/types";
+import { AuthTokens } from "@/types/auth";
 import { clearTokenCookies, setTokenCookies } from "@/utils/cookie";
 import { Request, Response } from "express";
 import * as AuthService from "@/modules/auth/service";
+
+/** Tokens for the response body: empty when AUTH_TOKENS_IN_BODY=false (cookies still carry them). */
+function bodyTokens(tokens: AuthTokens): Partial<AuthTokens> {
+  return config.authTokensInBody ? tokens : {};
+}
 
 /** POST /api/auth/register */
 export async function register(req: Request, res: Response): Promise<void> {
@@ -14,7 +21,7 @@ export async function register(req: Request, res: Response): Promise<void> {
   res.status(201).json({
     success: true,
     message: "User registered successfully!",
-    data: { user: serializeUser(user), tokens },
+    data: { user: serializeUser(user), tokens: bodyTokens(tokens) },
   });
 }
 
@@ -28,7 +35,7 @@ export async function login(req: Request, res: Response): Promise<void> {
   res.json({
     success: true,
     message: "Login successful!",
-    data: { user: serializeUser(user), tokens },
+    data: { user: serializeUser(user), tokens: bodyTokens(tokens) },
   });
 }
 
@@ -63,7 +70,7 @@ export async function refresh(req: Request, res: Response): Promise<void> {
   res.json({
     success: true,
     message: "Tokens refreshed successfully!",
-    data: { tokens },
+    data: { tokens: bodyTokens(tokens) },
   });
 }
 

@@ -1,6 +1,7 @@
 import { config } from "@/config/environment";
 import { AppError } from "@/types";
 import { NextFunction, Request, Response } from "express";
+import type { IncomingHttpHeaders } from "http";
 
 /**
  * CSRF defense via Origin/Referer allow-list — additive, opt-in.
@@ -27,15 +28,44 @@ export interface VerifyOriginOptions {
 }
 
 /** Resolve the request origin: explicit `Origin`, else the `Referer`'s origin. */
-function resolveOrigin(req: Request): string | undefined {
-  const origin = req.headers.origin;
+function resolveOrigin(headers: IncomingHttpHeaders): string | undefined {
+  const origin = headers.origin;
   if (origin) return origin;
-  const referer = req.headers.referer;
+  const referer = headers.referer;
   if (!referer) return undefined;
   try {
     return new URL(referer).origin;
   } catch {
     return undefined;
+  }
+}
+
+/**
+ * The CSRF origin rule, shared by the HTTP guard and the Socket.IO handshake. A request
+ * with no `Cookie`, `Origin` or `Referer` header passes (raw header presence, so a
+ * malformed Referer is not treated as absent); otherwise its resolved origin must be in
+ * the allow-list. Does not look at the method or at ENABLE_CSRF — callers do.
+ */
+export function isOriginAllowed(headers: IncomingHttpHeaders, allowList: string[]): boolean {
+  if (!headers.cookie && !headers.origin && !headers.referer) return true;
+  const origin = resolveOrigin(headers);
+  return origin !== undefined && allowList.includes(origin);
+}
+
+/**
+ * True when the `Origin` header names this server's own host (`Host` header), compared
+ * as host[:port] case-insensitively. A native WebSocket (React Native) sends an Origin
+ * equal to the API's own origin and may carry cookies from its jar; a cross-site page
+ * cannot forge that, because its Origin is its own. A missing, `null` or malformed Origin
+ * is not same-origin, and a different port is a different host.
+ */
+export function isSameOrigin(headers: IncomingHttpHeaders): boolean {
+  const { origin, host } = headers;
+  if (!origin || !host) return false;
+  try {
+    return new URL(origin).host.toLowerCase() === host.toLowerCase();
+  } catch {
+    return false;
   }
 }
 
@@ -47,14 +77,7 @@ export function createVerifyOrigin(opts: VerifyOriginOptions) {
       return;
     }
 
-    // Raw header presence (not resolveOrigin) so a malformed Referer is not treated as absent.
-    if (!req.headers.cookie && !req.headers.origin && !req.headers.referer) {
-      next();
-      return;
-    }
-
-    const origin = resolveOrigin(req);
-    if (!origin || !opts.allowList.includes(origin)) {
+    if (!isOriginAllowed(req.headers, opts.allowList)) {
       throw new AppError({
         message: "CSRF: request origin is not allowed!",
         statusCode: 403,

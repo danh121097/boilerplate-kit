@@ -1,3 +1,4 @@
+import { signHmac } from "@/__tests__/helpers/hmac-sign";
 import { closeServer, listenOnLoopback } from "@/__tests__/helpers/loopback-server";
 import { afterAll, beforeAll, describe, it, expect } from "vitest";
 import type { Server } from "http";
@@ -31,4 +32,20 @@ describe("Body-parser errors through the real app", () => {
     expect(res.body.errorType).toBe("VALIDATION_ERROR");
     expect(res.body.message).toBe("Request body is too large!");
   });
+
+  it.each(["gzip", "br", "deflate"])(
+    "answers a plain body labelled Content-Encoding: %s with 400 VALIDATION_ERROR",
+    async (encoding) => {
+      const body = JSON.stringify({ email: "a@b.com", password: "Passw0rd!" });
+      const res = await request(server)
+        .post(url)
+        .set(signHmac("POST", url, body))
+        .set("Content-Type", "application/json")
+        .set("Content-Encoding", encoding)
+        .send(body);
+      expect(res.status).toBe(400);
+      expect(res.body.errorType).toBe("VALIDATION_ERROR");
+      expect(res.body.message).toBe("Request body could not be read!");
+    },
+  );
 });

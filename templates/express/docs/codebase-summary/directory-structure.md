@@ -10,7 +10,7 @@ src/
 │
 ├── config/
 │   ├── environment.ts        # Loads .env, validates required vars → typed `config`
-│   ├── env-validation.ts     # Zod check of NODE_ENV, PORT, ENABLE_CSRF, REDIS_ENABLED, DOCS_ENABLED
+│   ├── env-validation.ts     # Zod check of NODE_ENV, PORT, ENABLE_CSRF, REDIS_ENABLED, DOCS_ENABLED, AUTH_TOKENS_IN_BODY
 │   ├── database.ts           # Mongoose connect (exit on failure) + graceful shutdown handlers
 │   ├── redis.ts              # Optional shared ioredis client (null when disabled)
 │   ├── keys.ts               # Load RSA keypair for RS256; fail-closed outside dev/test

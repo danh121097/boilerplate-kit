@@ -16,6 +16,7 @@ from `server.ts` after the HTTP server is created:
 ```ts
 io = new Server(httpServer, {
   cors: { origin: config.corsOrigins, credentials: true },
+  allowRequest, // ENABLE_CSRF origin rule on the handshake / upgrade (see below)
   pingInterval: 25000,
   pingTimeout: 20000,
   maxHttpBufferSize: 1e6, // 1 MB cap on inbound payloads
@@ -53,10 +54,33 @@ Notes:
 - `closeSocket()` force-disconnects live sockets (`io.disconnectSockets(true)`)
   before `io.close()`, since `close()` alone does not drop active websockets.
 
+## Handshake Origin Check
+
+`cors` only sets response headers; it does not stop a cross-site page from opening a
+WebSocket with the user's cookies. With `ENABLE_CSRF=true`, `allowRequest` runs
+`isOriginAllowed` ([`middleware/verify-origin.ts`](../../src/middleware/verify-origin.ts)),
+the same predicate as the HTTP CSRF guard, on the handshake / upgrade request: no
+`Cookie`, `Origin` or `Referer` passes (native clients); otherwise the `Origin` (or
+`Referer` origin) must be in `corsOrigins`. The handshake alone also passes when the
+`Origin` host (`new URL(origin).host`) equals the request's `Host` header,
+case-insensitively and port included: React Native's WebSocket sends the API's own
+origin and may attach cookies from its jar, which a cross-site page cannot forge. A
+different port, `Origin: null` or a malformed `Origin` is not same-origin; a foreign
+`Origin`, a `Cookie` without `Origin`, or a foreign `Referer` is still refused. A rejection is an HTTP `403` before any
+Socket.IO middleware runs; with `ENABLE_CSRF` off the check is skipped.
+
+Behind a reverse proxy the `Host` header must reach the app unchanged (nginx:
+`proxy_set_header Host $host;`, or the proxy's "preserve host" option). The rule
+compares against the raw `Host` only (`X-Forwarded-Host` is never read), so a proxy
+that rewrites it to the upstream name makes the comparison fail and React Native
+sockets get `403` while `ENABLE_CSRF=true`.
+
 ## Handshake Gates (order matters)
 
 Two middleware run on every handshake — **HMAC first, then JWT** — mirroring the
-HTTP pipeline. Both reject with the message `SOCKET_UNAUTHORIZED` (`'Unauthorized!'`).
+HTTP pipeline. Both reject with the message `SOCKET_UNAUTHORIZED` (`'Unauthorized!'`); only an
+HMAC rejection also carries `data`, so a client can tell the two apart (see
+[Rejection shape](#rejection-shape)).
 
 ### 1. `socketHmac`
 
@@ -75,8 +99,9 @@ verifyHmac({
 
 So the client signs `['GET', 'application/json', ctime, '/socket', ''].join('\n')`
 — same `verifyHmac` (freshness + timing-safe compare) as HTTP, just a fixed path
-with no volatile query. A failure is the generic `Unauthorized!` connect error
-(not `HMAC_ERROR`). `ctime` must be fresh, so a reconnecting client re-signs each
+with no volatile query. A failure (missing `sig` or `ctime`, invalid or
+expired signature, non-numeric or stale `ctime`) is the `Unauthorized!` connect error
+with `data: { errorType: "HMAC_ERROR" }`. `ctime` must be fresh, so a reconnecting client re-signs each
 handshake. See [hmac-verification.md](./hmac-verification.md).
 
 ### 2. `socketAuth`
@@ -100,6 +125,20 @@ The handshake reads **only** `auth.sig`, `auth.ctime` and `auth.token` (or the
 cookie). It reads no `auth.role`: the role comes from the verified JWT in
 `socket.data.user`, never from client input.
 
+### Rejection shape
+
+Both gates fail the handshake with `error.message === "Unauthorized!"`. Socket.IO
+forwards `error.data` to the client's `connect_error` handler:
+
+| Rejected by                                                 | `err.message`   | `err.data`                    |
+| ----------------------------------------------------------- | --------------- | ----------------------------- |
+| `socketHmac` (missing/invalid/expired signature or `ctime`) | `Unauthorized!` | `{ errorType: "HMAC_ERROR" }` |
+| `socketAuth` (missing, invalid, expired or revoked token)   | `Unauthorized!` | none                          |
+
+`HMAC_ERROR` is the same `errorType` the HTTP HMAC gate returns. A client seeing it
+should fix its signature or clock and reconnect, not spend a token refresh: the
+session is fine.
+
 ## Events
 
 [`socket/events.ts`](../../src/socket/events.ts) is the central event-name registry
@@ -114,7 +153,7 @@ accept names declared here):
 
 `authenticated` is the only event the server emits on its own; no `unauthorized` or
 `notification` event exists. A rejected handshake surfaces to the client as a
-`connect_error` with the `Unauthorized!` message.
+`connect_error` with the `Unauthorized!` message (plus `data.errorType` for HMAC).
 
 ## Emitting From Services
 

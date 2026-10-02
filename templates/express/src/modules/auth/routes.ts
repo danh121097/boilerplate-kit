@@ -11,7 +11,11 @@ import { z } from "zod";
 import type { RouteGroup } from "@/types/routing";
 import * as AuthController from "@/modules/auth/controller";
 
-const tokensSchema = z.object({ accessToken: z.string(), refreshToken: z.string() });
+// Both fields are omitted from the body when AUTH_TOKENS_IN_BODY=false (cookies still carry them).
+const tokensSchema = z.object({
+  accessToken: z.string().optional(),
+  refreshToken: z.string().optional(),
+});
 const registerResponseSchema = z.object({
   success: z.literal(true),
   message: z.string(),

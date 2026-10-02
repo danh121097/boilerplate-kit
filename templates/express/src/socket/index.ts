@@ -1,8 +1,10 @@
 import { config } from "@/config/environment";
 import { getRedis } from "@/config/redis";
+import { isOriginAllowed, isSameOrigin } from "@/middleware/verify-origin";
 import { socketAuth } from "@/socket/auth-middleware";
 import { SOCKET_EVENT } from "@/socket/events";
 import { socketHmac } from "@/socket/hmac-middleware";
+import { createLogThrottle } from "@/utils/log-throttle";
 import { logger } from "@/utils/logger";
 import { createAdapter } from "@socket.io/redis-adapter";
 import { Server, type Socket } from "socket.io";
@@ -17,6 +19,9 @@ import type { Redis } from "ioredis";
  */
 let io: Server | null = null;
 let subClient: Redis | null = null;
+
+/** Same outage noise as the shared client: one concise line per distinct message a minute. */
+const shouldLogSubscriberError = createLogThrottle(60_000);
 
 /**
  * The adapter fires `publish` without awaiting or catching it, so a rejection during
@@ -76,6 +81,18 @@ function withSafeSubscriptions(client: Redis): Redis {
 export function initSocket(httpServer: HttpServer): Server {
   io = new Server(httpServer, {
     cors: { origin: config.corsOrigins, credentials: true },
+    // `cors` only sets response headers; it does not stop a cross-site page from opening a
+    // WebSocket with the user's cookies. Apply the HTTP CSRF origin rule to the handshake /
+    // upgrade request (a no-op unless ENABLE_CSRF=true). Cookie-less native clients pass,
+    // and so does an Origin equal to this server's own host (native WebSocket stacks send it).
+    allowRequest: (req, callback): void => {
+      callback(
+        null,
+        !config.enableCsrf ||
+          isOriginAllowed(req.headers, config.corsOrigins) ||
+          isSameOrigin(req.headers),
+      );
+    },
     // Heartbeat: drop dead connections without flooding the wire (Socket.IO defaults).
     pingInterval: 25000,
     pingTimeout: 20000,
@@ -97,7 +114,11 @@ export function initSocket(httpServer: HttpServer): Server {
       commandTimeout: undefined,
       maxRetriesPerRequest: null,
     });
-    subClient.on("error", (err) => logger.warn("Socket.IO Redis subscriber error", { err }));
+    subClient.on("error", (err) => {
+      if (shouldLogSubscriberError(err.message)) {
+        logger.warn(`Socket.IO Redis subscriber error: ${err.message}`);
+      }
+    });
     io.adapter(createAdapter(withSafePublish(pub), withSafeSubscriptions(subClient)));
   }
 

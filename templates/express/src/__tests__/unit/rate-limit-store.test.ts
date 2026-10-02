@@ -55,4 +55,42 @@ describe("makeStore", () => {
     }
     expect(call).not.toHaveBeenCalled();
   });
+
+  it("logs a store failure as one concise warning per interval and keeps failing open", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    getRedisMock.mockReturnValue({ status: "reconnecting", call: vi.fn() });
+    const { config } = await import("@/config/environment");
+    const { logger } = await import("@/utils/logger");
+    const { globalRateLimiter } = await import("@/middleware/rate-limit");
+    const { default: express } = await import("express");
+    const { default: request } = await import("supertest");
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const isTest = config.isTest;
+    config.isTest = false;
+
+    const app = express();
+    app.use(globalRateLimiter);
+    app.get("/", (_req, res) => {
+      res.json({ ok: true });
+    });
+    const server = await listenOnLoopback(app);
+    try {
+      for (let i = 0; i < 5; i++) expect((await request(server).get("/")).status).toBe(200);
+
+      const storeWarnings = () =>
+        warn.mock.calls.filter(([message]) => /store unavailable/.test(message));
+      expect(storeWarnings()).toHaveLength(1);
+      expect(storeWarnings()[0][1]).toEqual({ reason: "Redis not ready" });
+      expect(consoleError).not.toHaveBeenCalled();
+
+      vi.setSystemTime(Date.now() + 61_000);
+      expect((await request(server).get("/")).status).toBe(200);
+      expect(storeWarnings()).toHaveLength(2);
+    } finally {
+      config.isTest = isTest;
+      await closeServer(server);
+      vi.useRealTimers();
+    }
+  });
 });

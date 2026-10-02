@@ -1,4 +1,5 @@
 import { config } from "@/config/environment";
+import { createLogThrottle } from "@/utils/log-throttle";
 import { logger } from "@/utils/logger";
 import Redis from "ioredis";
 
@@ -10,6 +11,10 @@ import Redis from "ioredis";
  * designed to run fully without it.
  */
 let client: Redis | null = null;
+
+/** During an outage ioredis emits one error per reconnect (~1.4 s); log each message once a minute. */
+const REDIS_ERROR_LOG_INTERVAL_MS = 60_000;
+const shouldLogRedisError = createLogThrottle(REDIS_ERROR_LOG_INTERVAL_MS);
 
 /** Connect lazily; no-op when disabled. Never exits the process on failure. */
 export function connectRedis(): void {
@@ -28,7 +33,9 @@ export function connectRedis(): void {
   });
 
   client.on("connect", () => logger.info("Redis connected"));
-  client.on("error", (err) => logger.error("Redis error", { err }));
+  client.on("error", (err) => {
+    if (shouldLogRedisError(err.message)) logger.error(`Redis error: ${err.message}`);
+  });
 }
 
 /** Shared client, or null when Redis is disabled / not connected. */

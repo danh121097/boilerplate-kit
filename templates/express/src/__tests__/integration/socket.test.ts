@@ -65,27 +65,50 @@ describe("Socket.IO handshake + targeted emit", () => {
     }
   });
 
-  it("rejects a connection without a token (HMAC present)", async () => {
-    const client = connect({ hmac: true });
+  /** Connect and resolve with the handshake rejection the client sees. */
+  async function rejection(opts: {
+    token?: string;
+    auth?: Record<string, unknown>;
+  }): Promise<Error & { data?: unknown }> {
+    const client = ioClient(url, {
+      auth: { ...(opts.token ? { token: opts.token } : {}), ...opts.auth },
+      transports: ["websocket"],
+      reconnection: false,
+    });
     try {
-      const err = await new Promise<Error>((resolve) => {
-        client.on("connect_error", resolve);
-      });
-      expect(err.message).toBe("Unauthorized!");
+      return await new Promise((resolve) => client.on("connect_error", resolve));
     } finally {
       client.disconnect();
     }
+  }
+
+  const staleCtime = String(Date.now() - 10 * 60 * 1000);
+  const hmacCases: Record<string, () => Record<string, unknown>> = {
+    "missing signature": () => ({}),
+    "invalid signature": () => ({ ...signSocketHmac(), sig: "bm90LWEtc2lnbmF0dXJl" }),
+    "stale ctime": () => ({ ...signSocketHmac(), ctime: staleCtime }),
+    "missing ctime": () => ({ sig: signSocketHmac().sig }),
+    "non-numeric ctime": () => ({ ...signSocketHmac(), ctime: "soon" }),
+  };
+
+  it.each(Object.keys(hmacCases))(
+    "rejects an HMAC failure (%s) with Unauthorized! and errorType HMAC_ERROR",
+    async (kind) => {
+      const err = await rejection({ token: signAccessToken(PAYLOAD), auth: hmacCases[kind]() });
+      expect(err.message).toBe("Unauthorized!");
+      expect(err.data).toEqual({ errorType: "HMAC_ERROR" });
+    },
+  );
+
+  it("rejects a missing token with Unauthorized! and no error data", async () => {
+    const err = await rejection({ auth: signSocketHmac() });
+    expect(err.message).toBe("Unauthorized!");
+    expect(err.data).toBeUndefined();
   });
 
-  it("rejects a connection without the HMAC signature", async () => {
-    const client = connect({ token: signAccessToken(PAYLOAD), hmac: false });
-    try {
-      const err = await new Promise<Error>((resolve) => {
-        client.on("connect_error", resolve);
-      });
-      expect(err.message).toBe("Unauthorized!");
-    } finally {
-      client.disconnect();
-    }
+  it("rejects a bad token with Unauthorized! and no error data", async () => {
+    const err = await rejection({ token: "not.a.jwt", auth: signSocketHmac() });
+    expect(err.message).toBe("Unauthorized!");
+    expect(err.data).toBeUndefined();
   });
 });

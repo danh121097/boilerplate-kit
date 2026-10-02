@@ -7,20 +7,59 @@ import rateLimit, { type RateLimitRequestHandler, type Store } from "express-rat
 import { RedisStore } from "rate-limit-redis";
 import type { NextFunction, Request, Response } from "express";
 
+const NOT_READY_MESSAGE = "Redis not ready";
+
 /**
  * RedisStore loads its Lua scripts in `init()`, which express-rate-limit calls at
  * startup, before Redis is ready (or while it is down). A failure there must not be an
  * unhandled rejection; the store reloads the scripts on the first real increment.
+ * At boot every limiter hits the not-ready case: the limiters are built right after
+ * `connectRedis()`, while the client is still connecting, so `sendCommand` rejects
+ * with NOT_READY_MESSAGE. That race is expected and not logged; any other init failure
+ * is. A genuine outage is reported by the Redis client's own error log.
  */
 class ResilientRedisStore extends RedisStore {
   override async init(options: Parameters<RedisStore["init"]>[0]): Promise<void> {
     try {
       await super.init(options);
     } catch (err) {
-      logger.warn("Rate-limit store init failed; scripts load on first use", { err });
+      const reason = err instanceof Error ? err.message : String(err);
+      if (reason === NOT_READY_MESSAGE) return;
+      logger.warn("Rate-limit store init failed; scripts load on first use", { reason });
     }
   }
 }
+
+/** Minimum gap between rate-limit store failure warnings (a Redis outage fails every request). */
+const STORE_ERROR_LOG_INTERVAL_MS = 60_000;
+let lastStoreErrorLoggedAt = Number.NEGATIVE_INFINITY;
+
+/**
+ * Logger handed to express-rate-limit, whose default dumps the full error (stack
+ * included) to the console on every failed store call. With `passOnStoreError` that is
+ * every request during a Redis outage. Store failures (the library passes a message)
+ * become one concise warning per interval; anything else is logged as-is.
+ */
+const rateLimitLogger = {
+  error(error: unknown, message?: string): void {
+    const reason = error instanceof Error ? error.message : String(error);
+    if (!message) {
+      logger.warn("express-rate-limit reported a problem", { reason });
+      return;
+    }
+    const now = Date.now();
+    if (now - lastStoreErrorLoggedAt < STORE_ERROR_LOG_INTERVAL_MS) return;
+    lastStoreErrorLoggedAt = now;
+    logger.warn("Rate-limit store unavailable; allowing requests without rate limiting", {
+      reason,
+    });
+  },
+  warn(warning: unknown): void {
+    logger.warn("express-rate-limit warning", {
+      reason: warning instanceof Error ? warning.message : String(warning),
+    });
+  },
+};
 
 /**
  * Build a Redis-backed store when Redis is enabled so rate-limit counters are
@@ -38,7 +77,7 @@ export function makeStore(prefix: string): Store | undefined {
     sendCommand: (command: string, ...args: string[]) =>
       isRedisReady(client)
         ? (client.call(command, ...args) as Promise<never>)
-        : Promise.reject(new Error("Redis not ready")),
+        : Promise.reject(new Error(NOT_READY_MESSAGE)),
   });
 }
 
@@ -65,6 +104,7 @@ function buildLimiter(
     store: makeStore(prefix),
     // Fail-open: a Redis outage must not 500 the endpoint.
     passOnStoreError: true,
+    logger: rateLimitLogger,
     handler: rateLimitHandler(message),
   });
 }

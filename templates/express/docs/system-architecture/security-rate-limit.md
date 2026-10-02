@@ -22,8 +22,11 @@ app.use(cors({ origin: config.corsOrigins, credentials: true }));
 - **`origin`** is `config.corsOrigins`, a hard-coded allow-list in
   [`config/environment.ts`](../../src/config/environment.ts) (three localhost
   dev origins outside production, a single placeholder origin in production —
-  replace it before deploying). It is not an env var. The Socket.IO server uses
-  the same list + `credentials: true`.
+  replace it before deploying). The production list is not an env var; outside
+  production `CORS_ORIGINS` (comma-separated bare origins, e.g.
+  `http://localhost:3001,https://dev.example.com`) replaces the dev list and a
+  malformed entry fails boot. The Socket.IO server uses the same list +
+  `credentials: true`.
 - **CSRF guard (opt-in)** — with `ENABLE_CSRF=true`,
   [`middleware/verify-origin.ts`](../../src/middleware/verify-origin.ts) rejects
   mutating methods (anything but GET/HEAD/OPTIONS) whose `Origin` (or `Referer`
@@ -33,7 +36,14 @@ app.use(cors({ origin: config.corsOrigins, credentials: true }));
   forges a browser's ambient credentials, and a request with no cookie has none to
   ride on, while browsers always send `Origin` on a cross-site write. Presence is
   checked on the raw headers, so a malformed `Referer` is not treated as absent, and
-  a `Cookie` without `Origin` or `Referer` is still `403`.
+  a `Cookie` without `Origin` or `Referer` is still `403`. The Socket.IO handshake /
+  WebSocket upgrade applies the same predicate (`isOriginAllowed`) through
+  `allowRequest` regardless of method, rejecting with HTTP `403`; cookie-less native
+  clients still connect. The handshake additionally accepts an `Origin` whose host
+  equals the request `Host` header (`isSameOrigin`; host and port, case-insensitive):
+  React Native's WebSocket sends the API's own origin and may carry cookies. A
+  different port, `Origin: null` or a malformed `Origin` is refused. The HTTP guard
+  does not use this rule.
 
 ## Authentication & Authorization
 
@@ -89,7 +99,9 @@ All limiters:
 - `standardHeaders: true`, `legacyHeaders: false` (emit `RateLimit-*` headers).
 - **`skip: () => isTest`** — disabled under `NODE_ENV=test`.
 - **`passOnStoreError: true`** — fail-open: a Redis-store outage must not 500 the
-  endpoint.
+  endpoint. Store failures are logged through the app logger as one concise `warn`
+  (reason only, no stack) per 60 s instead of the library's full console dump on every
+  request.
 - Answer a tripped limit with status `429` through the global error handler, so it uses the
   standard error envelope (`errorType: "RATE_LIMIT"`, `error_code: 429`, `message` /
   `error_message`: "Too many ...").
@@ -139,8 +151,8 @@ Socket.IO adapter.
 - **HMAC** request signing on every API route (anti-abuse, not a security
   boundary) — see [hmac-verification.md](./hmac-verification.md).
 - **Secrets via env** — `HMAC_SECRET` and `JWT_REFRESH_SECRET` (use ≥32 random
-  chars; length is not enforced) are required
-  (`getRequiredEnvVar` throws if missing); never commit them.
+  chars) are required (`getRequiredSecret` throws if missing or shorter than 32
+  characters); never commit them.
 
 ## See Also
 
