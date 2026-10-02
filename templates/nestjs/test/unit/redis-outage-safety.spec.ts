@@ -3,12 +3,13 @@
  * client is not ready, and socket emit/disconnect failures never escape as
  * unhandled rejections.
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AppLogger } from "@/common/logger/app-logger.service";
 import {
   AppThrottlerGuard,
   ReadyGuardedThrottlerStorage,
+  STORE_FAILURE_WARN_INTERVAL_MS,
 } from "@/common/throttler/throttler.module";
 import { CacheService } from "@/common/services/cache.service";
 import { SocketEmitService } from "@/modules/realtime/socket-emit.service";
@@ -120,6 +121,46 @@ describe("rate-limit storage with a not-ready client", () => {
     });
     expect(allowed).toBe(true);
     expect(client.call).not.toHaveBeenCalled();
+  });
+});
+
+describe("rate-limit store failure logging", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("warns once per interval with the message only, never the stack", async () => {
+    vi.useFakeTimers();
+    const warn = vi.spyOn(AppLogger.prototype, "warn").mockImplementation(() => {});
+    const storage = { increment: vi.fn().mockRejectedValue(new Error("Redis not ready")) };
+    const guard = new AppThrottlerGuard({ throttlers: [] }, storage as never, {} as never);
+    await guard.onModuleInit();
+    const props = {
+      context: {
+        switchToHttp: () => ({
+          getRequest: () => ({ headers: {}, ip: "1.1.1.1" }),
+          getResponse: () => ({}),
+        }),
+      },
+      limit: 5,
+      ttl: 1000,
+      blockDuration: 0,
+      throttler: { name: "default" },
+      getTracker: async () => "1.1.1.1",
+      generateKey: () => "k",
+    };
+    const call = () =>
+      (guard as unknown as { handleRequest(p: unknown): Promise<boolean> }).handleRequest(props);
+
+    for (let i = 0; i < 5; i++) expect(await call()).toBe(true);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain("Redis not ready");
+    expect(String(warn.mock.calls[0][0])).not.toContain("    at ");
+
+    vi.advanceTimersByTime(STORE_FAILURE_WARN_INTERVAL_MS + 1);
+    expect(await call()).toBe(true);
+    expect(warn).toHaveBeenCalledTimes(2);
   });
 });
 

@@ -1,16 +1,17 @@
 import { AppException } from "@/common/exceptions/app.exception";
+import { AppLogger } from "@/common/logger/app-logger.service";
 import { AppConfigService } from "@/config/app-config.service";
 import { isRedisReady } from "@/redis/redis-ready.util";
 import { RedisService } from "@/redis/redis.service";
 import { ThrottlerStorageRedisService } from "@nest-lab/throttler-storage-redis";
 import { ExecutionContext, HttpException, Injectable, Module } from "@nestjs/common";
-import { APP_GUARD, Reflector } from "@nestjs/core";
-import {
-  ThrottlerGuard,
-  ThrottlerModule,
-  ThrottlerRequest,
-} from "@nestjs/throttler";
+import { Reflector } from "@nestjs/core";
+import { ThrottlerGuard, ThrottlerModule, ThrottlerRequest } from "@nestjs/throttler";
+import { createHash } from "crypto";
 import type { Redis } from "ioredis";
+
+/** Minimum gap between "rate-limit store unavailable" warnings. */
+export const STORE_FAILURE_WARN_INTERVAL_MS = 60_000;
 
 /**
  * Custom throttler guard that:
@@ -32,6 +33,9 @@ import type { Redis } from "ioredis";
  */
 @Injectable()
 export class AppThrottlerGuard extends ThrottlerGuard {
+  private readonly logger = new AppLogger();
+  private lastStoreWarnAt = 0;
+
   /** Skip throttling entirely in test environment (matches express skip: () => isTest). */
   protected override async shouldSkip(context: ExecutionContext): Promise<boolean> {
     // Resolve AppConfigService from the guard's injected options context.
@@ -45,7 +49,8 @@ export class AppThrottlerGuard extends ThrottlerGuard {
   }
 
   /**
-   * Counter key per throttler name + client, ignoring controller and handler.
+   * Counter key per throttler name + hashed client, ignoring controller and handler.
+   * The client (IP) is SHA-256 hashed so the raw address never lands in Redis.
    * The library default also hashes class and handler names, which gives every
    * route its own counters; express shares one `auth` bucket across
    * register/refresh/logout and one global `default` bucket per client.
@@ -55,7 +60,7 @@ export class AppThrottlerGuard extends ThrottlerGuard {
     tracker: string,
     throttlerName: string,
   ): string {
-    return `${throttlerName}:${tracker}`;
+    return `${throttlerName}:${createHash("sha256").update(tracker).digest("hex")}`;
   }
 
   /**
@@ -71,8 +76,18 @@ export class AppThrottlerGuard extends ThrottlerGuard {
     } catch (error) {
       if (error instanceof HttpException) throw error;
       // Storage error (e.g. Redis outage) — allow request, do not block.
+      this.warnStoreFailure(error);
       return true;
     }
+  }
+
+  /** One concise warning per interval: during an outage every request fails the store. */
+  private warnStoreFailure(error: unknown): void {
+    const now = Date.now();
+    if (now - this.lastStoreWarnAt < STORE_FAILURE_WARN_INTERVAL_MS) return;
+    this.lastStoreWarnAt = now;
+    const reason = error instanceof Error ? error.message : String(error);
+    this.logger.warn(`Rate-limit store unavailable, failing open: ${reason}`);
   }
 
   /**
@@ -139,7 +154,7 @@ export function skipUnlessOptedIn(name: string): (context: ExecutionContext) => 
  *       default  → 100 req / 60 s   (global API cap)
  *       auth     → 30 req / 900 s   (auth endpoints; opt-in via @Throttle)
  *       login    → 30 req / 900 s   (login endpoint; opt-in via @Throttle)
- *   - Registers AppThrottlerGuard as APP_GUARD.
+ *   - AppThrottlerGuard is registered as APP_GUARD by AppModule (ahead of SecurityGuard).
  *
  * When Redis is disabled (getClient() === null), storage falls back to the
  * in-memory default — no additional configuration needed.
@@ -169,11 +184,8 @@ export function skipUnlessOptedIn(name: string): (context: ExecutionContext) => 
       },
     }),
   ],
-  providers: [
-    {
-      provide: APP_GUARD,
-      useClass: AppThrottlerGuard,
-    },
-  ],
+  // Re-export so AppModule can register AppThrottlerGuard as an APP_GUARD itself:
+  // global guards run in registration order, and the throttler must come first.
+  exports: [ThrottlerModule],
 })
 export class ThrottlerConfigModule {}

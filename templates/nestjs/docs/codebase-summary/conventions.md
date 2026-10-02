@@ -109,7 +109,7 @@ constructor(private readonly config: AppConfigService) {}
 // ...
 if (this.config.isProduction) { /* ... */ }
 this.config.apiPrefix;        // "/api/v1"
-this.config.corsOrigins;      // string[]
+this.config.corsOrigins;      // string[] (non-production: CORS_ORIGINS or the localhost defaults)
 ```
 
 Booleans `isProduction` / `isDevelopment` / `isTest` are derived from `NODE_ENV`

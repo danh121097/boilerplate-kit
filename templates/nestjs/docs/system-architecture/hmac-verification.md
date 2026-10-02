@@ -142,4 +142,4 @@ in the signed string and ignores it for verification.
 
 - [realtime-socket.md](./realtime-socket.md) — the socket handshake signs a fixed
   `['GET', 'application/json', ctime, '/socket', '']` contract
-- [security-rate-limit.md](./security-rate-limit.md) — HMAC runs before the throttler
+- [security-rate-limit.md](./security-rate-limit.md) — the throttler runs before HMAC (rejected requests still count)

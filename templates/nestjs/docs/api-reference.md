@@ -16,7 +16,8 @@ automatically — treat it as source of truth and this page as the stable summar
 > OpenAPI JSON is served at `/docs/json` and Swagger UI at `/docs`. In
 > development, Swagger UI signs "Try it out" requests automatically, so only a
 > Bearer token is needed for protected routes. The server still enforces HMAC,
-> and the HMAC secret is served to Swagger only in development. Docs are on
+> and the HMAC secret is served to Swagger only in development (as the same-origin
+> script `/docs/hmac-config.js`). Docs are on
 > outside production and off in production unless `DOCS_ENABLED=true`;
 > `DOCS_ENABLED=false` hides them everywhere. `NODE_ENV` defaults to
 > `development` when unset, so always set `NODE_ENV=production` on deploys.
@@ -52,7 +53,10 @@ automatically — treat it as source of truth and this page as the stable summar
   else `403 AUTHORIZATION_ERROR`. A request carrying no `Cookie`, no `Origin` and
   no `Referer` header is exempt: it has no ambient credentials to forge, which is
   how native (non-browser) clients call the API. Browsers always send `Origin` on
-  cross-site POSTs, so browser CSRF stays closed.
+  cross-site POSTs, so browser CSRF stays closed. The Socket.IO handshake also
+  accepts an `Origin` equal to the API's own host (React Native sends it); behind a
+  reverse proxy the `Host` header must reach the app unchanged or that rule rejects
+  React Native sockets.
 - **JWT** — non-`@Public` routes require a JWT access token from
   `Authorization: Bearer <token>` or the `accessToken` cookie; the guard also
   enforces token revocation.
@@ -91,7 +95,7 @@ Common codes: `400 VALIDATION_ERROR`, `401 AUTHENTICATION_ERROR`,
 `403 AUTHORIZATION_ERROR`, `404 NOT_FOUND`, `409 CONFLICT`, `429 RATE_LIMIT`.
 Validation failures carry the Zod issue messages joined with `", "` (e.g.
 `Invalid email format, Name is required`). Body-parser failures use the same
-envelope: `413` for an oversized body (100 kb default), `400` for malformed JSON.
+envelope: `413` for an oversized body (100 kb default), `400` for malformed JSON, `415` for an unsupported content encoding/charset, `400` "Request body could not be read!" for a body that cannot be decoded (corrupt gzip/br/deflate) or read.
 Unmatched routes under the API prefix hit the `NotFoundModule` catch-all (after
 HMAC): `404 NOT_FOUND` "Resource not found!". Router-level 404s outside the prefix
 are rewritten from Nest's "Cannot GET …" to the same message. An unsigned request
@@ -100,6 +104,21 @@ before the guard; Fastify answers `401` first. HMAC does not cover the body, so 
 order has no security effect. `stack` is added to the body only when
 `NODE_ENV=development` and the status is `>= 500`. See
 [system-architecture/error-handling.md](./system-architecture/error-handling.md).
+
+## Socket.IO handshake
+
+The handshake `auth` payload is `{ sig, ctime, token }` (HMAC over the fixed
+`GET /socket` contract, then the access token). A rejected handshake fires the
+client's `connect_error` with `error.message === "Unauthorized!"` in every case:
+
+| Rejection                                                       | `error.data`                    |
+| --------------------------------------------------------------- | ------------------------------- |
+| HMAC: missing `sig`/`ctime`, invalid/expired `ctime`, bad `sig` | `{ errorType: "HMAC_ERROR" }`   |
+| Token: missing, invalid, expired or revoked access token        | none (`undefined`)              |
+
+`HMAC_ERROR` is the same value the HTTP error envelope uses, so a client treats
+clock skew as a time-sync problem and does not spend a token refresh on it. See
+[system-architecture/realtime-socket.md](./system-architecture/realtime-socket.md).
 
 ## Pagination
 
@@ -162,7 +181,11 @@ return { success: true, data: items, meta }; // meta: { limit, nextCursor, hasNe
 - `tokens` are returned in the JSON body by design (token-mode and non-browser
   clients need them), in addition to the httpOnly cookies. A cookie-mode client
   that suffers XSS can therefore call `/auth/refresh` and read a fresh refresh
-  token; this is an accepted risk.
+  token; this is an accepted risk. When every client is cookie-based
+  (nextjs/nuxtjs/tanstack-start) set `AUTH_TOKENS_IN_BODY=false`: register, login
+  and refresh then return `tokens: {}` (cookies unchanged, refresh still reads the
+  body or the cookie). React Native, reactjs and vuejs read the tokens from the
+  body and need the default `true`.
 - Refresh uses rotation with reuse detection: the old refresh token is revoked
   and a new pair issued on every `/auth/refresh`; replaying a rotated token past
   the grace window revokes every refresh token of the user and disconnects their

@@ -34,7 +34,7 @@ export function setupSwagger(app: NestExpressApplication, config: AppConfigServi
     // CSP `script-src 'self'` blocks inline scripts but allows 'self' files, so the
     // interceptor in swagger-ui-init.js can read window.__HMAC_CFG__ from here.
     const expressApp = app.getHttpAdapter().getInstance() as Express;
-    expressApp.get("/swagger-hmac-config.js", (_req, res): void => {
+    expressApp.get("/docs/hmac-config.js", (_req, res): void => {
       res
         .set("Cache-Control", "no-store")
         .type("application/javascript")
@@ -43,7 +43,7 @@ export function setupSwagger(app: NestExpressApplication, config: AppConfigServi
   }
 
   SwaggerModule.setup("docs", app, cleanupOpenApiDoc(document), {
-    customJs: devAutoSign ? "/swagger-hmac-config.js" : undefined,
+    customJs: devAutoSign ? "/docs/hmac-config.js" : undefined,
     jsonDocumentUrl: "docs/json",
     swaggerOptions: {
       persistAuthorization: true,

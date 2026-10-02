@@ -20,6 +20,9 @@ tokens delivered as httpOnly cookies, with reuse detection. Source:
 | `token_use` claim    | `access`                                            | `refresh`                                       |
 | `iss` (issuer) claim | primary CORS origin                                 | primary CORS origin                             |
 
+The issuer is `corsOrigins[0]`, so changing or reordering `CORS_ORIGINS` in development
+invalidates live access tokens (one refresh per client recovers).
+
 The two token classes use different algorithms by design. **Access tokens are
 RS256** (asymmetric): the RSA private key signs, the public key verifies — so any
 resource server can validate an access token with the distributable public key
@@ -55,7 +58,10 @@ signRefreshToken(payload: JwtPayload): string {
 `verifyAccessToken` pins `algorithms: ['RS256']` and verifies with
 `jwtAccessPublicKey`, enforces the `issuer` and asserts `token_use` is `access` —
 throwing otherwise. Refresh tokens are signed with `this.config.jwtRefreshSecret`
-but never signature-verified on refresh: validity comes from the DB hash lookup.
+and `verifyRefreshToken` (HS256, expiry, `token_use: refresh`) runs before the DB
+hash lookup on refresh: a bad, tampered, wrong-secret or expired token gets the same
+generic `401 Invalid refresh token!` as an unknown one, without touching the DB or
+the reuse-detection branch. The DB lookup then decides rotation and reuse.
 
 > **Note:** refresh tokens are signed with **HS256** using the symmetric secret
 > `JWT_REFRESH_SECRET`, while access tokens are signed with **RS256** using the
@@ -126,6 +132,32 @@ native apps) have no cookie jar. Consequence, accepted: a cookie-mode browser
 client with an XSS hole can call `/auth/refresh` and read a fresh refresh token
 from the response, which httpOnly alone does not prevent. Mitigation (an opt-in
 body-less mode) is backlog.
+
+## Deploying the frontend and API on different subdomains
+
+Checked in Chromium (Playwright) against the express backend over plain HTTP with the
+development cookie attributes (`HttpOnly`, `SameSite=Lax`, no `Domain`). The fastify and
+nestjs backends set the same attributes; that is read from their source, not run.
+
+- Verified: with the page on `app.localhost` and the API on `api.localhost`, the browser
+  stored none of the `Set-Cookie` headers and `/auth/me` returned 401. Chromium treats
+  `localhost` as a public suffix, so the two hosts are different sites and `Lax` cookies
+  are not stored on a cross-site fetch. The same page on `localhost:5400` calling
+  `localhost:4100` (same site, different port) stored the cookies and sent them back.
+  A probe that sent `SameSite=None; Secure` was stored and sent from `api.localhost`, and a
+  `Domain=.localhost` attribute was rejected.
+- Not tested, from the SameSite rules: `app.example.com` and `api.example.com` share a
+  registrable domain, so they are the same site and `Lax`/`Strict` cookies work with
+  `credentials: include` (axios `withCredentials`). Hosts on different registrable domains
+  need `SameSite=None; Secure`, which the backends do not offer: `sameSite` is fixed to
+  `strict` in production and `lax` otherwise in the backend cookie helper.
+- Cookies are host-only unless the backend sets `COOKIE_DOMAIN` (for example
+  `.example.com`). Without it the browser sends `accessToken` only to the API host, so an
+  SSR server on the app host never sees it and SSR session reads are anonymous. Not tested
+  (no parent domain is available locally); the value goes to `Domain` on both set and clear.
+- In production the cookies are `Secure` and `SameSite=Strict` (HTTPS only; not tested).
+  Strict cookies are withheld on a navigation that arrives from another site, so the first
+  SSR render after following an external link can be anonymous until the browser refreshes.
 
 ## Auth Flows
 

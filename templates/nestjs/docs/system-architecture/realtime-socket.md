@@ -32,8 +32,12 @@ adapter:
 ```ts
 const server = super.createIOServer(port, {
   ...options,
-  ...buildSocketServerOptions(this.corsOrigins),
+  ...buildSocketServerOptions(this.config),
   // cors: { origin: corsOrigins, credentials: true }, pingInterval: 25000,
+  // allowRequest: with ENABLE_CSRF on, isOriginAllowed() (the HTTP origin guard's
+  // predicate, or an Origin whose host equals the request's Host header — native
+  // clients send the API's own origin) must pass for every handshake, else 403
+  // before any connection,
   // pingTimeout: 20000, maxHttpBufferSize: 1e6 (1 MB cap on inbound payloads)
 });
 if (this.pubClient) {
@@ -45,6 +49,13 @@ server.use(createSocketAuthMiddleware(tokenService, revocationService)); // hand
 
 Notes:
 
+- **Same-origin rule behind a reverse proxy** — with `ENABLE_CSRF=true` the
+  handshake also accepts an `Origin` whose host equals the request's `Host`
+  header (React Native sends the server's own origin). Only the raw `Host`
+  header is compared; `X-Forwarded-Host` is ignored. The proxy must forward
+  `Host` to the app unchanged (nginx: `proxy_set_header Host $host;`, otherwise
+  `proxy_pass` rewrites it to the upstream name). If it is rewritten, the rule
+  fails closed and React Native sockets get `403` while `ENABLE_CSRF=true`.
 - **Optional, like the rest of the Redis stack.** Without Redis it runs
   single-instance (CORS and the other options still apply); with Redis, `@socket.io/redis-adapter`
   makes emits reach clients on every instance.
@@ -72,6 +83,12 @@ Two Socket.IO middlewares registered by `SocketIoAdapter.createIOServer`
 run on every handshake — **HMAC first, then JWT** — mirroring the HTTP guard
 order. Any failure calls `next(new Error(SOCKET_UNAUTHORIZED))` (`'Unauthorized!'`),
 so the client gets a `connect_error` and the connection is never established.
+`error.message` is `'Unauthorized!'` for both gates; only an **HMAC rejection**
+(missing `sig`/`ctime`, invalid or expired `ctime`, bad signature) also sets
+`error.data = { errorType: "HMAC_ERROR" }` (the HTTP `HMAC_ERROR` value; socket.io
+passes `data` to the client's `connect_error`). A token rejection carries no `data`.
+A client can therefore tell clock skew from a bad session and skip a pointless
+token refresh.
 `EventsGateway.handleConnection` only runs for accepted sockets; it has no
 injected dependencies and only joins the `user:<userId>` room and emits
 `AUTHENTICATED`. As a safety net it still emits `error` (`SOCKET_UNAUTHORIZED`) and

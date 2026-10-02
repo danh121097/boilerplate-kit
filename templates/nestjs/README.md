@@ -69,17 +69,27 @@ All variables are documented in [`.env.example`](.env.example). Key ones:
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `PORT`                                         | HTTP port (default 3000)                                                                                                  |
 | `MONGODB_URI`                                  | MongoDB connection string (required)                                                                                      |
-| `API_PREFIX`                                   | Base path all routes mount under (default `/api/v1`)                                                                      |
-| `ENABLE_CSRF`                                  | Toggle the origin/CSRF guard step (default false); requests with no Cookie, Origin or Referer (native clients) are exempt |
+| `API_PREFIX`                                   | Base path all routes mount under (default `/api/v1`; trimmed, one leading `/`, no trailing `/`; empty = default)          |
+| `ENABLE_CSRF`                                  | Toggle the origin/CSRF guard step (default false); requests with no Cookie, Origin or Referer (native clients) are exempt. Also gates the Socket.IO handshake, which additionally accepts an Origin equal to the API's own host (React Native sends it). Behind a reverse proxy the `Host` header must reach the app unchanged, otherwise that same-origin rule rejects React Native sockets |
 | `COOKIE_DOMAIN`                                | Cookie domain for split-domain deploys (empty = host-only)                                                                |
 | `TRUST_PROXY`                                  | Behind a reverse proxy: `true`/`false`, a hop count, or a comma-separated list of IPs/subnets (unset = do not trust)      |
 | `DOCS_ENABLED`                                 | Optional. Swagger UI + OpenAPI at `/docs`. Unset = on outside production, off in production; `true`/`false` overrides     |
 | `JWT_PRIVATE_KEY_PATH` / `JWT_PUBLIC_KEY_PATH` | RS256 keypair file paths (access)                                                                                         |
-| `JWT_REFRESH_SECRET`                           | HS256 symmetric secret for refresh tokens (≥32 chars, required)                                                           |
+| `JWT_REFRESH_SECRET`                           | HS256 symmetric secret for refresh tokens; verified on every refresh (≥32 chars, required)                                |
+| `AUTH_TOKENS_IN_BODY`                          | Default `true`. `false` = register/login/refresh return `tokens: {}` (cookies unchanged); use only when every client is cookie-based (nextjs/nuxtjs/tanstack-start). React Native, reactjs and vuejs need `true` |
+| `CORS_ORIGINS`                                 | Optional, non-production only: comma-separated bare origins (`http://localhost:3000`, no path) replacing the default localhost list (5173/9000/4321). Production keeps the hard-coded list in `AppConfigService` and does not read or validate this var. The JWT `iss` claim is the first origin, so changing or reordering it in dev invalidates live access tokens (one refresh per client recovers) |
 | `JWT_ACCESS_EXPIRY` / `JWT_REFRESH_EXPIRY`     | Token lifetimes; also the cookie `maxAge` and refresh `expiresAt`                                                         |
-| `HMAC_SECRET`                                  | Secret for HMAC request signing (required)                                                                                |
-| `REDIS_ENABLED` / `REDIS_URL`                  | Toggle + connection for Redis features                                                                                    |
+| `HMAC_SECRET`                                  | Secret for HMAC request signing (≥32 chars, required)                                                                     |
+| `REDIS_ENABLED` / `REDIS_URL`                  | Toggle + connection for Redis features (an empty `REDIS_ENABLED=` counts as unset = false)                                |
 | `LOG_LEVEL`                                    | Optional. `debug` / `info` / `warn` / `error`. Unset = `debug` in development, `info` in production                       |
+
+> **Upgrade note (breaking for short secrets):** `HMAC_SECRET` and
+> `JWT_REFRESH_SECRET` must now be at least 32 characters; shorter values fail the
+> boot with `<NAME> must be at least 32 characters`. Rotate a short secret before
+> upgrading (rotating `JWT_REFRESH_SECRET` signs everyone out; rotating
+> `HMAC_SECRET` needs the clients' signing secret changed too). Refresh tokens are
+> now signature-verified, so a token signed with a different secret is refused with
+> `401`.
 
 ## Routes
 

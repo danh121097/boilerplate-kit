@@ -39,15 +39,24 @@ handlers) to the global filter automatically, so handlers can `throw` freely.
 registered as `APP_FILTER` (in `CommonModule`) with `@Catch()` — it catches
 **everything**. It normalizes three cases into one envelope:
 
-| Thrown thing                                                                     | How it is rendered                                                                                                                |
-| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `AppException`                                                                   | `statusCode` + `message` + its `errorType`, verbatim                                                                              |
-| any other `HttpException` (e.g. Nest's `NotFoundException` for unmatched routes) | status + unwrapped message; `errorType` mapped from status via `mapHttpStatusToErrorType`                                         |
-| Mongoose `CastError` / `ValidationError`                                         | `400` `VALIDATION_ERROR`, names the field(s) only (`map-database-error.ts`)                                                       |
-| Zod validation failure (`ZodValidationException`)                                | `400` `VALIDATION_ERROR`, issue messages joined with `", "` — same text as the express validator                                  |
-| body-parser error (too large, malformed JSON, bad encoding)                      | `413` / `400` / `415` `VALIDATION_ERROR`, fixed client-safe message (`map-body-parser-error.ts`); logged as `warn`, never `error` |
-| MongoDB duplicate key (`code 11000`)                                             | `409` `CONFLICT`, names the field(s) only                                                                                         |
-| any other non-HTTP error                                                         | `500` `INTERNAL_ERROR`, generic message                                                                                           |
+| Thrown thing                                                                                                                                             | How it is rendered                                                                                                                                              |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AppException`                                                                                                                                           | `statusCode` + `message` + its `errorType`, verbatim                                                                                                            |
+| any other `HttpException` (e.g. Nest's `NotFoundException` for unmatched routes)                                                                         | status + unwrapped message; `errorType` mapped from status via `mapHttpStatusToErrorType`                                                                       |
+| Mongoose `CastError` / `ValidationError`                                                                                                                 | `400` `VALIDATION_ERROR`, names the field(s) only (`map-database-error.ts`)                                                                                     |
+| Zod validation failure (`ZodValidationException`)                                                                                                        | `400` `VALIDATION_ERROR`, issue messages joined with `", "` — same text as the express validator                                                                |
+| body-parser error (too large, malformed JSON, unsupported encoding/charset 415, aborted / bad size / too many params / corrupt gzip-br-deflate body 400) | `413` / `400` / `415` `VALIDATION_ERROR`, fixed client-safe message, raw parser text never echoed (`map-body-parser-error.ts`); logged as `warn`, never `error` |
+| MongoDB duplicate key (`code 11000`)                                                                                                                     | `409` `CONFLICT`, names the field(s) only                                                                                                                       |
+| any other non-HTTP error                                                                                                                                 | `500` `INTERNAL_ERROR`, generic message                                                                                                                         |
+
+**JSON charset.** body-parser's JSON parser (2.3.0) accepts a `Content-Type` charset
+only when it starts with `utf-` (case-insensitive) and the charset is known to
+iconv, and it decodes the body with that charset. `utf-8` / `UTF-8` and no charset
+(default utf-8) are accepted. `utf-16` / `utf-16le` pass the prefix check but decode
+the body as UTF-16, so a UTF-8 payload is answered `400` "Malformed JSON request
+body!" (`entity.parse.failed`). The un-hyphenated `utf8`, `latin1` and unknown
+charsets answer `415` "Unsupported request charset!". Fastify differs: it accepts
+only `utf-8` / `utf8` and answers `415` for any other charset on a JSON media type.
 
 ```ts
 res.status(statusCode).json({

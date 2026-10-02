@@ -1,6 +1,6 @@
 import { CommonModule } from "@/common/common.module";
 import { SecurityGuard } from "@/common/guards/security.guard";
-import { ThrottlerConfigModule } from "@/common/throttler/throttler.module";
+import { AppThrottlerGuard, ThrottlerConfigModule } from "@/common/throttler/throttler.module";
 import { AppConfigModule } from "@/config/config.module";
 import { DatabaseModule } from "@/database/database.module";
 import { AuthModule } from "@/modules/auth/auth.module";
@@ -15,12 +15,12 @@ import { APP_GUARD } from "@nestjs/core";
 /**
  * Root application module.
  *
- * Two APP_GUARDs are registered — independent concerns, separate providers:
- *   1. SecurityGuard  — composite HMAC → origin/CSRF → JWT → roles (ordered internally).
- *   2. AppThrottlerGuard — rate limiting (registered via ThrottlerConfigModule).
- *
- * Internal ordering within SecurityGuard is deterministic. SecurityGuard runs before
- * the throttler, so requests it rejects (HMAC, CSRF, JWT, role) are not counted.
+ * Two APP_GUARDs are registered — independent concerns, separate providers, in this
+ * order (global guards run in registration order, so keep them together here):
+ *   1. AppThrottlerGuard — rate limiting. Runs first so requests SecurityGuard
+ *      rejects (HMAC, CSRF, bad JWT, role) still count against the caps, like
+ *      express/fastify where the limiter sits ahead of authentication.
+ *   2. SecurityGuard  — composite HMAC → origin/CSRF → JWT → roles (ordered internally).
  */
 @Module({
   imports: [
@@ -32,7 +32,7 @@ import { APP_GUARD } from "@nestjs/core";
     AuthModule,
     UserModule,
     RealtimeModule,
-    // Registers ThrottlerModule + AppThrottlerGuard as APP_GUARD.
+    // Configures + exports ThrottlerModule (AppThrottlerGuard is registered below).
     ThrottlerConfigModule,
     // Catch-all 404 behind HMAC. MUST stay the LAST entry: its `{*path}` route matches
     // everything, so any module imported after it gets all its routes answered 404.
@@ -40,6 +40,11 @@ import { APP_GUARD } from "@nestjs/core";
     NotFoundModule,
   ],
   providers: [
+    // Rate limiter — MUST precede SecurityGuard (see the class comment).
+    {
+      provide: APP_GUARD,
+      useClass: AppThrottlerGuard,
+    },
     // Composite security guard: HMAC → origin/CSRF → JWT → roles.
     {
       provide: APP_GUARD,

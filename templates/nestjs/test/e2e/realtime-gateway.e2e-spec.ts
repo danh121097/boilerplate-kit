@@ -3,8 +3,8 @@
  *
  * Scenarios:
  *   - Authenticated + HMAC-signed handshake → connects and receives "authenticated" event.
- *   - Unsigned handshake → refused at the handshake (connect_error, never connected).
- *   - HMAC signed but no Bearer token → refused at the handshake.
+ *   - HMAC rejections (missing / bad signature, stale ctime) → connect_error "Unauthorized!" + data.errorType HMAC_ERROR.
+ *   - Token rejections (missing / bad token) → connect_error "Unauthorized!" with no data.
  *   - Polling handshake from an allowed Origin carries CORS headers (Redis off).
  *   - Logout and a reuse-detected revoke-all disconnect the user's sockets.
  *
@@ -23,6 +23,7 @@ import { INestApplication } from "@nestjs/common";
 import { buildHmacHeaders, signSocketHandshake } from "../helpers/sign-request";
 import { createTestApp, TEST_HOST } from "../helpers/create-test-app";
 import { backdateRotation } from "../helpers/refresh-token-db";
+import { MAX_TIMESTAMP_AGE_MS } from "@/common/services/hmac.service";
 import { REFRESH_REUSE_GRACE_MS } from "@/modules/auth/refresh-session.service";
 
 const SKIP = process.env.SKIP_SOCKET_TESTS === "true";
@@ -126,7 +127,9 @@ function connectAndWait(
     const done = (event: string, data?: unknown) => resolve({ socket, event, data });
 
     socket.on("authenticated", (d: unknown) => done("authenticated", d));
-    socket.on("connect_error", (err: Error) => done("connect_error", err.message));
+    socket.on("connect_error", (err: Error & { data?: unknown }) =>
+      done("connect_error", { message: err.message, data: err.data }),
+    );
     socket.on("disconnect", (reason: string) => done("disconnect", reason));
 
     setTimeout(() => reject(new Error("Socket wait timed out")), 5_000);
@@ -163,32 +166,114 @@ describe("Socket.IO gateway handshake", () => {
     10_000,
   );
 
+  // Both gates answer "Unauthorized!"; only an HMAC rejection carries data.errorType,
+  // so a client can tell clock skew from a bad session.
+  const HMAC_REJECTION = { message: "Unauthorized!", data: { errorType: "HMAC_ERROR" } };
+  const TOKEN_REJECTION = { message: "Unauthorized!", data: undefined };
+
   it.skipIf(SKIP)(
-    "unsigned handshake is refused before a connection exists",
+    "missing signature is refused with HMAC_ERROR data",
     async () => {
       const accessToken = await getAccessToken();
-      // No sig/ctime — the handshake HMAC middleware rejects it.
       const { socket, event, data } = await connectAndWait({ token: accessToken });
       openSockets.push(socket);
 
       expect(event).toBe("connect_error");
-      expect(data).toBe("Unauthorized!");
+      expect(data).toEqual(HMAC_REJECTION);
       expect(socket.connected).toBe(false);
     },
     10_000,
   );
 
   it.skipIf(SKIP)(
-    "HMAC signed but no auth token is refused (JWT gate fails)",
+    "bad signature is refused with HMAC_ERROR data",
+    async () => {
+      const accessToken = await getAccessToken();
+      const { sig, ctime } = signSocketHandshake();
+      const badSig = sig.slice(0, -1) + (sig.endsWith("A") ? "B" : "A");
+      const { socket, event, data } = await connectAndWait({
+        sig: badSig,
+        ctime,
+        token: accessToken,
+      });
+      openSockets.push(socket);
+
+      expect(event).toBe("connect_error");
+      expect(data).toEqual(HMAC_REJECTION);
+    },
+    10_000,
+  );
+
+  it.skipIf(SKIP)(
+    "stale ctime is refused with HMAC_ERROR data",
+    async () => {
+      const accessToken = await getAccessToken();
+      const stale = String(Date.now() - MAX_TIMESTAMP_AGE_MS - 60_000);
+      const { sig, ctime } = signSocketHandshake(stale);
+      const { socket, event, data } = await connectAndWait({ sig, ctime, token: accessToken });
+      openSockets.push(socket);
+
+      expect(event).toBe("connect_error");
+      expect(data).toEqual(HMAC_REJECTION);
+    },
+    10_000,
+  );
+
+  it.skipIf(SKIP)(
+    "signature without ctime is refused with HMAC_ERROR data",
+    async () => {
+      const accessToken = await getAccessToken();
+      const { sig } = signSocketHandshake();
+      const { socket, event, data } = await connectAndWait({ sig, token: accessToken });
+      openSockets.push(socket);
+
+      expect(event).toBe("connect_error");
+      expect(data).toEqual(HMAC_REJECTION);
+    },
+    10_000,
+  );
+
+  it.skipIf(SKIP)(
+    "non-numeric ctime is refused with HMAC_ERROR data",
+    async () => {
+      const accessToken = await getAccessToken();
+      const { sig } = signSocketHandshake();
+      const { socket, event, data } = await connectAndWait({
+        sig,
+        ctime: "soon",
+        token: accessToken,
+      });
+      openSockets.push(socket);
+
+      expect(event).toBe("connect_error");
+      expect(data).toEqual(HMAC_REJECTION);
+    },
+    10_000,
+  );
+
+  it.skipIf(SKIP)(
+    "valid HMAC but no token is refused without error data",
     async () => {
       const { sig, ctime } = signSocketHandshake();
-      // Valid HMAC but no token — the handshake JWT middleware rejects it.
       const { socket, event, data } = await connectAndWait({ sig, ctime });
       openSockets.push(socket);
 
       expect(event).toBe("connect_error");
-      expect(data).toBe("Unauthorized!");
+      expect(data).toEqual(TOKEN_REJECTION);
       expect(socket.connected).toBe(false);
+    },
+    10_000,
+  );
+
+  it.skipIf(SKIP)(
+    "valid HMAC but a bad token is refused without error data",
+    async () => {
+      const { sig, ctime } = signSocketHandshake();
+      const { socket, event, data } = await connectAndWait({ sig, ctime, token: "not-a-jwt" });
+      openSockets.push(socket);
+
+      expect(event).toBe("connect_error");
+      expect(data).toEqual(TOKEN_REJECTION);
     },
     10_000,
   );

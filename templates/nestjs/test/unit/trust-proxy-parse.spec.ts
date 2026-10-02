@@ -31,7 +31,7 @@ describe("env schema TRUST_PROXY", () => {
   const base = {
     MONGODB_URI: "mongodb://localhost/test",
     JWT_REFRESH_SECRET: "x".repeat(32),
-    HMAC_SECRET: "secret",
+    HMAC_SECRET: "y".repeat(32),
   };
 
   it("is undefined when unset (do not trust)", () => {
@@ -51,7 +51,7 @@ describe("env schema JWT expiry", () => {
   const base = {
     MONGODB_URI: "mongodb://localhost/test",
     JWT_REFRESH_SECRET: "x".repeat(32),
-    HMAC_SECRET: "secret",
+    HMAC_SECRET: "y".repeat(32),
   };
 
   it("accepts positive <n><s|m|h|d>", () => {

@@ -14,8 +14,8 @@ import jwt from "jsonwebtoken";
  *                  can verify with the public key without holding signing power.
  * Refresh tokens: HS256 with the JWT_REFRESH_SECRET — symmetric is appropriate because
  *                  refresh tokens are only ever handled by this auth server (never sent
- *                  to third parties). Validity is established by the DB hash lookup on
- *                  refresh; the signature is not re-verified on that path.
+ *                  to third parties). On refresh the signature, expiry and token_use are
+ *                  verified first, then the DB hash lookup decides rotation/reuse.
  * token_use claim: distinguishes access vs refresh so a refresh token can never
  *                  satisfy access verification and vice-versa.
  * iat_ms:         millisecond issue time on access tokens (see signAccessToken).
@@ -77,6 +77,22 @@ export class TokenService {
       expiresIn: this.config.jwtRefreshExpiry as jwt.SignOptions["expiresIn"],
       jwtid: crypto.randomUUID(),
     });
+  }
+
+  /**
+   * Verify a refresh token's HS256 signature, expiry and token_use=refresh. Throws
+   * jsonwebtoken errors on failure. The issuer is not pinned: the DB record, not the
+   * origin list, decides whether a signed token is still live.
+   */
+  verifyRefreshToken(token: string): JwtPayload {
+    const decoded = jwt.verify(token, this.config.jwtRefreshSecret, {
+      algorithms: ["HS256"],
+    }) as JwtPayload & { token_use?: TokenUse };
+
+    if (decoded.token_use !== "refresh") {
+      throw new Error("Invalid token_use claim");
+    }
+    return decoded;
   }
 
   /** SHA-256 hash a token for secure DB storage (matches express hashToken). */

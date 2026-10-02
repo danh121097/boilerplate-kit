@@ -7,16 +7,31 @@ import { describe, expect, it, vi } from "vitest";
 import { RedisModule } from "@/redis/redis.module";
 import type { RedisService } from "@/redis/redis.service";
 
-function destroy(client: unknown): void {
-  new RedisModule({ getClient: () => client } as unknown as RedisService).onModuleDestroy();
+function destroy(client: unknown): Promise<void> {
+  return new RedisModule({ getClient: () => client } as unknown as RedisService).onModuleDestroy();
 }
 
 describe("RedisModule.onModuleDestroy", () => {
-  it("quits a ready client", () => {
+  it("quits a ready client", async () => {
     const client = { status: "ready", quit: vi.fn().mockResolvedValue("OK"), disconnect: vi.fn() };
-    destroy(client);
+    await destroy(client);
     expect(client.quit).toHaveBeenCalledOnce();
     expect(client.disconnect).not.toHaveBeenCalled();
+  });
+
+  it("does not resolve until QUIT has completed", async () => {
+    let finishQuit!: () => void;
+    const quit = vi.fn(() => new Promise<string>((resolve) => (finishQuit = () => resolve("OK"))));
+    const client = { status: "ready", quit, disconnect: vi.fn() };
+    let settled = false;
+    const done = destroy(client).then(() => {
+      settled = true;
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(settled).toBe(false);
+    finishQuit();
+    await done;
+    expect(settled).toBe(true);
   });
 
   it("disconnects when QUIT rejects, without an unhandled rejection", async () => {
@@ -28,7 +43,7 @@ describe("RedisModule.onModuleDestroy", () => {
     const unhandled = vi.fn();
     process.on("unhandledRejection", unhandled);
     try {
-      destroy(client);
+      await destroy(client);
       await new Promise((r) => setTimeout(r, 20));
     } finally {
       process.off("unhandledRejection", unhandled);
@@ -37,14 +52,14 @@ describe("RedisModule.onModuleDestroy", () => {
     expect(unhandled).not.toHaveBeenCalled();
   });
 
-  it("disconnects a client that is not ready instead of sending QUIT", () => {
+  it("disconnects a client that is not ready instead of sending QUIT", async () => {
     const client = { status: "connecting", quit: vi.fn(), disconnect: vi.fn() };
-    destroy(client);
+    await destroy(client);
     expect(client.quit).not.toHaveBeenCalled();
     expect(client.disconnect).toHaveBeenCalledOnce();
   });
 
-  it("does nothing when Redis is disabled", () => {
-    expect(() => destroy(null)).not.toThrow();
+  it("does nothing when Redis is disabled", async () => {
+    await expect(destroy(null)).resolves.toBeUndefined();
   });
 });

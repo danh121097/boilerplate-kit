@@ -118,8 +118,7 @@ export function addBearerToken(headers: HmacHeaders, accessToken: string): AuthH
  * Fixed contract (mirrors the socket gateway + express socket helper):
  *   method="GET", contentType="application/json", path="/socket"
  */
-export function signSocketHandshake(): HmacHeaders {
-  const ctime = Date.now().toString();
+export function signSocketHandshake(ctime: string = Date.now().toString()): HmacHeaders {
   const sig = computeHmac("GET", "application/json", ctime, "/socket");
   return { sig, ctime };
 }

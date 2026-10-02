@@ -20,8 +20,8 @@ import type { Request } from "express";
  *   3. JWT identity    (skipped for @Public routes)
  *   4. Role check      (skipped when no @Roles metadata)
  *
- * Using a single composite guard guarantees deterministic execution order
- * regardless of APP_GUARD array order (which NestJS does not guarantee).
+ * A single composite guard keeps these four steps in one fixed order. Order
+ * against the throttler guard is fixed by the provider order in app.module.ts.
  * Mirrors express middleware chain: hmac → verifyOrigin → [authenticate, requireMinRole].
  */
 @Injectable()

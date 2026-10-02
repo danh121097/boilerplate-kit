@@ -88,7 +88,10 @@ pnpm keys           # node scripts/ensure-keys.mjs  (generate/rotate RSA keypair
 `APP_NAME`, `NODE_ENV`, `PORT`, `MONGODB_URI`, `API_PREFIX`, `ENABLE_CSRF`,
 `COOKIE_DOMAIN`, `TRUST_PROXY` (optional), `DOCS_ENABLED` (optional), `JWT_PRIVATE_KEY_PATH`, `JWT_PUBLIC_KEY_PATH`,
 `JWT_REFRESH_SECRET`, `JWT_ACCESS_EXPIRY`, `JWT_REFRESH_EXPIRY`, `HMAC_SECRET`,
-`REDIS_ENABLED`, `REDIS_URL`, `LOG_LEVEL`.
+`REDIS_ENABLED`, `REDIS_URL`, `LOG_LEVEL`, `AUTH_TOKENS_IN_BODY` (optional, default true),
+`CORS_ORIGINS` (optional, non-production; not read or validated in production).
+The JWT `iss` claim is the first CORS origin, so changing or reordering `CORS_ORIGINS` in
+development invalidates live access tokens (one refresh per client recovers).
 
 `MONGODB_URI`, `HMAC_SECRET` (min 32 chars), `JWT_REFRESH_SECRET` (min 32 chars),
 `JWT_PRIVATE_KEY_PATH`, and `JWT_PUBLIC_KEY_PATH` are **required** — the Zod env

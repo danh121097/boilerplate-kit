@@ -48,10 +48,17 @@ describe("AppThrottlerGuard.generateKey", () => {
     const key = (handler: () => void, name: string) =>
       guard.generateKey(contextFor(handler), "10.0.0.1", name);
 
-    expect(key(FixtureController.prototype.optedIn, "auth")).toBe("auth:10.0.0.1");
+    expect(key(FixtureController.prototype.optedIn, "auth")).toMatch(/^auth:[0-9a-f]{64}$/);
     expect(key(FixtureController.prototype.plain, "auth")).toBe(
       key(FixtureController.prototype.optedIn, "auth"),
     );
+  });
+
+  it("never puts the raw client address in the key", () => {
+    const ctx = contextFor(FixtureController.prototype.plain);
+    for (const tracker of ["10.0.0.1", "2001:db8::1"]) {
+      expect(guard.generateKey(ctx, tracker, "default")).not.toContain(tracker);
+    }
   });
 
   it("keeps throttler names and clients apart", () => {

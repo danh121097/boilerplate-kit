@@ -1,4 +1,5 @@
 import { parseDurationSeconds } from "@/common/utils/duration.util";
+import { parseDevCorsOrigins } from "@/config/env.schema";
 import { loadRsaKeyPair } from "@/config/keys";
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -91,6 +92,9 @@ export class AppConfigService {
   get hmacSecret(): string {
     return this.get("HMAC_SECRET");
   }
+  get authTokensInBody(): boolean {
+    return this.get("AUTH_TOKENS_IN_BODY");
+  }
   get redisEnabled(): boolean {
     return this.get("REDIS_ENABLED");
   }
@@ -102,15 +106,16 @@ export class AppConfigService {
   }
 
   /**
-   * Allowed browser origins for CORS + the CSRF guard. Hard-coded here (not env)
-   * so the list is easy to edit in one place — add your production frontend
-   * origin(s) below before deploying. Keep localhost out of the production list.
+   * Allowed browser origins for CORS + the CSRF guard. The production list is
+   * hard-coded here so it is easy to edit in one place — add your production
+   * frontend origin(s) below before deploying and keep localhost out of it. Outside
+   * production the list comes from CORS_ORIGINS (default: the localhost trio).
    */
   get corsOrigins(): string[] {
     return this.isProduction
       ? [
           "https://app.example.com", // ← replace with your production frontend origin(s)
         ]
-      : ["http://localhost:5173", "http://localhost:9000", "http://localhost:4321"];
+      : parseDevCorsOrigins(this.get("CORS_ORIGINS"));
   }
 }

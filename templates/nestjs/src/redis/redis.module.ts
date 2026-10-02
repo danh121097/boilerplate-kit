@@ -62,13 +62,14 @@ export const REDIS_COMMAND_TIMEOUT_MS = 1000;
 export class RedisModule implements OnModuleDestroy {
   constructor(private readonly redisService: RedisService) {}
 
-  onModuleDestroy(): void {
+  async onModuleDestroy(): Promise<void> {
     // Single shutdown owner for the shared pub client.
     const client = this.redisService.getClient();
     if (client) {
       // QUIT needs a live connection; drop a client that is not ready instead, and
-      // fall back to disconnect if QUIT fails — process is exiting anyway.
-      if (client.status === "ready") client.quit().catch(() => client.disconnect());
+      // fall back to disconnect if QUIT fails — process is exiting anyway. Awaited so
+      // shutdown does not complete (and the process does not exit) with QUIT in flight.
+      if (client.status === "ready") await client.quit().catch(() => client.disconnect());
       else client.disconnect();
     }
   }

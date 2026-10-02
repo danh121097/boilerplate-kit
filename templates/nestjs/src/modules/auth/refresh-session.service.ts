@@ -59,6 +59,8 @@ export class RefreshSessionService {
   /**
    * Rotate a refresh token.
    *
+   *  0. Verify the JWT signature/expiry with JWT_REFRESH_SECRET; a bad, expired or
+   *     tampered token gets the same 401 as an unknown one (no DB access).
    *  1. Hash the raw token and atomically claim it: findOneAndUpdate on
    *     {token, isRevoked:false, expiresAt > now} → {isRevoked:true, rotatedAt:now}.
    *     Exactly one concurrent caller wins.
@@ -66,6 +68,16 @@ export class RefreshSessionService {
    *  3. Claim won → issue a new pair for the active user.
    */
   async refresh(rawRefreshToken: string): Promise<AuthTokens> {
+    try {
+      this.tokenService.verifyRefreshToken(rawRefreshToken);
+    } catch {
+      throw new AppException({
+        message: "Invalid refresh token!",
+        statusCode: 401,
+        errorType: "AUTHENTICATION_ERROR",
+      });
+    }
+
     const hashedToken = this.tokenService.hashToken(rawRefreshToken);
     const claimedToken = await this.refreshTokenModel.findOneAndUpdate(
       { token: hashedToken, isRevoked: false, expiresAt: { $gt: new Date() } },

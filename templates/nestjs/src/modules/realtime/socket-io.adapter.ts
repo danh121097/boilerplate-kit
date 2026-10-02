@@ -1,3 +1,4 @@
+import { isOriginAllowed, isSameOrigin } from "@/common/guards/origin-check";
 import { AppLogger } from "@/common/logger/app-logger.service";
 import { HmacService } from "@/common/services/hmac.service";
 import { TokenRevocationService } from "@/common/services/token-revocation.service";
@@ -16,11 +17,24 @@ import type { Server, ServerOptions } from "socket.io";
 
 /**
  * Socket.IO server options shared by every deployment (Redis on or off) — the
- * single source of truth for CORS, heartbeat and payload cap.
+ * single source of truth for CORS, origin check, heartbeat and payload cap.
  */
-export function buildSocketServerOptions(corsOrigins: string[]): Partial<ServerOptions> {
+export function buildSocketServerOptions(
+  config: Pick<AppConfigService, "enableCsrf" | "corsOrigins">,
+): Partial<ServerOptions> {
   return {
-    cors: { origin: corsOrigins, credentials: true },
+    cors: { origin: config.corsOrigins, credentials: true },
+    // CORS headers do not stop a websocket upgrade, so apply the HTTP origin guard's
+    // predicate to every handshake (polling and upgrade) when CSRF protection is on.
+    // An Origin equal to the API's own host also passes: native clients (React Native)
+    // send the server's own origin, and may attach cookies from their jar.
+    allowRequest: (req, callback): void => {
+      const allowed =
+        !config.enableCsrf ||
+        isOriginAllowed(req.headers, config.corsOrigins) ||
+        isSameOrigin(req.headers);
+      callback(allowed ? null : "Forbidden", allowed);
+    },
     pingInterval: 25000,
     pingTimeout: 20000,
     maxHttpBufferSize: 1e6,
@@ -49,7 +63,7 @@ export function buildSocketServerOptions(corsOrigins: string[]): Partial<ServerO
  * socket/index.ts. The gateway only ever sees authenticated sockets.
  */
 export class SocketIoAdapter extends IoAdapter {
-  private readonly corsOrigins: string[];
+  private readonly config: AppConfigService;
   private readonly logger: AppLogger;
   private readonly hmacService: HmacService;
   private readonly tokenService: TokenService;
@@ -61,7 +75,7 @@ export class SocketIoAdapter extends IoAdapter {
     private readonly pubClient: Redis | null,
   ) {
     super(app);
-    this.corsOrigins = app.get(AppConfigService).corsOrigins;
+    this.config = app.get(AppConfigService);
     this.logger = app.get(AppLogger);
     this.hmacService = app.get(HmacService);
     this.tokenService = app.get(TokenService);
@@ -71,7 +85,7 @@ export class SocketIoAdapter extends IoAdapter {
   createIOServer(port: number, options?: ServerOptions): ReturnType<IoAdapter["createIOServer"]> {
     const server = super.createIOServer(port, {
       ...options,
-      ...buildSocketServerOptions(this.corsOrigins),
+      ...buildSocketServerOptions(this.config),
     });
 
     if (this.pubClient) {

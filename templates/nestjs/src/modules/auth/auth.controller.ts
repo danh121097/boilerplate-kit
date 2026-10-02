@@ -1,7 +1,7 @@
 import { CurrentUser } from "@/common/decorators/current-user.decorator";
 import { Public } from "@/common/decorators/public.decorator";
 import { AppException } from "@/common/exceptions/app.exception";
-import { JwtPayload } from "@/common/types/auth.types";
+import { AuthTokens, JwtPayload } from "@/common/types/auth.types";
 import { AppConfigService } from "@/config/app-config.service";
 import { AuthService } from "@/modules/auth/auth.service";
 import { clearTokenCookies, setTokenCookies } from "@/modules/auth/cookie.util";
@@ -27,7 +27,8 @@ import type { Request, Response } from "express";
  *   Body field takes precedence; falls back to httpOnly cookie.
  *   An empty body field falls through to the cookie, like express.
  *
- * Envelope shapes (match express exactly):
+ * Envelope shapes (match express exactly; `tokens` is {} when
+ * AUTH_TOKENS_IN_BODY=false — the auth cookies are set either way):
  *   register  → 201 { success:true, message, data:{ user, tokens } }
  *   login     → 200 { success:true, message, data:{ user, tokens } }
  *   refresh   → 200 { success:true, message, data:{ tokens } }
@@ -42,11 +43,24 @@ export class AuthController {
     private readonly config: AppConfigService,
   ) {}
 
+  /**
+   * Tokens as returned in the response body: the `tokens` object stays but its
+   * fields are omitted (cookies unchanged) when AUTH_TOKENS_IN_BODY=false, for
+   * deployments whose clients are all cookie-based.
+   */
+  private bodyTokens(tokens: AuthTokens): { tokens: Partial<AuthTokens> } {
+    return { tokens: this.config.authTokensInBody ? tokens : {} };
+  }
+
   /** POST /auth/register — 201, public, auth throttle. */
   @Public()
   @Post("register")
   @ApiOperation({ summary: "Register a user" })
-  @ApiResponse({ status: 201, description: "User registered successfully" })
+  @ApiResponse({
+    status: 201,
+    description:
+      "User registered successfully; data.tokens is {} (fields omitted) when AUTH_TOKENS_IN_BODY=false",
+  })
   @ApiResponse({ status: 400, description: "The request body is invalid" })
   @ApiResponse({ status: 409, description: "An account with this email already exists" })
   @ApiResponse({ status: 429, description: "Too many registration attempts" })
@@ -56,13 +70,17 @@ export class AuthController {
   async register(
     @Body() dto: RegisterDto,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<{ success: boolean; message: string; data: { user: unknown; tokens: unknown } }> {
+  ): Promise<{
+    success: boolean;
+    message: string;
+    data: { user: unknown; tokens: Partial<AuthTokens> };
+  }> {
     const { user, tokens } = await this.authService.register(dto.email, dto.password, dto.name);
     setTokenCookies(res, tokens.accessToken, tokens.refreshToken, this.config);
     return {
       success: true,
       message: "User registered successfully!",
-      data: { user: serializeUser(user), tokens },
+      data: { user: serializeUser(user), ...this.bodyTokens(tokens) },
     };
   }
 
@@ -70,7 +88,11 @@ export class AuthController {
   @Public()
   @Post("login")
   @ApiOperation({ summary: "Log in and create a session" })
-  @ApiResponse({ status: 200, description: "Login successful" })
+  @ApiResponse({
+    status: 200,
+    description:
+      "Login successful; data.tokens is {} (fields omitted) when AUTH_TOKENS_IN_BODY=false",
+  })
   @ApiResponse({ status: 400, description: "The request body is invalid" })
   @ApiResponse({ status: 401, description: "The email or password is invalid" })
   @ApiResponse({ status: 429, description: "Too many login attempts" })
@@ -80,13 +102,17 @@ export class AuthController {
   async login(
     @Body() dto: LoginDto,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<{ success: boolean; message: string; data: { user: unknown; tokens: unknown } }> {
+  ): Promise<{
+    success: boolean;
+    message: string;
+    data: { user: unknown; tokens: Partial<AuthTokens> };
+  }> {
     const { user, tokens } = await this.authService.login(dto.email, dto.password);
     setTokenCookies(res, tokens.accessToken, tokens.refreshToken, this.config);
     return {
       success: true,
       message: "Login successful!",
-      data: { user: serializeUser(user), tokens },
+      data: { user: serializeUser(user), ...this.bodyTokens(tokens) },
     };
   }
 
@@ -102,7 +128,11 @@ export class AuthController {
     required: false,
     description: "Optional when the refresh-token cookie is present.",
   })
-  @ApiResponse({ status: 200, description: "Tokens refreshed successfully" })
+  @ApiResponse({
+    status: 200,
+    description:
+      "Tokens refreshed; data.tokens is {} (fields omitted) when AUTH_TOKENS_IN_BODY=false",
+  })
   @ApiResponse({ status: 400, description: "The request body is invalid" })
   @ApiResponse({
     status: 401,
@@ -116,7 +146,7 @@ export class AuthController {
     @Body() dto: RefreshDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<{ success: boolean; message: string; data?: { tokens: unknown } }> {
+  ): Promise<{ success: boolean; message: string; data: { tokens: Partial<AuthTokens> } }> {
     const rawToken: string | undefined =
       dto.refreshToken || (req.cookies as Record<string, string> | undefined)?.["refreshToken"];
 
@@ -145,7 +175,7 @@ export class AuthController {
     return {
       success: true,
       message: "Tokens refreshed successfully!",
-      data: { tokens },
+      data: this.bodyTokens(tokens),
     };
   }
 

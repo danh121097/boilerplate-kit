@@ -143,8 +143,8 @@ describe("Throttler (enabled)", () => {
 
     it("counts the default cap once per client across different routes", async () => {
       const ip = "203.0.113.20";
-      // Routes that fail in SecurityGuard never reach the throttler, so use a real
-      // session: /auth/me with a Bearer token passes every guard.
+      // Use a real session so every request is answered 200: /auth/me with a Bearer
+      // token passes every guard.
       const reg = await signedPost(
         "/auth/register",
         { email: "default-cap@example.com", password: "DefaultCap1!", name: "Cap" },
@@ -171,6 +171,27 @@ describe("Throttler (enabled)", () => {
       const other = await me();
       expect(other.status).toBe(429);
       expect(other.body.errorType).toBe("RATE_LIMIT");
+    }, 60_000);
+
+    it("counts requests the JWT guard rejects against the default cap", async () => {
+      const ip = "203.0.113.30";
+      const badJwtMe = () => {
+        const h = addBearerToken(buildHmacHeaders("GET", "/auth/me"), "not-a-jwt");
+        return req
+          .get("/api/v1/auth/me")
+          .set("sig", h.sig)
+          .set("ctime", h.ctime)
+          .set("Authorization", h.Authorization)
+          .set("X-Forwarded-For", ip);
+      };
+
+      for (let i = 0; i < 100; i++) {
+        expect((await badJwtMe()).status).toBe(401);
+      }
+
+      const blocked = await badJwtMe();
+      expect(blocked.status).toBe(429);
+      expect(blocked.body.errorType).toBe("RATE_LIMIT");
     }, 60_000);
   });
 });

@@ -6,10 +6,21 @@ import {
 import { TokenRevocationService, isTokenRevoked } from "@/common/services/token-revocation.service";
 import { TokenService } from "@/common/services/token.service";
 import { SOCKET_UNAUTHORIZED } from "@/modules/realtime/events";
+import type { ErrorType } from "@/common/exceptions/app.exception";
 import type { JwtPayload } from "@/common/types/auth.types";
 import type { Socket } from "socket.io";
 
 type Next = (err?: Error) => void;
+
+/**
+ * HMAC rejection: same message as a token rejection, plus `data.errorType` (the HTTP
+ * HMAC_ERROR value) so a client can tell clock skew from a bad session without
+ * spending a token refresh. socket.io hands `data` to the client's `connect_error`.
+ */
+const HMAC_ERROR: ErrorType = "HMAC_ERROR";
+function hmacRejection(): Error & { data: { errorType: ErrorType } } {
+  return Object.assign(new Error(SOCKET_UNAUTHORIZED), { data: { errorType: HMAC_ERROR } });
+}
 
 /**
  * Handshake HMAC gate (integrity + replay). The client signs the fixed socket
@@ -20,7 +31,7 @@ export function createSocketHmacMiddleware(hmacService: HmacService) {
   return (socket: Socket, next: Next): void => {
     const sig = socket.handshake.auth?.sig as string | undefined;
     const ctime = socket.handshake.auth?.ctime as string | number | undefined;
-    if (!sig || ctime === undefined) return next(new Error(SOCKET_UNAUTHORIZED));
+    if (!sig || ctime === undefined) return next(hmacRejection());
 
     const reason = hmacService.verifyHmac({
       method: "GET",
@@ -29,7 +40,7 @@ export function createSocketHmacMiddleware(hmacService: HmacService) {
       path: SOCKET_HMAC_PATH,
       sig,
     });
-    if (reason) return next(new Error(SOCKET_UNAUTHORIZED));
+    if (reason) return next(hmacRejection());
     next();
   };
 }

@@ -115,6 +115,59 @@ describe("body-parser errors", () => {
   });
 });
 
+describe("other body-parser error types", () => {
+  it("answers 415 VALIDATION_ERROR with a fixed message for an unsupported content encoding", async () => {
+    const res = await req
+      .post("/api/v1/auth/login")
+      .set("Content-Type", "application/json")
+      .set("Content-Encoding", "x-unknown")
+      .send("{}");
+
+    expect(res.status).toBe(415);
+    expect(res.body).toMatchObject({
+      ...ENVELOPE,
+      errorType: "VALIDATION_ERROR",
+      message: "Unsupported request content encoding!",
+      error_code: 415,
+    });
+  });
+});
+
+describe("undecodable compressed bodies", () => {
+  it.each(["gzip", "br", "deflate"])(
+    "answers 400 with a fixed message for a plain body labelled Content-Encoding: %s",
+    async (encoding) => {
+      const errorLog = vi.spyOn(AppLogger.prototype, "error");
+      const warnLog = vi.spyOn(AppLogger.prototype, "warn");
+      try {
+        const body = { email: "a@example.com", password: "Password1!" };
+        const h = buildHmacHeaders("POST", "/auth/login", body);
+        const res = await req
+          .post("/api/v1/auth/login")
+          .set("sig", h.sig)
+          .set("ctime", h.ctime)
+          .set("Content-Type", "application/json")
+          .set("Content-Encoding", encoding)
+          .send(JSON.stringify(body));
+
+        expect(res.status).toBe(400);
+        expect(res.body).toMatchObject({
+          ...ENVELOPE,
+          errorType: "VALIDATION_ERROR",
+          message: "Request body could not be read!",
+          error_code: 400,
+        });
+        expect(errorLog).not.toHaveBeenCalled();
+        const logged = JSON.stringify(warnLog.mock.calls);
+        expect(logged).not.toMatch(/header check|decompress|incorrect|zlib/i);
+      } finally {
+        errorLog.mockRestore();
+        warnLog.mockRestore();
+      }
+    },
+  );
+});
+
 describe("validation messages", () => {
   it("returns the Zod issue message, like the express validator", async () => {
     const res = await signedPost("/auth/login", { email: "not-an-email", password: "x" });

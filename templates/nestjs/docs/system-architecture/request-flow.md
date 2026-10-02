@@ -12,7 +12,7 @@ NestJS runs a fixed sequence around every handler. For this template:
 ```text
 1. Express middleware (configureApp): [trust proxy] → helmet → compression → cookieParser
 2. Global prefix + CORS:          setGlobalPrefix(apiPrefix), enableCors(credentials)
-3. Guards (APP_GUARD):            SecurityGuard  +  AppThrottlerGuard
+3. Guards (APP_GUARD):            AppThrottlerGuard  →  SecurityGuard
 4. Pipes (APP_PIPE):              ZodValidationPipe   (validates @Body DTOs)
 5. Route handler:                 controller method → service
 6. Filters (APP_FILTER):          HttpExceptionFilter (on any thrown error)
@@ -97,8 +97,8 @@ The module pattern keeps HTTP concerns and business logic separate:
 
 Example — `POST /api/v1/auth/login`:
 
-1. `SecurityGuard` (HMAC → `@Public` skips JWT) → `AppThrottlerGuard` (login
-   window) → `ZodValidationPipe` (validates `LoginDto`).
+1. `AppThrottlerGuard` (default + login windows) → `SecurityGuard` (HMAC →
+   `@Public` skips JWT) → `ZodValidationPipe` (validates `LoginDto`).
 2. `AuthController.login` reads `dto`, calls `AuthService.login`.
 3. Service authenticates, signs tokens, persists the hashed refresh token.
 4. Controller sets httpOnly cookies (`setTokenCookies`) and returns

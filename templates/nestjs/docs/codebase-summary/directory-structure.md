@@ -47,7 +47,7 @@ src/
 │   ├── filters/
 │   │   ├── http-exception.filter.ts # global filter → standard JSON error envelope
 │   │   ├── map-database-error.ts    # Mongoose/Mongo errors → 400/409 AppException
-│   │   └── map-body-parser-error.ts # body-parser errors (413 / malformed JSON) → 4xx AppException
+│   │   └── map-body-parser-error.ts # body-parser errors (413 / malformed JSON / bad encoding) → 4xx AppException
 │   ├── pipes/
 │   │   └── zod-validation.pipe.ts   # re-export of nestjs-zod ZodValidationPipe (global)
 │   ├── middleware/

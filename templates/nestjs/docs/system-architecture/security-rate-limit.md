@@ -60,6 +60,18 @@ none (a native app or server client) has nothing to forge, and browsers always
 send `Origin` on cross-site POSTs, so browser CSRF stays closed. The raw header
 presence is tested, so a malformed `Referer` is not mistaken for an absent one.
 
+The same predicate (`isOriginAllowed`) guards the Socket.IO handshake: the adapter's
+`allowRequest` refuses a polling or upgrade request whose `Origin` is not allowed or
+that carries a `Cookie` without an allowed `Origin`, while a cookie-less native
+client connects. CORS headers alone do not stop a websocket upgrade.
+
+**Same-origin handshake:** the adapter also lets a handshake through when its `Origin`
+host (`new URL(origin).host`, case-insensitive) equals the request's `Host` header.
+React Native's WebSocket sends the API's own origin and may attach cookies from its
+jar, so without this rule it would be refused with `ENABLE_CSRF=true`. Another port on
+the same hostname, an `Origin: null`, or an unparsable `Origin` is not same-origin; a
+foreign `Origin`, a `Cookie` without an `Origin`, and a foreign `Referer` stay refused.
+
 ## Rate Limiting
 
 [`throttler.module.ts`](../../src/common/throttler/throttler.module.ts) configures
@@ -72,18 +84,21 @@ presence is tested, so a malformed `Referer` is not mistaken for an absent one.
 | `auth`         | 15 min | 30  | `/auth/register`, `/auth/refresh`, `/auth/logout` |
 | `login`        | 15 min | 30  | `/auth/login` (brute-force protection)            |
 
-Counters are keyed by throttler name + client, not by route: `register`,
+Counters are keyed by throttler name + a SHA-256 hash of the client (the raw IP
+never reaches Redis), not by route: `register`,
 `refresh` and `logout` draw from **one** `auth` bucket, `login` has its own, and
 `default` is one bucket per client across every route
 (`generateKey` in `AppThrottlerGuard`; pinned by
 `test/e2e/rate-limit-throttler.e2e-spec.ts`).
 
-What is counted: `AppThrottlerGuard` runs **after** `SecurityGuard`, so a request
-that `SecurityGuard` rejects (unsigned/stale HMAC, CSRF origin, missing or bad JWT,
-role) never reaches the throttler and is **not** counted, notably a request with a
-bad JWT does not consume the 100/min `default` cap. Express and Fastify do count
-such requests; this difference is accepted. A signed request to an unknown route
-passes the guard via `NotFoundModule` and is counted against `default`.
+What is counted: `AppThrottlerGuard` runs **before** `SecurityGuard` (both are
+`APP_GUARD`s registered in that order in `AppModule`; global guards run in
+registration order), so a request that `SecurityGuard` later rejects (unsigned/stale
+HMAC, CSRF origin, missing or bad JWT, role) is counted too, notably a flood of bad
+JWTs is capped at 100/min like in Express and Fastify (pinned by the "counts requests
+the JWT guard rejects" case in `rate-limit-throttler.e2e-spec.ts`). Which routes opt
+in to `auth`/`login` is unchanged. A signed request to an unknown route is counted
+against `default` as well.
 
 Rate limits key on the client IP. Behind a reverse proxy set `TRUST_PROXY`
 (`true`/`false`, a hop count such as `1`, or a comma-separated list of
@@ -108,7 +123,8 @@ them in `@Throttle`. They layer **on top of** the global `default` cap:
 - **`shouldSkip` → true when `NODE_ENV=test`** — disabled under test.
 - **`handleRequest` fail-open** — a storage (Redis) error is caught and the
   request is allowed through, so a Redis outage never 500s an endpoint. The 429
-  (an `HttpException`) is always rethrown.
+  (an `HttpException`) is always rethrown. The failure is logged as one short
+  `warn` (reason only, no stack) at most once per 60 s, not per request.
 - **`throwThrottlingException`** throws `AppException({ errorType: 'RATE_LIMIT',
 statusCode: 429 })` so the standard error envelope is rendered.
 

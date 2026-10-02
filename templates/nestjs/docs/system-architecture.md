@@ -40,7 +40,8 @@ focused page under [`system-architecture/`](./system-architecture/).
 The global `SecurityGuard` + throttler guard (`APP_GUARD`), `ZodValidationPipe`
 (`APP_PIPE`), and `HttpExceptionFilter` (`APP_FILTER`) are registered inside the
 modules, so they are active as soon as the container is built. Shutdown hooks
-close Mongo, Redis, and the WS server gracefully.
+close Mongo, Redis, and the WS server gracefully. On `SIGTERM` the process exits with
+code 143 (Nest re-raises the signal after the shutdown hooks finish).
 
 ## Topics
 
