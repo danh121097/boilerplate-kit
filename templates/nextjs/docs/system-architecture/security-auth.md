@@ -213,20 +213,22 @@ Multiple backends can coexist. Each service has its own refresh endpoint and man
 ```ts
 // At startup in initServices():
 Api.setBaseURL(adminURL, "ADMIN");
-Api.registerInterceptors(new ApiInterceptors({
-  MAIN: { endpoint: "/auth/refresh" },
-  ADMIN: { endpoint: "/admin/auth/refresh" },
-}));
+Api.registerInterceptors(
+  new ApiInterceptors({
+    MAIN: { endpoint: "/auth/refresh" },
+    ADMIN: { endpoint: "/admin/auth/refresh" },
+  }),
+);
 ```
 
 A 401 on service ADMIN only triggers ADMIN's refresh; MAIN is unaffected.
 
 ## Cookie Storage Model
 
-| Token | Storage | Lifespan | Client Access |
-|-------|---------|----------|---------------|
-| accessToken | httpOnly cookie | 15m | No (server-managed) |
-| refreshToken | httpOnly cookie | 7d | No (server-managed) |
+| Token        | Storage         | Lifespan | Client Access       |
+| ------------ | --------------- | -------- | ------------------- |
+| accessToken  | httpOnly cookie | 15m      | No (server-managed) |
+| refreshToken | httpOnly cookie | 7d       | No (server-managed) |
 
 httpOnly cookies are inaccessible to JavaScript, so XSS cannot read them
 directly. Accepted risk: the backend also returns the tokens in the JSON body of
@@ -235,6 +237,32 @@ call `/auth/refresh` and read a fresh refresh token from the response. Opt-in
 backlog item: have the backend omit tokens from the body for cookie clients.
 The client never reads or stores tokens; it only sends requests with
 `withCredentials: true`, and the browser auto-includes the cookies.
+
+## Deploying the frontend and API on different subdomains
+
+Checked in Chromium (Playwright) against the express backend over plain HTTP with the
+development cookie attributes (`HttpOnly`, `SameSite=Lax`, no `Domain`). The fastify and
+nestjs backends set the same attributes; that is read from their source, not run.
+
+- Verified: with the page on `app.localhost` and the API on `api.localhost`, the browser
+  stored none of the `Set-Cookie` headers and `/auth/me` returned 401. Chromium treats
+  `localhost` as a public suffix, so the two hosts are different sites and `Lax` cookies
+  are not stored on a cross-site fetch. The same page on `localhost:5400` calling
+  `localhost:4100` (same site, different port) stored the cookies and sent them back.
+  A probe that sent `SameSite=None; Secure` was stored and sent from `api.localhost`, and a
+  `Domain=.localhost` attribute was rejected.
+- Not tested, from the SameSite rules: `app.example.com` and `api.example.com` share a
+  registrable domain, so they are the same site and `Lax`/`Strict` cookies work with
+  `credentials: include` (axios `withCredentials`). Hosts on different registrable domains
+  need `SameSite=None; Secure`, which the backends do not offer: `sameSite` is fixed to
+  `strict` in production and `lax` otherwise in the backend cookie helper.
+- Cookies are host-only unless the backend sets `COOKIE_DOMAIN` (for example
+  `.example.com`). Without it the browser sends `accessToken` only to the API host, so an
+  SSR server on the app host never sees it and SSR session reads are anonymous. Not tested
+  (no parent domain is available locally); the value goes to `Domain` on both set and clear.
+- In production the cookies are `Secure` and `SameSite=Strict` (HTTPS only; not tested).
+  Strict cookies are withheld on a navigation that arrives from another site, so the first
+  SSR render after following an external link can be anonymous until the browser refreshes.
 
 ## SSR Data Fetching
 
@@ -322,8 +350,9 @@ fixture and handlers) and `server/mock-server-read.ts` (the server-side read).
   hint left, the refresh is refused and the session ends as "expired", like a
   real refused refresh.
 - **Credentials.** One login pair, signed in as an `admin` so the built-in
-  users screen works. `register` signs up any user, who stays signed in but
-  cannot log in again (no user store) and is a plain `user`.
+  users screen works. `register` answers 400 for invalid input (same messages as the
+  backend) and 409 for the demo email; otherwise it signs up a user, who stays signed in
+  but cannot log in again (no user store) and is a plain `user`.
 - **Users.** `GET /users` (offset-paginated `?page&limit`, envelope
   `{ success: true, data, meta }`) and `GET /users/:id` answer from a fixed
   fixture: the demo user plus five sample users (`MOCK_SAMPLE_USERS`), newest

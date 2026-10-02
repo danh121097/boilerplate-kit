@@ -24,7 +24,8 @@ never touches `localStorage` or reads tokens directly.
 | `api-errors.ts`            | `toApiError`, `isUnauthorizedError`, `isRefreshRefused`, `isHmacError` / `HMAC_ERROR_TYPE`, `isSessionGoneError` (401 or 404), `refreshUnavailable`, `refreshHmacRejected`, `SessionEndedError`, `getApiErrorMessage` |
 | `app-prefix.ts`            | `getAppPrefix()` — prefix for lock and storage keys                |
 | `auth-refresh-client.ts`   | `createTokenRefresher` — bare axios refresh call (no interceptors), `REFRESH_TIMEOUT_MS` |
-| `hmac-signature.ts`        | HMAC-SHA256 signing via `NEXT_PUBLIC_HMAC_SECRET`; `signRequest`, `resolveContentType`; dev warning once when the secret is empty |
+| `runtime-env.ts`           | The only core file naming env keys: HMAC secret (`NEXT_PUBLIC_HMAC_SECRET`), build version, dev flag; `hmac-signature.ts` and `interceptors.ts` read through it |
+| `hmac-signature.ts`        | HMAC-SHA256 signing with the secret from `runtime-env.ts`; `signRequest`, `resolveContentType`; dev warning once when the secret is empty |
 | `headers-utils.ts`         | Attach HMAC headers to requests (no Bearer — cookies auto-sent)    |
 | `interceptors.ts`          | Request/response interceptors + 401 → refresh → replay             |
 | `session-refresher.ts`     | `registerSessionRefresher` / `refreshSession` — lets the socket hook refresh through the interceptors |

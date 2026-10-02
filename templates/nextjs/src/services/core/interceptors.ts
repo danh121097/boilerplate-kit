@@ -9,6 +9,7 @@ import {
 import { createTokenRefresher } from "@/services/core/auth-refresh-client";
 import { HeadersUtils } from "@/services/core/headers-utils";
 import { RefreshTokenManager } from "@/services/core/refresh-token-manager";
+import { HMAC_SECRET_ENV, isDevBuild } from "@/services/core/runtime-env";
 import { endSession, hasSessionHint } from "@/services/core/session";
 import type {
   ApiResponseError,
@@ -58,7 +59,10 @@ function pathOf(config: InternalAxiosRequestConfig): string {
  * (login/register/logout) — their 401 is final, never a reason to refresh. */
 function isRefreshExempt(config: InternalAxiosRequestConfig, options: RefreshOptions): boolean {
   const path = pathOf(config);
-  return [options.endpoint, ...options.skipPaths].some((p) => path === p || path.endsWith(p));
+  // Exact match on the service-relative path; an absolute URL is stripped of its baseURL first.
+  const base = config.baseURL ?? "";
+  const relative = base && path.startsWith(base) ? path.slice(base.length) : path;
+  return [options.endpoint, ...options.skipPaths].includes(relative);
 }
 
 /**
@@ -76,9 +80,9 @@ function canAttemptRefresh(config: InternalAxiosRequestConfig, options: RefreshO
 
 /** Dev-only hint: a rejected signature is a clock or secret problem, not a session one. */
 function warnHmacRejected(): void {
-  if (process.env.NODE_ENV !== "production") {
+  if (isDevBuild()) {
     console.warn(
-      "Request signature rejected (HMAC_ERROR): check the device clock and that NEXT_PUBLIC_HMAC_SECRET matches the backend HMAC_SECRET.",
+      `Request signature rejected (HMAC_ERROR): check the device clock and that ${HMAC_SECRET_ENV} matches the backend HMAC_SECRET.`,
     );
   }
 }

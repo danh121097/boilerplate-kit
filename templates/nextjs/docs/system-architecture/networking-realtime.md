@@ -98,7 +98,10 @@ the SSR bundle.
   auto-reconnecting (network error, server down) and nothing extra is scheduled.
   If it is false the server rejected the handshake (`Unauthorized!`): the hook
   refreshes the session once (`refreshSession`, the same single-flight refresh as
-  HTTP) and calls `connect()` again with the rotated cookie. Budget:
+  HTTP) and calls `connect()` again with the rotated cookie. A rejection whose
+  `error.data.errorType` is `HMAC_ERROR` (`HMAC_ERROR_TYPE`: clock skew or a wrong
+  secret; token rejections carry no `data`) never refreshes and spends none of the
+  budget: it goes straight to the backoff. Budget:
   `MAX_REFRESH_ATTEMPTS = 3` refreshes per outage; after that, or for any other
   rejection, one manual retry is scheduled (errors while one is pending do not
   reschedule) after `min(RECONNECT_BASE_MS * 2 ** attempt, RECONNECT_MAX_MS)` (2 s,

@@ -1,6 +1,6 @@
 import { SOCKET_EVENT } from "@/enums";
 import { getApiOrigin } from "@/services/core/api-config";
-import { isRefreshRefused, SessionEndedError } from "@/services/core/api-errors";
+import { HMAC_ERROR_TYPE, isRefreshRefused, SessionEndedError } from "@/services/core/api-errors";
 import { HMACSignatureGenerator } from "@/services/core/hmac-signature";
 import { refreshSession } from "@/services/core/session-refresher";
 import { useSocketIOStore } from "@/stores/socket-io";
@@ -16,6 +16,12 @@ const MAX_REFRESH_ATTEMPTS = 3;
 const SOCKET_UNAUTHORIZED = "Unauthorized!";
 /** Disconnect reason when the server closed the socket; socket.io does not reconnect on its own. */
 const SERVER_DISCONNECT = "io server disconnect";
+
+/** A rejected handshake signature (clock skew, wrong secret): the session was never judged,
+ * so a refresh cannot help. Token rejections carry no `data`. */
+function isSignatureRejection(error: Error & { data?: { errorType?: string } }): boolean {
+  return error.data?.errorType === HMAC_ERROR_TYPE;
+}
 
 /** Handshake signature, built by the same signer as the HTTP requests. Empty when
  * no HMAC secret is configured. */
@@ -143,7 +149,11 @@ export function useSocketIO() {
       // down). Otherwise the server rejected the handshake.
       if (socket.active) return;
       // A bounded number of consecutive refreshes per outage, then plain backoff.
-      if (error.message === SOCKET_UNAUTHORIZED && refreshAttempts < MAX_REFRESH_ATTEMPTS) {
+      if (
+        error.message === SOCKET_UNAUTHORIZED &&
+        !isSignatureRejection(error) &&
+        refreshAttempts < MAX_REFRESH_ATTEMPTS
+      ) {
         void refreshThenReconnect();
       } else {
         scheduleRetry();
