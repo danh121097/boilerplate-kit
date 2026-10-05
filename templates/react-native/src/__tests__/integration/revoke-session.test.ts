@@ -1,4 +1,4 @@
-import { resetSecureStore } from "@/__tests__/helpers/fake-secure-store";
+import { resetStorage } from "@/__tests__/helpers/fake-storage";
 import { refreshFailure } from "@/__tests__/helpers/http-mocks";
 import { AuthModel } from "@/services/auth";
 import {
@@ -15,10 +15,6 @@ import {
   persistRefreshToken,
 } from "@/services/core/auth-token-storage";
 
-jest.mock("expo-secure-store", () =>
-  require("@/__tests__/helpers/fake-secure-store").fakeSecureStore(),
-);
-
 /**
  * `AuthModel.revokeSession()`: the server rejected the session, so it is revoked
  * like a logout but ends as "expired" — once for concurrent callers, and not at
@@ -32,7 +28,7 @@ describe("AuthModel.revokeSession", () => {
   let unsubscribe: () => void;
 
   beforeEach(() => {
-    resetSecureStore();
+    resetStorage();
     ended = jest.fn();
     unsubscribe = onSessionEnded(ended);
   });

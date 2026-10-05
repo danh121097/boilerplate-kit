@@ -1,4 +1,4 @@
-import { resetSecureStore } from "@/__tests__/helpers/fake-secure-store";
+import { resetStorage } from "@/__tests__/helpers/fake-storage";
 import { httpError, makeClient, refreshFailure } from "@/__tests__/helpers/http-mocks";
 import { Api, isUnauthorizedError, onSessionEnded } from "@/services/core";
 import {
@@ -8,10 +8,6 @@ import {
   persistRefreshToken,
 } from "@/services/core/auth-token-storage";
 import axios from "axios";
-
-jest.mock("expo-secure-store", () =>
-  require("@/__tests__/helpers/fake-secure-store").fakeSecureStore(),
-);
 
 const HMAC_BODY = {
   success: false,
@@ -30,7 +26,7 @@ describe("interceptors — token refresh failures (async storage)", () => {
   let unsubscribe: () => void;
 
   beforeEach(() => {
-    resetSecureStore();
+    resetStorage();
     Api.setBaseURL("http://api.test", "MAIN");
     sessionEnded = jest.fn();
     unsubscribe = onSessionEnded(sessionEnded);

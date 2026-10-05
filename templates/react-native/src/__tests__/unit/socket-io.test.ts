@@ -1,16 +1,13 @@
-import { resetSecureStore } from "@/__tests__/helpers/fake-secure-store";
+import { resetStorage } from "@/__tests__/helpers/fake-storage";
 import { useSocketIOStore } from "@/stores/socket-io";
 
-jest.mock("expo-secure-store", () =>
-  require("@/__tests__/helpers/fake-secure-store").fakeSecureStore(),
-);
 // socket.io-client is heavy + native-adjacent; the store tests never open a real
 // connection, so stub it out.
 jest.mock("socket.io-client", () => ({ io: jest.fn(() => ({})) }));
 
 describe("socket-io store", () => {
   beforeEach(() => {
-    resetSecureStore();
+    resetStorage();
     useSocketIOStore.setState({ socket: null, authenticated: false });
   });
 

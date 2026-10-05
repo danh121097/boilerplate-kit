@@ -1,9 +1,6 @@
 import { render } from "@testing-library/react-native";
 
 // --- Mocks (declared before importing the layouts) ------------------------
-jest.mock("expo-secure-store", () =>
-  require("@/__tests__/helpers/fake-secure-store").fakeSecureStore(),
-);
 const mockRedirect = jest.fn();
 let mockPathname = "/profile";
 let mockGlobalParams: Record<string, string> = {};

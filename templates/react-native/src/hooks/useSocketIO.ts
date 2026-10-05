@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * Initialize a socket.io connection scoped to the mounting component.
  *
  * - Connects on mount (only while an access token exists), disconnects on unmount.
- *   The token is read asynchronously from SecureStore, so connecting is async.
+ *   The token is read asynchronously from storage, so connecting is async.
  * - Handshake auth is built per (re)connect: `{ token: 'Bearer <ACCESS_TOKEN>',
  *   ...HMACHeaders }`, `token` omitted when signed out.
  * - `authenticated` turns true only when the server emits `authenticated`, and

@@ -1,4 +1,4 @@
-import { resetSecureStore } from "@/__tests__/helpers/fake-secure-store";
+import { resetStorage } from "@/__tests__/helpers/fake-storage";
 import { logoutAndClear } from "@/__tests__/helpers/logout";
 import { queryClient } from "@/providers/query-client-provider";
 import { AuthModel } from "@/services/auth";
@@ -9,10 +9,6 @@ import {
 } from "@/services/core/auth-token-storage";
 import { endSession } from "@/services/core/session";
 import { useAuthStore } from "@/stores/auth";
-
-jest.mock("expo-secure-store", () =>
-  require("@/__tests__/helpers/fake-secure-store").fakeSecureStore(),
-);
 
 const USER = { _id: "u1", email: "a@b.com", name: "A", role: "user" };
 
@@ -40,7 +36,7 @@ function resetStore() {
 
 describe("auth store loadUser", () => {
   beforeEach(() => {
-    resetSecureStore();
+    resetStorage();
     resetStore();
     queryClient.clear();
   });

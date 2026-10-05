@@ -1,8 +1,5 @@
 import { render, screen } from "@testing-library/react-native";
 
-jest.mock("expo-secure-store", () =>
-  require("@/__tests__/helpers/fake-secure-store").fakeSecureStore(),
-);
 jest.mock("expo-router", () => {
   const { Pressable } = require("react-native");
   return {

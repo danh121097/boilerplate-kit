@@ -1,4 +1,4 @@
-import { resetSecureStore } from "@/__tests__/helpers/fake-secure-store";
+import { resetStorage } from "@/__tests__/helpers/fake-storage";
 import { bearerOf, httpError, makeClient, ok } from "@/__tests__/helpers/http-mocks";
 import { logoutAndClear } from "@/__tests__/helpers/logout";
 import { queryClient } from "@/providers/query-client-provider";
@@ -13,10 +13,6 @@ import {
 } from "@/services/core/auth-token-storage";
 import { useAuthStore } from "@/stores/auth";
 import axios from "axios";
-
-jest.mock("expo-secure-store", () =>
-  require("@/__tests__/helpers/fake-secure-store").fakeSecureStore(),
-);
 
 /**
  * Logout racing an in-flight token refresh, through the real interceptors +
@@ -33,7 +29,7 @@ const flush = () => new Promise((r) => setTimeout(r, 0));
 
 describe("logout during an in-flight refresh", () => {
   beforeEach(async () => {
-    resetSecureStore();
+    resetStorage();
     Api.setBaseURL("http://api.test", "MAIN");
     await persistAccessToken("OLD", "MAIN");
     await persistRefreshToken("OLD_R", "MAIN");

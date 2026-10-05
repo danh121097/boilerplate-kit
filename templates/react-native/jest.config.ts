@@ -10,6 +10,8 @@ const config: Config = {
   // Keeps a local `EXPO_PUBLIC_AUTH_MOCK*` from turning the dev-only mock auth on in every suite.
   setupFilesAfterEnv: [
     "<rootDir>/src/__tests__/setup-mock-auth-off.ts",
+    // In-memory expo-secure-store + react-native-mmkv for every suite.
+    "<rootDir>/src/__tests__/setup-storage.ts",
     // Unref Query's gc timers so a leaked cache entry cannot keep a worker alive.
     "<rootDir>/src/__tests__/setup-query-timers.ts",
   ],

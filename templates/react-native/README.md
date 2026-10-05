@@ -10,13 +10,13 @@ equivalents. Kept lean enough to read in one sitting.
 
 | Concern         | Choice                                                              |
 | --------------- | ------------------------------------------------------------------ |
-| Runtime         | Expo (managed) · React Native 0.79 · React 19                      |
+| Runtime         | Expo (managed, dev build) · React Native 0.79 · React 19           |
 | Navigation      | Expo Router (file-based, typed routes, auth-gated route groups)    |
 | Styling         | NativeWind v4 (Tailwind for RN) + hand-written `components/ui/`     |
 | Data fetching   | TanStack Query                                                      |
 | State           | Zustand (`auth`, `socket-io` stores)                               |
 | HTTP            | axios client factory + injectable interceptors                     |
-| Token storage   | `expo-secure-store` (async, Keychain/Keystore-backed)              |
+| Storage         | `react-native-mmkv` v4, AES-256 encrypted, key in `expo-secure-store` |
 | Auth            | JWT access token (Bearer) + refresh-token rotation (single-flight) |
 | Request signing | HMAC request signing (crypto-js) on every request                  |
 | Realtime        | Socket.IO (`socket.io-client`)                                     |
@@ -30,8 +30,15 @@ equivalents. Kept lean enough to read in one sitting.
 ```sh
 cp .env.example .env          # then edit values
 pnpm install
-pnpm dev                      # expo start — press i / a for iOS / Android
+pnpm ios                      # first run: builds the dev client (expo run:ios)
+pnpm android                  # or: expo run:android
+pnpm dev                      # afterwards: Metro dev server for the installed dev client
 ```
+
+**Expo Go is not supported.** `react-native-mmkv` v4 is a native (Nitro) module, so the app
+runs in a development build, not in Expo Go. `pnpm ios` / `pnpm android` generate the native
+project (`ios/`, `android/` — git-ignored) and install the dev client; they need Xcode
+(CocoaPods) or the Android SDK + JDK. Rebuild after changing native dependencies.
 
 Point `EXPO_PUBLIC_APP_ENDPOINT` at a running backend (the `express`, `fastify` or
 `nestjs` template in this kit works out of the box). Every `EXPO_PUBLIC_*` var is
@@ -62,9 +69,9 @@ Native only (iOS and Android): there is no web target.
 
 | Script           | Does                                                     |
 | ---------------- | -------------------------------------------------------- |
-| `pnpm dev`       | `expo start` (Metro dev server)                          |
-| `pnpm ios`       | open in the iOS simulator                                |
-| `pnpm android`   | open in an Android emulator                              |
+| `pnpm dev`       | `expo start` (Metro dev server for the dev client)       |
+| `pnpm ios`       | `expo run:ios` — build + run the dev client on iOS       |
+| `pnpm android`   | `expo run:android` — build + run it on Android           |
 | `pnpm test`      | run the jest-expo suite                                  |
 | `pnpm test:watch`| jest watch mode                                          |
 | `pnpm typecheck` | `tsc --noEmit`                                           |
@@ -80,7 +87,7 @@ Copy `.env.example` → `.env` and fill in the values:
 | --------------------------------- | ----------------------------------------------------------------------- |
 | `EXPO_PUBLIC_APP_ENDPOINT`        | Backend base URL (a device needs a reachable host, not `localhost`)     |
 | `EXPO_PUBLIC_API_PREFIX`          | API path prefix (e.g. `/api/v1`)                                        |
-| `EXPO_PUBLIC_APP_NAME`            | Prefix for SecureStore keys (sanitized to `[A-Za-z0-9._-]`)             |
+| `EXPO_PUBLIC_APP_NAME`            | Prefix for storage keys (sanitized to `[A-Za-z0-9._-]`)                 |
 | `EXPO_PUBLIC_LANGUAGE_CODE`       | Fallback language (`en` / `ja`) when nothing is saved and the device locale is unsupported |
 | `EXPO_PUBLIC_HMAC_SECRET`         | Required by the bundled backends; must equal the backend `HMAC_SECRET`  |
 | `EXPO_PUBLIC_BUILD_VERSION`       | Sent as `x-version`; injected by CI                                     |
@@ -106,7 +113,7 @@ src/
   i18n/                  i18next setup + locales
   providers/             QueryClientProvider
   services/
-    core/                axios client, interceptors, refresh, HMAC, token storage
+    core/                axios client, interceptors, refresh, HMAC, encrypted storage + tokens
     auth/                auth service (login / register / logout / me) + dev data/mock-auth*.ts
     users/               users service
     init-services.ts     wire base URLs + interceptors + refresh options
@@ -117,10 +124,12 @@ src/
 ## How auth works
 
 1. `initServices()` (called once in the root layout) registers the MAIN backend's
-   base URL, its SecureStore token slots, and its refresh endpoint, then installs
+   base URL, its storage token slots, and its refresh endpoint, then installs
    the axios interceptors.
-2. Login persists the access + refresh tokens to `expo-secure-store` (async).
-3. Every request attaches `Bearer <access>` (read async from SecureStore) plus the
+2. Login persists the access + refresh tokens to the encrypted MMKV instance. Its AES-256
+   key is generated on first launch and held in the Keychain / Keystore (`expo-secure-store`);
+   MMKV itself is synchronous; the token helpers stay async as a stable contract.
+3. Every request attaches `Bearer <access>` (read async from storage) plus the
    HMAC signature headers.
 4. On a 401 the response interceptor refreshes once (single-flight — concurrent
    401s share one network refresh), replays the request with the new token, and
@@ -149,7 +158,7 @@ a state reset through `watchSessionEnd` (an `onSessionEnded` listener), and the
   (offline, timeout, 5xx) the user stays signed in and a bottom banner
   (`session.unavailable` + `session.retry`) re-runs the restore. A 401 shows no banner.
 - **Language**: EN/JA toggle on the profile screen, saved under `STORAGE_KEYS.LANGUAGE`
-  (SecureStore). Resolution order: saved > device > `EXPO_PUBLIC_LANGUAGE_CODE` > `en`.
+  (encrypted MMKV). Resolution order: saved > device > `EXPO_PUBLIC_LANGUAGE_CODE` > `en`.
 - **Theme**: light only, same neutral palette tokens as the web templates; there is no
   dark mode or dark toggle.
 - **Not found**: `app/+not-found.tsx` uses the shared `not_found.*` keys.

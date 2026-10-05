@@ -1,11 +1,7 @@
-import { resetSecureStore } from "@/__tests__/helpers/fake-secure-store";
+import { resetStorage } from "@/__tests__/helpers/fake-storage";
 import { persistAccessToken } from "@/services/core/auth-token-storage";
 import { useSocketIOStore } from "@/stores/socket-io";
 import { act, renderHook } from "@testing-library/react-native";
-
-jest.mock("expo-secure-store", () =>
-  require("@/__tests__/helpers/fake-secure-store").fakeSecureStore(),
-);
 
 type Handler = (...args: unknown[]) => void;
 const mockHandlers = new Map<string, Handler>();
@@ -41,7 +37,7 @@ describe("useSocketIO", () => {
   beforeEach(async () => {
     jest.useFakeTimers();
     mockHandlers.clear();
-    resetSecureStore();
+    resetStorage();
     await persistAccessToken("TKN", "MAIN");
     useSocketIOStore.setState({ socket: null, authenticated: false });
     mockSocket.active = false;
@@ -61,7 +57,7 @@ describe("useSocketIO", () => {
   });
 
   it("does not connect while signed out", async () => {
-    resetSecureStore();
+    resetStorage();
     const { unmount } = renderHook(() => useSocketIO());
     await advance(0);
     expect(mockSocket.connect).not.toHaveBeenCalled();
@@ -70,7 +66,7 @@ describe("useSocketIO", () => {
 
   it("does not connect when unmounted during the pending auth read", async () => {
     const { unmount } = renderHook(() => useSocketIO());
-    unmount(); // the SecureStore read has not resolved yet
+    unmount(); // the storage read has not resolved yet
     await advance(0);
     expect(mockSocket.connect).not.toHaveBeenCalled();
     expect(useSocketIOStore.getState().socket).toBeNull();

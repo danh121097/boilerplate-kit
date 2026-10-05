@@ -1,4 +1,4 @@
-import { resetSecureStore } from "@/__tests__/helpers/fake-secure-store";
+import { resetStorage } from "@/__tests__/helpers/fake-storage";
 import { AuthModel } from "@/services/auth";
 import { onSessionEnded, RefreshTokenManager, SESSION_WAIT_TIMEOUT_MS } from "@/services/core";
 import {
@@ -9,15 +9,11 @@ import {
   persistRefreshToken,
 } from "@/services/core/auth-token-storage";
 
-jest.mock("expo-secure-store", () =>
-  require("@/__tests__/helpers/fake-secure-store").fakeSecureStore(),
-);
-
 /**
  * AuthModel is tested against a stubbed `api` (the response interceptor already
  * unwraps the backend envelope, so the stub resolves to the envelope body and the
  * model reads `.data` once). Verifies token lifecycle + payload mapping against
- * async SecureStore.
+ * async storage.
  */
 
 const RESULT = {
@@ -26,7 +22,7 @@ const RESULT = {
 };
 
 describe("AuthModel", () => {
-  beforeEach(() => resetSecureStore());
+  beforeEach(() => resetStorage());
   afterEach(() => jest.restoreAllMocks());
 
   it("login persists the access token and returns the result", async () => {

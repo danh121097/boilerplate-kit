@@ -5,6 +5,7 @@
 | Tool | Version | Role |
 |------|---------|------|
 | Expo (Metro) | latest | Dev server + JS bundler (managed) |
+| Expo prebuild (`expo run:*`) | latest | Generates the git-ignored native projects for the dev client |
 | Expo Router | latest | File-based typed route generation |
 | NativeWind v4 | 4 | Tailwind for React Native (via preset) |
 | TypeScript | 5 | Type checking (separate from Metro) |
@@ -15,9 +16,9 @@
 ## Scripts
 
 ```
-pnpm dev         → expo start (Metro dev server, press i/a for iOS/Android)
-pnpm ios         → expo start --ios (open iOS simulator)
-pnpm android     → expo start --android (open Android emulator)
+pnpm dev         → expo start (Metro dev server for the installed dev client)
+pnpm ios         → expo run:ios (prebuild + build + run the dev client)
+pnpm android     → expo run:android (prebuild + build + run the dev client)
 pnpm typecheck   → tsc --noEmit
 pnpm test        → jest-expo
 pnpm test:watch  → jest-expo --watch
@@ -26,7 +27,10 @@ pnpm lint:fix    → eslint . --fix && prettier --write .
 pnpm format      → prettier --write .
 ```
 
-**No build step.** Expo handles bundling; EAS Build is optional and out of scope.
+**Dev build, not Expo Go.** `react-native-mmkv` v4 (with `react-native-nitro-modules`) is a native
+module, so the app runs in a development build (`expo-dev-client`). `pnpm ios` / `pnpm android`
+generate `ios/` / `android/` (git-ignored) and install it; rebuild after changing native
+dependencies. Metro handles JS bundling; EAS Build is optional and out of scope.
 
 ## Route generation
 

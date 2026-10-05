@@ -1,24 +1,21 @@
+import { createStorageState } from "@/__tests__/helpers/fake-storage";
 import type { AxiosRequestConfig } from "axios";
 
 /**
  * Dev-only mock auth, exercised through the public surface: `AuthModel` on the
  * real axios client with the real interceptors, its transport replaced by the
- * mock. Every test boots a fresh module graph (`boot`) over the same SecureStore
+ * mock. Every test boots a fresh module graph (`boot`) over the same storage
  * contents, which is what an app restart does.
  */
 
 // Lives in the test file (not the shared fake) so it survives `jest.resetModules`.
-const mockSecureStore = new Map<string, string>();
-jest.mock("expo-secure-store", () => ({
-  WHEN_UNLOCKED: "whenUnlocked",
-  getItemAsync: async (key: string) => mockSecureStore.get(key) ?? null,
-  setItemAsync: async (key: string, value: string) => {
-    mockSecureStore.set(key, value);
-  },
-  deleteItemAsync: async (key: string) => {
-    mockSecureStore.delete(key);
-  },
-}));
+const mockStorage = createStorageState();
+jest.mock("expo-secure-store", () =>
+  require("@/__tests__/helpers/fake-storage").fakeSecureStore(mockStorage),
+);
+jest.mock("react-native-mmkv", () =>
+  require("@/__tests__/helpers/fake-storage").fakeMMKV(mockStorage),
+);
 
 const DEMO = { email: "demo@example.com", password: "password" };
 const REAL_RESULT = {
@@ -52,7 +49,8 @@ function boot() {
 
 describe("mock auth", () => {
   beforeEach(() => {
-    mockSecureStore.clear();
+    mockStorage.secure.clear();
+    mockStorage.files.clear();
     backend.mockClear();
     setDev(true);
     process.env.EXPO_PUBLIC_AUTH_MOCK = "true";

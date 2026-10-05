@@ -1,6 +1,12 @@
-import { fakeSecureStore, resetSecureStore } from "@/__tests__/helpers/fake-secure-store";
+import { resetStorage } from "@/__tests__/helpers/fake-storage";
 import { SOCKET_EVENT } from "@/enums";
-import { Api, ApiInterceptors, getApiBaseUrl, onSessionEnded } from "@/services/core";
+import {
+  Api,
+  ApiInterceptors,
+  getApiBaseUrl,
+  getAppStorage,
+  onSessionEnded,
+} from "@/services/core";
 import {
   getAccessToken,
   getRefreshToken,
@@ -17,19 +23,13 @@ import {
 } from "@/services/core/socket-connection";
 import { io } from "socket.io-client";
 import axios from "axios";
-import * as SecureStore from "expo-secure-store";
 
 /**
  * Socket handshake + reconnect rules, with the real refresh manager (the bare
- * refresh client's `axios.post` is stubbed), SecureStore faked in memory and a
+ * refresh client's `axios.post` is stubbed), storage faked in memory and a
  * fake socket.io transport.
  */
 
-jest.mock("expo-secure-store", () => {
-  const fake = require("@/__tests__/helpers/fake-secure-store").fakeSecureStore();
-  // A mock fn (not the plain function) so a test can make one read fail.
-  return { ...fake, getItemAsync: jest.fn() };
-});
 jest.mock("socket.io-client", () => ({ io: jest.fn() }));
 
 type Handler = (...args: never[]) => void;
@@ -106,8 +106,7 @@ describe("socket connection", () => {
 
   beforeEach(() => {
     jest.useFakeTimers();
-    resetSecureStore();
-    jest.mocked(SecureStore.getItemAsync).mockImplementation(fakeSecureStore().getItemAsync);
+    resetStorage();
     ENV_KEYS.forEach((k) => (envSnapshot[k] = process.env[k]));
     delete process.env.EXPO_PUBLIC_HMAC_SECRET;
     Api.setBaseURL("http://api.test", "MAIN");
@@ -163,9 +162,12 @@ describe("socket connection", () => {
       expect(await handshake()).toEqual({ token: "Bearer TOKEN" });
     });
 
-    it("still answers the handshake, empty, when the SecureStore read fails", async () => {
+    it("still answers the handshake, empty, when the storage read fails", async () => {
       createSocket();
-      jest.mocked(SecureStore.getItemAsync).mockRejectedValueOnce(new Error("keychain locked"));
+      await persistAccessToken("TOKEN"); // with a token stored, an empty handshake can only mean the read failed
+      jest.spyOn(getAppStorage(), "getString").mockImplementationOnce(() => {
+        throw new Error("storage unreadable");
+      });
 
       expect(await handshake()).toEqual({});
     });
@@ -274,7 +276,7 @@ describe("socket connection", () => {
       expect(socket.connect).not.toHaveBeenCalled();
     });
 
-    it("a refused refresh ends the session, clears SecureStore and never reconnects", async () => {
+    it("a refused refresh ends the session, clears the stored tokens and never reconnects", async () => {
       jest.spyOn(axios, "post").mockRejectedValue(refreshFailure(401));
       const ended = jest.fn();
       unsubscribe.push(onSessionEnded(ended));
@@ -368,7 +370,7 @@ describe("socket connection", () => {
     });
 
     it("does not refresh or reconnect when signed out", async () => {
-      resetSecureStore();
+      resetStorage();
       const post = jest.spyOn(axios, "post");
       const { socket, emit } = track(setup());
 

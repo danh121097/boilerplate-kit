@@ -27,7 +27,7 @@ export default {
   },
   home: {
     welcome: "Welcome",
-    description: "Expo Router + NativeWind + TanStack Query + Zustand + SecureStore JWT Auth.",
+    description: "Expo Router + NativeWind + TanStack Query + Zustand + Encrypted MMKV JWT Auth.",
   },
   profile: {
     title: "Profile",

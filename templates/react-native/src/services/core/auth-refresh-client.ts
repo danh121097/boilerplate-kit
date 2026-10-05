@@ -16,7 +16,7 @@ export const REFRESH_TIMEOUT_MS = 15_000;
  * Kept on a bare axios instance — NOT the app client — so a 401 returned by the
  * refresh request itself can never recurse back into the refresh interceptor.
  *
- * The refresh token is read from SecureStore (async) and sent in the request
+ * The refresh token is read from storage (async) and sent in the request
  * body. The backend rotates the pair and returns the new access (+ refresh)
  * tokens, which are handed back to the single-flight manager to persist (it
  * guards the write with the session epoch). Failures are rethrown as the raw

@@ -7,7 +7,7 @@ import { ActivityIndicator, View } from "react-native";
 
 /**
  * Authenticated route group. Renders a splash until the boot-time hydration
- * settles: the SecureStore read and, when tokens exist, the `getMe` call with its
+ * settles: the storage read and, when tokens exist, the `getMe` call with its
  * refresh (so it never flashes /login). Then it redirects guests to
  * the login screen with `?redirect=<current path>` so sign-in returns there. The
  * decision is the store's `isAuthenticated`. Only an explicit logout goes to a

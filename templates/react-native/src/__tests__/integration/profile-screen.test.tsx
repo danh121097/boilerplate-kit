@@ -1,9 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 
 // --- Mocks (declared before importing the screen) -------------------------
-jest.mock("expo-secure-store", () =>
-  require("@/__tests__/helpers/fake-secure-store").fakeSecureStore(),
-);
 const mockReplace = jest.fn();
 jest.mock("expo-router", () => ({
   router: { replace: (...args: unknown[]) => mockReplace(...args) },

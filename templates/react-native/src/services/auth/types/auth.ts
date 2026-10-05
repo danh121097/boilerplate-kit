@@ -5,7 +5,7 @@ import type { User } from "@/services/users/types/user";
 /** The signed-in user: the backend's `PublicUser`, same shape as a listed `User`. */
 export type AuthUser = User;
 
-/** Both tokens are held client-side in SecureStore (access for the Bearer header,
+/** Both tokens are held client-side in encrypted storage (access for the Bearer header,
  * refresh for the refresh request body). */
 export interface AuthTokens {
   accessToken: string;

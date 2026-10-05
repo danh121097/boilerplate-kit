@@ -43,7 +43,7 @@ function signHeader(): { sig?: string; ctime?: number } {
 
 /**
  * Handshake payload: `token` only when signed in (never an empty `Bearer`), plus a
- * fresh signature. The access token is read asynchronously from SecureStore.
+ * fresh signature. The access token is read asynchronously from storage.
  */
 export async function buildAuth(): Promise<SocketAuth> {
   const token = await getAccessToken();
@@ -53,7 +53,7 @@ export async function buildAuth(): Promise<SocketAuth> {
 /**
  * Create the (not yet connected) socket against `getApiOrigin()`. `auth` is
  * the callback form, so every connect and reconnect is signed afresh with the
- * current token and a new `ctime`. When the SecureStore read fails the handshake
+ * current token and a new `ctime`. When the storage read fails the handshake
  * goes out empty: the backend rejects it with `"Unauthorized!"`, which surfaces as
  * a `connect_error` handled by the lifecycle (refresh, then backoff) instead of
  * leaving the handshake hanging.
@@ -112,7 +112,7 @@ export function attachSocketLifecycle(
   let attempt = 0;
   let refreshAttempts = 0;
   let timer: ReturnType<typeof setTimeout> | null = null;
-  // Bumped by `stop` so a recovery or connect still awaiting SecureStore / the
+  // Bumped by `stop` so a recovery or connect still awaiting storage / the
   // refresh does not reconnect.
   let generation = 0;
 

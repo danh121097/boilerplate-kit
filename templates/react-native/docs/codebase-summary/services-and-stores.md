@@ -13,10 +13,10 @@ src/services/
 │   ├── api-errors.ts             # toApiError, isRefreshRefused, refreshUnavailable, SessionEndedError
 │   ├── session.ts                # Session epoch, logout-pending, onSessionEnded/endSession, hasStoredSession, safeRedirect
 │   ├── query-client.ts           # resetQueriesToSignedOut / resetQueriesOnSessionEnd
-│   ├── app-prefix.ts             # getAppPrefix() — sanitized SecureStore key prefix
+│   ├── app-prefix.ts             # getAppPrefix() — sanitized storage key prefix
 │   ├── auth-refresh-client.ts    # Bare axios refresh call (no interceptors)
-│   ├── auth-token-storage.ts     # Per-service expo-secure-store token registry (async, fails closed for unregistered services)
-│   ├── first-launch.ts           # Clears stale Keychain tokens on the first launch after an install (document-directory marker)
+│   ├── app-storage.ts            # getAppStorage() — AES-256 encrypted MMKV instance; its key lives in expo-secure-store
+│   ├── auth-token-storage.ts     # Per-service token registry over app storage (async, fails closed for unregistered services)
 │   ├── headers-utils.ts    # HeadersUtils.setAuthHeaders / addAuthorizationHeader
 │   ├── hmac-signature.ts   # HMACSignatureGenerator.signRequest + resolveContentType (crypto-js)
 │   ├── model.ts            # Model base class — subclass + Model.setup()
@@ -43,12 +43,13 @@ src/services/
 - **defineQuery**: returns a hook + `.key` + `.queryKey()` — queryKey is a stable array.
 - **defineMutation**: returns a hook + `.key` — wraps `useMutation`, invalidates keys on success.
 - **initServices()**: called once in `app/_layout.tsx` (root layout) before providers mount. Takes no callback: the root layout subscribes `watchSessionEnd()` (stores/auth.ts) to `onSessionEnded`.
-- **Token storage is async**: `SecureStore.getItemAsync()` returns a promise; all token reads/writes must await.
+- **Token helpers are async**: MMKV is synchronous, but `getAccessToken()` and the other token helpers return promises (stable contract; a storage failure rejects); await them.
 
 ## Zustand Stores
 
 ```
 src/stores/
+├── mmkv-persist.ts  # mmkvPersist(name, options) — Zustand `persist` options backed by the encrypted MMKV instance
 ├── auth.ts       # useAuthStore (user / isAuthenticated / hydrated / hydrateError / hydrate / retryHydrate / loadUser / clearSession) + watchSessionEnd
 └── socket-io.ts  # useSocketIOStore: socket connection state
 ```

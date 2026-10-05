@@ -1,10 +1,10 @@
 import { STORAGE_KEYS } from "@/enums";
+import { getAppStorage } from "@/services/core/app-storage";
 import { getLocales } from "expo-localization";
 import { initReactI18next } from "react-i18next";
 import en from "@/i18n/locales/en";
 import ja from "@/i18n/locales/ja";
 import i18next from "i18next";
-import * as SecureStore from "expo-secure-store";
 
 export type AppLocale = "en" | "ja";
 
@@ -36,7 +36,6 @@ export function initI18n(): typeof i18next {
     interpolation: { escapeValue: false },
     // Detection handled above via expo-localization; no browser detector plugin.
   });
-  // SecureStore reads are async: apply the saved choice once it resolves.
   void restoreSavedLanguage();
   return i18next;
 }
@@ -45,7 +44,7 @@ export function initI18n(): typeof i18next {
  * (the device / env / `en` startup language stays). */
 export async function restoreSavedLanguage(): Promise<void> {
   try {
-    const saved = await SecureStore.getItemAsync(STORAGE_KEYS.LANGUAGE);
+    const saved = getAppStorage().getString(STORAGE_KEYS.LANGUAGE);
     if (isAppLocale(saved) && saved !== i18next.language) await i18next.changeLanguage(saved);
   } catch {
     // Keep the detected language.
@@ -57,7 +56,7 @@ export async function restoreSavedLanguage(): Promise<void> {
 export async function setLocale(locale: AppLocale): Promise<void> {
   await i18next.changeLanguage(locale);
   try {
-    await SecureStore.setItemAsync(STORAGE_KEYS.LANGUAGE, locale);
+    getAppStorage().set(STORAGE_KEYS.LANGUAGE, locale);
   } catch {
     // The switch applies for this session even if it cannot be saved.
   }

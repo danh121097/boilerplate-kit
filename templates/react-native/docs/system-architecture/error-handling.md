@@ -59,6 +59,7 @@ is pending the submit button is disabled, shows its spinner and the
 
 ## Test environment
 
-Jest-expo with `@testing-library/react-native` handles mocking. Token storage
-tests mock `expo-secure-store` via `jest.mock`. Integration tests stub the
+Jest-expo with `@testing-library/react-native` handles mocking. Storage is
+faked in memory for every suite (`expo-secure-store` + `react-native-mmkv`, registered in
+`setup-storage.ts`). Integration tests stub the
 network adapter — no real HTTP. See [testing](../code-standards/testing.md).

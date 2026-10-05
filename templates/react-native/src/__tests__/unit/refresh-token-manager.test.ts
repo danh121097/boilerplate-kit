@@ -1,4 +1,4 @@
-import { resetSecureStore } from "@/__tests__/helpers/fake-secure-store";
+import { resetStorage } from "@/__tests__/helpers/fake-storage";
 import { refreshFailure } from "@/__tests__/helpers/http-mocks";
 import { SessionEndedError } from "@/services/core/api-errors";
 import {
@@ -11,14 +11,10 @@ import {
 import { RefreshTokenManager } from "@/services/core/refresh-token-manager";
 import { beginLogout } from "@/services/core/session";
 
-jest.mock("expo-secure-store", () =>
-  require("@/__tests__/helpers/fake-secure-store").fakeSecureStore(),
-);
-
 const tick = () => new Promise((r) => setTimeout(r, 5));
 
 describe("RefreshTokenManager", () => {
-  beforeEach(() => resetSecureStore());
+  beforeEach(() => resetStorage());
 
   it("dedupes concurrent calls into a single refresh and persists the tokens", async () => {
     let runs = 0;

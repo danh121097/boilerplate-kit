@@ -124,7 +124,7 @@ export class RefreshTokenManager {
 
   private async refreshUnlessRotated(epoch: number, staleToken?: string | null): Promise<string> {
     const service = this.service;
-    // Re-checked after every await: SecureStore reads are async, and a logout
+    // Re-checked after every await: storage reads are async, and a logout
     // may land in between.
     const assertSameSession = () => {
       if (isLogoutPending(service) || getSessionEpoch(service) !== epoch) {

@@ -1,3 +1,4 @@
+import { createStorageState } from "@/__tests__/helpers/fake-storage";
 import type { AxiosRequestConfig } from "axios";
 
 /**
@@ -8,17 +9,13 @@ import type { AxiosRequestConfig } from "axios";
  */
 
 // Lives in the test file (not the shared fake) so it survives `jest.resetModules`.
-const mockSecureStore = new Map<string, string>();
-jest.mock("expo-secure-store", () => ({
-  WHEN_UNLOCKED: "whenUnlocked",
-  getItemAsync: async (key: string) => mockSecureStore.get(key) ?? null,
-  setItemAsync: async (key: string, value: string) => {
-    mockSecureStore.set(key, value);
-  },
-  deleteItemAsync: async (key: string) => {
-    mockSecureStore.delete(key);
-  },
-}));
+const mockStorage = createStorageState();
+jest.mock("expo-secure-store", () =>
+  require("@/__tests__/helpers/fake-storage").fakeSecureStore(mockStorage),
+);
+jest.mock("react-native-mmkv", () =>
+  require("@/__tests__/helpers/fake-storage").fakeMMKV(mockStorage),
+);
 
 const DEMO = { email: "demo@example.com", password: "password" };
 const NEW_USER = { email: "new@example.com", password: "password", name: "New User" };
@@ -44,7 +41,8 @@ function boot() {
 
 describe("mock users", () => {
   beforeEach(() => {
-    mockSecureStore.clear();
+    mockStorage.secure.clear();
+    mockStorage.files.clear();
     backend.mockClear();
     Object.assign(globalThis, { __DEV__: true });
     process.env.EXPO_PUBLIC_AUTH_MOCK = "true";

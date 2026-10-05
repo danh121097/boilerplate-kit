@@ -24,12 +24,12 @@ Local UI state lives in Zustand stores under `src/stores/`.
 interface AuthState {
   user: AuthUser | null;     // null when logged out, or signed in but not yet loaded
   isAuthenticated: boolean;  // tokens are stored and the session is live
-  hydrated: boolean;         // boot-time SecureStore check finished
+  hydrated: boolean;         // boot-time storage check finished
   loggedOut: boolean;        // explicit logout → gate goes to a plain /login
   hydrateError: ApiResponseError | null; // transient restore failure (session kept)
   expireSession(): void;     // session expired: user null, isAuthenticated false
   setUser(user): void;       // also clears loggedOut
-  hydrate(): Promise<void>;  // first launch after install: clear stale tokens; read token → loadUser(); marks hydrated
+  hydrate(): Promise<void>;  // read token → loadUser(); marks hydrated
   retryHydrate(): Promise<void>; // re-run the restore (no splash); clears hydrateError on success
   loadUser(opts?: { silent?: boolean }): Promise<void>; // getMe; safe to retry; silent = no hydrateError on a transient failure
   clearSession(): void;      // local sign-out: reset state + queries, loggedOut: true (no API call)
@@ -67,7 +67,7 @@ Auth state rules:
   (`AuthModel.logout()`: revoke, clear tokens, emit the `"logout"` session end); its
   `isPending` disables the button, and `onSettled` (not `onSuccess`, so a failed
   request still signs out) calls `clearSession()` and `router.replace("/login")`.
-- If SecureStore cannot be read while restoring, the current state is kept and
+- If storage cannot be read while restoring, the current state is kept and
   `hydrateError` is set; the user is signed out locally only when the read succeeds
   and finds no tokens. At boot the user is still signed out at that point, so the
   auth gate shows the login screen and the banner (rendered by the `(app)` layout)
@@ -75,20 +75,43 @@ Auth state rules:
 
 Stores are imported explicitly — no auto-import or global injection.
 
+### Persisted stores
+
+To keep a store across launches, wrap it in Zustand's `persist` with `mmkvPersist(name, options)`
+(`src/stores/mmkv-persist.ts`); the state is saved as JSON in the encrypted MMKV instance under
+`<prefix>_STORE_<name>`:
+
+```ts
+export const useThemeStore = create<ThemeState>()(
+  persist(
+    (set) => ({ mode: "light", setMode: (mode) => set({ mode }) }),
+    mmkvPersist("theme", { partialize: ({ mode }) => ({ mode }) }),
+  ),
+);
+```
+
+`options` are the usual `persist` options (`partialize`, `version`, `migrate`, …) minus `name` and
+`storage`. MMKV is synchronous, so a store hydrates while it is created and the first render already
+sees the saved state (`persist.hasHydrated()` is true at once). If the storage cannot be opened (e.g. a
+locked Keychain) the store keeps its initial state and writes are skipped until a read succeeds
+(`persist.rehydrate()` retries), so the defaults never overwrite the saved state. Persisted stores
+are not cleared on logout, so keep tokens and other user data out of them and reset them yourself
+where needed.
+
 ## Locale state
 
 Locale is tracked by i18next. `setLocale()` in `src/i18n/i18n.ts` calls
 `i18next.changeLanguage()` and saves the choice under `STORAGE_KEYS.LANGUAGE`
-(SecureStore). At boot `initI18n()` starts from the device locale (then
+(encrypted MMKV). At boot `initI18n()` starts from the device locale (then
 `EXPO_PUBLIC_LANGUAGE_CODE`, then `en`) and `restoreSavedLanguage()` applies the
-saved choice once SecureStore answers: saved > device > env > en. The profile screen
+saved choice: saved > device > env > en. The profile screen
 has the EN/JA toggle. The `useTranslation()` hook re-renders screens reactively on
 language change.
 
-## Secure storage keys
+## Storage keys
 
 `STORAGE_KEYS` in `src/enums/storage-keys.ts` is the single source of truth for
-all `expo-secure-store` keys, prefixed with app namespace to prevent collisions:
+all keys of the encrypted MMKV instance, prefixed with app namespace to prevent collisions:
 
 ```ts
 ACCESS_TOKEN:  `${APP_PREFIX}_ACCESS_TOKEN`
@@ -101,5 +124,7 @@ THEME:         `${APP_PREFIX}_THEME`
 `sanitizeStorageKeyPrefix()`: characters outside `[A-Za-z0-9._-]` (spaces
 included) become `_`, and an empty value falls back to `PRISM_APP`.
 
-**All reads/writes are async.** Use `await SecureStore.getItemAsync(key)` and
-`await SecureStore.setItemAsync(key, value)`.
+**The instance is synchronous.** Get it with `getAppStorage()` (`@/services/core/app-storage`; the
+encryption key is read once per process), then use MMKV's API: `storage.getString(key)`, `storage.set(key, value)`,
+`storage.remove(key)`. The encryption key itself is not in `STORAGE_KEYS`: it lives in
+SecureStore under `<prefix>_STORAGE_KEY` (see [security-auth](./security-auth.md)).

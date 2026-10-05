@@ -18,7 +18,7 @@ interface SocketIOState {
  * - `setSocketIO`: partial-merge updater
  *
  * `socket.io-client` runs on React Native unchanged; the only mobile-specific
- * concern is that the access token is read asynchronously from SecureStore before
+ * concern is that the access token is read asynchronously from storage before
  * connecting (see `@/hooks/useSocketIO`).
  */
 export const useSocketIOStore = create<SocketIOState>((set) => ({

@@ -63,11 +63,11 @@ the unwrapped `User`. Screens read `data.data`, show
 - The handshake `auth` is a callback, so every connect and reconnect builds a fresh
   payload: `{ token: "Bearer <access>", sig, ctime }` with a new `ctime` and
   signature each time (`HMACSignatureGenerator.signRequest`, `GET /socket`, the same
-  signer as HTTP). The access token is read asynchronously from SecureStore.
+  signer as HTTP). The access token is read asynchronously from storage.
   `token` is omitted when signed out (never an empty `Bearer`), `sig`/`ctime` when no
   secret is set, and the payload carries no `role`: the backend reads only `sig`,
   `ctime` and `token`, and takes the role from the JWT.
-- If the SecureStore read fails, the handshake goes out empty and unsigned; the
+- If the storage read fails, the handshake goes out empty and unsigned; the
   backend rejects it with `connect_error "Unauthorized!"`, so the failure is visible
   (the status dot goes grey) instead of the handshake hanging.
 - The socket events are `authenticated`, `ping`, `disconnect` and `connect_error`

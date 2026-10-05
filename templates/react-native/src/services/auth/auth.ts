@@ -26,7 +26,7 @@ import type {
 } from "@/services/auth/types/auth";
 import type { ApiService, SessionEndReason } from "@/services/core";
 
-/** Both stored tokens of `service`; a failed SecureStore read counts as none. */
+/** Both stored tokens of `service`; a failed storage read counts as none. */
 async function readTokenPair(service: ApiService) {
   const [access, refresh] = await Promise.all([
     getAccessToken(service).catch(() => null),
@@ -100,7 +100,7 @@ export class AuthModel extends Model {
    * 1. Logout-pending from the first tick (before any await): no refresh starts
    *    while this waits or reads the tokens, and a 401 that would trigger one
    *    rejects with `session_ended`. The token reads start in the same tick
-   *    (SecureStore is async) — that pair is the fallback below.
+   *    (storage reads are async) — that pair is the fallback below.
    * 2. Wait out any in-flight refresh (`withSessionLock`, capped at 15s) so the
    *    token revoked is the rotated one, not the one it replaced — a
    *    rotated-but-unrevoked token would stay valid on the server.
@@ -175,7 +175,7 @@ export class AuthModel extends Model {
     }
   }
 
-  /** Persist both tokens (async SecureStore): access for the Bearer header,
+  /** Persist both tokens (async encrypted storage): access for the Bearer header,
    * refresh for the refresh call. */
   private static async storeSession(result: AuthResult): Promise<AuthResult> {
     await persistAccessToken(result.tokens.accessToken, this.service);

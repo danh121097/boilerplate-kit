@@ -1,11 +1,7 @@
-import { resetSecureStore } from "@/__tests__/helpers/fake-secure-store";
+import { resetStorage } from "@/__tests__/helpers/fake-storage";
 import { STORAGE_KEYS } from "@/enums";
+import { getAppStorage } from "@/services/core/app-storage";
 import i18next from "i18next";
-import * as SecureStore from "expo-secure-store";
-
-jest.mock("expo-secure-store", () =>
-  require("@/__tests__/helpers/fake-secure-store").fakeSecureStore(),
-);
 
 let mockDevice: string | undefined;
 jest.mock("expo-localization", () => ({
@@ -17,7 +13,7 @@ import { detectLanguage, initI18n, restoreSavedLanguage, setLocale } from "@/i18
 describe("locale resolution (saved > device > env > en)", () => {
   let envSnapshot: string | undefined;
   beforeEach(() => {
-    resetSecureStore();
+    resetStorage();
     mockDevice = undefined;
     envSnapshot = process.env.EXPO_PUBLIC_LANGUAGE_CODE;
     delete process.env.EXPO_PUBLIC_LANGUAGE_CODE;
@@ -46,7 +42,7 @@ describe("locale resolution (saved > device > env > en)", () => {
     await i18next.changeLanguage("en");
 
     await setLocale("ja");
-    expect(await SecureStore.getItemAsync(STORAGE_KEYS.LANGUAGE)).toBe("ja");
+    expect(getAppStorage().getString(STORAGE_KEYS.LANGUAGE)).toBe("ja");
 
     await i18next.changeLanguage("en"); // a fresh launch starts from the device language
     await restoreSavedLanguage();
@@ -56,7 +52,7 @@ describe("locale resolution (saved > device > env > en)", () => {
   it("ignores an unsupported saved value", async () => {
     initI18n();
     await i18next.changeLanguage("en");
-    await SecureStore.setItemAsync(STORAGE_KEYS.LANGUAGE, "fr");
+    getAppStorage().set(STORAGE_KEYS.LANGUAGE, "fr");
     await restoreSavedLanguage();
     expect(i18next.language).toBe("en");
   });

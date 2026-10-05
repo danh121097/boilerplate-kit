@@ -29,7 +29,7 @@ export interface RefreshedTokens {
 
 /**
  * Resolved refresh config for one service. The refresh token is read from
- * SecureStore and sent in the refresh request body; the backend rotates the pair.
+ * storage and sent in the refresh request body; the backend rotates the pair.
  */
 export interface RefreshOptions {
   /** Refresh endpoint, relative to the owning service's baseURL. */
@@ -42,7 +42,7 @@ export interface RefreshOptions {
   skipPaths: string[];
   /** Whether a session exists to refresh. Default: an access or refresh token
    * is stored for the service (`hasStoredSession`). Async on React Native
-   * because SecureStore reads are async. */
+   * because storage reads are async. */
   hasSession: () => boolean | Promise<boolean>;
   /** Called after a refresh persisted the rotated tokens. */
   onRefreshed?: () => void;

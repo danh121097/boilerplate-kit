@@ -36,7 +36,7 @@ import axios from "axios";
  * network call is replaced; every other API still hits the real backend.
  *
  * Session persistence is the real mode's: the mock hands out opaque tokens that
- * the client stores in the same SecureStore slots, so an app restart and logout
+ * the client stores in the same storage slots, so an app restart and logout
  * behave as with the backend. Tokens carry the user, so `/auth/me`
  * and `/auth/refresh` answer statelessly. Login accepts one credential pair
  * (`EXPO_PUBLIC_AUTH_MOCK_EMAIL` / `EXPO_PUBLIC_AUTH_MOCK_PASSWORD`, default

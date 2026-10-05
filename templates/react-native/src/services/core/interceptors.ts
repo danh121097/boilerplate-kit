@@ -85,7 +85,7 @@ function isExempt(config: InternalAxiosRequestConfig, options: RefreshOptions): 
  * A 401 is eligible for an automatic refresh only when the request has not
  * already been replayed, it is not exempt, and a session exists for that service
  * (so anonymous traffic never triggers a refresh storm). The session check reads
- * SecureStore, so this returns a promise.
+ * storage, so this returns a promise.
  */
 async function canAttemptRefresh(
   config: InternalAxiosRequestConfig,
@@ -226,7 +226,7 @@ function setActiveInterceptors(interceptors: ApiInterceptors): void {
  * Refresh `service`'s session outside an HTTP request (e.g. a socket handshake
  * the server rejected), through the same single-flight manager as the 401
  * interceptor. Resolves to the fresh access token. `staleToken` is the access
- * token that was rejected (default: the stored one, read from SecureStore). A
+ * token that was rejected (default: the stored one, read from storage). A
  * refused refresh clears the tokens and ends the session before rejecting;
  * rejects with `SessionEndedError` when the session already ended, and with the
  * raw error otherwise (session kept). Rejects without a response when the

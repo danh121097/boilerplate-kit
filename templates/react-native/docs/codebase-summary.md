@@ -22,7 +22,7 @@ src/
 ├── i18n/                # react-i18next setup + en/ja locales
 ├── providers/           # React context providers (QueryClientProvider)
 ├── services/            # Axios service layer
-│   ├── core/            # Api, interceptors, HMAC, SecureStore, TanStack helpers
+│   ├── core/            # Api, interceptors, HMAC, encrypted storage + tokens, TanStack helpers
 │   ├── auth/            # AuthModel + query/mutation definitions
 │   ├── users/           # UsersModel + useUsersListQuery
 │   └── init-services.ts # Wire base URLs, interceptors, per-service refresh options

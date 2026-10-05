@@ -25,7 +25,7 @@ export class HeadersUtils {
   /**
    * Attach the Bearer token from the matching storage slot for the service,
    * unless the caller already set one (logout sends the access token it
-   * captured before ending the session). SecureStore reads are async, so this is `async` — the request
+   * captured before ending the session). Storage reads are async, so this is `async` — the request
    * interceptor awaits it (axios awaits a promise-returning request interceptor).
    */
   static async addAuthorizationHeader(

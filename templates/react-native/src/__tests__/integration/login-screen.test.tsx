@@ -1,10 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 
 // --- Mocks (declared before importing the screen) -------------------------
-jest.mock("expo-secure-store", () =>
-  require("@/__tests__/helpers/fake-secure-store").fakeSecureStore(),
-);
-
 // jest hoists jest.mock() above imports; factories may only reference
 // out-of-scope vars whose names start with `mock`.
 const mockReplace = jest.fn();

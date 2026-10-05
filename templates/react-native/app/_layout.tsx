@@ -29,7 +29,7 @@ export default function RootLayout() {
   // Re-check the session when the app returns from the background.
   useSessionRevalidation();
 
-  // Restore any persisted session from SecureStore on boot.
+  // Restore any persisted session from storage on boot.
   useEffect(() => {
     void hydrate();
   }, [hydrate]);

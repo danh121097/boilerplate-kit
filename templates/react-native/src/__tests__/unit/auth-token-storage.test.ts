@@ -1,4 +1,4 @@
-import { resetSecureStore } from "@/__tests__/helpers/fake-secure-store";
+import { resetStorage } from "@/__tests__/helpers/fake-storage";
 import { STORAGE_KEYS } from "@/enums";
 import {
   clearAccessToken,
@@ -15,13 +15,9 @@ import {
 } from "@/services/core/auth-token-storage";
 import { getSessionEpoch, hasStoredSession } from "@/services/core/session";
 
-jest.mock("expo-secure-store", () =>
-  require("@/__tests__/helpers/fake-secure-store").fakeSecureStore(),
-);
-
-describe("auth-token-storage (async / SecureStore)", () => {
+describe("auth-token-storage (async / encrypted MMKV)", () => {
   beforeEach(() => {
-    resetSecureStore();
+    resetStorage();
     registerServiceToken("ADMIN", { access: "ADMIN_ACCESS", refresh: "ADMIN_REFRESH" });
   });
 
@@ -90,7 +86,7 @@ describe("auth-token-storage (async / SecureStore)", () => {
     expect(await getRefreshToken("ADMIN")).toBeNull();
   });
 
-  it("keeps STORAGE_KEYS values SecureStore-legal ([A-Za-z0-9._-])", () => {
+  it("keeps STORAGE_KEYS values within [A-Za-z0-9._-]", () => {
     for (const value of Object.values(STORAGE_KEYS)) {
       expect(value).toMatch(/^[A-Za-z0-9._-]+$/);
     }

@@ -1,4 +1,4 @@
-import { resetSecureStore } from "@/__tests__/helpers/fake-secure-store";
+import { resetStorage } from "@/__tests__/helpers/fake-storage";
 import {
   bearerOf,
   httpError,
@@ -17,13 +17,9 @@ import {
 } from "@/services/core/auth-token-storage";
 import axios from "axios";
 
-jest.mock("expo-secure-store", () =>
-  require("@/__tests__/helpers/fake-secure-store").fakeSecureStore(),
-);
-
 /**
  * How a 401 interacts with the end of a session, through the real interceptors:
- * a logout (or a new login) landing while the 401 handler awaits its SecureStore
+ * a logout (or a new login) landing while the 401 handler awaits its storage
  * reads, a token already rotated by an earlier refresh, and a secondary
  * service's refused refresh.
  */
@@ -42,7 +38,7 @@ describe("interceptors — 401s racing the end of a session", () => {
   let unsubscribe: () => void;
 
   beforeEach(async () => {
-    resetSecureStore();
+    resetStorage();
     Api.setBaseURL("http://api.test", "MAIN");
     await persistAccessToken("OLD", "MAIN");
     await persistRefreshToken("OLD_R", "MAIN");

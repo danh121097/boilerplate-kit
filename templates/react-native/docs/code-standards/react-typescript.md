@@ -89,7 +89,7 @@ Button.displayName = "Button";
 ## Service queries in screens
 
 ```tsx
-// Async SecureStore — all token reads return promises
+// Fetching goes through the service layer — no storage access in screens
 const { data, isLoading, error } = useUsersListQuery();
 ```
 
@@ -103,14 +103,16 @@ const { token, setToken } = useAuthStore();
 
 ## Async token storage
 
-All token reads/writes are async (via `expo-secure-store`). Promises must be awaited:
+Tokens live in encrypted MMKV, which is synchronous, but the helpers in
+`@/services/core/auth-token-storage` are `async` (a stable contract: a storage failure surfaces
+as a rejection). Promises must be awaited, and tokens are never read from storage directly:
 
 ```tsx
-// ❌ Wrong: sync access
-const token = SecureStore.getItem("token");
+// ❌ Wrong: not awaited (a Promise is always truthy)
+const token = getAccessToken();
 
-// ✅ Correct: async await
-const token = await SecureStore.getItemAsync("token");
+// ✅ Correct
+const token = await getAccessToken();
 ```
 
 ## i18n

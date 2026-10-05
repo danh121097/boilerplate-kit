@@ -1,7 +1,8 @@
-import { resetSecureStore } from "@/__tests__/helpers/fake-secure-store";
+import { resetStorage } from "@/__tests__/helpers/fake-storage";
 import { logoutAndClear } from "@/__tests__/helpers/logout";
 import { queryClient } from "@/providers/query-client-provider";
 import { AuthModel } from "@/services/auth";
+import { getAppStorage } from "@/services/core/app-storage";
 import {
   clearServiceTokens,
   getAccessToken,
@@ -11,11 +12,6 @@ import {
 } from "@/services/core/auth-token-storage";
 import { onSessionEnded } from "@/services/core/session";
 import { useAuthStore } from "@/stores/auth";
-import * as SecureStore from "expo-secure-store";
-
-jest.mock("expo-secure-store", () =>
-  require("@/__tests__/helpers/fake-secure-store").fakeSecureStore(),
-);
 
 const USER = { _id: "u1", email: "a@b.com", name: "A", role: "user" };
 
@@ -44,7 +40,7 @@ function resetStore() {
 
 describe("auth store", () => {
   beforeEach(() => {
-    resetSecureStore();
+    resetStorage();
     resetStore();
     queryClient.clear();
   });
@@ -109,10 +105,12 @@ describe("auth store", () => {
       });
     });
 
-    it("keeps the signed-in state and flags hydrateError when SecureStore cannot be read", async () => {
+    it("keeps the signed-in state and flags hydrateError when storage cannot be read", async () => {
       await persistAccessToken("AT", "MAIN");
       useAuthStore.setState({ user: USER as never, isAuthenticated: true, hydrated: true });
-      const read = jest.spyOn(SecureStore, "getItemAsync").mockRejectedValue(new Error("keychain"));
+      const read = jest.spyOn(getAppStorage(), "getString").mockImplementation(() => {
+        throw new Error("storage unreadable");
+      });
 
       await useAuthStore.getState().retryHydrate();
 

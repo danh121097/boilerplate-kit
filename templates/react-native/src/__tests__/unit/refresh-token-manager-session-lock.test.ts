@@ -1,4 +1,4 @@
-import { resetSecureStore } from "@/__tests__/helpers/fake-secure-store";
+import { resetStorage } from "@/__tests__/helpers/fake-storage";
 import { SessionEndedError } from "@/services/core/api-errors";
 import { getAccessToken } from "@/services/core/auth-token-storage";
 import {
@@ -7,14 +7,10 @@ import {
   withSessionLock,
 } from "@/services/core/refresh-token-manager";
 
-jest.mock("expo-secure-store", () =>
-  require("@/__tests__/helpers/fake-secure-store").fakeSecureStore(),
-);
-
 const tick = () => new Promise((r) => setTimeout(r, 5));
 
 describe("withSessionLock", () => {
-  beforeEach(() => resetSecureStore());
+  beforeEach(() => resetStorage());
 
   it("runs the task at once when no refresh is in flight", async () => {
     const task = jest.fn(async () => "done");

@@ -4,16 +4,29 @@
 
 | Token | Where stored | Who manages |
 |-------|-------------|-------------|
-| Access token (JWT) | `expo-secure-store` (Keychain on iOS, Keystore on Android) | Client (`auth-token-storage.ts`) |
-| Refresh token | `expo-secure-store` (same as above) | Client (rotated by backend on every refresh) |
+| Access token (JWT) | AES-256 encrypted MMKV instance (`app-storage.ts`) | Client (`auth-token-storage.ts`) |
+| Refresh token | same encrypted MMKV instance | Client (rotated by backend on every refresh) |
+| MMKV encryption key | `expo-secure-store` (Keychain on iOS, Keystore on Android), `WHEN_UNLOCKED_THIS_DEVICE_ONLY` | Client (`app-storage.ts`) |
 
-**All token storage is async.** `SecureStore.getItemAsync()` returns a promise;
-all reads and writes must await. The backend also sets httpOnly cookies, but the
+**Encrypted MMKV, key in the Keychain/Keystore.** `getAppStorage()` returns the
+shared MMKV instance (id `<prefix>_storage`, AES-256). Its key is 32 hex chars from
+`expo-crypto`, generated on first use and stored in SecureStore under
+`<prefix>_STORAGE_KEY`; it is read once per process with the synchronous SecureStore
+API, so `getAppStorage()` and every MMKV call are synchronous. A key that cannot be
+read (locked Keychain) throws and is never regenerated, so the stored data is not orphaned; the failure is not cached,
+so the next call retries. A missing or malformed key next to an existing file
+(Keychain cleared, Android backup restore) means that file cannot be decrypted: it
+is deleted and a new key is generated, so the app boots signed out.
+
+**All token helpers are async.** `getAccessToken()` and the rest return promises, a
+stable contract over the synchronous storage; all reads and writes must await. A
+storage that cannot be opened rejects the call, which callers treat as "tokens unreadable" (the
+auth store keeps its state and sets `hydrateError`). The backend also sets httpOnly cookies, but the
 app never uses them: cookies are disabled (`withCredentials: false` on the app
 client, the refresh client and the socket), so no native cookie jar is involved.
 The client sends the access token as a `Bearer` header and the refresh token in the
-request **body** of `/auth/refresh` and `/auth/logout`. Tokens live only in
-SecureStore.
+request **body** of `/auth/refresh` and `/auth/logout`. Tokens live only in the
+encrypted MMKV instance.
 
 **Unregistered services fail closed.** `auth-token-storage.ts` resolves a service
 to its own slot pair and never falls back to the MAIN slots: for a service not
@@ -27,9 +40,9 @@ that carry no `Cookie`, `Origin` or `Referer` header, which is what this native
 client sends, so it works with the check on. Browsers always send `Origin` on a
 cross-site mutating request, so browser CSRF stays closed.
 
-SecureStore keys must match `[A-Za-z0-9._-]`. The `EXPO_PUBLIC_APP_NAME` key
-prefix is sanitized (`sanitizeStorageKeyPrefix`): any other character, spaces
-included, becomes `_` (`"My App"` → `My_App_ACCESS_TOKEN`).
+The `EXPO_PUBLIC_APP_NAME` key prefix is sanitized (`sanitizeStorageKeyPrefix`) to
+`[A-Za-z0-9._-]` because it names the SecureStore slot of the encryption key: any
+other character, spaces included, becomes `_` (`"My App"` → `My_App_ACCESS_TOKEN`).
 
 ## HMAC request signing
 
@@ -126,7 +139,7 @@ A 401 is routed in this order:
    the 401 rejects with `SessionEndedError` (`error_code: 401`,
    `message: "session_ended"`) and nothing else happens — no `/auth/refresh`
    call, no clear, no event. The check runs again after every await of the 401
-   handler (the `hasSession` SecureStore read, the refresh), so a logout that
+   handler (the `hasSession` storage read, the refresh), so a logout that
    lands while the handler is reading tokens still wins.
 3. **Anonymous** (`hasSession()` false — neither token stored) or **already
    replayed once** (`config._retry`): passed through. A replayed request that
@@ -180,7 +193,7 @@ end. It revokes the **latest** refresh token (the steps are shared with
 2. It reads the refresh token **and** the access token again, preferring what
    is stored now (a rotated pair) and falling back to the pair it started
    reading when logout began (those reads are kicked off before the wait, since
-   SecureStore is async) if storage is empty by then. It then bumps the session
+   storage reads are async) if storage is empty by then. It then bumps the session
    epoch: every request sent before now that 401s rejects as `session_ended`.
 3. It posts `{ refreshToken }` to `/auth/logout` (body — no cookie jar in RN) with
    `Authorization: Bearer <access token read in step 2>`, only when one was held.
@@ -198,7 +211,7 @@ is a `"logout"` session end: it never adds a
 `redirect` (it sets `loggedOut`, so the gate goes to a plain `/login`).
 
 Refresh coordination is in memory only (single app process — no cross-tab case),
-so it uses no storage keys. Every SecureStore key comes from `STORAGE_KEYS` or
+so it uses no storage keys. Every storage key comes from `STORAGE_KEYS` or
 the sanitized app prefix (`getAppPrefix()`).
 
 **Epoch guard:** every token clear (`clearServiceTokens`, `clearAuthTokens`,
@@ -219,7 +232,7 @@ are rolled back (compare-and-delete).
 - A signed-in user on the guest-only login screen is sent to the validated return
   path (in-app paths only, `safeRedirect`), else home.
 - The decision uses the auth store's `isAuthenticated`, restored at boot by
-  `hydrate()` (SecureStore read, then `getMe`); the `(app)` gate shows a splash
+  `hydrate()` (storage read, then `getMe`); the `(app)` gate shows a splash
   until it finishes. There is no SSR. A guest arriving by deep link at boot goes to
   `/login?redirect=<path>` once hydration finishes.
 - Own explicit logout goes to plain `/login`; an involuntary sign-out (expired
@@ -304,17 +317,14 @@ token is stored) and calls `getMe`:
 a slow or offline start keeps the splash until the request settles (bounded by the
 request timeouts) rather than flashing `/login`.
 
-**Reinstall.** The iOS Keychain survives an uninstall, so a reinstalled app would
-boot into the previous install's session. Before reading any token, `hydrate()`
-calls `clearStaleTokensOnFirstLaunch()` (`services/core/first-launch.ts`): it looks
-for a marker file in the app's document directory (`expo-file-system`, already part
-of Expo, now declared in `package.json`), which an uninstall deletes. No marker means
-the first launch after an install: the marker is written, then every registered
-service's SecureStore tokens are cleared, so the app boots signed out. A normal
-relaunch finds the marker and keeps the session. It fails open: if the marker cannot
-be read or written the stored session is kept (a broken disk must not sign users out
-on every launch). An app updated from a version without this marker looks like a
-fresh install once and signs out once.
+**Reinstall.** The tokens live in the MMKV file inside the app sandbox (iOS
+`Documents/mmkv`, Android `files/mmkv`), which an uninstall deletes, so a
+reinstalled app boots signed out. Only the encryption key can outlive the app (the
+iOS Keychain survives an uninstall); it protects nothing without the file, and a
+new install simply reuses it for a fresh, empty file. The key is stored
+`WHEN_UNLOCKED_THIS_DEVICE_ONLY`, so an iCloud / Android Auto Backup restore onto another device can
+bring the file back but never the key; that falls under the "missing key" rule above: the file is
+dropped and the app boots signed out.
 
 **Resume.** `useSessionRevalidation()` (`hooks/useSessionRevalidation.ts`, mounted in
 the root layout) re-checks the session when `AppState` becomes `active`: it calls
@@ -360,7 +370,7 @@ replies), plus `services/users/data/mock-users.ts` (the users fixture and handle
   (`{ error_code: 401, message: "Invalid email or password!" }`) the login form
   already shows. Any other API still calls the real backend.
 - **Session.** Persisted exactly like the real mode: opaque
-  `mock-access|…` / `mock-refresh|…` tokens go to the same SecureStore slots,
+  `mock-access|…` / `mock-refresh|…` tokens go to the same storage slots,
   so an app restart keeps the session, an invalid access token refreshes through
   the mock, and logout works. The token carries the user, so `me` and
   `refresh` need no server state.

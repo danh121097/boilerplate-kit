@@ -1,4 +1,4 @@
-import { resetSecureStore } from "@/__tests__/helpers/fake-secure-store";
+import { resetStorage } from "@/__tests__/helpers/fake-storage";
 import { bearerOf, httpError, makeClient, ok } from "@/__tests__/helpers/http-mocks";
 import { Api, onSessionEnded, REFRESH_TIMEOUT_MS, SessionEndedError } from "@/services/core";
 import {
@@ -9,13 +9,9 @@ import {
 } from "@/services/core/auth-token-storage";
 import axios from "axios";
 
-jest.mock("expo-secure-store", () =>
-  require("@/__tests__/helpers/fake-secure-store").fakeSecureStore(),
-);
-
 /**
  * End-to-end test of 401 → refresh → replay through the real interceptors with
- * async SecureStore. The app instance 401s while the Bearer token is stale and
+ * async storage. The app instance 401s while the Bearer token is stale and
  * 200s once it's fresh; the bare refresh client's `axios.post` is stubbed to mint
  * a new token.
  */
@@ -29,7 +25,7 @@ describe("interceptors — token refresh (async storage)", () => {
   let unsubscribe: () => void;
 
   beforeEach(() => {
-    resetSecureStore();
+    resetStorage();
     Api.setBaseURL("http://api.test", "MAIN");
     sessionEnded = jest.fn();
     unsubscribe = onSessionEnded(sessionEnded);

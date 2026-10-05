@@ -1,12 +1,8 @@
-import { resetSecureStore } from "@/__tests__/helpers/fake-secure-store";
+import { resetStorage } from "@/__tests__/helpers/fake-storage";
 import { persistAccessToken } from "@/services/core/auth-token-storage";
 import { HeadersUtils } from "@/services/core/headers-utils";
 import { AxiosHeaders } from "axios";
 import type { InternalAxiosRequestConfig } from "axios";
-
-jest.mock("expo-secure-store", () =>
-  require("@/__tests__/helpers/fake-secure-store").fakeSecureStore(),
-);
 
 function configWith(headers: Record<string, unknown> = {}) {
   return { url: "/x", method: "get", headers } as unknown as InternalAxiosRequestConfig;
@@ -15,7 +11,7 @@ function configWith(headers: Record<string, unknown> = {}) {
 describe("headers-utils", () => {
   let secretSnapshot: string | undefined;
   beforeEach(() => {
-    resetSecureStore();
+    resetStorage();
     secretSnapshot = process.env.EXPO_PUBLIC_HMAC_SECRET;
   });
   afterEach(() => {

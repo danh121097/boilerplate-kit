@@ -4,10 +4,6 @@ import { AuthModel } from "@/services/auth";
 import { endSession } from "@/services/core/session";
 import { useAuthStore, watchSessionEnd } from "@/stores/auth";
 
-jest.mock("expo-secure-store", () =>
-  require("@/__tests__/helpers/fake-secure-store").fakeSecureStore(),
-);
-
 const USER = { _id: "u1", email: "a@b.com", name: "A", role: "user" };
 
 // Signing out pins the session query to null; drop it so its GC timer does not

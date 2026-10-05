@@ -2,9 +2,9 @@
 
 ## Vision
 
-A production-ready React Native mobile starter (Expo managed) that teams can
+A production-ready React Native mobile starter (Expo managed, dev build) that teams can
 scaffold once and extend. Ships with a full axios service layer (JWT bearer +
-`expo-secure-store` refresh-token rotation + HMAC-signed requests), Expo Router
+refresh-token rotation over encrypted MMKV storage + HMAC-signed requests), Expo Router
 (file-based typed routes), TanStack React Query, Zustand, NativeWind v4,
 react-i18next (`expo-localization` detection), and a complete jest-expo suite.
 
@@ -22,7 +22,7 @@ react-i18next (`expo-localization` detection), and a complete jest-expo suite.
 | Styling | NativeWind v4 (Tailwind for RN) | v4 |
 | HTTP | axios | 1.x |
 | i18n | react-i18next + i18next | 15.x / 24.x |
-| Token storage | expo-secure-store (async, Keychain/Keystore) | — |
+| Storage | react-native-mmkv (AES-256 encrypted; key in expo-secure-store → Keychain/Keystore) | 4.x |
 | Tests | jest-expo + `@testing-library/react-native` | — |
 | Package manager | pnpm | 9+ |
 | Language | TypeScript | 5.8 strict (Expo-pinned) |
@@ -30,9 +30,9 @@ react-i18next (`expo-localization` detection), and a complete jest-expo suite.
 ## Scripts
 
 ```bash
-pnpm dev          # expo start (Metro dev server)
-pnpm ios          # open iOS simulator
-pnpm android      # open Android emulator
+pnpm dev          # expo start (Metro dev server for the dev client)
+pnpm ios          # expo run:ios (build + run the dev client)
+pnpm android      # expo run:android
 pnpm typecheck    # tsc --noEmit
 pnpm test         # jest-expo
 pnpm lint         # eslint + prettier --check (read-only)
@@ -44,7 +44,9 @@ pnpm format       # prettier --write
 
 - No `any` without explicit justification comment.
 - `strict`, `noUncheckedIndexedAccess`, `noFallthroughCasesInSwitch` and `verbatimModuleSyntax` in tsconfig.
-- Token storage is **async**—all SecureStore reads/writes return promises.
+- Storage is one AES-256 encrypted MMKV instance whose key is held in the Keychain/Keystore. MMKV is
+  synchronous; the token helpers stay **async** (stable contract) and must be awaited.
+- Dev build only: `react-native-mmkv` v4 is a native (Nitro) module, so Expo Go cannot run the app.
 - HMAC secret is required by the bundled backends and must equal the backend `HMAC_SECRET`
   (empty means every request gets a 401; a dev build warns once). It ships in the bundle,
   so it is public — an anti-abuse layer, not a security boundary.

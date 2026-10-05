@@ -1,7 +1,6 @@
 import { queryClient } from "@/providers/query-client-provider";
 import { AuthModel, authContract } from "@/services/auth";
 import {
-  clearStaleTokensOnFirstLaunch,
   getSessionEpoch,
   hasStoredSession,
   isSessionGoneError,
@@ -22,7 +21,7 @@ interface AuthState {
   user: AuthUser | null;
   /** True while a session (stored tokens) is active. */
   isAuthenticated: boolean;
-  /** False until the boot-time SecureStore check finishes — the auth gate shows a
+  /** False until the boot-time storage check finishes — the auth gate shows a
    * splash while false so it never flashes `/login` before the token is read. */
   hydrated: boolean;
   /** True after an explicit logout, until the login screen shows: the auth gate
@@ -34,7 +33,7 @@ interface AuthState {
   /** Reset auth state after the refresh endpoint refused the session. */
   expireSession: () => void;
   setUser: (user: AuthUser | null) => void;
-  /** Boot-time restore: on the first launch after an install clear stale tokens, then read the persisted token, resolve the user, mark hydrated. */
+  /** Boot-time restore: read the persisted token, resolve the user, mark hydrated. */
   hydrate: () => Promise<void>;
   /** Re-run the restore after a transient failure (does not show the boot splash again). */
   retryHydrate: () => Promise<void>;
@@ -66,8 +65,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ user, isAuthenticated: Boolean(user), loggedOut: false, hydrateError: null }),
 
   hydrate: async () => {
-    // A reinstall keeps the Keychain: drop the previous install's tokens before they are read.
-    await clearStaleTokensOnFirstLaunch();
     await restoreSession(get);
     set({ hydrated: true });
   },
@@ -105,7 +102,7 @@ async function restoreSession(get: () => AuthState): Promise<void> {
   await get().loadUser();
 }
 
-/** Whether tokens are stored, or null when SecureStore could not be read (says
+/** Whether tokens are stored, or null when storage could not be read (says
  * nothing about the session: never treat it as signed out). */
 async function readStoredSession(): Promise<boolean | null> {
   try {
@@ -115,7 +112,7 @@ async function readStoredSession(): Promise<boolean | null> {
   }
 }
 
-/** A SecureStore read failed: keep the current state and flag it so the UI can retry. */
+/** A storage read failed: keep the current state and flag it so the UI can retry. */
 function keepStateOnReadError(): void {
   useAuthStore.setState({
     hydrateError: { ...toApiError(new Error("storage_unavailable")), retryable: true },

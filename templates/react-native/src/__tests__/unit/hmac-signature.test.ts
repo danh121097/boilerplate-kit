@@ -213,9 +213,6 @@ describe("hmac-signature", () => {
   it("the refresh client signs application/json because it always sends a JSON body", async () => {
     process.env.EXPO_PUBLIC_HMAC_SECRET = "shared-secret";
     jest.resetModules();
-    jest.doMock("expo-secure-store", () =>
-      require("@/__tests__/helpers/fake-secure-store").fakeSecureStore(),
-    );
     const axiosMod = require("axios").default as typeof import("axios").default;
     const post = jest.spyOn(axiosMod, "post").mockResolvedValue({
       data: { data: { tokens: { accessToken: "A" } } },

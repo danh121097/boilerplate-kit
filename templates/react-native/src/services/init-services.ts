@@ -7,7 +7,7 @@ import type { ServiceRefreshConfig, ServiceTokenKeys } from "@/services/core";
 
 /**
  * Declare every backend the app talks to in one place. Each entry wires a
- * service's base URL, the SecureStore slots its access + refresh tokens live in,
+ * service's base URL, the storage slots its access + refresh tokens live in,
  * and (optionally) its automatic token-refresh endpoint.
  *
  * Add a backend = add a row + its `EXPO_PUBLIC_*_API_URL` in `.env`. Rows with an

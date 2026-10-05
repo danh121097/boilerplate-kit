@@ -37,7 +37,7 @@ export function isLogoutPending(service: ApiService = "MAIN"): boolean {
 
 /**
  * Mark a logout as running until the returned `done()` is called (idempotent).
- * Call synchronously when logout starts, before any await: SecureStore reads
+ * Call synchronously when logout starts, before any await: storage reads
  * are async, so this flag is what blocks a refresh while logout reads the
  * tokens it is about to revoke.
  */
@@ -83,7 +83,7 @@ export function endSession(reason: SessionEndReason, service: ApiService = "MAIN
 }
 
 /** A session exists while either token is stored (the access token may be gone
- * while the refresh token can still renew it). Async: SecureStore reads are. */
+ * while the refresh token can still renew it). Async: storage reads are. */
 export async function hasStoredSession(service: ApiService = "MAIN"): Promise<boolean> {
   const [access, refresh] = await Promise.all([getAccessToken(service), getRefreshToken(service)]);
   return Boolean(access || refresh);
