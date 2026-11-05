@@ -87,7 +87,9 @@ jobs:
 
   backend-bun:
     name: backend-bun-${{ matrix.template }}
-    runs-on: ubuntu-latest
+    # MongoDB 8 cannot start on newer Ubuntu runner kernels yet.
+    # https://github.com/actions/runner-images/issues/15005
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
