@@ -4,6 +4,8 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   plugins: [tsconfigPaths({ projects: ["tsconfig.test.json"] })],
   test: {
+    // Bun's Vitest runner needs Zod transformed instead of externalized.
+    server: process.versions.bun ? { deps: { inline: ["zod"] } } : undefined,
     globals: true,
     environment: "node",
     globalSetup: ["./test/global-setup.ts"],

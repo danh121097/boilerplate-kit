@@ -28,6 +28,8 @@ npm create prism-app@latest
 | **Fastify 5**      | TypeScript · Mongoose · Socket.io · Redis · JWT Auth · Swagger                         |
 | **NestJS 11**      | TypeScript · Mongoose · Socket.io · Redis · JWT Auth · Swagger                         |
 
+Backend applications run on Bun >=1.4.0; their existing build and test tools still require Node.js >=20.19.0. The CLI itself remains a Node.js program.
+
 Backends share the same security model — RS256 JWT access + refresh rotation
 (reuse-detected), HMAC-signed requests, RBAC, optional Redis, and Socket.io.
 

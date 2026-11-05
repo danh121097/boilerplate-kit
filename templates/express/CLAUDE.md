@@ -4,7 +4,7 @@ Guidance for Claude Code (and other coding agents) working in this repository.
 
 ## Project Overview
 
-Node.js + Express + TypeScript backend starter — JWT access tokens + httpOnly
+Bun + Express + TypeScript backend starter — JWT access tokens + httpOnly
 refresh-token rotation, HMAC-signed request verification, MongoDB/Mongoose,
 Socket.IO, rate limiting, and a modular `controller/service/routes/validation`
 layout. Package manager: **pnpm**.
@@ -30,16 +30,20 @@ layout. Package manager: **pnpm**.
 
 Full standards: [docs/code-standards.md](./docs/code-standards.md).
 
+Bun >=1.4.0 runs the app; Node.js >=20.19.0 remains required by build/test tools.
+
 ## Scripts
 
 ```bash
-pnpm dev          # tsx watch src/server.ts
+pnpm dev          # bun --watch src/server.ts
 pnpm build        # tsc --noEmit -p tsconfig.build.json && swc src -d dist
 pnpm typecheck    # tsc --noEmit -p tsconfig.test.json
 pnpm test         # vitest run
 pnpm lint         # eslint src/**/*.ts
 pnpm format       # prettier --write .
-pnpm start        # node dist/server.js
+pnpm start        # bun dist/server.js
+pnpm test:bun     # Vitest workers run on Bun
+pnpm test:redis:bun # real Redis lane; requires REDIS_URL
 ```
 
 ## Documentation

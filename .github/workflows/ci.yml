@@ -1,0 +1,150 @@
+name: ci
+
+on:
+  push:
+    branches: [master, main, latest]
+  pull_request:
+    branches: [master, main, latest]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build-${{ matrix.node }}-${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Setup Node ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm build
+      - run: pnpm test
+
+      - name: Smoke — version flag
+        shell: bash
+        run: node dist/cli.mjs --version
+
+  # Real-Redis lane for the backend starters: state shared across two app copies and
+  # Redis outage recovery. Separate from the unit/integration suites, which use no Redis.
+  backend-redis:
+    name: backend-redis-${{ matrix.template }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        template: [express, fastify, nestjs]
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: templates/${{ matrix.template }}
+    env:
+      REDIS_URL: redis://127.0.0.1:6379
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: templates/${{ matrix.template }}/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm exec vitest run -c vitest.redis.config.ts --passWithNoTests=false
+
+  backend-bun:
+    name: backend-bun-${{ matrix.template }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        template: [express, fastify, nestjs]
+    services:
+      mongo:
+        image: mongo:8
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: templates/${{ matrix.template }}/pnpm-lock.yaml
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - name: Install backend dependencies
+        working-directory: templates/${{ matrix.template }}
+        run: pnpm install --frozen-lockfile
+      - name: Check and build backend
+        working-directory: templates/${{ matrix.template }}
+        run: |
+          pnpm typecheck
+          pnpm lint
+          pnpm build
+          pnpm test
+          pnpm test:bun --maxWorkers=2
+      - name: Test real Redis behavior
+        working-directory: templates/${{ matrix.template }}
+        env:
+          REDIS_URL: redis://127.0.0.1:6379
+        run: |
+          pnpm exec vitest run -c vitest.redis.config.ts --passWithNoTests=false
+          bun run --bun vitest run -c vitest.redis.config.ts --passWithNoTests=false
+      - name: Exercise the Bun application
+        env:
+          BUN_SMOKE_MONGODB_URI: mongodb://127.0.0.1:27017
+          BUN_SMOKE_REDIS_URL: redis://127.0.0.1:6379
+        run: node scripts/backend-bun-smoke.mjs ${{ matrix.template }}
+      - name: Build the Bun production image
+        run: docker build -t backend-bun-${{ matrix.template }} templates/${{ matrix.template }}

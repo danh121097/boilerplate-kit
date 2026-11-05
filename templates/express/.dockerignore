@@ -1,40 +1,17 @@
-# Keep the build context small and avoid copying secrets / rebuild able artifacts.
-
 node_modules
 dist
 coverage
-
-# npm/yarn artifacts — this project uses pnpm (keep pnpm-lock.yaml for installs)
-
-package-lock.json
-yarn.lock
-
-# Secrets — never copy into the image
-
-.env
-.env.\*
-!.env.example
-src/keys/rsa.private
-src/keys/rsa.public
-
-# VCS / tooling / docs not needed at build or runtime
-
 .git
-.gitignore
+.env
+.env.*
+!.env.example
+src/keys
+*.pem
+*.key
 .vscode
 .claude
 plans
 docs
-
-# Tests are not needed in the production image
-
-src/**tests**
-
-# Logs and misc
-
-_.log
-npm-debug.log_
-Dockerfile
-.dockerignore
-docker-compose.yml
-README.md
+test
+src/__tests__
+*.log

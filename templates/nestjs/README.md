@@ -1,6 +1,6 @@
 # NestJS starter
 
-Opinionated Node.js + TypeScript backend built on NestJS 11. Production-grade
+Opinionated Bun + TypeScript backend built on NestJS 11. Production-grade
 structure mirroring a real codebase — modular controllers, a single composite
 security guard (HMAC → CSRF → JWT → roles), JWT (RS256 access + HS256 refresh
 rotation with reuse detection), Socket.IO, optional Redis, Zod-validated DTOs,
@@ -11,7 +11,7 @@ sitting.
 
 | Concern         | Choice                                                                                          |
 | --------------- | ----------------------------------------------------------------------------------------------- |
-| Runtime         | Node.js + TypeScript (pnpm recommended; PM-agnostic)                                            |
+| Runtime         | Bun >=1.4.0 + TypeScript (pnpm recommended; PM-agnostic)                                            |
 | Framework       | NestJS 11 (`@nestjs/platform-express`)                                                          |
 | Database        | MongoDB via `@nestjs/mongoose`                                                                  |
 | Auth            | JWT access tokens (RS256, file keys) + refresh tokens (HS256 symmetric secret, httpOnly cookie) |
@@ -36,7 +36,7 @@ docker compose up -d          # start MongoDB (+ Redis) locally
 pnpm dev
 ```
 
-`pnpm keys` runs a portable Node script (`scripts/ensure-keys.mjs`) that
+`pnpm keys` runs a portable Bun script (`scripts/ensure-keys.mjs`) that
 generates the RSA keypair (`src/keys/rsa.private` / `rsa.public`) used to sign
 access tokens — no openssl needed (`src/keys/setup.sh` is the openssl
 alternative). The `predev` hook runs it automatically if the keys are absent.
@@ -60,6 +60,30 @@ Once running:
 > `DOCS_ENABLED=false` hides them everywhere. `NODE_ENV` defaults to
 > `development` when unset, so always set `NODE_ENV=production` on deploys.
 > See [docs/api-reference.md](./docs/api-reference.md).
+
+## Runtime and Docker
+
+The application requires Bun >=1.4.0. Node.js >=20.19.0 is still required by
+the existing build and test tooling; your package manager may require a newer
+Node version. npm, pnpm, yarn, and Bun can install dependencies, but the app
+runs on Bun regardless of the package manager. Bun's automatic `.env` loading
+is disabled in `bunfig.toml`; the existing application configuration loads
+`.env` and preserves its previous precedence.
+
+The Dockerfile uses `bun.lock` for frozen installs and runs the built app on
+Bun. A fresh scaffold has no lockfile: run `bun install` first, or, when using
+another package manager, run `bun install --lockfile-only` after installing to
+generate `bun.lock` from its lockfile. Commit the lockfiles your project uses
+and update `bun.lock` whenever dependencies change.
+
+```sh
+docker build -t backend-starter .
+```
+
+Set `NODE_ENV=production`, pass the required environment variables, make MongoDB
+reachable from the container, and mount the RSA keypair read-only using
+`JWT_PRIVATE_KEY_PATH` and `JWT_PUBLIC_KEY_PATH`. Never bake secrets into the
+image.
 
 ## Environment
 
@@ -109,10 +133,10 @@ Mounted under `API_PREFIX` (default `/api/v1`). The live reference is Swagger at
 
 ## Scripts
 
-- `dev` — watch-mode dev server (`nest start --watch`)
+- `dev` — watch-mode dev server (`nest start --watch --exec bun`; Nest/SWC compile before Bun runs the app)
 - `build` — `nest build`
 - `typecheck` — `tsc --noEmit`
-- `start` — run the built server (`node dist/src/main.js`)
+- `start` — run the built server (`bun dist/src/main.js`)
 - `lint` / `lint:fix` — ESLint
 - `format` / `format:check` — Prettier
 - `test` / `test:watch` / `test:coverage` — Vitest
@@ -120,6 +144,11 @@ Mounted under `API_PREFIX` (default `/api/v1`). The live reference is Swagger at
 
 > Scripts are package-manager agnostic — `pnpm run …`, `npm run …`, `yarn …`,
 > or `bun run …` all work.
+
+Run `pnpm test:bun` to execute the full Vitest suite with Bun. For the real
+Redis lane, start a disposable local Redis and run
+`REDIS_URL=redis://127.0.0.1:6379 pnpm test:redis:bun`. Without `REDIS_URL`,
+the Redis lane skips. CI requires it to execute tests.
 
 ## Project structure
 

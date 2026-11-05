@@ -9,7 +9,7 @@ focused page under [`system-architecture/`](./system-architecture/).
 
 | Concern                | Choice                                                                                                                   |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Runtime / language     | Node.js + TypeScript (package manager: **pnpm**, PM-agnostic)                                                            |
+| Runtime / language     | Bun >=1.4.0 + TypeScript (package manager: **pnpm**, PM-agnostic)                                                            |
 | Framework              | NestJS 11 (`@nestjs/platform-express`)                                                                                   |
 | Data store             | MongoDB via `@nestjs/mongoose`                                                                                           |
 | Access tokens          | JWT **RS256** (RSA keypair), 15 min default                                                                              |

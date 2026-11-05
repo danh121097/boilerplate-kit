@@ -16,7 +16,7 @@ import { authenticate } from "@/middleware/auth";
 
 Declared in `tsconfig.json` (`paths: { "@/*": ["./src/*"] }`). Resolved at build
 by swc (`.swcrc` `jsc.paths`) and in tests by `vite-tsconfig-paths`. The runtime entry
-(`tsx watch src/server.ts`) resolves it via `tsconfig.json` paths.
+(`bun --watch src/server.ts`) resolves it via `tsconfig.json` paths.
 
 ## Barrels
 

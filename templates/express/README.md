@@ -1,12 +1,12 @@
 # Express starter
 
-Opinionated Node.js + TypeScript backend built on Express 5. Production-grade structure mirroring a real codebase — modular routing, JWT (RS256) + HMAC auth, Socket.io, optional Redis, Zod validation, and a full Vitest suite — kept lean enough to read in one sitting.
+Opinionated Bun + TypeScript backend built on Express 5. Production-grade structure mirroring a real codebase — modular routing, JWT (RS256) + HMAC auth, Socket.io, optional Redis, Zod validation, and a full Vitest suite — kept lean enough to read in one sitting.
 
 ## Stack
 
 | Concern        | Choice                                                                                          |
 | -------------- | ----------------------------------------------------------------------------------------------- |
-| Runtime        | Node.js + TypeScript                                                                            |
+| Runtime        | Bun >=1.4.0 + TypeScript                                                                            |
 | Framework      | Express 5                                                                                       |
 | Database       | MongoDB via Mongoose                                                                            |
 | Auth           | JWT access tokens (RS256, file keys) + refresh tokens (HS256 symmetric secret, httpOnly cookie) |
@@ -33,8 +33,32 @@ The first `pnpm dev` runs `predev`, which executes `scripts/ensure-keys.mjs` to 
 RSA keypair (`src/keys/rsa.private` / `rsa.public`) used to sign access tokens. Both keys are
 gitignored — never commit `rsa.private`. Rotate with `pnpm keys --force` (or `sh src/keys/setup.sh --force`).
 
-> Requires `openssl` (for key generation) and a running MongoDB at `MONGODB_URI`.
+> Requires Bun >=1.4.0, Node.js >=20.19.0 for build/test tools, and a running MongoDB at `MONGODB_URI`.
 > Redis is opt-in: leave `REDIS_ENABLED=false` to run fully without it.
+
+## Runtime and Docker
+
+The application requires Bun >=1.4.0. Node.js >=20.19.0 is still required by
+the existing build and test tooling; your package manager may require a newer
+Node version. npm, pnpm, yarn, and Bun can install dependencies, but the app
+runs on Bun regardless of the package manager. Bun's automatic `.env` loading
+is disabled in `bunfig.toml`; the existing application configuration loads
+`.env` and preserves its previous precedence.
+
+The Dockerfile uses `bun.lock` for frozen installs and runs the built app on
+Bun. A fresh scaffold has no lockfile: run `bun install` first, or, when using
+another package manager, run `bun install --lockfile-only` after installing to
+generate `bun.lock` from its lockfile. Commit the lockfiles your project uses
+and update `bun.lock` whenever dependencies change.
+
+```sh
+docker build -t backend-starter .
+```
+
+Set `NODE_ENV=production`, pass the required environment variables, make MongoDB
+reachable from the container, and mount the RSA keypair read-only using
+`JWT_PRIVATE_KEY_PATH` and `JWT_PUBLIC_KEY_PATH`. Never bake secrets into the
+image.
 
 ## Environment
 
@@ -90,14 +114,19 @@ outside production and off in production unless `DOCS_ENABLED=true`;
 
 ## Scripts
 
-- `dev` — watch-mode dev server (tsx)
+- `dev` — watch-mode dev server (`bun --watch src/server.ts`)
 - `build` — type-check (`tsconfig.build.json`) then compile `src` to `dist` with swc
 - `typecheck` — `tsc --noEmit -p tsconfig.test.json` (includes tests)
 - `keys` — generate the RSA keypair (`--force` rotates)
 - `format` / `format:check` — Prettier
-- `start` — run the built server with Node (`node dist/server.js`)
+- `start` — run the built server with Bun (`bun dist/server.js`)
 - `lint` / `lint:fix` — ESLint
 - `test` / `test:watch` / `test:coverage` — Vitest
+
+Run `pnpm test:bun` to execute the full Vitest suite with Bun. For the real
+Redis lane, start a disposable local Redis and run
+`REDIS_URL=redis://127.0.0.1:6379 pnpm test:redis:bun`. Without `REDIS_URL`,
+the Redis lane skips. CI requires it to execute tests.
 
 ## Project structure
 

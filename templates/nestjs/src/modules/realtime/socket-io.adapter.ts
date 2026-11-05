@@ -64,7 +64,7 @@ export function buildSocketServerOptions(
  */
 export class SocketIoAdapter extends IoAdapter {
   private readonly config: AppConfigService;
-  private readonly logger: AppLogger;
+  private readonly appLogger: AppLogger;
   private readonly hmacService: HmacService;
   private readonly tokenService: TokenService;
   private readonly revocationService: TokenRevocationService;
@@ -76,7 +76,7 @@ export class SocketIoAdapter extends IoAdapter {
   ) {
     super(app);
     this.config = app.get(AppConfigService);
-    this.logger = app.get(AppLogger);
+    this.appLogger = app.get(AppLogger);
     this.hmacService = app.get(HmacService);
     this.tokenService = app.get(TokenService);
     this.revocationService = app.get(TokenRevocationService);
@@ -89,7 +89,7 @@ export class SocketIoAdapter extends IoAdapter {
     });
 
     if (this.pubClient) {
-      const warn = (message: string): void => this.logger.warn(message);
+      const warn = (message: string): void => this.appLogger.warn(message);
       this.subClient = this.pubClient.duplicate({
         enableOfflineQueue: true,
         commandTimeout: undefined,

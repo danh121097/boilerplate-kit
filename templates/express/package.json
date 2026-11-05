@@ -4,15 +4,16 @@
   "description": "Express + TypeScript backend starter — JWT, HMAC, MongoDB, Redis, Socket.IO",
   "main": "dist/server.js",
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=20.19.0",
+    "bun": ">=1.4.0"
   },
   "scripts": {
-    "keys": "node scripts/ensure-keys.mjs",
-    "predev": "node scripts/ensure-keys.mjs",
-    "dev": "tsx watch src/server.ts",
+    "keys": "bun scripts/ensure-keys.mjs",
+    "predev": "bun scripts/ensure-keys.mjs",
+    "dev": "bun --watch src/server.ts",
     "build": "tsc --noEmit -p tsconfig.build.json && swc src -d dist --strip-leading-paths --config-file .swcrc",
     "typecheck": "tsc --noEmit -p tsconfig.test.json",
-    "start": "node dist/server.js",
+    "start": "bun dist/server.js",
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "format": "prettier --write .",
@@ -20,7 +21,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:redis": "vitest run -c vitest.redis.config.ts"
+    "test:redis": "vitest run -c vitest.redis.config.ts",
+    "test:bun": "bun run --bun vitest run",
+    "test:redis:bun": "bun run --bun vitest run -c vitest.redis.config.ts"
   },
   "keywords": [
     "nodejs",

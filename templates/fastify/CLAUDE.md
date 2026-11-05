@@ -4,7 +4,7 @@ Guidance for coding agents working in this Fastify backend.
 
 ## Project Overview
 
-Node.js + Fastify 5 + TypeScript starter with RS256 access JWTs, HS256
+Bun + Fastify 5 + TypeScript starter with RS256 access JWTs, HS256
 httpOnly refresh-token rotation, HMAC request verification, MongoDB/Mongoose,
 Socket.IO, rate limiting, optional Redis, Zod validation, and Swagger.
 
@@ -35,15 +35,19 @@ Socket.IO, rate limiting, optional Redis, Zod validation, and Swagger.
 - Use the `@/` import alias and kebab-case file names.
 - Keep request/response schemas, Swagger metadata, and handler behavior aligned.
 
+Bun >=1.4.0 runs the app; Node.js >=20.19.0 remains required by build/test tools.
+
 ## Commands
 
 ```bash
-pnpm dev          # tsx watch src/server.ts (generates local RSA keys first)
+pnpm dev          # bun --watch src/server.ts (generates local RSA keys first)
 pnpm build        # tsc --noEmit (build config) && swc src -d dist
 pnpm typecheck    # tsc --noEmit -p tsconfig.test.json (src + tests)
 pnpm test         # vitest run
 pnpm lint         # eslint src/**/*.ts
-pnpm start        # node dist/server.js
+pnpm start        # bun dist/server.js
+pnpm test:bun     # Vitest workers run on Bun
+pnpm test:redis:bun # real Redis lane; requires REDIS_URL
 ```
 
 ## Documentation

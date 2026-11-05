@@ -1,6 +1,6 @@
 # Agent Instructions
 
-**Project**: `express-starter` — Node.js + Express + TypeScript backend.
+**Project**: `express-starter` — Bun + Express + TypeScript backend.
 JWT access tokens + httpOnly refresh-token rotation, HMAC-signed requests,
 MongoDB/Mongoose, Redis (cache + rate limit + token revocation), Socket.IO,
 rate limiting. Package manager: **pnpm**.

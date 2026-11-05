@@ -4,7 +4,8 @@ import { validateRef } from "./validate-ref.js";
 import { downloadTemplate } from "giget";
 import { spawnSync } from "node:child_process";
 import { existsSync, realpathSync } from "node:fs";
-import { cp, mkdir, realpath } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Template } from "../types.js";
@@ -52,7 +53,12 @@ const FALLBACK_COPY_EXCLUDE = new Set([
 
 function isExcluded(relOrAbsPath: string, extra?: Set<string>): boolean {
   const parts = relOrAbsPath.split(/[\\/]/);
-  return parts.some((p) => LOCAL_COPY_EXCLUDE.has(p) || (extra?.has(p) ?? false));
+  return parts.some(
+    (p) =>
+      LOCAL_COPY_EXCLUDE.has(p) ||
+      (p.startsWith(".env.") && p !== ".env.example") ||
+      (extra?.has(p) ?? false),
+  );
 }
 
 /**
@@ -154,17 +160,27 @@ export async function downloadCleanTemplate(opts: DownloadOpts): Promise<void> {
 
   let lastErr: unknown;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    let stagingDir: string | undefined;
     try {
+      stagingDir = await mkdtemp(join(tmpdir(), "prism-template-"));
+      const extractedDir = join(stagingDir, "template");
       await downloadTemplate(source, {
-        dir: opts.targetDir,
-        force: opts.force ?? false,
+        dir: extractedDir,
         preferOffline: false,
+      });
+      await cp(extractedDir, opts.targetDir, {
+        recursive: true,
+        force: opts.force ?? false,
+        errorOnExist: true,
+        filter: (src) => !isExcluded(basename(src)),
       });
       return;
     } catch (err) {
       lastErr = err;
       if (attempt < MAX_ATTEMPTS && isTransient(err)) continue;
       throw wrapFetchError(err, source);
+    } finally {
+      if (stagingDir) await rm(stagingDir, { recursive: true, force: true });
     }
   }
   // Unreachable; here only to satisfy the type checker.

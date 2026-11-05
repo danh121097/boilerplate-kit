@@ -1,33 +1,17 @@
-# Keep the build context small and avoid copying secrets / rebuildable artifacts.
-
 node_modules
 dist
 coverage
-
-# Secrets — never copy into the image
+.git
 .env
 .env.*
 !.env.example
-src/keys/rsa.private
-src/keys/rsa.public
-
-# VCS / tooling / docs not needed at build or runtime
-.git
-.gitignore
+src/keys
+*.pem
+*.key
 .vscode
 .claude
 plans
 docs
-
-# Tests are not needed in the production image
 test
-**/*.spec.ts
-**/*.e2e-spec.ts
-
-# Logs and misc
+src/__tests__
 *.log
-npm-debug.log*
-Dockerfile
-.dockerignore
-docker-compose.yml
-README.md

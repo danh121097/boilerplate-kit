@@ -13,7 +13,7 @@ module / controller / service / provider model with a single composite
 
 | Concern              | Choice                                                                                         |
 | -------------------- | ---------------------------------------------------------------------------------------------- |
-| Runtime / language   | Node.js, TypeScript 6 (strict, `target` ES2022, `module` commonjs, decorators on)              |
+| Runtime / language   | Bun >=1.4.0, TypeScript 6 (strict, `target` ES2022, `module` commonjs, decorators on)              |
 | Framework            | NestJS 11 (`@nestjs/platform-express`)                                                         |
 | Database             | MongoDB via `@nestjs/mongoose` (`src/database/*`, `src/schemas/*`)                             |
 | Realtime             | Socket.IO 4 via `@nestjs/websockets` / `@nestjs/platform-socket.io` (`src/modules/realtime/*`) |
@@ -67,21 +67,25 @@ features that each fail open / no-op when off: distributed throttler storage, th
 `cache` helper (`src/common/services/cache.service.ts`), access-token revocation, and the
 cross-instance Socket.IO fan-out (`SocketIoAdapter` wires the Redis adapter; without Redis it still applies the shared socket options).
 
+Bun >=1.4.0 runs the application; Node.js >=20.19.0 is still required by build/test tools.
+
 ## Scripts (`package.json`)
 
 ```bash
-pnpm dev            # nest start --watch (predev generates RSA keys if absent)
+pnpm dev            # nest start --watch --exec bun (predev generates RSA keys if absent)
 pnpm build          # nest build
 pnpm typecheck      # tsc --noEmit -p tsconfig.json
-pnpm start          # node dist/src/main.js
+pnpm start          # bun dist/src/main.js
 pnpm lint           # eslint "src/**/*.ts"   (lint:fix to autofix)
 pnpm format         # prettier --write .     (format:check to verify)
 pnpm test           # vitest run             (test:watch, test:coverage)
-pnpm keys           # node scripts/ensure-keys.mjs  (generate/rotate RSA keypair)
+pnpm keys           # bun scripts/ensure-keys.mjs  (generate/rotate RSA keypair)
 ```
 
 > Scripts are package-manager agnostic. pnpm is recommended; `npm run …`,
 > `yarn …`, or `bun run …` work identically.
+
+Run `pnpm test:bun` for the full Vitest suite on Bun and `pnpm test:redis:bun` for the real-Redis lane with a disposable `REDIS_URL`.
 
 ## Environment (`.env.example`)
 

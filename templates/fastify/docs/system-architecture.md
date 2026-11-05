@@ -8,7 +8,7 @@ realtime, and security controls. Topic pages live in
 
 | Concern         | Choice                                                      |
 | --------------- | ----------------------------------------------------------- |
-| Runtime         | Node.js >=20.19.0 + TypeScript                              |
+| Runtime         | Bun >=1.4.0 + TypeScript                              |
 | HTTP            | Fastify 5                                                   |
 | Data            | MongoDB via Mongoose                                        |
 | Access token    | RS256, 15-minute default                                    |

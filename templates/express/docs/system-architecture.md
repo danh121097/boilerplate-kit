@@ -9,7 +9,7 @@ to a focused page under [`system-architecture/`](./system-architecture/).
 
 | Concern                | Choice                                                                                  |
 | ---------------------- | --------------------------------------------------------------------------------------- |
-| Runtime / language     | Node.js + TypeScript (package manager: **pnpm**)                                        |
+| Runtime / language     | Bun >=1.4.0 + TypeScript (package manager: **pnpm**)                                        |
 | HTTP framework         | Express 5                                                                               |
 | Data store             | MongoDB via Mongoose                                                                    |
 | Access tokens          | JWT **RS256** (RSA keypair), 15 min default                                             |

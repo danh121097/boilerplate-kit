@@ -18,12 +18,7 @@ src/keys/*
 !src/keys/setup.sh
 !src/keys/.gitkeep
 
-# Lock files
-package-lock.json
-yarn.lock
-bun.lock
-bun.lockb
-
+# Commit the lockfile(s) used by your project.
 
 # typescript
 *.tsbuildinfo

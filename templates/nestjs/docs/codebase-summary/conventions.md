@@ -14,7 +14,7 @@ import { AppConfigService } from "@/config/app-config.service";
 ```
 
 Declared in `tsconfig.json` (`paths: { "@/*": ["src/*"] }`). Resolved by
-`nest build` / `ts-node` at runtime and by `vite-tsconfig-paths` in tests.
+`nest build` / SWC before execution by Bun and by `vite-tsconfig-paths` in tests.
 (Some existing files use relative imports for short hops — both work; prefer `@/`
 for cross-area imports.)
 

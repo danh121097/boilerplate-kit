@@ -16,6 +16,8 @@ if (!redisUrl) {
 
 export default defineConfig({
   test: {
+    // Bun's Vitest runner needs Zod transformed instead of externalized.
+    server: process.versions.bun ? { deps: { inline: ["zod"] } } : undefined,
     globals: true,
     root: "./",
     globalSetup: ["./test/global-setup.ts"],

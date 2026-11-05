@@ -8,6 +8,8 @@ import { defineConfig } from "vitest/config";
 // honours the `@/*` alias. Keep both — removing either breaks DI in tests.
 export default defineConfig({
   test: {
+    // Bun's Vitest runner needs Zod transformed instead of externalized.
+    server: process.versions.bun ? { deps: { inline: ["zod"] } } : undefined,
     globals: true,
     root: "./",
     // globalSetup runs ONCE in the main process before any worker starts —

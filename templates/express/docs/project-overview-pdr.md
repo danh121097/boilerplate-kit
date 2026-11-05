@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A Node.js + Express 5 + TypeScript backend starter. It ships a complete auth
+A Bun + Express 5 + TypeScript backend starter. It ships a complete auth
 stack (JWT access tokens + httpOnly refresh-token rotation), HMAC request
 verification, MongoDB persistence via Mongoose, Socket.IO realtime, layered rate
 limiting, and an optional Redis tier — all behind a declarative module pattern
@@ -12,7 +12,7 @@ limiting, and an optional Redis tier — all behind a declarative module pattern
 
 | Concern              | Choice                                                                                                      |
 | -------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Runtime / language   | Node.js, TypeScript 6 (strict, `target` ES2022, `module` commonjs)                                          |
+| Runtime / language   | Bun >=1.4.0, TypeScript 6 (strict, `target` ES2022, `module` commonjs)                                          |
 | Web framework        | Express 5 (`src/app.ts`)                                                                                    |
 | Database             | MongoDB via Mongoose 9 (`src/config/database.ts`, `src/models/*`)                                           |
 | Realtime             | Socket.IO 4 (`src/socket/*`)                                                                                |
@@ -52,17 +52,21 @@ three features, each a transparent no-op when off: distributed rate-limit store,
 the `cache` helper (`src/utils/cache.ts`), and access-token revocation. With Redis
 on, Socket.IO also wires a pub/sub adapter for cross-instance emits.
 
+Bun >=1.4.0 runs the application; Node.js >=20.19.0 is still required by build/test tools.
+
 ## Scripts (`package.json`)
 
 ```bash
-pnpm dev            # tsx watch src/server.ts (predev generates RSA keys if absent)
+pnpm dev            # bun --watch src/server.ts (predev generates RSA keys if absent)
 pnpm build          # tsc --noEmit -p tsconfig.build.json && swc src -d dist
 pnpm typecheck      # tsc --noEmit -p tsconfig.test.json
-pnpm start          # node dist/server.js
+pnpm start          # bun dist/server.js
 pnpm lint           # eslint src/**/*.ts   (lint:fix to autofix)
 pnpm format         # prettier --write .   (format:check to verify)
 pnpm test           # vitest run           (test:watch, test:coverage)
 ```
+
+Run `pnpm test:bun` for the full Vitest suite on Bun and `pnpm test:redis:bun` for the real-Redis lane with a disposable `REDIS_URL`.
 
 ## Environment
 

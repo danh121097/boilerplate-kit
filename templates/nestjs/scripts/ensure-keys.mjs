@@ -1,7 +1,7 @@
 // Portable RSA keypair bootstrap for JWT access-token signing (RS256).
 //
-// Runs on `predev` / `pnpm keys` across any package manager and OS — uses Node's
-// built-in crypto (no `sh`/openssl dependency). If the keypair already exists it
+// Runs on `predev` / `pnpm keys` across any package manager and OS — uses the Node-compatible
+// crypto API (no `sh`/openssl dependency). If the keypair already exists it
 // is a no-op; pass `--force` to rotate (invalidates live tokens).
 //
 // For manual/openssl-based generation or CI, `src/keys/setup.sh` is also provided.

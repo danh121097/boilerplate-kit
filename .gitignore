@@ -67,6 +67,8 @@ repomix-output.xml
 plans/*
 !plans/templates
 !plans/templates/**
+!plans/261105-bun-backend-migration/
+!plans/261105-bun-backend-migration/**
 
 screenshots/*
 docs/screenshots/*
@@ -88,9 +90,12 @@ ck.md
 .gemini/
 .agents/
 
-# Editor / CI configs not tracked in this repo
+# Editor / local CI configs not tracked, except the backend verification workflow.
 .vscode/
-.github/
+.github/*
+!.github/workflows/
+.github/workflows/*
+!.github/workflows/ci.yml
 
 # ...except the VSCode settings that ship with each starter template
 # (ESLint auto-fix-on-save + recommended extensions).

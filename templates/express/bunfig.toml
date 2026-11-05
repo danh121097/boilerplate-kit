@@ -1,0 +1,2 @@
+# Keep dotenv / Nest ConfigModule in charge of .env loading.
+env = false

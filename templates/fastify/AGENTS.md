@@ -1,6 +1,6 @@
 # Agent Instructions
 
-**Project**: `fastify-starter` — Node.js + Fastify 5 + TypeScript backend.
+**Project**: `fastify-starter` — Bun + Fastify 5 + TypeScript backend.
 It uses MongoDB/Mongoose, RS256 access JWTs, rotating refresh tokens, HMAC
 request signing, optional Redis, rate limiting, and Socket.IO. Package manager:
 **pnpm**.

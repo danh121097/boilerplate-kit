@@ -4,7 +4,7 @@ Guidance for Claude Code (and other coding agents) working in this repository.
 
 ## Project Overview
 
-Node.js + NestJS + TypeScript backend starter — JWT access tokens (RS256) +
+Bun + NestJS + TypeScript backend starter — JWT access tokens (RS256) +
 httpOnly refresh-token rotation with reuse detection, HMAC-signed request
 verification, MongoDB/Mongoose, Socket.IO, named-throttler rate limiting, and a
 module / controller / service layout with a single composite `SecurityGuard`,
@@ -42,17 +42,21 @@ global `ZodValidationPipe`, and live Swagger docs at `/docs`. Package manager:
 
 Full standards: [docs/code-standards.md](./docs/code-standards.md).
 
+Bun >=1.4.0 runs the app; Node.js >=20.19.0 remains required by build/test tools.
+
 ## Scripts
 
 ```bash
-pnpm dev             # nest start --watch
+pnpm dev             # nest start --watch --exec bun
 pnpm build           # nest build
 pnpm typecheck       # tsc --noEmit -p tsconfig.json
 pnpm test            # vitest run
 pnpm lint            # eslint "src/**/*.ts"
 pnpm format          # prettier --write .
 pnpm keys            # generate/rotate the RS256 keypair
-pnpm start           # node dist/src/main.js
+pnpm start           # bun dist/src/main.js
+pnpm test:bun     # Vitest workers run on Bun
+pnpm test:redis:bun # real Redis lane; requires REDIS_URL
 ```
 
 > Scripts are package-manager agnostic — `npm run …`, `yarn …`, or `bun run …`

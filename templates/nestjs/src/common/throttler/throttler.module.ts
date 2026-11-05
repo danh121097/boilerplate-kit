@@ -33,7 +33,7 @@ export const STORE_FAILURE_WARN_INTERVAL_MS = 60_000;
  */
 @Injectable()
 export class AppThrottlerGuard extends ThrottlerGuard {
-  private readonly logger = new AppLogger();
+  private readonly appLogger = new AppLogger();
   private lastStoreWarnAt = 0;
 
   /** Skip throttling entirely in test environment (matches express skip: () => isTest). */
@@ -87,7 +87,7 @@ export class AppThrottlerGuard extends ThrottlerGuard {
     if (now - this.lastStoreWarnAt < STORE_FAILURE_WARN_INTERVAL_MS) return;
     this.lastStoreWarnAt = now;
     const reason = error instanceof Error ? error.message : String(error);
-    this.logger.warn(`Rate-limit store unavailable, failing open: ${reason}`);
+    this.appLogger.warn(`Rate-limit store unavailable, failing open: ${reason}`);
   }
 
   /**

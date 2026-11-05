@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A Node.js + Fastify 5 + TypeScript backend starter. It includes authentication
+A Bun + Fastify 5 + TypeScript backend starter. It includes authentication
 (RS256 access tokens and rotating HS256 refresh tokens), HMAC request signing,
 MongoDB via Mongoose, Socket.IO, rate limiting, optional Redis, Zod validation,
 and Swagger/OpenAPI.
@@ -11,7 +11,7 @@ and Swagger/OpenAPI.
 
 | Concern              | Choice                                                                        |
 | -------------------- | ----------------------------------------------------------------------------- |
-| Runtime / language   | Node.js >=20.19.0, TypeScript 6, strict mode                                  |
+| Runtime / language   | Bun >=1.4.0, TypeScript 6, strict mode                                  |
 | Web framework        | Fastify 5                                                                     |
 | Database             | MongoDB via Mongoose                                                          |
 | Realtime             | Socket.IO 4                                                                   |
@@ -38,6 +38,8 @@ and Swagger/OpenAPI.
 - Redis is optional. When enabled it provides distributed rate limits, cache,
   access-token revocation, and Socket.IO cross-instance delivery.
 
+Bun >=1.4.0 runs the application; Node.js >=20.19.0 is still required by build/test tools.
+
 ## Commands
 
 - pnpm dev — watch server; generates RSA keys if absent
@@ -46,7 +48,9 @@ and Swagger/OpenAPI.
 - pnpm typecheck — TypeScript check
 - pnpm lint — ESLint
 - pnpm test — Vitest
-- pnpm start — run dist/server.js with Node.js
+- pnpm start — run dist/server.js with Bun
+
+Run `pnpm test:bun` for the full Vitest suite on Bun and `pnpm test:redis:bun` for the real-Redis lane with a disposable `REDIS_URL`.
 
 ## Environment
 

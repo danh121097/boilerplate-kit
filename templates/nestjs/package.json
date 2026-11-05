@@ -4,15 +4,16 @@
   "description": "NestJS + TypeScript backend starter — JWT, HMAC, MongoDB, Redis, Socket.IO, Swagger",
   "main": "dist/src/main.js",
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=20.19.0",
+    "bun": ">=1.4.0"
   },
   "scripts": {
-    "keys": "node scripts/ensure-keys.mjs",
-    "predev": "node scripts/ensure-keys.mjs",
-    "dev": "nest start --watch",
+    "keys": "bun scripts/ensure-keys.mjs",
+    "predev": "bun scripts/ensure-keys.mjs",
+    "dev": "nest start --watch --exec bun",
     "build": "nest build",
     "typecheck": "tsc --noEmit -p tsconfig.test.json",
-    "start": "node dist/src/main.js",
+    "start": "bun dist/src/main.js",
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "format": "prettier --write .",
@@ -20,7 +21,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:redis": "vitest run -c vitest.redis.config.ts"
+    "test:redis": "vitest run -c vitest.redis.config.ts",
+    "test:bun": "bun run --bun vitest run",
+    "test:redis:bun": "bun run --bun vitest run -c vitest.redis.config.ts"
   },
   "keywords": [
     "nodejs",
@@ -84,5 +87,8 @@
     "unplugin-swc": "^1.5.9",
     "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^4.1.0"
+  },
+  "overrides": {
+    "socket.io": "4.8.3"
   }
 }

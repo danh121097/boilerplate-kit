@@ -5,7 +5,13 @@ coverage
 .env
 .env.*
 !.env.example
-src/keys/rsa.private
-src/keys/rsa.public
+src/keys
+*.pem
+*.key
+.vscode
+.claude
+plans
+docs
 test
+src/__tests__
 *.log

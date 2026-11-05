@@ -1,35 +1,37 @@
-import tsconfigPaths from 'vite-tsconfig-paths';
-import { defineConfig } from 'vitest/config';
+import tsconfigPaths from "vite-tsconfig-paths";
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   // use the test tsconfig (includes src/__tests__) so @/ resolves in test files too
-  plugins: [tsconfigPaths({ projects: ['tsconfig.test.json'] })],
+  plugins: [tsconfigPaths({ projects: ["tsconfig.test.json"] })],
   test: {
+    // Bun's Vitest runner needs Zod transformed instead of externalized.
+    server: process.versions.bun ? { deps: { inline: ["zod"] } } : undefined,
     globals: true,
-    environment: 'node',
-    setupFiles: ['./src/__tests__/setup.ts'],
+    environment: "node",
+    setupFiles: ["./src/__tests__/setup.ts"],
     include: [
-      'src/**/*.test.ts',
-      'src/**/*.spec.ts',
-      'src/**/*.e2e-spec.ts',
-      'test/**/*.test.ts',
-      'test/**/*.spec.ts',
-      'test/**/*.e2e-spec.ts'
+      "src/**/*.test.ts",
+      "src/**/*.spec.ts",
+      "src/**/*.e2e-spec.ts",
+      "test/**/*.test.ts",
+      "test/**/*.spec.ts",
+      "test/**/*.e2e-spec.ts",
     ],
     coverage: {
-      provider: 'v8',
-      include: ['src/**/*.ts'],
+      provider: "v8",
+      include: ["src/**/*.ts"],
       exclude: [
-        'src/__tests__/**',
-        'src/server.ts',
-        'src/config/database.ts',
-        'src/app.ts',
-        'src/config/environment.ts',
-        'src/routes/health-check.ts'
+        "src/__tests__/**",
+        "src/server.ts",
+        "src/config/database.ts",
+        "src/app.ts",
+        "src/config/environment.ts",
+        "src/routes/health-check.ts",
       ],
-      thresholds: { statements: 100, branches: 100, functions: 100, lines: 100 }
+      thresholds: { statements: 100, branches: 100, functions: 100, lines: 100 },
     },
     testTimeout: 30000,
-    hookTimeout: 30000
-  }
+    hookTimeout: 30000,
+  },
 });
